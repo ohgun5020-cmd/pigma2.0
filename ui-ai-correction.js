@@ -504,7 +504,23 @@
         return "문제 없음";
       }
 
+      const parts = [];
+      if (accessibility.bodyTextContrastIssueCount > 0) {
+        parts.push(`본문 ${accessibility.bodyTextContrastIssueCount}건`);
+      }
+      if (accessibility.actionTextContrastIssueCount > 0) {
+        parts.push(`버튼 ${accessibility.actionTextContrastIssueCount}건`);
+      }
+      if (accessibility.largeTextContrastIssueCount > 0) {
+        parts.push(`큰 텍스트 ${accessibility.largeTextContrastIssueCount}건`);
+      }
       const minimum = formatRatio(accessibility.minimumContrastRatio);
+      if (parts.length && minimum) {
+        return `문제 ${accessibility.contrastIssueCount}건 · ${parts.join(" · ")} · 최저 ${minimum}`;
+      }
+      if (parts.length) {
+        return `문제 ${accessibility.contrastIssueCount}건 · ${parts.join(" · ")}`;
+      }
       return minimum ? `문제 ${accessibility.contrastIssueCount}건 · 최저 ${minimum}` : `문제 ${accessibility.contrastIssueCount}건`;
     };
 
@@ -830,6 +846,11 @@
       }
 
       if (message.type === "ai-design-read-error") {
+        if (message.matchesCurrentSelection === false) {
+          setReadButtonBusy(false);
+          setIssueApplyBusy("");
+          return;
+        }
         renderErrorState(message.message);
       }
     });
@@ -1341,6 +1362,10 @@
     }
 
     if (message.type === "ai-design-read-error") {
+      if (message.matchesCurrentSelection === false) {
+        setReadButtonBusy(false);
+        return;
+      }
       renderErrorState(message.message);
     }
   });
@@ -2092,11 +2117,25 @@
   }
 
   if (message.type === "ai-design-consistency-error") {
+    if (message.matchesCurrentSelection === false) {
+      isBusy = false;
+      activeBusyMode = "";
+      activeIssueId = "";
+      syncButtonState();
+      return;
+    }
     renderErrorState(message.message);
     return;
   }
 
   if (message.type === "ai-design-consistency-clear-error") {
+    if (message.matchesCurrentSelection === false) {
+      isBusy = false;
+      activeBusyMode = "";
+      activeIssueId = "";
+      syncButtonState();
+      return;
+    }
     renderClearErrorState(message.message);
   }
 });
@@ -2405,6 +2444,10 @@
     }
 
     if (message.type === "ai-regroup-rename-error") {
+      if (message.matchesCurrentSelection === false) {
+        setButtonBusy(false);
+        return;
+      }
       renderErrorState(message.message);
     }
   });
@@ -2725,6 +2768,10 @@ window.__PIGMA_AI_CORRECTION_REGROUP_RENAME__ = {
     }
 
     if (message.type === "ai-typo-audit-error") {
+      if (message.matchesCurrentSelection === false) {
+        setButtonBusy(false);
+        return;
+      }
       renderErrorState(message.message);
     }
   });
@@ -3039,6 +3086,10 @@ window.__PIGMA_AI_CORRECTION_REGROUP_RENAME__ = {
     }
 
     if (message.type === "ai-typo-fix-error") {
+      if (message.matchesCurrentSelection === false) {
+        setButtonBusy(false);
+        return;
+      }
       renderErrorState(message.message);
     }
   });
@@ -3370,6 +3421,10 @@ window.__PIGMA_AI_CORRECTION_TYPO_FIX__ = {
     }
 
     if (message.type === "ai-pixel-perfect-error") {
+      if (message.matchesCurrentSelection === false) {
+        setButtonBusy(false);
+        return;
+      }
       renderErrorState(message.message);
     }
   });

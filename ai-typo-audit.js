@@ -312,6 +312,7 @@
     "tr-TR": { label: "터키어 (튀르키예)", aiLabel: "Turkish (Turkey)", latinLocaleHint: "" },
     "uk-UA": { label: "우크라이나어 (우크라이나)", aiLabel: "Ukrainian (Ukraine)", latinLocaleHint: "" },
   });
+  let activeTypoTask = "";
 
   if (typeof originalOnMessage !== "function") {
     return;
@@ -335,16 +336,16 @@
       }
 
       if (message.type === "run-ai-typo-fix") {
-        await runTypoFix();
+        await withTypoTaskLock("fix", runTypoFix);
         return;
       }
 
       if (message.type === "run-ai-typo-clear") {
-        await runTypoClear();
+        await withTypoTaskLock("clear", runTypoClear);
         return;
       }
 
-      await runTypoAudit();
+      await withTypoTaskLock("audit", runTypoAudit);
       return;
     }
 
@@ -365,7 +366,70 @@
     );
   }
 
+  async function withTypoTaskLock(task, runner) {
+    if (activeTypoTask) {
+      if (activeTypoTask === task) {
+        postTypoTaskStatus(task, "running", getTypoTaskRunningMessage(task));
+      } else {
+        postTypoTaskError(task, "다른 오타 작업이 이미 진행 중입니다. 현재 작업이 끝난 뒤 다시 실행해 주세요.");
+      }
+      return false;
+    }
+
+    activeTypoTask = task;
+    try {
+      await runner();
+      return true;
+    } finally {
+      activeTypoTask = "";
+    }
+  }
+
+  function getTypoTaskRunningMessage(task) {
+    if (task === "fix") {
+      return "오타 후보를 찾아 현재 선택의 텍스트를 직접 수정하고, 고친 부분에는 주석을 남기는 중입니다.";
+    }
+    if (task === "clear") {
+      return "현재 선택 범위에 남아 있는 AI 오타 주석을 정리하는 중입니다.";
+    }
+    return "오타 후보를 찾고 Dev Mode 주석 또는 결과 패널로 정리하는 중입니다.";
+  }
+
+  function postTypoTaskStatus(task, status, message) {
+    if (task === "fix") {
+      postFixStatus(status, message);
+      return;
+    }
+    if (task === "clear") {
+      postClearStatus(status, message);
+      return;
+    }
+    postStatus(status, message);
+  }
+
+  function postTypoTaskError(task, message) {
+    if (task === "fix") {
+      figma.ui.postMessage({
+        type: "ai-typo-fix-error",
+        message,
+      });
+      return;
+    }
+    if (task === "clear") {
+      figma.ui.postMessage({
+        type: "ai-typo-clear-error",
+        message,
+      });
+      return;
+    }
+    figma.ui.postMessage({
+      type: "ai-typo-audit-error",
+      message,
+    });
+  }
+
   async function runTypoAudit() {
+    const runSelectionSignature = getSelectionSignature(figma.currentPage.selection);
     postStatus("running", "오타 후보를 찾고 Dev Mode 주석 또는 결과 패널로 정리하는 중입니다.");
 
     try {
@@ -376,7 +440,7 @@
       figma.ui.postMessage({
         type: "ai-typo-audit-result",
         result,
-        matchesCurrentSelection: true,
+        matchesCurrentSelection: matchesSelectionSignature(result.selectionSignature || runSelectionSignature),
       });
 
       figma.notify(
@@ -390,12 +454,14 @@
       figma.ui.postMessage({
         type: "ai-typo-audit-error",
         message,
+        matchesCurrentSelection: matchesSelectionSignature(runSelectionSignature),
       });
       figma.notify(message, { error: true, timeout: 2200 });
     }
   }
 
   async function runTypoFix() {
+    const runSelectionSignature = getSelectionSignature(figma.currentPage.selection);
     postFixStatus("running", "오타 후보를 찾아 현재 선택의 텍스트를 직접 수정하고, 고친 부분에는 주석을 남기는 중입니다.");
 
     try {
@@ -406,7 +472,7 @@
       figma.ui.postMessage({
         type: "ai-typo-fix-result",
         result,
-        matchesCurrentSelection: true,
+        matchesCurrentSelection: matchesSelectionSignature(result.selectionSignature || runSelectionSignature),
       });
 
       figma.notify(
@@ -420,12 +486,14 @@
       figma.ui.postMessage({
         type: "ai-typo-fix-error",
         message,
+        matchesCurrentSelection: matchesSelectionSignature(runSelectionSignature),
       });
       figma.notify(message, { error: true, timeout: 2200 });
     }
   }
 
   async function runTypoClear() {
+    const runSelectionSignature = getSelectionSignature(figma.currentPage.selection);
     postClearStatus("running", "현재 선택 범위에 남아 있는 AI 오타 주석을 정리하는 중입니다.");
 
     try {
@@ -436,7 +504,7 @@
       figma.ui.postMessage({
         type: "ai-typo-clear-result",
         result,
-        matchesCurrentSelection: true,
+        matchesCurrentSelection: matchesSelectionSignature(result.selectionSignature || runSelectionSignature),
       });
 
       figma.notify(`오타 주석 정리 완료 (${result.summary.removedAnnotationCount || 0}건 제거)`, {
@@ -447,6 +515,7 @@
       figma.ui.postMessage({
         type: "ai-typo-clear-error",
         message,
+        matchesCurrentSelection: matchesSelectionSignature(runSelectionSignature),
       });
       figma.notify(message, { error: true, timeout: 2200 });
     }
@@ -581,6 +650,10 @@
 
   function matchesCurrentSelection(result) {
     return !!result && result.selectionSignature === getSelectionSignature(figma.currentPage.selection);
+  }
+
+  function matchesSelectionSignature(selectionSignature) {
+    return typeof selectionSignature === "string" && selectionSignature === getSelectionSignature(figma.currentPage.selection);
   }
 
   async function readProofingSettings() {

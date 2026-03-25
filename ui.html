@@ -851,6 +851,8 @@
         display: grid;
         gap: 10px;
         padding-top: 6px;
+        margin: 0;
+        border: 0;
       }
 
       #viewAi .ai-correction-actions > .ai-correction-group:first-child {
@@ -861,6 +863,21 @@
         display: flex;
         align-items: center;
         gap: 10px;
+        width: 100%;
+        padding: 0;
+        cursor: pointer;
+        list-style: none;
+        background: transparent;
+        border: 0;
+        color: var(--text-faint);
+      }
+
+      .ai-correction-group-heading::-webkit-details-marker {
+        display: none;
+      }
+
+      .ai-correction-group-heading::marker {
+        content: "";
       }
 
       .ai-correction-group-title {
@@ -946,6 +963,28 @@
       .ai-read-metrics .metric-card,
       .ai-regroup-metrics .metric-card {
         gap: 2px;
+      }
+
+      .ai-correction-group-heading:focus-visible {
+        outline: 2px solid rgba(66, 133, 244, 0.32);
+        outline-offset: 4px;
+        border-radius: 10px;
+      }
+
+      .ai-correction-group-heading::after {
+        content: "";
+        width: 6px;
+        height: 6px;
+        margin-left: auto;
+        border-right: 1px solid currentColor;
+        border-bottom: 1px solid currentColor;
+        transform: rotate(45deg);
+        transition: transform 140ms ease;
+        opacity: 0.58;
+      }
+
+      .ai-correction-group[open] .ai-correction-group-heading::after {
+        transform: rotate(-135deg);
       }
 
       .ai-read-compact-list {
@@ -2690,49 +2729,11 @@
         <section class="view" id="viewAi" role="tabpanel" aria-labelledby="tabAi" hidden>
           <div class="stack">
             <div class="ai-correction-actions" role="group" aria-label="AI 디자인 진단 및 교정 기능">
-              <div class="ai-correction-group" role="group" aria-label="디자인 진단 기능">
-                <div class="ai-correction-group-heading" aria-hidden="true">
-                  <p class="ai-correction-group-title">디자인 진단</p>
-                  <span class="ai-correction-group-line"></span>
-                </div>
-                <div class="ai-correction-group-actions">
-                  <button
-                    class="button-primary ai-correction-action is-primary"
-                    id="aiReadDesignButton"
-                    type="button"
-                    data-ai-action="read-design"
-                    title="명도 대비, 폰트 크기, 터치 영역을 기준으로 현재 선택의 웹 접근성을 진단합니다."
-                    aria-label="웹 접근성 진단. 명도 대비, 폰트 크기, 터치 영역을 기준으로 현재 선택의 웹 접근성을 진단합니다."
-                  >
-                    웹 접근성 진단
-                  </button>
-                  <button
-                    class="button-secondary ai-correction-action"
-                    id="aiDesignConsistencyButton"
-                    type="button"
-                    data-ai-action="design-consistency"
-                    title="선택 화면의 색상, 타이포그래피, 여백과 제목·반복 블록·폼 규칙을 기준으로 디자인 일관성을 진단합니다."
-                    aria-label="디자인 일관성. 색상, 타이포그래피, 여백과 제목, 반복 블록, 폼 규칙을 기준으로 현재 선택의 일관성을 진단합니다."
-                  >
-                    디자인 일관성
-                  </button>
-                  <button
-                    class="button-secondary ai-correction-action"
-                    id="aiDesignConsistencyClearButton"
-                    type="button"
-                    data-ai-action="design-consistency-clear"
-                    title="현재 선택 범위에 남아 있는 웹 접근성 진단과 디자인 일관성 Dev Mode 주석을 함께 정리합니다."
-                    aria-label="디자인 진단 주석 삭제. 현재 선택 범위에 남아 있는 웹 접근성 진단과 디자인 일관성 Dev Mode 주석을 함께 정리합니다."
-                  >
-                    주석 삭제
-                  </button>
-                </div>
-              </div>
-              <div class="ai-correction-group" role="group" aria-label="레이어 정리 기능">
-                <div class="ai-correction-group-heading" aria-hidden="true">
+              <details class="ai-correction-group" role="group" aria-label="레이어 정리 기능">
+                <summary class="ai-correction-group-heading">
                   <p class="ai-correction-group-title">레이어 정리</p>
                   <span class="ai-correction-group-line"></span>
-                </div>
+                </summary>
                 <div class="ai-correction-group-actions">
                   <button
                     class="button-secondary ai-correction-action"
@@ -2746,16 +2747,6 @@
                   </button>
                   <button
                     class="button-secondary ai-correction-action"
-                    id="aiRegroupRenameButton"
-                    type="button"
-                    data-ai-action="regroup-rename"
-                    title="맥락을 이해하고 웹용 구조 기준으로 그룹과 이름을 수정하는 버튼입니다."
-                    aria-label="그룹과 이름 수정 웹용. 맥락을 이해하고 웹용 구조 기준으로 그룹과 이름을 수정합니다."
-                  >
-                    그룹과 이름 수정 (웹용)
-                  </button>
-                  <button
-                    class="button-secondary ai-correction-action"
                     id="aiRegroupRenameHybridButton"
                     type="button"
                     data-ai-action="regroup-rename-hybrid"
@@ -2764,13 +2755,23 @@
                   >
                     그룹과 이름 수정 (디자인용)
                   </button>
+                  <button
+                    class="button-secondary ai-correction-action"
+                    id="aiRegroupRenameButton"
+                    type="button"
+                    data-ai-action="regroup-rename"
+                    title="맥락을 이해하고 웹용 구조 기준으로 그룹과 이름을 수정하는 버튼입니다."
+                    aria-label="그룹과 이름 수정 웹용. 맥락을 이해하고 웹용 구조 기준으로 그룹과 이름을 수정합니다."
+                  >
+                    그룹과 이름 수정 (웹용)
+                  </button>
                 </div>
-              </div>
-              <div class="ai-correction-group" role="group" aria-label="오타 기능">
-                <div class="ai-correction-group-heading" aria-hidden="true">
+              </details>
+              <details class="ai-correction-group" role="group" aria-label="오타 기능">
+                <summary class="ai-correction-group-heading">
                   <p class="ai-correction-group-title">오타</p>
                   <span class="ai-correction-group-line"></span>
-                </div>
+                </summary>
                 <div class="ai-correction-group-actions">
                   <button
                     class="button-secondary ai-correction-action"
@@ -2803,12 +2804,50 @@
                     주석 삭제
                   </button>
                 </div>
-              </div>
-              <div class="ai-correction-group" role="group" aria-label="픽셀 퍼펙트 기능">
-                <div class="ai-correction-group-heading" aria-hidden="true">
+              </details>
+              <details class="ai-correction-group" role="group" aria-label="디자인 진단 기능">
+                <summary class="ai-correction-group-heading">
+                  <p class="ai-correction-group-title">디자인 진단</p>
+                  <span class="ai-correction-group-line"></span>
+                </summary>
+                <div class="ai-correction-group-actions">
+                  <button
+                    class="button-secondary ai-correction-action"
+                    id="aiDesignConsistencyButton"
+                    type="button"
+                    data-ai-action="design-consistency"
+                    title="선택 화면의 색상, 타이포그래피, 여백과 제목·반복 블록·폼 규칙을 기준으로 디자인 일관성을 진단합니다."
+                    aria-label="디자인 일관성. 색상, 타이포그래피, 여백과 제목, 반복 블록, 폼 규칙을 기준으로 현재 선택의 일관성을 진단합니다."
+                  >
+                    디자인 일관성
+                  </button>
+                  <button
+                    class="button-secondary ai-correction-action"
+                    id="aiReadDesignButton"
+                    type="button"
+                    data-ai-action="read-design"
+                    title="명도 대비, 폰트 크기, 터치 영역을 기준으로 현재 선택의 웹 접근성을 진단합니다."
+                    aria-label="웹 접근성 진단. 명도 대비, 폰트 크기, 터치 영역을 기준으로 현재 선택의 웹 접근성을 진단합니다."
+                  >
+                    웹 접근성 진단
+                  </button>
+                  <button
+                    class="button-secondary ai-correction-action"
+                    id="aiDesignConsistencyClearButton"
+                    type="button"
+                    data-ai-action="design-consistency-clear"
+                    title="현재 선택 범위에 남아 있는 웹 접근성 진단과 디자인 일관성 Dev Mode 주석을 함께 정리합니다."
+                    aria-label="디자인 진단 주석 삭제. 현재 선택 범위에 남아 있는 웹 접근성 진단과 디자인 일관성 Dev Mode 주석을 함께 정리합니다."
+                  >
+                    주석 삭제
+                  </button>
+                </div>
+              </details>
+              <details class="ai-correction-group" role="group" aria-label="픽셀 퍼펙트 기능">
+                <summary class="ai-correction-group-heading">
                   <p class="ai-correction-group-title">픽셀 퍼펙트</p>
                   <span class="ai-correction-group-line"></span>
-                </div>
+                </summary>
                 <div class="ai-correction-group-actions">
                   <button
                     class="button-secondary ai-correction-action"
@@ -2831,10 +2870,11 @@
                     주석 삭제
                   </button>
                 </div>
-              </div>
+              </details>
             </div>
 
-            <details class="panel soft collapsible ai-read-summary-panel" id="aiReadSummaryPanel">
+            <div id="aiCorrectionDebugPanels" class="stack ai-correction-debug-panels" hidden aria-hidden="true">
+              <details class="panel soft collapsible ai-read-summary-panel" id="aiReadSummaryPanel">
               <summary>
                 <div class="panel-copy">
                   <p class="section-kicker">웹 접근성 진단</p>
@@ -3243,18 +3283,18 @@
               </summary>
 
               <div class="ai-regroup-summary-body">
-                <p class="panel-text" id="aiPixelPerfectPanelCopy">
-                  0.5 단위 stroke/blur 예외값은 유지하고, 나머지 소수점 보정 대상은 AI 판독 후 정수 스냅으로 적용합니다.
-                </p>
+                  <p class="panel-text" id="aiPixelPerfectPanelCopy">
+                    0.5 단위 stroke/blur 예외값은 유지하고, 나머지 소수점 보정 대상은 로컬 규칙으로 정수 스냅을 적용합니다.
+                  </p>
 
                 <div class="surface-card">
                   <div class="surface-card-head">
                     <p class="meta-fold-label">적용 요약</p>
                     <p class="surface-card-note" id="aiPixelPerfectProcessedAt">마지막 실행 없음</p>
                   </div>
-                  <p class="surface-card-title" id="aiPixelPerfectSelectionSummary">웹 접근성 진단 이후 결과가 여기에 표시됩니다.</p>
+                  <p class="surface-card-title" id="aiPixelPerfectSelectionSummary">픽셀 교정 결과가 여기에 표시됩니다.</p>
                   <p class="view-note" id="aiPixelPerfectSelectionNote">
-                    후보를 찾은 뒤 AI가 올림/내림 방향을 판독하고, 적용 불가 항목과 0.5 예외값은 결과 패널에 함께 남깁니다.
+                    후보를 찾은 뒤 가장 가까운 정수 기준으로 스냅하고, 적용 불가 항목과 0.5 예외값은 결과 패널에 함께 남깁니다.
                   </p>
                 </div>
 
@@ -3279,7 +3319,7 @@
 
                 <div class="surface-card ai-read-compact-list">
                   <div class="surface-card-head">
-                    <p class="meta-fold-label">판독 결과</p>
+                    <p class="meta-fold-label">보정 상태</p>
                     <p class="surface-card-note">픽셀 스냅 보정</p>
                   </div>
                   <div class="ai-read-compact-row">
@@ -3291,8 +3331,8 @@
                     <strong id="aiPixelPerfectStrategyValue">전략 대기</strong>
                   </div>
                   <div class="ai-read-compact-row">
-                    <span class="detail-label">AI 상태</span>
-                    <strong id="aiPixelPerfectAiStatusValue">AI 상태 대기</strong>
+                    <span class="detail-label">판정 방식</span>
+                    <strong id="aiPixelPerfectAiStatusValue">로컬 규칙 대기</strong>
                   </div>
                   <div class="ai-read-compact-row">
                     <span class="detail-label">대표 변경</span>
@@ -3303,12 +3343,13 @@
                 <div class="list-card ai-regroup-insights">
                   <div class="surface-card-head">
                     <p class="meta-fold-label">적용 내역</p>
-                    <p class="surface-card-note" id="aiPixelPerfectChangeMeta">AI 호출 대기</p>
+                    <p class="surface-card-note" id="aiPixelPerfectChangeMeta">로컬 판정 대기</p>
                   </div>
                   <ul class="list" id="aiPixelPerfectChangeList"></ul>
                 </div>
               </div>
-            </details>
+              </details>
+            </div>
           </div>
         </section>
 
@@ -3357,6 +3398,27 @@
                       </span>
                     </label>
                   </div>
+                </div>
+                <div class="setting-row">
+                  <span class="setting-label">디버깅</span>
+                  <div class="switch-row">
+                    <strong id="settingsScreenDebugLabel">디버깅 모드</strong>
+                    <div class="switch-meta">
+                      <span id="settingsScreenDebugState" class="switch-state-text" data-state="off" aria-live="polite">비활성</span>
+                      <button
+                        id="settingsScreenDebugToggle"
+                        class="switch-control"
+                        type="button"
+                        role="switch"
+                        aria-checked="false"
+                        aria-labelledby="settingsScreenDebugLabel"
+                        aria-controls="aiCorrectionDebugPanels"
+                      >
+                        <span class="switch-slider" aria-hidden="true"></span>
+                      </button>
+                    </div>
+                  </div>
+                  <span class="setting-hint">AI 보정 하단의 결과 패널을 표시합니다.</span>
                 </div>
               </div>
             </details>
@@ -4129,6 +4191,100 @@
     </script>
     <script>
       (() => {
+        const storageKey = "pigma-screen-debug-mode-v1";
+        const toggle = document.getElementById("settingsScreenDebugToggle");
+        const toggleState = document.getElementById("settingsScreenDebugState");
+        const debugPanels = document.getElementById("aiCorrectionDebugPanels");
+
+        if (
+          !(toggle instanceof HTMLButtonElement) ||
+          !(toggleState instanceof HTMLElement) ||
+          !(debugPanels instanceof HTMLElement)
+        ) {
+          return;
+        }
+
+        const notifyDebugModeChanged = (enabled) => {
+          window.dispatchEvent(
+            new CustomEvent("pigma:debug-mode-changed", {
+              detail: {
+                enabled,
+              },
+            })
+          );
+        };
+
+        const readDebugMode = () => {
+          try {
+            const raw = window.localStorage.getItem(storageKey);
+            if (!raw) {
+              return false;
+            }
+
+            const parsed = JSON.parse(raw);
+            return parsed?.enabled === true;
+          } catch (error) {
+            return false;
+          }
+        };
+
+        const writeDebugMode = (enabled) => {
+          try {
+            window.localStorage.setItem(
+              storageKey,
+              JSON.stringify({
+                enabled,
+              })
+            );
+          } catch (error) {}
+        };
+
+        const applyDebugMode = (enabled) => {
+          const next = enabled === true;
+          toggle.setAttribute("aria-checked", next ? "true" : "false");
+          toggle.dataset.state = next ? "on" : "off";
+          toggleState.dataset.state = next ? "on" : "off";
+          toggleState.textContent = next ? "활성" : "비활성";
+          debugPanels.hidden = !next;
+          debugPanels.setAttribute("aria-hidden", next ? "false" : "true");
+          document.documentElement.dataset.aiCorrectionDebugMode = next ? "true" : "false";
+          window.__PIGMA_AI_CORRECTION_DEBUG_MODE__ = next;
+          return next;
+        };
+
+        const revealAndFocusPanel = (panel) => {
+          if (!(panel instanceof HTMLDetailsElement)) {
+            return;
+          }
+
+          panel.open = true;
+          if (debugPanels.hidden) {
+            return;
+          }
+
+          requestAnimationFrame(() => {
+            panel.scrollIntoView({
+              block: "start",
+              behavior: "smooth",
+            });
+          });
+        };
+
+        let currentDebugMode = applyDebugMode(readDebugMode());
+
+        window.__PIGMA_AI_CORRECTION_PANEL_VISIBILITY__ = {
+          revealAndFocusPanel,
+        };
+
+        toggle.addEventListener("click", () => {
+          currentDebugMode = applyDebugMode(!currentDebugMode);
+          writeDebugMode(currentDebugMode);
+          notifyDebugModeChanged(currentDebugMode);
+        });
+      })();
+    </script>
+    <script>
+      (() => {
         if (window.__PIGMA_AI_LLM_UI_BRIDGE__) {
           return;
         }
@@ -4546,8 +4702,29 @@
             isSyncing = false;
           };
 
+          const accessibilityMessageTypes = {
+            requestCache: "request-ai-accessibility-cache",
+            runDiagnosis: "run-ai-accessibility-diagnosis",
+            applyFix: "run-ai-accessibility-apply-fix",
+            cache: "ai-accessibility-cache",
+            status: "ai-accessibility-status",
+            result: "ai-accessibility-result",
+            error: "ai-accessibility-error",
+          };
+          const legacyAccessibilityMessageTypes = {
+            requestCache: "request-ai-design-read-cache",
+            runDiagnosis: "run-ai-design-read",
+            applyFix: "run-ai-design-read-apply-fix",
+            cache: "ai-design-read-cache",
+            status: "ai-design-read-status",
+            result: "ai-design-read-result",
+            error: "ai-design-read-error",
+          };
+          const isAccessibilityUiMessage = (type, key) =>
+            type === accessibilityMessageTypes[key] || type === legacyAccessibilityMessageTypes[key];
+
           const requestCachedDesignRead = () => {
-            postPluginMessage({ type: "request-ai-design-read-cache" });
+            postPluginMessage({ type: accessibilityMessageTypes.requestCache });
           };
 
           const activateAiTab = () => {
@@ -4567,19 +4744,9 @@
             activateAiTab();
           };
 
-          const readStoredSummaryPanelState = () => {
-            try {
-              return window.localStorage.getItem(AI_READ_SUMMARY_OPEN_KEY) === "true";
-            } catch (error) {
-              return false;
-            }
-          };
+          const readStoredSummaryPanelState = () => false;
 
-          const persistSummaryPanelState = () => {
-            try {
-              window.localStorage.setItem(AI_READ_SUMMARY_OPEN_KEY, elements.summaryPanel.open ? "true" : "false");
-            } catch (error) {}
-          };
+          const persistSummaryPanelState = () => {};
 
           const syncIssueButtonsBusyState = () => {
             elements.insightList.querySelectorAll("[data-issue-id]").forEach((button) => {
@@ -4653,7 +4820,23 @@
               return "문제 없음";
             }
 
+            const parts = [];
+            if (accessibility.bodyTextContrastIssueCount > 0) {
+              parts.push(`본문 ${accessibility.bodyTextContrastIssueCount}건`);
+            }
+            if (accessibility.actionTextContrastIssueCount > 0) {
+              parts.push(`버튼 ${accessibility.actionTextContrastIssueCount}건`);
+            }
+            if (accessibility.largeTextContrastIssueCount > 0) {
+              parts.push(`큰 텍스트 ${accessibility.largeTextContrastIssueCount}건`);
+            }
             const minimum = formatRatio(accessibility.minimumContrastRatio);
+            if (parts.length && minimum) {
+              return `문제 ${accessibility.contrastIssueCount}건 · ${parts.join(" · ")} · 최저 ${minimum}`;
+            }
+            if (parts.length) {
+              return `문제 ${accessibility.contrastIssueCount}건 · ${parts.join(" · ")}`;
+            }
             return minimum ? `문제 ${accessibility.contrastIssueCount}건 · 최저 ${minimum}` : `문제 ${accessibility.contrastIssueCount}건`;
           };
 
@@ -4889,12 +5072,13 @@
               return;
             }
 
+            window.__PIGMA_AI_CORRECTION_PANEL_VISIBILITY__?.revealAndFocusPanel(elements.summaryPanel);
             setIssueApplyBusy("");
             setReadButtonBusy(true);
             setStatus("running", "진단 중");
             elements.panelTitle.textContent = "웹 접근성 진단 중";
             elements.panelCopy.textContent = "현재 선택을 기준으로 명도 대비, 폰트 크기, 터치 영역을 분석하고 있습니다.";
-            postPluginMessage({ type: "run-ai-design-read" });
+            postPluginMessage({ type: accessibilityMessageTypes.runDiagnosis });
           });
 
           elements.insightList.addEventListener("click", (event) => {
@@ -4914,7 +5098,7 @@
             elements.panelTitle.textContent = "수정안 적용 중";
             elements.panelCopy.textContent = "선택한 제안을 적용한 뒤 다시 진단하고 있습니다.";
             postPluginMessage({
-              type: "run-ai-design-read-apply-fix",
+              type: accessibilityMessageTypes.applyFix,
               issueId,
             });
           });
@@ -4948,7 +5132,7 @@
               return;
             }
 
-            if (message.type === "ai-design-read-cache") {
+            if (isAccessibilityUiMessage(message.type, "cache")) {
               if (message.result) {
                 renderResult(message.result, message.matchesCurrentSelection === true);
               } else if (!lastRenderedResult) {
@@ -4957,7 +5141,7 @@
               return;
             }
 
-            if (message.type === "ai-design-read-status") {
+            if (isAccessibilityUiMessage(message.type, "status")) {
               if (message.status === "running") {
                 setReadButtonBusy(true);
                 setIssueApplyBusy("");
@@ -4973,12 +5157,17 @@
               return;
             }
 
-            if (message.type === "ai-design-read-result") {
+            if (isAccessibilityUiMessage(message.type, "result")) {
               renderResult(message.result, message.matchesCurrentSelection !== false);
               return;
             }
 
-            if (message.type === "ai-design-read-error") {
+            if (isAccessibilityUiMessage(message.type, "error")) {
+              if (message.matchesCurrentSelection === false) {
+                setReadButtonBusy(false);
+                setIssueApplyBusy("");
+                return;
+              }
               renderErrorState(message.message);
             }
           });
@@ -5233,19 +5422,9 @@
           postPluginMessage({ type: "request-ai-design-read-cache" });
         };
 
-        const readStoredSummaryPanelState = () => {
-          try {
-            return window.localStorage.getItem(AI_READ_SUMMARY_OPEN_KEY) === "true";
-          } catch (error) {
-            return false;
-          }
-        };
+        const readStoredSummaryPanelState = () => false;
 
-        const persistSummaryPanelState = () => {
-          try {
-            window.localStorage.setItem(AI_READ_SUMMARY_OPEN_KEY, elements.summaryPanel.open ? "true" : "false");
-          } catch (error) {}
-        };
+        const persistSummaryPanelState = () => {};
 
         const setReadButtonBusy = (busy) => {
           isReadingDesign = busy;
@@ -5436,10 +5615,11 @@
             elements.contextValue.textContent = "재시도 필요";
             elements.layerBreakdownValue.textContent = "재시도 필요";
             elements.namingValue.textContent = "재시도 필요";
-            elements.pixelValue.textContent = "재시도 필요";
-            elements.styleValue.textContent = "재시도 필요";
-            renderInsightList(["선택을 다시 확인하고 버튼을 한 번 더 눌러주세요."]);
-          }
+        };
+
+          elements.panelCopy.textContent = message || "픽셀 교정에 실패했습니다.";
+          elements.aiStatusValue.textContent = pixelDecisionModeReady;
+          elements.changeMeta.textContent = "다시 실행 필요";
         };
 
         const renderResult = (result, matchesCurrentSelection) => {
@@ -5492,6 +5672,7 @@
             return;
           }
 
+          window.__PIGMA_AI_CORRECTION_PANEL_VISIBILITY__?.revealAndFocusPanel(elements.summaryPanel);
           setReadButtonBusy(true);
           setStatus("running", "읽는 중");
           elements.panelTitle.textContent = "디자인 읽는 중";
@@ -5534,6 +5715,10 @@
           }
 
           if (message.type === "ai-design-read-error") {
+            if (message.matchesCurrentSelection === false) {
+              setReadButtonBusy(false);
+              return;
+            }
             renderErrorState(message.message);
           }
         });
@@ -6168,7 +6353,7 @@
           activeBusyMode = "diagnosis";
           activeIssueId = "";
           applyModeLabels();
-          elements.panel.open = true;
+          window.__PIGMA_AI_CORRECTION_PANEL_VISIBILITY__?.revealAndFocusPanel(elements.panel);
           setStatus("running", "진단 중");
           elements.panelTitle.textContent = "디자인 일관성 진단 중";
           elements.panelCopy.textContent = "대표 색상, 타이포, 여백과 제목, 반복 블록, 폼 규칙을 추론하고 어긋난 값을 찾고 있습니다.";
@@ -6184,7 +6369,7 @@
           activeBusyMode = "clear";
           activeIssueId = "";
           applyClearModeLabels();
-          elements.panel.open = true;
+          window.__PIGMA_AI_CORRECTION_PANEL_VISIBILITY__?.revealAndFocusPanel(elements.panel);
           setStatus("running", "정리 중");
           elements.panelTitle.textContent = "디자인 진단 주석 정리 중";
           elements.panelCopy.textContent =
@@ -6211,7 +6396,7 @@
           isBusy = true;
           activeBusyMode = "apply-fix";
           activeIssueId = issueId;
-          elements.panel.open = true;
+          window.__PIGMA_AI_CORRECTION_PANEL_VISIBILITY__?.revealAndFocusPanel(elements.panel);
           setStatus("running", "적용 중");
           elements.panelTitle.textContent = "일관성 제안 적용 중";
           elements.panelCopy.textContent = "선택한 제안을 적용하고 다시 디자인 일관성을 확인하고 있습니다.";
@@ -6229,6 +6414,10 @@
           }
 
           if (
+            message.type === "ai-accessibility-cache" ||
+            message.type === "ai-accessibility-status" ||
+            message.type === "ai-accessibility-result" ||
+            message.type === "ai-accessibility-error" ||
             message.type === "ai-design-read-cache" ||
             message.type === "ai-design-read-status" ||
             message.type === "ai-design-read-result" ||
@@ -6277,11 +6466,25 @@
           }
 
           if (message.type === "ai-design-consistency-error") {
+            if (message.matchesCurrentSelection === false) {
+              isBusy = false;
+              activeBusyMode = "";
+              activeIssueId = "";
+              syncButtonState();
+              return;
+            }
             renderErrorState(message.message);
             return;
           }
 
           if (message.type === "ai-design-consistency-clear-error") {
+            if (message.matchesCurrentSelection === false) {
+              isBusy = false;
+              activeBusyMode = "";
+              activeIssueId = "";
+              syncButtonState();
+              return;
+            }
             renderClearErrorState(message.message);
           }
         });
@@ -6375,19 +6578,9 @@
           postPluginMessage({ type: "request-ai-regroup-rename-cache" });
         };
 
-        const readStoredPanelState = () => {
-          try {
-            return window.localStorage.getItem(PANEL_STATE_KEY) === "true";
-          } catch (error) {
-            return false;
-          }
-        };
+        const readStoredPanelState = () => false;
 
-        const persistPanelState = () => {
-          try {
-            window.localStorage.setItem(PANEL_STATE_KEY, elements.panel.open ? "true" : "false");
-          } catch (error) {}
-        };
+        const persistPanelState = () => {};
 
         const setButtonBusy = (busy, mode = activeMode) => {
           isApplying = busy;
@@ -6600,6 +6793,7 @@
             return;
           }
 
+          window.__PIGMA_AI_CORRECTION_PANEL_VISIBILITY__?.revealAndFocusPanel(elements.panel);
           setButtonBusy(true, "web");
           setStatus("running", "적용 중");
           elements.panelTitle.textContent = "그룹과 이름 수정 진행 중";
@@ -6613,6 +6807,7 @@
             return;
           }
 
+          window.__PIGMA_AI_CORRECTION_PANEL_VISIBILITY__?.revealAndFocusPanel(elements.panel);
           setButtonBusy(true, "hybrid");
           setStatus("running", "적용 중");
           elements.panelTitle.textContent = "그룹과 이름 수정 진행 중";
@@ -6736,19 +6931,9 @@
           postPluginMessage({ type: "request-ai-typo-audit-cache" });
         };
 
-        const readStoredPanelState = () => {
-          try {
-            return window.localStorage.getItem(PANEL_STATE_KEY) === "true";
-          } catch (error) {
-            return false;
-          }
-        };
+        const readStoredPanelState = () => false;
 
-        const persistPanelState = () => {
-          try {
-            window.localStorage.setItem(PANEL_STATE_KEY, elements.panel.open ? "true" : "false");
-          } catch (error) {}
-        };
+        const persistPanelState = () => {};
 
         const setButtonBusy = (busy) => {
           isApplying = busy;
@@ -6936,6 +7121,7 @@
             return;
           }
 
+          window.__PIGMA_AI_CORRECTION_PANEL_VISIBILITY__?.revealAndFocusPanel(elements.panel);
           setButtonBusy(true);
           setStatus("running", "검수 중");
           elements.panelTitle.textContent = "오타 검수 진행 중";
@@ -6971,6 +7157,10 @@
           }
 
           if (message.type === "ai-typo-audit-error") {
+            if (message.matchesCurrentSelection === false) {
+              setButtonBusy(false);
+              return;
+            }
             renderErrorState(message.message);
           }
         });
@@ -7052,19 +7242,9 @@
           postPluginMessage({ type: "request-ai-typo-fix-cache" });
         };
 
-        const readStoredPanelState = () => {
-          try {
-            return window.localStorage.getItem(PANEL_STATE_KEY) === "true";
-          } catch (error) {
-            return false;
-          }
-        };
+        const readStoredPanelState = () => false;
 
-        const persistPanelState = () => {
-          try {
-            window.localStorage.setItem(PANEL_STATE_KEY, elements.panel.open ? "true" : "false");
-          } catch (error) {}
-        };
+        const persistPanelState = () => {};
 
         const setButtonBusy = (busy) => {
           isApplying = busy;
@@ -7250,6 +7430,7 @@
             return;
           }
 
+          window.__PIGMA_AI_CORRECTION_PANEL_VISIBILITY__?.revealAndFocusPanel(elements.panel);
           setButtonBusy(true);
           setStatus("running", "수정 중");
           elements.panelTitle.textContent = "오타 자동 수정 진행 중";
@@ -7285,6 +7466,10 @@
           }
 
           if (message.type === "ai-typo-fix-error") {
+            if (message.matchesCurrentSelection === false) {
+              setButtonBusy(false);
+              return;
+            }
             renderErrorState(message.message);
           }
         });
@@ -7371,19 +7556,9 @@
           postPluginMessage({ type: "request-ai-typo-clear-cache" });
         };
 
-        const readStoredPanelState = () => {
-          try {
-            return window.localStorage.getItem(PANEL_STATE_KEY) === "true";
-          } catch (error) {
-            return false;
-          }
-        };
+        const readStoredPanelState = () => false;
 
-        const persistPanelState = () => {
-          try {
-            window.localStorage.setItem(PANEL_STATE_KEY, elements.panel.open ? "true" : "false");
-          } catch (error) {}
-        };
+        const persistPanelState = () => {};
 
         const setButtonBusy = (busy) => {
           isApplying = busy;
@@ -7558,6 +7733,7 @@
             return;
           }
 
+          window.__PIGMA_AI_CORRECTION_PANEL_VISIBILITY__?.revealAndFocusPanel(elements.panel);
           setButtonBusy(true);
           setStatus("running", "정리 중");
           elements.panelTitle.textContent = "오타 주석 정리 진행 중";
@@ -7593,6 +7769,10 @@
           }
 
           if (message.type === "ai-typo-clear-error") {
+            if (message.matchesCurrentSelection === false) {
+              setButtonBusy(false);
+              return;
+            }
             renderErrorState(message.message);
           }
         });
@@ -7670,6 +7850,31 @@
         ) {
           return;
         }
+
+        const pixelButtonTitle =
+          "레이어와 각종 수치 데이터의 소수점 보정 대상을 로컬 규칙으로 정수 스냅 교정합니다.";
+        const pixelButtonAriaLabel =
+          "픽셀 교정. 레이어와 각종 수치 데이터의 소수점 보정 대상을 로컬 규칙으로 정수 스냅 교정합니다.";
+        const pixelPanelCopy =
+          "0.5 단위 stroke/blur 예외값은 유지하고, 나머지 소수점 보정 대상은 로컬 규칙으로 정수 스냅을 적용합니다.";
+        const pixelSelectionSummary = "픽셀 교정 결과가 여기에 표시됩니다.";
+        const pixelSelectionNote =
+          "후보를 찾은 뒤 가장 가까운 정수 기준으로 스냅하고, 적용 불가 항목과 0.5 예외값은 결과 패널에 함께 남깁니다.";
+        const pixelDecisionModeIdle = "로컬 규칙 대기";
+        const pixelDecisionModeReady = "로컬 규칙";
+        const pixelChangeMetaIdle = "로컬 판정 대기";
+        const pixelRunningCopy =
+          "현재 선택에서 소수점 후보를 찾고, 0.5 stroke/blur 예외값을 제외한 뒤 로컬 규칙으로 정수 스냅을 적용하고 있습니다.";
+
+        const applyPixelPerfectCopy = () => {
+          elements.button.title = pixelButtonTitle;
+          elements.button.setAttribute("aria-label", pixelButtonAriaLabel);
+          if (elements.aiStatusValue.previousElementSibling instanceof HTMLElement) {
+            elements.aiStatusValue.previousElementSibling.textContent = "판정 방식";
+          }
+        };
+
+        applyPixelPerfectCopy();
 
         let isApplying = false;
         let lastRenderedResult = null;
@@ -7790,21 +7995,19 @@
           setButtonBusy(false);
           setStatus("idle", "대기");
           elements.panelTitle.textContent = "픽셀 교정 준비";
-          elements.panelCopy.textContent =
-            "0.5 단위 stroke/blur 예외값은 유지하고, 나머지 소수점 보정 대상은 AI 판독 후 정수 스냅으로 적용합니다.";
+          elements.panelCopy.textContent = pixelPanelCopy;
           elements.processedAt.textContent = "마지막 실행 없음";
-          elements.selectionSummary.textContent = "웹 접근성 진단 이후 결과가 여기에 표시됩니다.";
-          elements.selectionNote.textContent =
-            "후보를 찾은 뒤 AI가 올림/내림 방향을 판독하고, 적용 불가 항목과 0.5 예외값은 결과 패널에 함께 남깁니다.";
+          elements.selectionSummary.textContent = pixelSelectionSummary;
+          elements.selectionNote.textContent = pixelSelectionNote;
           fillMetric(elements.candidateCount, 0);
           fillMetric(elements.appliedCount, 0);
           fillMetric(elements.excludedCount, 0);
           fillMetric(elements.skippedCount, 0);
           elements.contextValue.textContent = "맥락 대기";
           elements.strategyValue.textContent = "전략 대기";
-          elements.aiStatusValue.textContent = "AI 상태 대기";
+          elements.aiStatusValue.textContent = pixelDecisionModeIdle;
           elements.previewValue.textContent = "대표 변경 대기";
-          elements.changeMeta.textContent = "AI 호출 대기";
+          elements.changeMeta.textContent = pixelChangeMetaIdle;
           renderChangeList(null);
         };
 
@@ -7823,7 +8026,7 @@
             fillMetric(elements.skippedCount, 0);
             elements.contextValue.textContent = "재시도 필요";
             elements.strategyValue.textContent = "재시도 필요";
-            elements.aiStatusValue.textContent = "AI 재시도 필요";
+            elements.aiStatusValue.textContent = "재시도 필요";
             elements.previewValue.textContent = "대표 변경 없음";
             elements.changeMeta.textContent = "재시도 필요";
             renderChangeList({
@@ -7842,7 +8045,7 @@
           const applied = Array.isArray(result.applied) ? result.applied : [];
           const excluded = Array.isArray(result.excluded) ? result.excluded : [];
           const skipped = Array.isArray(result.skipped) ? result.skipped : [];
-          const aiStatusLabel = summary.aiStatusLabel || "AI 상태 미확인";
+          const aiStatusLabel = summary.aiStatusLabel || pixelDecisionModeReady;
           const aiProviderLabel = summary.aiProviderLabel || "";
           const aiModelLabel = summary.aiModelLabel || "";
           lastRenderedResult = result;
@@ -7880,6 +8083,13 @@
           elements.changeMeta.textContent = matchesCurrentSelection
             ? `${summary.reviewStrategy || "전략 미확인"} · ${aiStatusLabel}`
             : `최근 캐시 · ${summary.reviewStrategy || "전략 미확인"} · ${aiStatusLabel}`;
+          elements.panelCopy.textContent = matchesCurrentSelection
+            ? summary.appliedCount > 0
+              ? "소수점 후보를 로컬 규칙으로 정수 스냅 보정하고, 0.5 예외값은 유지했습니다."
+              : summary.candidateCount > 0
+                ? "후보는 찾았지만 실제 적용까지 이어진 항목은 없었습니다."
+                : "보정이 필요한 소수점 후보를 찾지 못했습니다."
+            : "최근 픽셀 교정 결과를 불러왔습니다.";
           renderChangeList(result);
         };
 
@@ -7891,8 +8101,7 @@
           setButtonBusy(true);
           setStatus("running", "적용 중");
           elements.panelTitle.textContent = "픽셀 교정 진행 중";
-          elements.panelCopy.textContent =
-            "현재 선택에서 소수점 후보를 찾고, 0.5 stroke/blur 예외값을 제외한 뒤 AI 판독으로 정수 스냅을 적용하고 있습니다.";
+          elements.panelCopy.textContent = pixelRunningCopy;
           postPluginMessage({ type: "run-ai-pixel-perfect" });
         });
 
@@ -7924,6 +8133,10 @@
           }
 
           if (message.type === "ai-pixel-perfect-error") {
+            if (message.matchesCurrentSelection === false) {
+              setButtonBusy(false);
+              return;
+            }
             renderErrorState(message.message);
           }
         });
@@ -8235,6 +8448,10 @@
           }
 
           if (message.type === "ai-pixel-perfect-clear-error") {
+            if (message.matchesCurrentSelection === false) {
+              setButtonBusy(false);
+              return;
+            }
             renderErrorState(message.message);
           }
         });

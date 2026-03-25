@@ -121,6 +121,7 @@
     "field",
     "container",
   ]);
+  let activeExecution = null;
 
   if (typeof originalOnMessage !== "function") {
     return;
@@ -133,7 +134,14 @@
         return;
       }
 
-      await runRegroupRename(message);
+      await withExecutionLock(
+        {
+          status: "running",
+          message: getNamingModeMeta(resolveNamingMode(message && message.namingMode)).runningDescription,
+          namingMode: resolveNamingMode(message && message.namingMode),
+        },
+        () => runRegroupRename(message)
+      );
       return;
     }
 
@@ -146,6 +154,24 @@
     return !!message && (message.type === "request-ai-regroup-rename-cache" || message.type === "run-ai-regroup-rename");
   }
 
+  async function withExecutionLock(execution, runner) {
+    if (activeExecution) {
+      postStatus(activeExecution.status, activeExecution.message, activeExecution.namingMode);
+      return false;
+    }
+
+    activeExecution =
+      execution && typeof execution === "object"
+        ? execution
+        : { status: "running", message: "", namingMode: DEFAULT_NAMING_MODE };
+    try {
+      await runner();
+      return true;
+    } finally {
+      activeExecution = null;
+    }
+  }
+
   function resolveNamingMode(value) {
     return value === "hybrid" ? "hybrid" : DEFAULT_NAMING_MODE;
   }
@@ -155,6 +181,7 @@
   }
 
   async function runRegroupRename(message) {
+    const runSelectionSignature = getSelectionSignature(figma.currentPage.selection);
     const namingMode = resolveNamingMode(message && message.namingMode);
     const modeMeta = getNamingModeMeta(namingMode);
     activeNamingMode = namingMode;
@@ -169,7 +196,7 @@
       figma.ui.postMessage({
         type: "ai-regroup-rename-result",
         result,
-        matchesCurrentSelection: true,
+        matchesCurrentSelection: matchesSelectionSignature(result.selectionSignature || runSelectionSignature),
       });
 
       figma.notify(`리그룹핑/리네이밍 완료 (${result.summary.renameCount}개 이름 정리)`, { timeout: 1800 });
@@ -179,6 +206,7 @@
       figma.ui.postMessage({
         type: "ai-regroup-rename-error",
         message,
+        matchesCurrentSelection: matchesSelectionSignature(runSelectionSignature),
       });
 
       figma.notify(message, { error: true, timeout: 2200 });
@@ -236,6 +264,10 @@
 
   function matchesCurrentSelection(result) {
     return !!result && result.selectionSignature === getSelectionSignature(figma.currentPage.selection);
+  }
+
+  function matchesSelectionSignature(selectionSignature) {
+    return typeof selectionSignature === "string" && selectionSignature === getSelectionSignature(figma.currentPage.selection);
   }
 
   async function applyRegroupRename(designReadResult, options) {

@@ -1063,14 +1063,13 @@ $importPatch = [System.IO.File]::ReadAllText($patch, [System.Text.Encoding]::UTF
 $exportPatchContent = [System.IO.File]::ReadAllText($exportPatch, [System.Text.Encoding]::UTF8)
 $aiSettingsPatchContent = [System.IO.File]::ReadAllText($aiSettingsPatch, [System.Text.Encoding]::UTF8)
 $aiLlmClientPatchContent = [System.IO.File]::ReadAllText($aiLlmClientPatch, [System.Text.Encoding]::UTF8)
-$aiDesignReadPatchContent = [System.IO.File]::ReadAllText($aiDesignReadPatch, [System.Text.Encoding]::UTF8)
 $aiAccessibilityDiagnosisPatchContent = [System.IO.File]::ReadAllText($aiAccessibilityDiagnosisPatch, [System.Text.Encoding]::UTF8)
 $aiDesignConsistencyPatchContent = [System.IO.File]::ReadAllText($aiDesignConsistencyPatch, [System.Text.Encoding]::UTF8)
 $aiRegroupRenamePatchContent = [System.IO.File]::ReadAllText($aiRegroupRenamePatch, [System.Text.Encoding]::UTF8)
 $aiTypoAuditPatchContent = [System.IO.File]::ReadAllText($aiTypoAuditPatch, [System.Text.Encoding]::UTF8)
 $aiPixelPerfectPatchContent = [System.IO.File]::ReadAllText($aiPixelPerfectPatch, [System.Text.Encoding]::UTF8)
 $deleteHiddenLayersPatchContent = [System.IO.File]::ReadAllText($deleteHiddenLayersPatch, [System.Text.Encoding]::UTF8)
-[System.IO.File]::WriteAllText($destination, $bundle + "`r`n" + $importPatch + "`r`n" + $exportPatchContent + "`r`n" + $aiSettingsPatchContent + "`r`n" + $aiLlmClientPatchContent + "`r`n" + $aiDesignReadPatchContent + "`r`n" + $aiAccessibilityDiagnosisPatchContent + "`r`n" + $aiDesignConsistencyPatchContent + "`r`n" + $aiRegroupRenamePatchContent + "`r`n" + $aiTypoAuditPatchContent + "`r`n" + $aiPixelPerfectPatchContent + "`r`n" + $deleteHiddenLayersPatchContent, $utf8NoBom)
+[System.IO.File]::WriteAllText($destination, $bundle + "`r`n" + $importPatch + "`r`n" + $exportPatchContent + "`r`n" + $aiSettingsPatchContent + "`r`n" + $aiLlmClientPatchContent + "`r`n" + $aiAccessibilityDiagnosisPatchContent + "`r`n" + $aiDesignConsistencyPatchContent + "`r`n" + $aiRegroupRenamePatchContent + "`r`n" + $aiTypoAuditPatchContent + "`r`n" + $aiPixelPerfectPatchContent + "`r`n" + $deleteHiddenLayersPatchContent, $utf8NoBom)
 
 & node $uiExternalizer $destination
 if ($LASTEXITCODE -ne 0) {

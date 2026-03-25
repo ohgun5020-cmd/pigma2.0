@@ -6,6 +6,25 @@
 
   const originalOnMessage = figma.ui.onmessage;
   const AI_DESIGN_READ_CACHE_KEY = "pigma:ai-design-read-cache:v1";
+  const AI_ACCESSIBILITY_CACHE_KEY = "pigma:ai-accessibility-diagnosis-cache:v1";
+  const ACCESSIBILITY_MESSAGE_TYPES = {
+    requestCache: "request-ai-accessibility-cache",
+    runDiagnosis: "run-ai-accessibility-diagnosis",
+    applyFix: "run-ai-accessibility-apply-fix",
+    result: "ai-accessibility-result",
+    error: "ai-accessibility-error",
+    cache: "ai-accessibility-cache",
+    status: "ai-accessibility-status",
+  };
+  const LEGACY_ACCESSIBILITY_MESSAGE_TYPES = {
+    requestCache: "request-ai-design-read-cache",
+    runDiagnosis: "run-ai-design-read",
+    applyFix: "run-ai-design-read-apply-fix",
+    result: "ai-design-read-result",
+    error: "ai-design-read-error",
+    cache: "ai-design-read-cache",
+    status: "ai-design-read-status",
+  };
   const PATCH_VERSION = 3;
   const ANNOTATION_CATEGORY_LABEL = "웹 접근성 진단";
   const ANNOTATION_CATEGORY_COLOR = "green";
@@ -49,6 +68,7 @@
   const CONTROL_NAME_PATTERN = /(button|btn|cta|chip|tab|pill|toggle|switch|checkbox|radio|link|menu|nav|button|버튼|탭|칩|토글|스위치|체크|링크|메뉴)/i;
   const ACTION_TEXT_PATTERN =
     /^(ok|go|next|done|start|login|sign in|sign up|signup|save|apply|cancel|submit|buy|open|menu|search|confirm|delete|continue|확인|다음|완료|시작|저장|적용|취소|구매|열기|메뉴|검색|삭제|계속)$/i;
+  let activeExecution = null;
 
   if (typeof originalOnMessage !== "function") {
     return;
@@ -56,17 +76,39 @@
 
   figma.ui.onmessage = async (message) => {
     if (isAccessibilityMessage(message)) {
-      if (message.type === "request-ai-design-read-cache") {
-        await postCachedResult();
+      const messageMode = getAccessibilityMessageMode(message.type);
+      if (!messageMode) {
+        return originalOnMessage(message);
+      }
+
+      if (isAccessibilityCacheRequestType(message.type)) {
+        await postCachedResult(messageMode);
         return;
       }
 
-      if (message.type === "run-ai-design-read-apply-fix") {
-        await applyIssueFix(message);
+      if (isAccessibilityApplyFixType(message.type)) {
+        await withExecutionLock(
+          {
+            status: "applying-fix",
+            message: "선택한 접근성 수정안을 적용하고 있습니다.",
+            extra: {
+              issueId: message && typeof message.issueId === "string" ? message.issueId.trim() : "",
+            },
+          },
+          () => applyIssueFix(message, messageMode),
+          messageMode
+        );
         return;
       }
 
-      await runAccessibilityDiagnosis();
+      await withExecutionLock(
+        {
+          status: "running",
+          message: "현재 선택의 웹 접근성을 진단하고 있습니다.",
+        },
+        () => runAccessibilityDiagnosis({ messageMode: messageMode }),
+        messageMode
+      );
       return;
     }
 
@@ -76,18 +118,76 @@
   globalScope.__PIGMA_AI_ACCESSIBILITY_DIAG_PATCH__ = true;
 
   function isAccessibilityMessage(message) {
+    return !!message && !!getAccessibilityMessageMode(message.type);
+  }
+
+  function getAccessibilityMessageMode(type) {
+    if (
+      type === ACCESSIBILITY_MESSAGE_TYPES.requestCache ||
+      type === ACCESSIBILITY_MESSAGE_TYPES.runDiagnosis ||
+      type === ACCESSIBILITY_MESSAGE_TYPES.applyFix
+    ) {
+      return "accessibility";
+    }
+
+    if (
+      type === LEGACY_ACCESSIBILITY_MESSAGE_TYPES.requestCache ||
+      type === LEGACY_ACCESSIBILITY_MESSAGE_TYPES.runDiagnosis ||
+      type === LEGACY_ACCESSIBILITY_MESSAGE_TYPES.applyFix
+    ) {
+      return "legacy";
+    }
+
+    return "";
+  }
+
+  function resolveAccessibilityMessageMode(value) {
+    return value === "accessibility" ? "accessibility" : "legacy";
+  }
+
+  function getAccessibilityMessageTypes(mode) {
+    return resolveAccessibilityMessageMode(mode) === "accessibility"
+      ? ACCESSIBILITY_MESSAGE_TYPES
+      : LEGACY_ACCESSIBILITY_MESSAGE_TYPES;
+  }
+
+  function isAccessibilityCacheRequestType(type) {
     return (
-      !!message &&
-      (message.type === "request-ai-design-read-cache" ||
-        message.type === "run-ai-design-read" ||
-        message.type === "run-ai-design-read-apply-fix")
+      type === ACCESSIBILITY_MESSAGE_TYPES.requestCache ||
+      type === LEGACY_ACCESSIBILITY_MESSAGE_TYPES.requestCache
     );
+  }
+
+  function isAccessibilityApplyFixType(type) {
+    return type === ACCESSIBILITY_MESSAGE_TYPES.applyFix || type === LEGACY_ACCESSIBILITY_MESSAGE_TYPES.applyFix;
+  }
+
+  async function withExecutionLock(execution, runner, messageMode) {
+    if (activeExecution) {
+      postStatus(activeExecution.status, activeExecution.message, activeExecution.extra, messageMode);
+      return false;
+    }
+
+    activeExecution =
+      execution && typeof execution === "object" ? execution : { status: "running", message: "", extra: {} };
+    try {
+      await runner();
+      return true;
+    } finally {
+      activeExecution = null;
+    }
   }
 
   async function runAccessibilityDiagnosis(options) {
     const runOptions = options && typeof options === "object" ? options : {};
+    const messageMode = resolveAccessibilityMessageMode(runOptions.messageMode);
+    const messageTypes = getAccessibilityMessageTypes(messageMode);
+    const runSelectionSignature = getSelectionSignature(figma.currentPage.selection);
     if (!runOptions.skipStatus) {
       postStatus("running", "현재 선택의 웹 접근성을 진단하고 있습니다.");
+    }
+    if (!runOptions.skipStatus && messageMode === "accessibility") {
+      figma.ui.postMessage({ type: ACCESSIBILITY_MESSAGE_TYPES.status, status: "running", message: "" });
     }
 
     try {
@@ -118,9 +218,9 @@
       await writeCachedResult(result);
 
       figma.ui.postMessage({
-        type: "ai-design-read-result",
+        type: messageTypes.result,
         result,
-        matchesCurrentSelection: true,
+        matchesCurrentSelection: matchesSelectionSignature(result.selectionSignature || runSelectionSignature),
       });
 
       if (runOptions.notify !== false) {
@@ -129,14 +229,15 @@
     } catch (error) {
       const message = normalizeErrorMessage(error, "웹 접근성 진단에 실패했습니다.");
       figma.ui.postMessage({
-        type: "ai-design-read-error",
+        type: messageTypes.error,
         message,
+        matchesCurrentSelection: matchesSelectionSignature(runSelectionSignature),
       });
       figma.notify(message, { error: true, timeout: 2200 });
     }
   }
 
-  async function applyIssueFix(message) {
+  async function applyIssueFix(message, messageMode) {
     const issueId = message && typeof message.issueId === "string" ? message.issueId.trim() : "";
     if (!issueId) {
       throw new Error("적용할 접근성 수정안을 찾지 못했습니다.");
@@ -145,6 +246,14 @@
     postStatus("applying-fix", "선택한 접근성 수정안을 적용하고 있습니다.", {
       issueId,
     });
+    if (resolveAccessibilityMessageMode(messageMode) === "accessibility") {
+      figma.ui.postMessage({
+        type: ACCESSIBILITY_MESSAGE_TYPES.status,
+        status: "applying-fix",
+        message: "",
+        issueId: issueId,
+      });
+    }
 
     const cachedResult = await readCachedResult();
     const issues =
@@ -161,23 +270,26 @@
     figma.notify("접근성 수정 적용 완료", { timeout: 1600 });
     await runAccessibilityDiagnosis({
       skipStatus: true,
+      messageMode: messageMode,
       notifyMessage: "접근성 수정 적용 후 재진단 완료",
     });
   }
 
-  async function postCachedResult() {
+  async function postCachedResult(messageMode) {
+    const messageTypes = getAccessibilityMessageTypes(messageMode);
     const result = await readCachedResult();
     figma.ui.postMessage({
-      type: "ai-design-read-cache",
+      type: messageTypes.cache,
       result,
       matchesCurrentSelection: matchesCurrentSelection(result),
     });
   }
 
-  function postStatus(status, message, extra) {
+  function postStatus(status, message, extra, messageMode) {
+    const messageTypes = getAccessibilityMessageTypes(messageMode);
     const payload = extra && typeof extra === "object" ? extra : {};
     const body = {
-      type: "ai-design-read-status",
+      type: messageTypes.status,
       status,
       message,
     };
@@ -188,20 +300,34 @@
   }
 
   async function readCachedResult() {
+    const dedicated = await readCacheValue(AI_ACCESSIBILITY_CACHE_KEY);
+    if (dedicated) {
+      return normalizeCachedResult(dedicated);
+    }
+
+    const legacy = await readCacheValue(AI_DESIGN_READ_CACHE_KEY);
+    return normalizeCachedResult(legacy);
+  }
+
+  async function writeCachedResult(result) {
+    const normalized = normalizeCachedResult(result);
+    await writeCacheValue(AI_ACCESSIBILITY_CACHE_KEY, normalized);
+    await writeCacheValue(AI_DESIGN_READ_CACHE_KEY, normalized);
+    return normalized;
+  }
+
+  async function readCacheValue(cacheKey) {
     try {
-      const value = await figma.clientStorage.getAsync(AI_DESIGN_READ_CACHE_KEY);
-      return normalizeCachedResult(value);
+      return await figma.clientStorage.getAsync(cacheKey);
     } catch (error) {
       return null;
     }
   }
 
-  async function writeCachedResult(result) {
-    const normalized = normalizeCachedResult(result);
+  async function writeCacheValue(cacheKey, value) {
     try {
-      await figma.clientStorage.setAsync(AI_DESIGN_READ_CACHE_KEY, normalized);
+      await figma.clientStorage.setAsync(cacheKey, value);
     } catch (error) {}
-    return normalized;
   }
 
   function normalizeCachedResult(value) {
@@ -213,6 +339,10 @@
 
   function matchesCurrentSelection(result) {
     return !!result && result.selectionSignature === getSelectionSignature(figma.currentPage.selection);
+  }
+
+  function matchesSelectionSignature(selectionSignature) {
+    return typeof selectionSignature === "string" && selectionSignature === getSelectionSignature(figma.currentPage.selection);
   }
 
   function analyzeCurrentSelection() {
@@ -453,7 +583,7 @@
     }
     if (accessibility.issueCount > 0) {
       nodeInsights.push(
-        `접근성 진단: 대비 ${accessibility.contrastIssueCount}건 · 폰트 ${accessibility.fontSizeIssueCount}건 · 터치 ${accessibility.tapTargetIssueCount}건`
+        `접근성 진단: 대비 ${formatContrastInsight(accessibility)} · 폰트 ${accessibility.fontSizeIssueCount}건 · 터치 ${accessibility.tapTargetIssueCount}건`
       );
       if (accessibility.fixableCount > 0) {
         nodeInsights.push(`즉시 적용 가능: ${accessibility.fixableCount}건`);
@@ -538,13 +668,10 @@
     const contrastIssues = analyzeContrastIssues(textEntries, solidFillEntries);
     const fontSizeIssues = analyzeFontSizeIssues(textEntries);
     const tapTargetAnalysis = analyzeTapTargetIssues(nodeEntries);
+    const contrastSummary = summarizeContrastIssues(contrastIssues);
     const issues = dedupeIssues(contrastIssues.concat(fontSizeIssues, tapTargetAnalysis.issues))
       .sort(compareIssues)
       .slice(0, MAX_ISSUE_COUNT);
-
-    const contrastRatios = contrastIssues
-      .map((issue) => issue.currentRatio)
-      .filter((value) => typeof value === "number" && Number.isFinite(value));
     const fontSizes = fontSizeIssues
       .map((issue) => issue.currentFontSize)
       .filter((value) => typeof value === "number" && Number.isFinite(value));
@@ -566,11 +693,15 @@
       issueCount: issues.length,
       fixableCount: issues.filter((issue) => issue && issue.canApply).length,
       contrastIssueCount: contrastIssues.length,
+      bodyTextContrastIssueCount: contrastSummary.bodyTextIssueCount,
+      actionTextContrastIssueCount: contrastSummary.actionTextIssueCount,
+      largeTextContrastIssueCount: contrastSummary.largeTextIssueCount,
       fontSizeIssueCount: fontSizeIssues.length,
       tapTargetIssueCount: tapTargetAnalysis.issues.length,
-      minimumContrastRatio: contrastRatios.length
-        ? contrastRatios.reduce((smallest, value) => (value < smallest ? value : smallest), contrastRatios[0])
-        : null,
+      minimumContrastRatio: contrastSummary.minimumContrastRatio,
+      minimumBodyTextContrastRatio: contrastSummary.minimumBodyTextContrastRatio,
+      minimumActionTextContrastRatio: contrastSummary.minimumActionTextContrastRatio,
+      minimumLargeTextContrastRatio: contrastSummary.minimumLargeTextContrastRatio,
       smallestFontSize: fontSizes.length
         ? fontSizes.reduce((smallest, value) => (value < smallest ? value : smallest), fontSizes[0])
         : null,
@@ -589,6 +720,73 @@
         modeLabel: "Result only",
       },
     };
+  }
+
+  function summarizeContrastIssues(issues) {
+    const summary = {
+      bodyTextIssueCount: 0,
+      actionTextIssueCount: 0,
+      largeTextIssueCount: 0,
+      minimumContrastRatio: null,
+      minimumBodyTextContrastRatio: null,
+      minimumActionTextContrastRatio: null,
+      minimumLargeTextContrastRatio: null,
+    };
+
+    const trackMinimum = (field, value) => {
+      if (typeof value !== "number" || !Number.isFinite(value)) {
+        return;
+      }
+      summary[field] =
+        typeof summary[field] === "number" && Number.isFinite(summary[field])
+          ? Math.min(summary[field], value)
+          : value;
+      summary.minimumContrastRatio =
+        typeof summary.minimumContrastRatio === "number" && Number.isFinite(summary.minimumContrastRatio)
+          ? Math.min(summary.minimumContrastRatio, value)
+          : value;
+    };
+
+    for (const issue of Array.isArray(issues) ? issues : []) {
+      if (!issue || typeof issue.contrastKind !== "string") {
+        continue;
+      }
+
+      if (issue.contrastKind === "action-text") {
+        summary.actionTextIssueCount += 1;
+        trackMinimum("minimumActionTextContrastRatio", issue.currentRatio);
+        continue;
+      }
+      if (issue.contrastKind === "large-text") {
+        summary.largeTextIssueCount += 1;
+        trackMinimum("minimumLargeTextContrastRatio", issue.currentRatio);
+        continue;
+      }
+
+      summary.bodyTextIssueCount += 1;
+      trackMinimum("minimumBodyTextContrastRatio", issue.currentRatio);
+    }
+
+    return summary;
+  }
+
+  function formatContrastInsight(accessibility) {
+    if (!accessibility || !accessibility.contrastIssueCount) {
+      return "0건";
+    }
+
+    const parts = [];
+    if (accessibility.bodyTextContrastIssueCount > 0) {
+      parts.push(`본문 ${accessibility.bodyTextContrastIssueCount}건`);
+    }
+    if (accessibility.actionTextContrastIssueCount > 0) {
+      parts.push(`버튼 ${accessibility.actionTextContrastIssueCount}건`);
+    }
+    if (accessibility.largeTextContrastIssueCount > 0) {
+      parts.push(`큰 텍스트 ${accessibility.largeTextContrastIssueCount}건`);
+    }
+
+    return parts.length ? `${accessibility.contrastIssueCount}건 (${parts.join(" · ")})` : `${accessibility.contrastIssueCount}건`;
   }
 
   function analyzeContrastIssues(textEntries, solidFillEntries) {
@@ -610,25 +808,28 @@
       }
 
       const fixPlan = buildContrastFixPlan(textEntry, background, threshold);
+      const contrastMeta = getContrastIssueMeta(textEntry, threshold);
       const suggestion = fixPlan
         ? buildContrastSuggestionText(fixPlan, threshold)
         : "배경색 또는 텍스트 색을 더 선명하게 조정하면 기준에 가까워질 수 있습니다.";
 
       issues.push({
-        id: createIssueId("contrast", textEntry.node.id),
-        type: "contrast",
+        id: createIssueId(`contrast:${contrastMeta.kind}`, textEntry.node.id),
+        type: contrastMeta.type,
         severity: resolveContrastSeverity(ratio, threshold),
         wcag: threshold >= NORMAL_TEXT_CONTRAST_RATIO ? "WCAG 1.4.3" : "WCAG 1.4.3 (큰 텍스트)",
         nodeId: textEntry.node.id,
         nodeName: textEntry.name,
         nodeType: textEntry.type,
-        summary: `명도 대비 ${ratio.toFixed(2)}:1`,
-        detail: `현재 텍스트 대비가 권장 기준 ${threshold}:1에 못 미칩니다.`,
+        summary: `${contrastMeta.label} 대비 ${ratio.toFixed(2)}:1`,
+        detail: `${contrastMeta.label} 대비가 권장 기준 ${threshold}:1에 못 미칩니다.`,
         suggestion,
         canApply: !!fixPlan,
         applyLabel: fixPlan ? "제안 적용" : "",
         fixPlan,
+        contrastKind: contrastMeta.kind,
         currentRatio: ratio,
+        requiredContrastRatio: threshold,
         currentSize: null,
         currentFontSize: null,
       });
@@ -793,6 +994,9 @@
       accessibility: {
         issueCount: localResult.accessibility ? localResult.accessibility.issueCount : 0,
         contrastIssueCount: localResult.accessibility ? localResult.accessibility.contrastIssueCount : 0,
+        bodyTextContrastIssueCount: localResult.accessibility ? localResult.accessibility.bodyTextContrastIssueCount || 0 : 0,
+        actionTextContrastIssueCount: localResult.accessibility ? localResult.accessibility.actionTextContrastIssueCount || 0 : 0,
+        largeTextContrastIssueCount: localResult.accessibility ? localResult.accessibility.largeTextContrastIssueCount || 0 : 0,
         fontSizeIssueCount: localResult.accessibility ? localResult.accessibility.fontSizeIssueCount : 0,
         tapTargetIssueCount: localResult.accessibility ? localResult.accessibility.tapTargetIssueCount : 0,
         issues: Array.isArray(localResult.accessibility && localResult.accessibility.issues)
@@ -932,12 +1136,12 @@
 
   function applySolidFillColorPlan(plan) {
     const node = figma.getNodeById(plan.targetNodeId);
-    if (!node || !("fills" in node) || !Array.isArray(node.fills)) {
+    const index = typeof plan.paintIndex === "number" ? plan.paintIndex : 0;
+    if (!canEditSolidPaint(node, index)) {
       throw new Error("색상을 변경할 레이어를 찾지 못했습니다.");
     }
 
     const fills = node.fills.map((paint) => clonePlainObject(paint));
-    const index = typeof plan.paintIndex === "number" ? plan.paintIndex : 0;
     const paint = fills[index];
     if (!paint || paint.type !== "SOLID") {
       throw new Error("색상을 적용할 수 있는 SOLID fill이 없습니다.");
@@ -950,7 +1154,7 @@
 
   async function applyFontSizePlan(plan) {
     const node = figma.getNodeById(plan.targetNodeId);
-    if (!node || node.type !== "TEXT") {
+    if (!canAdjustFontSize(node)) {
       throw new Error("폰트 크기를 조정할 텍스트 레이어를 찾지 못했습니다.");
     }
 
@@ -1213,6 +1417,30 @@
     return fontSize >= 24 || (fontSize >= 18.5 && fontWeight >= 700)
       ? LARGE_TEXT_CONTRAST_RATIO
       : NORMAL_TEXT_CONTRAST_RATIO;
+  }
+
+  function getContrastIssueMeta(textEntry, threshold) {
+    if (textEntry && textEntry.isActionText) {
+      return {
+        kind: "action-text",
+        type: "contrast-action-text",
+        label: "버튼/액션 텍스트",
+      };
+    }
+
+    if (threshold < NORMAL_TEXT_CONTRAST_RATIO) {
+      return {
+        kind: "large-text",
+        type: "contrast-large-text",
+        label: "큰 텍스트",
+      };
+    }
+
+    return {
+      kind: "body-text",
+      type: "contrast-body-text",
+      label: "본문 텍스트",
+    };
   }
 
   function resolveTapTargetCandidate(entry) {
@@ -1525,21 +1753,79 @@
   }
 
   function canEditSolidPaint(node, paintIndex) {
-    return !!node && "fills" in node && Array.isArray(node.fills) && typeof paintIndex === "number" && paintIndex >= 0;
+    if (!isDirectlyEditableNode(node)) {
+      return false;
+    }
+    if (!("fills" in node) || !Array.isArray(node.fills) || typeof paintIndex !== "number" || paintIndex < 0) {
+      return false;
+    }
+    const paint = node.fills[paintIndex];
+    return !!paint && paint.visible !== false && paint.type === "SOLID" && !!paint.color;
   }
 
   function canAdjustFontSize(node) {
-    return !!node && node.type === "TEXT";
+    return (
+      !!node &&
+      node.type === "TEXT" &&
+      isDirectlyEditableNode(node) &&
+      typeof node.characters === "string" &&
+      node.characters.length > 0 &&
+      typeof node.setRangeFontSize === "function" &&
+      collectEditableFontNames(node).length > 0
+    );
   }
 
   function canResizeNode(node) {
-    if (!node) {
+    if (!isDirectlyEditableNode(node)) {
       return false;
     }
     if (node.type === "GROUP" || node.type === "TEXT" || node.type === "LINE") {
       return false;
     }
+    if (!canResizeInParentAutoLayout(node)) {
+      return false;
+    }
     return typeof node.resizeWithoutConstraints === "function" || typeof node.resize === "function";
+  }
+
+  function isDirectlyEditableNode(node) {
+    return !!node && !hasLockedAncestor(node) && !hasInstanceAncestor(node);
+  }
+
+  function hasLockedAncestor(node) {
+    let current = node;
+    while (current && current.type !== "PAGE" && current.type !== "DOCUMENT") {
+      if (current.locked === true) {
+        return true;
+      }
+      current = current.parent;
+    }
+    return false;
+  }
+
+  function hasInstanceAncestor(node) {
+    let current = node;
+    while (current && current.type !== "PAGE" && current.type !== "DOCUMENT") {
+      if (current.type === "INSTANCE") {
+        return true;
+      }
+      current = current.parent;
+    }
+    return false;
+  }
+
+  function canResizeInParentAutoLayout(node) {
+    if (!node || !node.parent || typeof node.parent.layoutMode !== "string" || node.parent.layoutMode === "NONE") {
+      return true;
+    }
+    if (node.layoutPositioning === "ABSOLUTE") {
+      return true;
+    }
+
+    const horizontalMode =
+      typeof node.layoutSizingHorizontal === "string" ? node.layoutSizingHorizontal : "FIXED";
+    const verticalMode = typeof node.layoutSizingVertical === "string" ? node.layoutSizingVertical : "FIXED";
+    return horizontalMode === "FIXED" && verticalMode === "FIXED";
   }
 
   function hasVisibleFillOrStroke(node) {

@@ -24,11 +24,13 @@
   const FONT_SIZE_TOKEN_LIMIT = 6;
   const SPACING_TOKEN_LIMIT = 6;
   const MIN_TOKEN_COUNT = 2;
+  const SPACING_PLAN_FIELDS = new Set(["itemSpacing", "paddingTop", "paddingRight", "paddingBottom", "paddingLeft"]);
   const PALETTE_ROLES = {
     fills: "배경",
     strokes: "보더",
     text: "텍스트",
   };
+  let activeExecution = null;
 
   figma.ui.onmessage = async (message) => {
     if (isConsistencyMessage(message)) {
@@ -38,16 +40,39 @@
       }
 
       if (message.type === "run-ai-design-consistency-clear") {
-        await runDesignConsistencyClear();
+        await withExecutionLock(
+          {
+            status: "clearing-annotations",
+            message: "현재 선택 범위에 남아 있는 웹 접근성 진단과 디자인 일관성 Dev Mode 주석을 정리하고 있습니다.",
+            extra: {},
+          },
+          runDesignConsistencyClear
+        );
         return;
       }
 
       if (message.type === "run-ai-design-consistency-apply-fix") {
-        await applyIssueFix(message);
+        await withExecutionLock(
+          {
+            status: "applying-fix",
+            message: "선택한 일관성 제안을 적용하고 있습니다.",
+            extra: {
+              issueId: message && typeof message.issueId === "string" ? message.issueId.trim() : "",
+            },
+          },
+          () => applyIssueFix(message)
+        );
         return;
       }
 
-      await runDesignConsistencyDiagnosis();
+      await withExecutionLock(
+        {
+          status: "running",
+          message: "현재 선택을 기준으로 디자인 일관성을 검사하고 있습니다.",
+          extra: {},
+        },
+        runDesignConsistencyDiagnosis
+      );
       return;
     }
 
@@ -66,8 +91,25 @@
     );
   }
 
+  async function withExecutionLock(execution, runner) {
+    if (activeExecution) {
+      postStatus(activeExecution.status, activeExecution.message, activeExecution.extra);
+      return false;
+    }
+
+    activeExecution =
+      execution && typeof execution === "object" ? execution : { status: "running", message: "", extra: {} };
+    try {
+      await runner();
+      return true;
+    } finally {
+      activeExecution = null;
+    }
+  }
+
   async function runDesignConsistencyDiagnosis(options) {
     const runOptions = options && typeof options === "object" ? options : {};
+    const runSelectionSignature = getSelectionSignature(figma.currentPage.selection);
     if (!runOptions.skipStatus) {
       postStatus("running", "현재 선택을 기준으로 디자인 일관성을 검사하고 있습니다.");
     }
@@ -102,7 +144,7 @@
       figma.ui.postMessage({
         type: "ai-design-consistency-result",
         result,
-        matchesCurrentSelection: true,
+        matchesCurrentSelection: matchesSelectionSignature(result.selectionSignature || runSelectionSignature),
       });
 
       if (runOptions.notify !== false) {
@@ -113,6 +155,7 @@
       figma.ui.postMessage({
         type: "ai-design-consistency-error",
         message,
+        matchesCurrentSelection: matchesSelectionSignature(runSelectionSignature),
       });
       figma.notify(message, { error: true, timeout: 2200 });
     }
@@ -148,6 +191,7 @@
   }
 
   async function runDesignConsistencyClear() {
+    const runSelectionSignature = getSelectionSignature(figma.currentPage.selection);
     postStatus("clearing-annotations", "현재 선택 범위에 남아 있는 웹 접근성 진단과 디자인 일관성 Dev Mode 주석을 정리하고 있습니다.");
 
     try {
@@ -163,7 +207,7 @@
       figma.ui.postMessage({
         type: "ai-design-consistency-clear-result",
         result,
-        matchesCurrentSelection: true,
+        matchesCurrentSelection: matchesSelectionSignature(result.selectionSignature || runSelectionSignature),
       });
 
       if ((result.summary.removedAnnotationCount || 0) > 0) {
@@ -178,6 +222,7 @@
       figma.ui.postMessage({
         type: "ai-design-consistency-clear-error",
         message,
+        matchesCurrentSelection: matchesSelectionSignature(runSelectionSignature),
       });
       figma.notify(message, { error: true, timeout: 2200 });
     }
@@ -322,6 +367,10 @@
 
   function matchesCurrentSelection(result) {
     return !!result && result.selectionSignature === getSelectionSignature(figma.currentPage.selection);
+  }
+
+  function matchesSelectionSignature(selectionSignature) {
+    return typeof selectionSignature === "string" && selectionSignature === getSelectionSignature(figma.currentPage.selection);
   }
 
   function analyzeCurrentSelection() {
@@ -835,6 +884,17 @@
         continue;
       }
 
+      const fixPlan = canAdjustSpacingFields(entry.node, entry.fields)
+        ? {
+            action: "set-spacing-value",
+            targetNodeId: entry.nodeId,
+            changes: entry.fields.map((field) => ({
+              field,
+              value: targetValue,
+            })),
+          }
+        : null;
+
       issues.push({
         id: createIssueId(`spacing:${entry.kind}`, entry.nodeId),
         category: "spacing",
@@ -847,16 +907,9 @@
         summary: `${entry.label} ${currentValue}px`,
         detail: `${entry.label} 값이 대표 간격 스케일과 어긋나 있습니다.`,
         suggestion: `${targetValue}px로 맞추면 여백 규칙이 더 또렷해집니다.`,
-        canApply: true,
-        applyLabel: "간격 적용",
-        fixPlan: {
-          action: "set-spacing-value",
-          targetNodeId: entry.nodeId,
-          changes: entry.fields.map((field) => ({
-            field,
-            value: targetValue,
-          })),
-        },
+        canApply: !!fixPlan,
+        applyLabel: fixPlan ? "간격 적용" : "",
+        fixPlan,
       });
     }
 
@@ -1070,6 +1123,7 @@
               clusterSize: group.length,
               label: summary.label,
               titleNodeId: summary.titleTextEntry.nodeId,
+              titleNode: summary.titleTextEntry.node,
             });
           }
         }
@@ -1143,7 +1197,7 @@
         tolerance: 1,
         maxDistance: 6,
         buildIssue: function (candidate, nearest, currentCount, groupSize) {
-          const canApply = typeof candidate.titleNodeId === "string" && candidate.titleNodeId.length > 0;
+          const canApply = canAdjustFontSize(candidate.titleNode);
           return {
             id: createIssueId("repeat-title-size:" + roundValue(candidate.value), candidate.nodeId),
             category: "component",
@@ -2100,12 +2154,13 @@
   function applySolidPaintColorPlan(plan) {
     const node = figma.getNodeById(plan.targetNodeId);
     const property = plan.property === "strokes" ? "strokes" : "fills";
-    if (!node || !(property in node) || !Array.isArray(node[property])) {
+    const paintIndex = typeof plan.paintIndex === "number" ? plan.paintIndex : -1;
+    if (!canEditSolidPaintProperty(node, property, paintIndex)) {
       throw new Error("색상을 변경할 레이어를 찾지 못했습니다.");
     }
 
     const paints = node[property].map((paint) => clonePlainObject(paint));
-    const target = paints[plan.paintIndex];
+    const target = paints[paintIndex];
     if (!target || target.type !== "SOLID") {
       throw new Error("변경할 색상 페인트를 찾지 못했습니다.");
     }
@@ -2116,7 +2171,7 @@
 
   async function applyFontSizePlan(plan) {
     const node = figma.getNodeById(plan.targetNodeId);
-    if (!node || node.type !== "TEXT") {
+    if (!canAdjustFontSize(node)) {
       throw new Error("폰트 크기를 변경할 텍스트를 찾지 못했습니다.");
     }
 
@@ -2143,6 +2198,13 @@
     const changes = Array.isArray(plan.changes) ? plan.changes : [];
     if (!changes.length) {
       throw new Error("적용할 간격 값이 비어 있습니다.");
+    }
+
+    const fields = changes
+      .filter((change) => !!change && typeof change.field === "string")
+      .map((change) => change.field);
+    if (!canAdjustSpacingFields(node, fields)) {
+      throw new Error("현재 선택에서는 간격 값을 직접 적용할 수 없습니다.");
     }
 
     for (const change of changes) {
@@ -2559,11 +2621,71 @@
   }
 
   function canEditPaintEntry(entry) {
-    return !!entry && !!entry.node && entry.property in entry.node && Array.isArray(entry.node[entry.property]);
+    return !!entry && canEditSolidPaintProperty(entry.node, entry.property, entry.paintIndex);
   }
 
   function canAdjustFontSize(node) {
-    return !!node && node.type === "TEXT";
+    return (
+      !!node &&
+      node.type === "TEXT" &&
+      isDirectlyEditableNode(node) &&
+      typeof node.characters === "string" &&
+      node.characters.length > 0 &&
+      typeof node.setRangeFontSize === "function" &&
+      collectEditableFontNames(node).length > 0
+    );
+  }
+
+  function canEditSolidPaintProperty(node, property, paintIndex) {
+    if (!isDirectlyEditableNode(node)) {
+      return false;
+    }
+    if ((property !== "fills" && property !== "strokes") || !(property in node) || !Array.isArray(node[property])) {
+      return false;
+    }
+    if (typeof paintIndex !== "number" || paintIndex < 0) {
+      return false;
+    }
+    const paint = node[property][paintIndex];
+    return !!paint && paint.visible !== false && paint.type === "SOLID" && !!paint.color;
+  }
+
+  function canAdjustSpacingFields(node, fields) {
+    if (!isDirectlyEditableNode(node) || !Array.isArray(fields) || !fields.length) {
+      return false;
+    }
+    for (const field of fields) {
+      if (!SPACING_PLAN_FIELDS.has(field) || typeof node[field] !== "number" || !Number.isFinite(node[field])) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function isDirectlyEditableNode(node) {
+    return !!node && !hasLockedAncestor(node) && !hasInstanceAncestor(node);
+  }
+
+  function hasLockedAncestor(node) {
+    let current = node;
+    while (current && current.type !== "PAGE" && current.type !== "DOCUMENT") {
+      if (current.locked === true) {
+        return true;
+      }
+      current = current.parent;
+    }
+    return false;
+  }
+
+  function hasInstanceAncestor(node) {
+    let current = node;
+    while (current && current.type !== "PAGE" && current.type !== "DOCUMENT") {
+      if (current.type === "INSTANCE") {
+        return true;
+      }
+      current = current.parent;
+    }
+    return false;
   }
 
   function hasLayout(node) {

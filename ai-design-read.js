@@ -42,6 +42,7 @@
     /^copy(?: of)? /i,
     /^untitled/i,
   ];
+  let activeExecution = null;
 
   if (typeof originalOnMessage !== "function") {
     return;
@@ -54,7 +55,13 @@
         return;
       }
 
-      await runDesignRead();
+      await withExecutionLock(
+        {
+          status: "running",
+          message: "선택된 디자인을 읽는 중입니다.",
+        },
+        runDesignRead
+      );
       return;
     }
 
@@ -67,7 +74,23 @@
     return !!message && (message.type === "request-ai-design-read-cache" || message.type === "run-ai-design-read");
   }
 
+  async function withExecutionLock(execution, runner) {
+    if (activeExecution) {
+      postStatus(activeExecution.status, activeExecution.message);
+      return false;
+    }
+
+    activeExecution = execution && typeof execution === "object" ? execution : { status: "running", message: "" };
+    try {
+      await runner();
+      return true;
+    } finally {
+      activeExecution = null;
+    }
+  }
+
   async function runDesignRead() {
+    const runSelectionSignature = getSelectionSignature(figma.currentPage.selection);
     postStatus("running", "선택된 디자인을 읽는 중입니다.");
 
     try {
@@ -78,7 +101,7 @@
       figma.ui.postMessage({
         type: "ai-design-read-result",
         result,
-        matchesCurrentSelection: true,
+        matchesCurrentSelection: matchesSelectionSignature(result.selectionSignature || runSelectionSignature),
       });
 
       figma.notify("디자인 읽기 완료", { timeout: 1600 });
@@ -88,6 +111,7 @@
       figma.ui.postMessage({
         type: "ai-design-read-error",
         message,
+        matchesCurrentSelection: matchesSelectionSignature(runSelectionSignature),
       });
 
       figma.notify(message, { error: true, timeout: 2200 });
@@ -141,6 +165,10 @@
 
   function matchesCurrentSelection(result) {
     return !!result && result.selectionSignature === getSelectionSignature(figma.currentPage.selection);
+  }
+
+  function matchesSelectionSignature(selectionSignature) {
+    return typeof selectionSignature === "string" && selectionSignature === getSelectionSignature(figma.currentPage.selection);
   }
 
   function analyzeCurrentSelection() {

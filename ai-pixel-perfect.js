@@ -8,9 +8,7 @@
   const AI_DESIGN_READ_CACHE_KEY = "pigma:ai-design-read-cache:v1";
   const AI_PIXEL_PERFECT_CACHE_KEY = "pigma:ai-pixel-perfect-cache:v1";
   const AI_PIXEL_PERFECT_CLEAR_CACHE_KEY = "pigma:ai-pixel-perfect-clear-cache:v1";
-  const PATCH_VERSION = 4;
-  const MAX_AI_CANDIDATES = 120;
-  const AI_CHUNK_SIZE = 40;
+  const PATCH_VERSION = 5;
   const RESULT_PREVIEW_LIMIT = 80;
   const VALUE_EPSILON = 0.0001;
   const EFFECT_RADIUS_KEYS = new Set(["radius", "spread", "startRadius", "endRadius"]);
@@ -19,6 +17,7 @@
   const ANNOTATION_CATEGORY_COLOR = "red";
   const ANNOTATION_LABEL_PREFIX = "Pigma Perfect pixel";
   const ANNOTATION_CHANGE_PREVIEW_LIMIT = 4;
+  let activePixelPerfectTask = "";
 
   if (typeof originalOnMessage !== "function") {
     return;
@@ -37,11 +36,11 @@
       }
 
       if (message.type === "run-ai-pixel-perfect-clear") {
-        await runPixelPerfectClear();
+        await withPixelPerfectTaskLock("clear", runPixelPerfectClear);
         return;
       }
 
-      await runPixelPerfect();
+      await withPixelPerfectTaskLock("apply", runPixelPerfect);
       return;
     }
 
@@ -60,7 +59,59 @@
     );
   }
 
+  async function withPixelPerfectTaskLock(task, runner) {
+    if (activePixelPerfectTask) {
+      if (activePixelPerfectTask === task) {
+        postPixelPerfectTaskStatus(task, "running", getPixelPerfectTaskRunningMessage(task));
+      } else {
+        postPixelPerfectTaskError(
+          task,
+          "다른 픽셀 교정 작업이 이미 진행 중입니다. 현재 작업이 끝난 뒤 다시 실행해 주세요."
+        );
+      }
+      return false;
+    }
+
+    activePixelPerfectTask = task;
+    try {
+      await runner();
+      return true;
+    } finally {
+      activePixelPerfectTask = "";
+    }
+  }
+
+  function getPixelPerfectTaskRunningMessage(task) {
+    if (task === "clear") {
+      return "Removing pixel-perfect Dev Mode annotations from the current selection.";
+    }
+    return "소수점 보정 후보를 분석하고 정수 스냅 적용 중입니다.";
+  }
+
+  function postPixelPerfectTaskStatus(task, status, message) {
+    if (task === "clear") {
+      postClearStatus(status, message);
+      return;
+    }
+    postStatus(status, message);
+  }
+
+  function postPixelPerfectTaskError(task, message) {
+    if (task === "clear") {
+      figma.ui.postMessage({
+        type: "ai-pixel-perfect-clear-error",
+        message,
+      });
+      return;
+    }
+    figma.ui.postMessage({
+      type: "ai-pixel-perfect-error",
+      message,
+    });
+  }
+
   async function runPixelPerfect() {
+    const runSelectionSignature = getSelectionSignature(figma.currentPage.selection);
     postStatus("running", "소수점 보정 후보를 분석하고 정수 스냅 적용 중입니다.");
 
     try {
@@ -70,7 +121,7 @@
       figma.ui.postMessage({
         type: "ai-pixel-perfect-result",
         result,
-        matchesCurrentSelection: true,
+        matchesCurrentSelection: matchesSelectionSignature(result.selectionSignature || runSelectionSignature),
       });
 
       const summary = result.summary || {};
@@ -94,12 +145,14 @@
       figma.ui.postMessage({
         type: "ai-pixel-perfect-error",
         message,
+        matchesCurrentSelection: matchesSelectionSignature(runSelectionSignature),
       });
       figma.notify(message, { error: true, timeout: 2200 });
     }
   }
 
   async function runPixelPerfectClear() {
+    const runSelectionSignature = getSelectionSignature(figma.currentPage.selection);
     postClearStatus("running", "Removing pixel-perfect Dev Mode annotations from the current selection.");
 
     try {
@@ -109,7 +162,7 @@
       figma.ui.postMessage({
         type: "ai-pixel-perfect-clear-result",
         result,
-        matchesCurrentSelection: true,
+        matchesCurrentSelection: matchesSelectionSignature(result.selectionSignature || runSelectionSignature),
       });
 
       const summary = result.summary || {};
@@ -126,6 +179,7 @@
       figma.ui.postMessage({
         type: "ai-pixel-perfect-clear-error",
         message,
+        matchesCurrentSelection: matchesSelectionSignature(runSelectionSignature),
       });
       figma.notify(message, { error: true, timeout: 2200 });
     }
@@ -180,14 +234,7 @@
         selection,
         context,
         source: "local-rules",
-        aiSummary: {
-          aiStatusLabel: "No candidates",
-          aiProviderLabel: "",
-          aiModelLabel: "",
-          aiDecisionCount: 0,
-          fallbackDecisionCount: 0,
-          reviewStrategy: "Nearest integer snap",
-        },
+        aiSummary: buildLocalDecisionSummary([]),
         applied: [],
         annotations: [],
         excluded: collection.excluded,
@@ -237,7 +284,7 @@
     return buildPixelPerfectResult({
       selection,
       context,
-      source: aiDecisionSummary.usedAi ? "hybrid-ai" : "local-rules",
+      source: "local-rules",
       aiSummary: aiDecisionSummary,
       applied,
       annotations: annotationApplied.applied,
@@ -332,10 +379,10 @@
         annotationSkippedCount: Array.isArray(annotationSummary.skipped) ? annotationSummary.skipped.length : 0,
         aiDecisionCount: aiSummary.aiDecisionCount || 0,
         fallbackDecisionCount: aiSummary.fallbackDecisionCount || 0,
-        aiStatusLabel: aiSummary.aiStatusLabel || "AI unavailable",
+        aiStatusLabel: aiSummary.aiStatusLabel || "로컬 규칙",
         aiProviderLabel: aiSummary.aiProviderLabel || "",
         aiModelLabel: aiSummary.aiModelLabel || "",
-        reviewStrategy: aiSummary.reviewStrategy || "Nearest integer snap",
+        reviewStrategy: aiSummary.reviewStrategy || "0.5 stroke/blur 예외 유지 후 최근접 정수 스냅",
         modeLabel: annotationSummary.modeLabel || "Result only",
         categoryLabel: annotationSummary.categoryLabel || "",
       },
@@ -846,165 +893,64 @@
     });
   }
 
-  async function requestAiDecisions(candidates, context) {
-    const ai = getAiHelper();
-    const fallbackSummary = {
+  function buildLocalDecisionSummary(candidates) {
+    const candidateCount = Array.isArray(candidates) ? candidates.length : 0;
+    return {
       usedAi: false,
-      aiStatusLabel: "AI 미설정",
+      aiStatusLabel: "로컬 규칙",
       aiProviderLabel: "",
       aiModelLabel: "",
       aiDecisionCount: 0,
-      fallbackDecisionCount: candidates.length,
-      reviewStrategy: "0.5 stroke/blur 예외 유지 후 기본 반올림",
+      fallbackDecisionCount: candidateCount,
+      reviewStrategy: candidateCount > 0 ? "0.5 stroke/blur 예외 유지 후 최근접 정수 스냅" : "보정 대상 없음",
       decisionMap: new Map(),
     };
-
-    if (!ai) {
-      return fallbackSummary;
-    }
-
-    let configured = false;
-    try {
-      configured = await ai.hasConfiguredAiAsync();
-    } catch (error) {
-      configured = false;
-    }
-
-    if (!configured) {
-      return fallbackSummary;
-    }
-
-    const aiCandidates = candidates.slice(0, MAX_AI_CANDIDATES);
-    const decisionMap = new Map();
-    let providerLabel = "";
-    let modelLabel = "";
-
-    try {
-      for (let index = 0; index < aiCandidates.length; index += AI_CHUNK_SIZE) {
-        const chunk = aiCandidates.slice(index, index + AI_CHUNK_SIZE);
-        const response = await ai.requestJsonTask({
-          instructions:
-            "You choose integer snap targets for a Figma pixel-perfect cleanup tool. Return Korean JSON. For every row, choose exactly one integer target from floorValue or ceilValue. Prefer preserving visual intent with the smallest noticeable shift. For positions prefer alignment and crisp UI placement. For sizes prefer natural UI dimensions. For typography prefer common whole-number text metrics that still feel intentional. For opacity percentages prefer natural whole-number values, often 100 when the visible change is negligible. For radii and effects prefer common whole-number design token values. Half-step stroke or blur values are already removed from the candidate list.",
-          schema: {
-            type: "object",
-            properties: {
-              decisions: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    id: { type: "string" },
-                    target: { type: "number" },
-                    direction: { type: "string" },
-                    reason: { type: "string" },
-                  },
-                  required: ["id", "target", "direction", "reason"],
-                },
-              },
-            },
-            required: ["decisions"],
-          },
-          payload: {
-            selectionLabel: context.selectionLabel || "",
-            contextLabel: context.contextLabel || "",
-            languageLabel: context.languageLabel || "",
-            priorPixelSummary: context.designReadPixelSummary || "",
-            candidates: chunk.map((candidate) => ({
-              id: candidate.id,
-              nodeName: candidate.nodeName,
-              nodeType: candidate.nodeType,
-              field: candidate.label,
-              category: candidate.category,
-              currentValue: roundValue(candidate.currentValue),
-              floorValue: candidate.floorValue,
-              ceilValue: candidate.ceilValue,
-              nearestValue: candidate.nearestValue,
-            })),
-          },
-        });
-
-        if (response && typeof response === "object") {
-          if (!providerLabel && typeof response._provider === "string") {
-            providerLabel = response._provider;
-          }
-          if (!modelLabel && typeof response._model === "string") {
-            modelLabel = response._model;
-          }
-        }
-
-        const rows = response && Array.isArray(response.decisions) ? response.decisions : [];
-        for (const row of rows) {
-          if (!row || typeof row !== "object" || typeof row.id !== "string") {
-            continue;
-          }
-
-          decisionMap.set(row.id, {
-            target: typeof row.target === "number" ? row.target : null,
-            direction: typeof row.direction === "string" ? row.direction.trim() : "",
-            reason: typeof row.reason === "string" && row.reason.trim() ? row.reason.trim() : "AI 픽셀 판단",
-          });
-        }
-      }
-
-      return {
-        usedAi: true,
-        aiStatusLabel: "AI 판독 적용",
-        aiProviderLabel: providerLabel,
-        aiModelLabel: modelLabel,
-        aiDecisionCount: Math.min(aiCandidates.length, decisionMap.size),
-        fallbackDecisionCount: candidates.length - Math.min(aiCandidates.length, decisionMap.size),
-        reviewStrategy:
-          candidates.length > MAX_AI_CANDIDATES
-            ? "0.5 stroke/blur 예외 유지 후 AI 판독 + 초과분 기본 반올림"
-            : "0.5 stroke/blur 예외 유지 후 AI 판독",
-        decisionMap,
-      };
-    } catch (error) {
-      return {
-        usedAi: false,
-        aiStatusLabel: "AI 재시도 필요",
-        aiProviderLabel: "",
-        aiModelLabel: "",
-        aiDecisionCount: 0,
-        fallbackDecisionCount: candidates.length,
-        reviewStrategy: "0.5 stroke/blur 예외 유지 후 기본 반올림",
-        decisionMap: new Map(),
-      };
-    }
   }
 
-  function buildDecisionPlans(candidates, aiSummary) {
+  async function requestAiDecisions(candidates) {
+    return buildLocalDecisionSummary(candidates);
+  }
+
+  function buildDecisionPlans(candidates) {
     const plans = [];
-    const decisionMap = aiSummary && aiSummary.decisionMap instanceof Map ? aiSummary.decisionMap : new Map();
-
     for (const candidate of candidates) {
-      const aiDecision = decisionMap.get(candidate.id);
-      const targetValue = resolveTargetValue(candidate, aiDecision);
-      const source = aiDecision && Number.isInteger(targetValue) ? "ai" : "fallback";
-      const reason =
-        aiDecision && Number.isInteger(targetValue)
-          ? aiDecision.reason || "AI 픽셀 판단"
-          : "기본 반올림";
-
       plans.push({
         candidate,
-        targetValue,
-        source,
-        reason,
+        source: "local",
+        targetValue: candidate.nearestValue,
+        reason: buildLocalDecisionReason(candidate),
       });
     }
 
     return plans;
   }
 
-  function resolveTargetValue(candidate, aiDecision) {
-    if (aiDecision && typeof aiDecision.target === "number" && Number.isInteger(aiDecision.target)) {
-      if (aiDecision.target === candidate.floorValue || aiDecision.target === candidate.ceilValue) {
-        return aiDecision.target;
-      }
+  function buildLocalDecisionReason(candidate) {
+    if (!candidate || typeof candidate !== "object") {
+      return "가장 가까운 정수로 스냅했습니다.";
     }
 
-    return candidate.nearestValue;
+    switch (candidate.category) {
+      case "position":
+        return "가장 가까운 정수 좌표로 스냅했습니다.";
+      case "size":
+        return "가장 가까운 정수 크기로 스냅했습니다.";
+      case "radius":
+        return "가장 가까운 정수 반경 값으로 스냅했습니다.";
+      case "effect-blur":
+      case "effect-offset":
+        return "가장 가까운 정수 효과 값으로 스냅했습니다.";
+      case "text-size":
+      case "text-line-height":
+      case "text-letter-spacing":
+      case "text-spacing":
+        return "가장 가까운 정수 텍스트 값으로 스냅했습니다.";
+      case "paint-opacity":
+      case "opacity":
+        return "가장 가까운 정수 퍼센트로 스냅했습니다.";
+      default:
+        return "가장 가까운 정수로 스냅했습니다.";
+    }
   }
 
   async function applyPlannedChange(plan) {
@@ -1051,7 +997,7 @@
     const currentX = typeof node.x === "number" ? node.x : null;
     const currentY = typeof node.y === "number" ? node.y : null;
     if (!Number.isFinite(currentX) || !Number.isFinite(currentY)) {
-      throw new Error("position ?띿꽦???쎌쓣 ???놁뒿?덈떎.");
+      throw new Error("position 속성을 읽을 수 없습니다.");
     }
 
     const desiredX = fieldKey === "x" ? targetValue : currentX;
@@ -1079,7 +1025,7 @@
     }
 
     if (!isCloseEnough(node.x, desiredX) || !isCloseEnough(node.y, desiredY)) {
-      throw new Error("position ?곸슜???ㅽ뙣?덉뒿?덈떎.");
+      throw new Error("position 적용에 실패했습니다.");
     }
   }
 
@@ -1149,14 +1095,14 @@
     const meta = candidate && candidate.meta && typeof candidate.meta === "object" ? candidate.meta : {};
     const textField = typeof meta.textField === "string" ? meta.textField : "";
     if (!node || node.type !== "TEXT" || !textField) {
-      throw new Error("text ?띿꽦 ?곸슜???ㅽ뙣?덉뒿?덈떎.");
+      throw new Error("text 속성 적용에 실패했습니다.");
     }
 
     await loadFontsForTextNode(node);
 
     if (textField === "fontSize" || textField === "paragraphSpacing") {
       if (typeof node[textField] !== "number") {
-        throw new Error(`${textField} 媛믪쓣 ?쎌쓣 ???놁뒿?덈떎.`);
+        throw new Error(`${textField} 값을 읽을 수 없습니다.`);
       }
       node[textField] = targetValue;
       return;
@@ -1166,7 +1112,7 @@
       const currentValue = node[textField];
       const unit = typeof meta.unit === "string" && meta.unit ? meta.unit : currentValue && currentValue.unit;
       if (!unit || currentValue === figma.mixed || !currentValue || typeof currentValue !== "object") {
-        throw new Error(`${textField} 媛믪쓣 ?섏쭅 ???놁뒿?덈떎.`);
+        throw new Error(`${textField} 값을 수정할 수 없습니다.`);
       }
 
       node[textField] = {
@@ -1176,7 +1122,7 @@
       return;
     }
 
-    throw new Error("吏?먯븯吏 ?딆뒗 text ?띿꽦?낅땲??");
+    throw new Error("지원하지 않는 text 속성입니다.");
   }
 
   function applyPaintOpacityChange(node, meta, targetValue) {
@@ -1185,7 +1131,7 @@
     const valueScale = meta && typeof meta.valueScale === "number" && meta.valueScale > 0 ? meta.valueScale : 1;
     const paints = node && Array.isArray(node[paintListKey]) ? node[paintListKey] : null;
     if (!paints || paintIndex < 0 || paintIndex >= paints.length) {
-      throw new Error("paint opacity ?곸슜???ㅽ뙣?덉뒿?덈떎.");
+      throw new Error("paint opacity 적용에 실패했습니다.");
     }
 
     const clonedPaints = paints.map((paint) => clonePlainObject(paint));
@@ -1200,7 +1146,7 @@
       field: plan.candidate.label,
       from: formatNumber(plan.candidate.currentValue),
       to: String(plan.targetValue),
-      source: plan.source === "ai" ? "AI 판독" : "기본 반올림",
+      source: "로컬 규칙",
       reason: plan.reason,
     };
   }
@@ -1638,6 +1584,10 @@
     return !!result && result.selectionSignature === getSelectionSignature(figma.currentPage.selection);
   }
 
+  function matchesSelectionSignature(selectionSignature) {
+    return typeof selectionSignature === "string" && selectionSignature === getSelectionSignature(figma.currentPage.selection);
+  }
+
   function getSelectionSignature(selection) {
     const ids = Array.from(selection || [])
       .map((node) => String(node.id || ""))
@@ -1730,10 +1680,4 @@
     return fallback;
   }
 
-  function getAiHelper() {
-    const helper = globalScope.__PIGMA_AI_LLM__;
-    return helper && typeof helper.requestJsonTask === "function" && typeof helper.hasConfiguredAiAsync === "function"
-      ? helper
-      : null;
-  }
 })();
