@@ -1,0 +1,21 @@
+{
+  "runtimeFile": "ui.html",
+  "buildScript": "build-patched-main.ps1",
+  "requiredRuntimeSnippets": [
+    "invalidateTextLayers:n1",
+    "function editableTextParagraphRuns(",
+    "paragraphStyleRuns:l",
+    "gridding:\"none\"",
+    "useFractionalGlyphWidths:!0",
+    "Ff().serializeEngineData(Vf().encodeEngineData(T.text))",
+    "text metadata could not be encoded safely",
+    "editable-text-build-summary"
+  ],
+  "requiredBuildSnippets": [
+    "ui text invalidation disabled",
+    "ui editable text engine metadata",
+    "ui editable text preflight fallback",
+    "ui editable text redraw write option",
+    "verify-text-export-guard.js"
+  ]
+}

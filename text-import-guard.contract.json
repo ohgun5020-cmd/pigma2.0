@@ -1,0 +1,30 @@
+{
+  "sourceFile": "psd-import-text-fix.js",
+  "bundleFile": "code.patched.js",
+  "buildScript": "build-patched-main.ps1",
+  "requiredMarkers": [
+    "PIGMA_TEXT_IMPORT_GUARD::SOURCE_OF_TRUTH",
+    "PIGMA_TEXT_IMPORT_GUARD::BROAD_TEXT_UPDATES_DISABLED_IN_BUNDLE",
+    "PIGMA_TEXT_IMPORT_GUARD::SOURCE_ID_MATCHING",
+    "PIGMA_TEXT_IMPORT_GUARD::SOURCE_ID_TAGGING",
+    "PIGMA_TEXT_IMPORT_GUARD::NO_BROAD_TEXT_UPDATES",
+    "PIGMA_TEXT_IMPORT_GUARD::TEXT_ALIGNMENT_SCOPE"
+  ],
+  "requiredFunctions": [
+    "prepareImportPayloadItem",
+    "shouldApplyScopedTextFixes",
+    "applyTextFixes",
+    "applyTextFixesBySourceId",
+    "collectImportedTextNodesBySourceId",
+    "findImportedTextNodeForPayload",
+    "getPayloadSourceId",
+    "getImportedSourceId",
+    "alignImportedTextNode"
+  ],
+  "requiredSnippets": [
+    "prepareImportPayloadItem(message.payload);",
+    "prepareImportPayloadItem(item);",
+    "collectImportedTextNodesBySourceId(parentNode);",
+    "getPluginData(IMPORT_SOURCE_ID_KEY)"
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "sourceFile": "psd-export-boundary.js",
+  "bundleFile": "code.patched.js",
+  "buildScript": "build-patched-main.ps1",
+  "requiredMarkers": [
+    "PIGMA_EXPORT_BOUNDARY::SOURCE_OF_TRUTH",
+    "PIGMA_EXPORT_BOUNDARY::MESSAGE_TYPES",
+    "PIGMA_EXPORT_BOUNDARY::NORMALIZE_SETTINGS"
+  ],
+  "requiredFunctions": [
+    "isExportMessage",
+    "normalizeExportMessage",
+    "normalizeExportSettings",
+    "normalizeExportExperiments"
+  ],
+  "requiredSnippets": [
+    "message.type === \"request-export\"",
+    "message.type === \"request-next-export-root\"",
+    "settings: normalizeExportSettings(message.settings)",
+    "developerExportExperiments: normalizeExportExperiments(message.developerExportExperiments)"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "name": "Pigma 1.9 - Figma to PSD",
+  "id": "pigma19-clean-local-20260323-importfix1",
+  "api": "1.0.0",
+  "main": "code.patched.js",
+  "capabilities": [],
+  "enableProposedApi": false,
+  "documentAccess": "dynamic-page",
+  "editorType": [
+    "figma"
+  ],
+  "ui": "ui.html",
+  "networkAccess": {
+    "allowedDomains": [
+      "https://api.openai.com",
+      "https://generativelanguage.googleapis.com"
+    ],
+    "reasoning": "Calls user-configured OpenAI or Gemini APIs to analyze selected design content for AI correction features."
+  }
+}
