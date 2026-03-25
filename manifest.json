@@ -1,6 +1,6 @@
 {
-  "name": "Pigma 1.9 - Figma to PSD",
-  "id": "pigma19-clean-local-20260323-importfix1",
+  "name": "Pigma 2.0 - Figma to PSD",
+  "id": "pigma20-clean-local-20260325",
   "api": "1.0.0",
   "main": "code.patched.js",
   "capabilities": [],

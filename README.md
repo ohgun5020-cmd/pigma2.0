@@ -1,11 +1,11 @@
-# Pigma 1.9
+# Pigma 2.0
 
 Clean local workspace for the Figma-to-PSD plugin.
 
 ## Plugin Manifest
 
-- Name: `Pigma 1.9 - Figma to PSD`
-- Local plugin ID: `pigma19-clean-local-20260323-importfix1`
+- Name: `Pigma 2.0 - Figma to PSD`
+- Local plugin ID: `pigma20-clean-local-20260325`
 - API: `1.0.0`
 - Main bundle: `code.patched.js`
 - UI entry: `ui.html`
@@ -63,9 +63,9 @@ Clean local workspace for the Figma-to-PSD plugin.
 - `sync-embedded-ui.js`
   - Legacy escape hatch. Avoid this in the normal workflow.
 
-## Clean 1.9 Scope
+## Clean 2.0 Scope
 
-This `pigma1.9` folder intentionally keeps only the runtime, patch, and verification files that are needed for local plugin work.
+This `2.0` folder intentionally keeps only the runtime, patch, and verification files that are needed for local plugin work.
 
 Not copied forward from `pigma1.7`:
 
@@ -79,7 +79,7 @@ Runtime note: the active AI correction UI logic currently lives inline in `ui.ht
 
 ### White Screen Postmortem
 
-- Symptom we hit in `pigma1.9`:
+- Symptom we hit in `2.0`:
   - the plugin opened as a blank white panel and Figma felt frozen right after launch
   - the console kept repeating permissions-policy warnings such as `camera is not allowed in this document`, `microphone is not allowed in this document`, `clipboard-write is not allowed in this document`, and `display-capture is not allowed in this document`
 - Actual root cause:
@@ -212,7 +212,7 @@ If a future generated patch needs a newer syntax feature, assume it is unsafe un
 
 ## Version Bump Summary
 
-- Folder target moved to `pigma1.9`
-- Plugin display name updated to `Pigma 1.9 - Figma to PSD`
-- Local plugin ID replaced with `pigma19-clean-local-20260323-importfix1`
-- README rewritten to match the clean 1.9 workspace
+- Folder target moved to `2.0`
+- Plugin display name updated to `Pigma 2.0 - Figma to PSD`
+- Local plugin ID replaced with `pigma20-clean-local-20260325`
+- README rewritten to match the clean 2.0 workspace
