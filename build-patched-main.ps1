@@ -3,6 +3,8 @@ $source = Join-Path $root "code.js"
 $patch = Join-Path $root "psd-import-text-fix.js"
 $exportPatch = Join-Path $root "psd-export-boundary.js"
 $aiSettingsPatch = Join-Path $root "ai-settings-storage.js"
+$aiResponsiveMemoryPatch = Join-Path $root "ai-responsive-memory.js"
+$aiResponsivePairAnalyzerPatch = Join-Path $root "ai-responsive-pair-analyzer.js"
 $aiLlmClientPatch = Join-Path $root "ai-llm-client.js"
 $aiDesignReadPatch = Join-Path $root "ai-design-read.js"
 $aiAccessibilityDiagnosisPatch = Join-Path $root "ai-accessibility-diagnosis.js"
@@ -38,6 +40,14 @@ if (-not (Test-Path $exportPatch)) {
 
 if (-not (Test-Path $aiSettingsPatch)) {
   throw "Missing AI settings patch: $aiSettingsPatch"
+}
+
+if (-not (Test-Path $aiResponsiveMemoryPatch)) {
+  throw "Missing AI responsive memory patch: $aiResponsiveMemoryPatch"
+}
+
+if (-not (Test-Path $aiResponsivePairAnalyzerPatch)) {
+  throw "Missing AI responsive pair analyzer patch: $aiResponsivePairAnalyzerPatch"
 }
 
 if (-not (Test-Path $aiLlmClientPatch)) {
@@ -126,6 +136,8 @@ $runtimeSyntaxSourceFiles = @(
   $patch,
   $exportPatch,
   $aiSettingsPatch,
+  $aiResponsiveMemoryPatch,
+  $aiResponsivePairAnalyzerPatch,
   $aiLlmClientPatch,
   $aiDesignReadPatch,
   $aiAccessibilityDiagnosisPatch,
@@ -1062,6 +1074,8 @@ $bundle = Replace-Section `
 $importPatch = [System.IO.File]::ReadAllText($patch, [System.Text.Encoding]::UTF8)
 $exportPatchContent = [System.IO.File]::ReadAllText($exportPatch, [System.Text.Encoding]::UTF8)
 $aiSettingsPatchContent = [System.IO.File]::ReadAllText($aiSettingsPatch, [System.Text.Encoding]::UTF8)
+$aiResponsiveMemoryPatchContent = [System.IO.File]::ReadAllText($aiResponsiveMemoryPatch, [System.Text.Encoding]::UTF8)
+$aiResponsivePairAnalyzerPatchContent = [System.IO.File]::ReadAllText($aiResponsivePairAnalyzerPatch, [System.Text.Encoding]::UTF8)
 $aiLlmClientPatchContent = [System.IO.File]::ReadAllText($aiLlmClientPatch, [System.Text.Encoding]::UTF8)
 $aiAccessibilityDiagnosisPatchContent = [System.IO.File]::ReadAllText($aiAccessibilityDiagnosisPatch, [System.Text.Encoding]::UTF8)
 $aiDesignConsistencyPatchContent = [System.IO.File]::ReadAllText($aiDesignConsistencyPatch, [System.Text.Encoding]::UTF8)
@@ -1069,7 +1083,7 @@ $aiRegroupRenamePatchContent = [System.IO.File]::ReadAllText($aiRegroupRenamePat
 $aiTypoAuditPatchContent = [System.IO.File]::ReadAllText($aiTypoAuditPatch, [System.Text.Encoding]::UTF8)
 $aiPixelPerfectPatchContent = [System.IO.File]::ReadAllText($aiPixelPerfectPatch, [System.Text.Encoding]::UTF8)
 $deleteHiddenLayersPatchContent = [System.IO.File]::ReadAllText($deleteHiddenLayersPatch, [System.Text.Encoding]::UTF8)
-[System.IO.File]::WriteAllText($destination, $bundle + "`r`n" + $importPatch + "`r`n" + $exportPatchContent + "`r`n" + $aiSettingsPatchContent + "`r`n" + $aiLlmClientPatchContent + "`r`n" + $aiAccessibilityDiagnosisPatchContent + "`r`n" + $aiDesignConsistencyPatchContent + "`r`n" + $aiRegroupRenamePatchContent + "`r`n" + $aiTypoAuditPatchContent + "`r`n" + $aiPixelPerfectPatchContent + "`r`n" + $deleteHiddenLayersPatchContent, $utf8NoBom)
+[System.IO.File]::WriteAllText($destination, $bundle + "`r`n" + $importPatch + "`r`n" + $exportPatchContent + "`r`n" + $aiSettingsPatchContent + "`r`n" + $aiResponsiveMemoryPatchContent + "`r`n" + $aiResponsivePairAnalyzerPatchContent + "`r`n" + $aiLlmClientPatchContent + "`r`n" + $aiAccessibilityDiagnosisPatchContent + "`r`n" + $aiDesignConsistencyPatchContent + "`r`n" + $aiRegroupRenamePatchContent + "`r`n" + $aiTypoAuditPatchContent + "`r`n" + $aiPixelPerfectPatchContent + "`r`n" + $deleteHiddenLayersPatchContent, $utf8NoBom)
 
 & node $uiExternalizer $destination
 if ($LASTEXITCODE -ne 0) {

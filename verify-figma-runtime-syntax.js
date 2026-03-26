@@ -8,6 +8,8 @@ const defaultFiles = [
   "psd-import-text-fix.js",
   "psd-export-boundary.js",
   "ai-settings-storage.js",
+  "ai-responsive-memory.js",
+  "ai-responsive-pair-analyzer.js",
   "ai-llm-client.js",
   "ai-design-read.js",
   "ai-accessibility-diagnosis.js",

@@ -397,49 +397,55 @@
       }
 
       .views {
+        display: flex;
         flex: 1 1 auto;
         min-height: 0;
-        padding: 0 var(--views-padding-inline) var(--views-padding-block-end);
+        overflow: hidden;
+        background: var(--bg);
+      }
+
+      .view {
+        display: none;
+        flex: 1 1 auto;
+        min-height: 0;
+        padding: var(--view-padding-block-start) var(--views-padding-inline) var(--views-padding-block-end);
         overflow-x: hidden;
         overflow-y: auto;
         overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-y;
         scrollbar-gutter: stable;
         scrollbar-width: thin;
         scrollbar-color: var(--scrollbar) transparent;
         background: var(--bg);
       }
 
-      .views::-webkit-scrollbar {
+      .view::-webkit-scrollbar {
         width: 8px;
         background: transparent;
       }
 
-      .views::-webkit-scrollbar-track {
+      .view::-webkit-scrollbar-track {
         background: transparent;
       }
 
-      .views::-webkit-scrollbar-corner,
-      .views::-webkit-scrollbar-track-piece {
+      .view::-webkit-scrollbar-corner,
+      .view::-webkit-scrollbar-track-piece {
         background: transparent;
       }
 
-      .views::-webkit-scrollbar-button {
+      .view::-webkit-scrollbar-button {
         display: none;
         width: 0;
         height: 0;
       }
 
-      .views::-webkit-scrollbar-thumb {
+      .view::-webkit-scrollbar-thumb {
         min-height: 24px;
         border: 2px solid transparent;
         border-radius: 999px;
         background: var(--scrollbar);
         background-clip: content-box;
-      }
-
-      .view {
-        display: none;
-        padding-top: var(--view-padding-block-start);
       }
 
       .view.is-active {
@@ -914,6 +920,21 @@
         box-shadow: var(--shadow-soft);
       }
 
+      .design-assist-group {
+        gap: 12px;
+      }
+
+      .design-assist-body {
+        display: grid;
+        gap: 10px;
+      }
+
+      .design-assist-targets {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
       .ai-read-status[data-tone="running"] {
         color: var(--accent);
         background: var(--accent-soft);
@@ -1270,6 +1291,87 @@
       .list-stack {
         display: grid;
         gap: 14px;
+      }
+
+      .responsive-memory-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .responsive-memory-actions button,
+      .responsive-memory-actions .ghost-link {
+        flex: 1 1 160px;
+      }
+
+      .responsive-memory-status-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 12px;
+      }
+
+      .responsive-memory-status-card {
+        display: grid;
+        gap: 4px;
+        padding: 12px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        background: var(--surface);
+        box-shadow: var(--chip-inset);
+      }
+
+      .responsive-memory-status-card strong {
+        font-size: 14px;
+        line-height: 1.2;
+      }
+
+      .responsive-memory-status-card span {
+        color: var(--text-faint);
+        font-size: 10px;
+        line-height: 1.35;
+      }
+
+      .responsive-memory-inline-note {
+        color: var(--text-faint);
+        font-size: 11px;
+        line-height: 1.45;
+      }
+
+      .responsive-memory-preview {
+        display: grid;
+        gap: 10px;
+        width: 100%;
+      }
+
+      .responsive-memory-preview-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .responsive-memory-preview-list {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .responsive-memory-preview-block {
+        display: grid;
+        gap: 4px;
+        padding: 12px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        background: var(--surface);
+        box-shadow: var(--chip-inset);
+      }
+
+      .responsive-memory-preview-block strong {
+        font-size: 11px;
+        line-height: 1.35;
+      }
+
+      .responsive-memory-preview-block span {
+        color: var(--text-faint);
+        font-size: 10px;
+        line-height: 1.45;
       }
 
       .option-block {
@@ -1949,6 +2051,14 @@
         .theme-choice-grid {
           grid-template-columns: minmax(0, 1fr);
         }
+
+        .responsive-memory-status-grid {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        .responsive-memory-preview-list {
+          grid-template-columns: minmax(0, 1fr);
+        }
       }
 
       .split-columns {
@@ -2094,6 +2204,10 @@
         .theme-choice-swatch {
           width: 28px;
           height: 28px;
+        }
+
+        .design-assist-targets {
+          grid-template-columns: minmax(0, 1fr);
         }
       }
 
@@ -2729,6 +2843,46 @@
         <section class="view" id="viewAi" role="tabpanel" aria-labelledby="tabAi" hidden>
           <div class="stack">
             <div class="ai-correction-actions" role="group" aria-label="AI 디자인 진단 및 교정 기능">
+              <details class="ai-correction-group design-assist-group" role="group" aria-label="디자인 어시스트 기능" open>
+                <summary class="ai-correction-group-heading">
+                  <p class="ai-correction-group-title">디자인 어시스트</p>
+                  <span class="ai-correction-group-line"></span>
+                </summary>
+                <div class="design-assist-body">
+                  <div class="design-assist-targets" role="group" aria-label="디자인 어시스트 실행">
+                    <button
+                      class="button-secondary ai-correction-action"
+                      id="designAssistMoButton"
+                      type="button"
+                      data-design-assist-action="mobile-design"
+                      title="선택한 PC 디자인 프레임을 기준으로 모바일 시안을 준비하는 버튼입니다."
+                      aria-label="MO 디자인. 선택한 PC 디자인 프레임을 기준으로 모바일 시안을 준비합니다."
+                    >
+                      MO 디자인
+                    </button>
+                    <button
+                      class="button-secondary ai-correction-action"
+                      id="designAssistPcButton"
+                      type="button"
+                      data-design-assist-action="pc-design"
+                      title="현재 선택을 PC 기준 디자인으로 설정하는 버튼입니다."
+                      aria-label="PC 디자인. 현재 선택을 PC 기준 디자인으로 설정합니다."
+                    >
+                      PC 디자인
+                    </button>
+                  </div>
+                  <button
+                    class="button-secondary ai-correction-action"
+                    id="designAssistTrainButton"
+                    type="button"
+                    data-design-assist-action="train-design-pairs"
+                    title="완성된 PC와 MO 예제를 학습 데이터로 등록하는 버튼입니다."
+                    aria-label="학습하기. 완성된 PC와 MO 예제를 학습 데이터로 등록합니다."
+                  >
+                    학습하기
+                  </button>
+                </div>
+              </details>
               <details class="ai-correction-group" role="group" aria-label="레이어 정리 기능">
                 <summary class="ai-correction-group-heading">
                   <p class="ai-correction-group-title">레이어 정리</p>
@@ -3575,6 +3729,149 @@
               </div>
             </details>
 
+            <details class="panel collapsible settings-subpanel">
+              <summary>
+                <div class="panel-copy">
+                  <p class="section-kicker">AI / 학습 메모리</p>
+                  <p class="panel-title">학습 메모리</p>
+                </div>
+                <div class="summary-side" aria-hidden="true"></div>
+              </summary>
+
+              <p class="panel-text">PC/MO 학습 규칙과 메모리 파일을 관리합니다. 현재 단계에서는 JSONL 백업과 복원부터 안전하게 지원합니다.</p>
+
+              <div class="setting-list">
+                <div class="responsive-memory-status-grid">
+                  <div class="responsive-memory-status-card">
+                    <span>메모리 레코드</span>
+                    <strong id="responsiveMemoryRecordCount">0개</strong>
+                  </div>
+                  <div class="responsive-memory-status-card">
+                    <span>마지막 업데이트</span>
+                    <strong id="responsiveMemoryUpdatedAt">대기 중</strong>
+                  </div>
+                </div>
+
+                <div class="responsive-memory-status-grid">
+                  <div class="responsive-memory-status-card">
+                    <span>학습 pair</span>
+                    <strong id="responsiveMemoryPairCount">0건</strong>
+                  </div>
+                  <div class="responsive-memory-status-card">
+                    <span>누적 aggregate</span>
+                    <strong id="responsiveMemoryAggregateCount">0개</strong>
+                  </div>
+                  <div class="responsive-memory-status-card">
+                    <span>반복 규칙</span>
+                    <strong id="responsiveMemoryRepeatedAggregateCount">0개</strong>
+                  </div>
+                  <div class="responsive-memory-status-card">
+                    <span>충돌 버킷</span>
+                    <strong id="responsiveMemoryConflictAggregateCount">0개</strong>
+                  </div>
+                  <div class="responsive-memory-status-card">
+                    <span>평균 support</span>
+                    <strong id="responsiveMemoryAggregateSupport">0</strong>
+                  </div>
+                </div>
+
+                <div class="setting-row">
+                  <span class="setting-label">메모리 구성</span>
+                  <strong id="responsiveMemoryTypeSummary">pair 0 · match 0 · rule 0</strong>
+                  <span class="setting-hint" id="responsiveMemoryStatusNote">플러그인 캐시 상태를 확인하는 중입니다.</span>
+                </div>
+
+                <div class="setting-row">
+                  <span class="setting-label">누적 집계 상태</span>
+                  <strong id="responsiveMemoryAggregateSummary">아직 집계된 규칙이 없습니다.</strong>
+                  <span class="setting-hint" id="responsiveMemoryAggregateNote">pair를 여러 개 학습하면 반복 규칙과 충돌 버킷이 여기서 보입니다.</span>
+                </div>
+
+                <div class="setting-row">
+                  <span class="setting-label">학습 실행</span>
+                  <div class="responsive-memory-actions">
+                    <button id="responsiveMemoryLearnButton" class="button-primary" type="button">선택 2프레임 학습</button>
+                  </div>
+                  <span class="responsive-memory-inline-note">루트 프레임 두 개를 함께 선택하면 PC/MO pair 초안과 기본 rule 초안을 메모리에 저장합니다.</span>
+                </div>
+
+                <div class="setting-row">
+                  <span class="setting-label">최근 학습 결과</span>
+                  <div class="responsive-memory-preview">
+                    <strong id="responsiveMemoryLastSummary">아직 학습 결과가 없습니다.</strong>
+                    <span class="setting-hint" id="responsiveMemoryLastDetail">학습을 실행하면 최근 pair, match, rule 요약을 여기에 표시합니다.</span>
+
+                    <div class="responsive-memory-status-grid responsive-memory-preview-grid">
+                      <div class="responsive-memory-status-card">
+                        <span>최근 match</span>
+                        <strong id="responsiveMemoryLastMatchCount">0건</strong>
+                      </div>
+                      <div class="responsive-memory-status-card">
+                        <span>확정 match</span>
+                        <strong id="responsiveMemoryLastConfirmedMatchCount">0건</strong>
+                      </div>
+                      <div class="responsive-memory-status-card">
+                        <span>후보 match</span>
+                        <strong id="responsiveMemoryLastCandidateMatchCount">0건</strong>
+                      </div>
+                      <div class="responsive-memory-status-card">
+                        <span>낮은 신뢰 match</span>
+                        <strong id="responsiveMemoryLastLowConfidence">0건</strong>
+                      </div>
+                      <div class="responsive-memory-status-card">
+                        <span>최근 rule</span>
+                        <strong id="responsiveMemoryLastRuleCount">0개</strong>
+                      </div>
+                    </div>
+
+                    <div class="responsive-memory-preview-list">
+                      <div class="responsive-memory-preview-block">
+                        <strong>대표 규칙</strong>
+                        <span id="responsiveMemoryRulePreview">아직 생성된 규칙이 없습니다.</span>
+                      </div>
+                      <div class="responsive-memory-preview-block">
+                        <strong>주의 match</strong>
+                        <span id="responsiveMemoryMatchPreview">낮은 신뢰 match가 없으면 여기에 표시하지 않습니다.</span>
+                      </div>
+                      <div class="responsive-memory-preview-block">
+                        <strong>반복 규칙</strong>
+                        <span id="responsiveMemoryRepeatedRulePreview">아직 반복된 규칙이 없습니다.</span>
+                      </div>
+                      <div class="responsive-memory-preview-block">
+                        <strong>충돌 규칙</strong>
+                        <span id="responsiveMemoryConflictingRulePreview">충돌이 감지되면 여기에 표시합니다.</span>
+                      </div>
+                      <div class="responsive-memory-preview-block">
+                        <strong>저신뢰 규칙</strong>
+                        <span id="responsiveMemoryLowConfidenceRulePreview">낮은 신뢰 규칙이 없으면 여기에 표시하지 않습니다.</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="setting-row">
+                  <span class="setting-label">백업 / 복원</span>
+                  <div class="responsive-memory-actions">
+                    <button id="responsiveMemoryExportButton" class="button-secondary" type="button">JSONL 내보내기</button>
+                    <button id="responsiveMemoryImportButton" class="button-primary" type="button">JSONL 불러오기</button>
+                    <button id="responsiveMemoryClearButton" class="button-secondary" type="button">메모리 초기화</button>
+                    <button
+                      id="responsiveMemorySyncButton"
+                      class="button-secondary"
+                      type="button"
+                      disabled
+                      aria-disabled="true"
+                      title="내부 앱 동기화는 다음 단계에서 연결됩니다."
+                    >
+                      내부 앱 동기화
+                    </button>
+                  </div>
+                  <span class="responsive-memory-inline-note">현재 불러오기는 merge 방식으로 동작합니다. 같은 id의 레코드는 최신 값으로 덮어씁니다.</span>
+                  <input id="responsiveMemoryImportInput" type="file" accept=".jsonl,.txt,application/json,text/plain" hidden />
+                </div>
+              </div>
+            </details>
+
             <details class="panel collapsible" id="assetAuditPanel" hidden style="display: none !important" aria-hidden="true">
               <summary>
                 <div class="panel-copy">
@@ -4187,6 +4484,421 @@
             apiKeyInput.blur();
           }
         });
+      })();
+    </script>
+    <script>
+      (() => {
+        const learnButton = document.getElementById("responsiveMemoryLearnButton");
+        const exportButton = document.getElementById("responsiveMemoryExportButton");
+        const importButton = document.getElementById("responsiveMemoryImportButton");
+        const clearButton = document.getElementById("responsiveMemoryClearButton");
+        const syncButton = document.getElementById("responsiveMemorySyncButton");
+        const importInput = document.getElementById("responsiveMemoryImportInput");
+        const recordCountValue = document.getElementById("responsiveMemoryRecordCount");
+        const updatedAtValue = document.getElementById("responsiveMemoryUpdatedAt");
+        const pairCountValue = document.getElementById("responsiveMemoryPairCount");
+        const aggregateCountValue = document.getElementById("responsiveMemoryAggregateCount");
+        const repeatedAggregateCountValue = document.getElementById("responsiveMemoryRepeatedAggregateCount");
+        const conflictAggregateCountValue = document.getElementById("responsiveMemoryConflictAggregateCount");
+        const aggregateSupportValue = document.getElementById("responsiveMemoryAggregateSupport");
+        const typeSummaryValue = document.getElementById("responsiveMemoryTypeSummary");
+        const statusNote = document.getElementById("responsiveMemoryStatusNote");
+        const aggregateSummaryValue = document.getElementById("responsiveMemoryAggregateSummary");
+        const aggregateNoteValue = document.getElementById("responsiveMemoryAggregateNote");
+        const lastSummaryValue = document.getElementById("responsiveMemoryLastSummary");
+        const lastDetailValue = document.getElementById("responsiveMemoryLastDetail");
+        const lastMatchCountValue = document.getElementById("responsiveMemoryLastMatchCount");
+        const lastConfirmedMatchCountValue = document.getElementById("responsiveMemoryLastConfirmedMatchCount");
+        const lastCandidateMatchCountValue = document.getElementById("responsiveMemoryLastCandidateMatchCount");
+        const lastLowConfidenceValue = document.getElementById("responsiveMemoryLastLowConfidence");
+        const lastRuleCountValue = document.getElementById("responsiveMemoryLastRuleCount");
+        const rulePreviewValue = document.getElementById("responsiveMemoryRulePreview");
+        const matchPreviewValue = document.getElementById("responsiveMemoryMatchPreview");
+        const repeatedRulePreviewValue = document.getElementById("responsiveMemoryRepeatedRulePreview");
+        const conflictingRulePreviewValue = document.getElementById("responsiveMemoryConflictingRulePreview");
+        const lowConfidenceRulePreviewValue = document.getElementById("responsiveMemoryLowConfidenceRulePreview");
+
+        if (
+          !(learnButton instanceof HTMLButtonElement) ||
+          !(exportButton instanceof HTMLButtonElement) ||
+          !(importButton instanceof HTMLButtonElement) ||
+          !(clearButton instanceof HTMLButtonElement) ||
+          !(syncButton instanceof HTMLButtonElement) ||
+          !(importInput instanceof HTMLInputElement) ||
+          !(recordCountValue instanceof HTMLElement) ||
+          !(updatedAtValue instanceof HTMLElement) ||
+          !(pairCountValue instanceof HTMLElement) ||
+          !(aggregateCountValue instanceof HTMLElement) ||
+          !(repeatedAggregateCountValue instanceof HTMLElement) ||
+          !(conflictAggregateCountValue instanceof HTMLElement) ||
+          !(aggregateSupportValue instanceof HTMLElement) ||
+          !(typeSummaryValue instanceof HTMLElement) ||
+          !(statusNote instanceof HTMLElement) ||
+          !(aggregateSummaryValue instanceof HTMLElement) ||
+          !(aggregateNoteValue instanceof HTMLElement) ||
+          !(lastSummaryValue instanceof HTMLElement) ||
+          !(lastDetailValue instanceof HTMLElement) ||
+          !(lastMatchCountValue instanceof HTMLElement) ||
+          !(lastConfirmedMatchCountValue instanceof HTMLElement) ||
+          !(lastCandidateMatchCountValue instanceof HTMLElement) ||
+          !(lastLowConfidenceValue instanceof HTMLElement) ||
+          !(lastRuleCountValue instanceof HTMLElement) ||
+          !(rulePreviewValue instanceof HTMLElement) ||
+          !(matchPreviewValue instanceof HTMLElement) ||
+          !(repeatedRulePreviewValue instanceof HTMLElement) ||
+          !(conflictingRulePreviewValue instanceof HTMLElement) ||
+          !(lowConfidenceRulePreviewValue instanceof HTMLElement)
+        ) {
+          return;
+        }
+
+        const postPluginMessage = (message) => {
+          parent.postMessage({ pluginMessage: message }, "*");
+        };
+
+        let busyMode = "";
+
+        const defaultState = {
+          schemaVersion: 1,
+          updatedAt: "",
+          recordCount: 0,
+          countsByType: {},
+          aggregateStats: {
+            totalCount: 0,
+            repeatedCount: 0,
+            conflictCount: 0,
+            highConfidenceCount: 0,
+            averageSupportCount: 0,
+            pairCount: 0,
+          },
+        };
+
+        const defaultLearningResult = {
+          summary: "아직 학습 결과가 없습니다.",
+          detail: "학습을 실행하면 최근 pair, match, rule 요약을 여기에 표시합니다.",
+          matchCount: 0,
+          confirmedMatchCount: 0,
+          candidateMatchCount: 0,
+          lowConfidenceCount: 0,
+          ruleCount: 0,
+          rulePreview: [],
+          matchPreview: [],
+        };
+
+        const formatRecordCount = (value) => {
+          const next = Number.isFinite(value) ? value : 0;
+          return `${next}개`;
+        };
+
+        const formatUpdatedAt = (value) => {
+          if (typeof value !== "string" || !value.trim()) {
+            return "대기 중";
+          }
+
+          const date = new Date(value);
+          if (Number.isNaN(date.getTime())) {
+            return "대기 중";
+          }
+
+          return new Intl.DateTimeFormat(navigator.language || "ko-KR", {
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+          }).format(date);
+        };
+
+        const formatTypeSummary = (countsByType) => {
+          const counts = countsByType && typeof countsByType === "object" ? countsByType : {};
+          return `pair ${counts.pair || 0} · match ${counts.match || 0} · rule ${counts.rule || 0} · aggregate ${counts["aggregate-rule"] || 0}`;
+        };
+
+        const normalizeAggregateStats = (value) => {
+          const next = value && typeof value === "object" ? value : {};
+          return {
+            totalCount: Number.isFinite(next.totalCount) ? next.totalCount : 0,
+            repeatedCount: Number.isFinite(next.repeatedCount) ? next.repeatedCount : 0,
+            conflictCount: Number.isFinite(next.conflictCount) ? next.conflictCount : 0,
+            highConfidenceCount: Number.isFinite(next.highConfidenceCount) ? next.highConfidenceCount : 0,
+            averageSupportCount: Number.isFinite(next.averageSupportCount) ? next.averageSupportCount : 0,
+            pairCount: Number.isFinite(next.pairCount) ? next.pairCount : 0,
+          };
+        };
+
+        const defaultStatusNote = (state) => {
+          if (!state || !state.recordCount) {
+            return "아직 저장된 학습 메모리가 없습니다.";
+          }
+
+          const aggregate = normalizeAggregateStats(state.aggregateStats);
+          if (aggregate.pairCount <= 1) {
+            return "JSONL 메모리 캐시가 준비되었습니다. pair를 더 학습하면 반복 규칙이 누적됩니다.";
+          }
+
+          return "JSONL 메모리 캐시가 준비되었습니다.";
+        };
+
+        const formatShortCount = (value, unit) => {
+          const next = Number.isFinite(value) ? value : 0;
+          return `${next}${unit}`;
+        };
+
+        const formatPreviewText = (items, fallback) => {
+          return Array.isArray(items) && items.length ? items.join(" · ") : fallback;
+        };
+
+        const formatAggregateSummary = (aggregateStats) => {
+          const aggregate = normalizeAggregateStats(aggregateStats);
+          if (!aggregate.totalCount) {
+            return "아직 집계된 규칙이 없습니다.";
+          }
+
+          return `반복 ${aggregate.repeatedCount}개 · 충돌 ${aggregate.conflictCount}개 · 고신뢰 ${aggregate.highConfidenceCount}개`;
+        };
+
+        const formatAggregateNote = (aggregateStats) => {
+          const aggregate = normalizeAggregateStats(aggregateStats);
+          if (!aggregate.pairCount) {
+            return "pair를 여러 개 학습하면 반복 규칙과 충돌 버킷이 여기서 보입니다.";
+          }
+          if (aggregate.pairCount === 1) {
+            return "현재는 pair 1개라 반복 규칙이 없는 것이 정상입니다.";
+          }
+          return `현재 ${aggregate.pairCount}개 pair 기준으로 평균 support ${aggregate.averageSupportCount}를 추적 중입니다.`;
+        };
+
+        const applyState = (state, note) => {
+          const next = state && typeof state === "object" ? state : defaultState;
+          const aggregate = normalizeAggregateStats(next.aggregateStats);
+          recordCountValue.textContent = formatRecordCount(next.recordCount);
+          updatedAtValue.textContent = formatUpdatedAt(next.updatedAt);
+          pairCountValue.textContent = formatShortCount(aggregate.pairCount, "건");
+          aggregateCountValue.textContent = formatShortCount(aggregate.totalCount, "개");
+          repeatedAggregateCountValue.textContent = formatShortCount(aggregate.repeatedCount, "개");
+          conflictAggregateCountValue.textContent = formatShortCount(aggregate.conflictCount, "개");
+          aggregateSupportValue.textContent = `${aggregate.averageSupportCount}`;
+          typeSummaryValue.textContent = formatTypeSummary(next.countsByType);
+          aggregateSummaryValue.textContent = formatAggregateSummary(aggregate);
+          aggregateNoteValue.textContent = formatAggregateNote(aggregate);
+          statusNote.textContent = typeof note === "string" && note.trim() ? note.trim() : defaultStatusNote(next);
+        };
+
+        const applyLearningPreview = (result) => {
+          const next = result && typeof result === "object" ? result : defaultLearningResult;
+          const preview = next.preview && typeof next.preview === "object" ? next.preview : {};
+          const stats = next.matchStats && typeof next.matchStats === "object" ? next.matchStats : {};
+          const detailParts = [];
+          if (typeof next.detectionReason === "string" && next.detectionReason.trim()) {
+            detailParts.push(next.detectionReason.trim());
+          }
+          if (Number.isFinite(stats.averageConfidence)) {
+            detailParts.push(`평균 신뢰도 ${Math.round(stats.averageConfidence * 100)}%`);
+          }
+          if (stats.cappedAtMatchLimit) {
+            detailParts.push("match 상한선에 도달했습니다");
+          }
+          lastSummaryValue.textContent = typeof next.summary === "string" && next.summary.trim() ? next.summary.trim() : defaultLearningResult.summary;
+          lastDetailValue.textContent = detailParts.length ? detailParts.join(" · ") : defaultLearningResult.detail;
+          lastMatchCountValue.textContent = formatShortCount(Number.isFinite(stats.matchedNodeCount) ? stats.matchedNodeCount : next.matchCount, "건");
+          lastConfirmedMatchCountValue.textContent = formatShortCount(
+            Number.isFinite(stats.confirmedMatchCount) ? stats.confirmedMatchCount : next.confirmedMatchCount,
+            "건"
+          );
+          lastCandidateMatchCountValue.textContent = formatShortCount(
+            Number.isFinite(stats.candidateMatchCount) ? stats.candidateMatchCount : next.candidateMatchCount,
+            "건"
+          );
+          lastLowConfidenceValue.textContent = formatShortCount(
+            Number.isFinite(stats.lowConfidenceMatchCount) ? stats.lowConfidenceMatchCount : next.lowConfidenceCount,
+            "건"
+          );
+          lastRuleCountValue.textContent = formatShortCount(Number.isFinite(next.ruleCount) ? next.ruleCount : 0, "개");
+          rulePreviewValue.textContent = formatPreviewText(preview.representativeRules, "아직 생성된 규칙이 없습니다.");
+          matchPreviewValue.textContent = formatPreviewText(preview.lowConfidenceMatches, "낮은 신뢰 match가 없으면 여기에 표시하지 않습니다.");
+          repeatedRulePreviewValue.textContent = formatPreviewText(preview.repeatedRules, "아직 반복된 규칙이 없습니다.");
+          conflictingRulePreviewValue.textContent = formatPreviewText(preview.conflictingRules, "충돌이 감지되면 여기에 표시합니다.");
+          lowConfidenceRulePreviewValue.textContent = formatPreviewText(preview.lowConfidenceRules, "낮은 신뢰 규칙이 없으면 여기에 표시하지 않습니다.");
+        };
+
+        const applyBusy = (mode) => {
+          busyMode = typeof mode === "string" ? mode : "";
+          const isBusy = busyMode.length > 0;
+          learnButton.disabled = isBusy;
+          exportButton.disabled = isBusy;
+          importButton.disabled = isBusy;
+          clearButton.disabled = isBusy;
+          importInput.disabled = isBusy;
+          learnButton.setAttribute("aria-busy", isBusy && busyMode === "learn" ? "true" : "false");
+          exportButton.setAttribute("aria-busy", isBusy && busyMode === "export" ? "true" : "false");
+          importButton.setAttribute("aria-busy", isBusy && busyMode === "import" ? "true" : "false");
+          clearButton.setAttribute("aria-busy", isBusy && busyMode === "clear" ? "true" : "false");
+          learnButton.textContent = isBusy && busyMode === "learn" ? "학습 중..." : "선택 2프레임 학습";
+          exportButton.textContent = isBusy && busyMode === "export" ? "내보내는 중..." : "JSONL 내보내기";
+          importButton.textContent = isBusy && busyMode === "import" ? "불러오는 중..." : "JSONL 불러오기";
+          clearButton.textContent = isBusy && busyMode === "clear" ? "초기화 중..." : "메모리 초기화";
+          syncButton.disabled = true;
+          syncButton.setAttribute("aria-disabled", "true");
+        };
+
+        const requestState = () => {
+          postPluginMessage({ type: "request-responsive-memory-state" });
+        };
+
+        const buildDownloadFileName = () => {
+          const now = new Date();
+          const year = String(now.getFullYear());
+          const month = String(now.getMonth() + 1).padStart(2, "0");
+          const day = String(now.getDate()).padStart(2, "0");
+          const hour = String(now.getHours()).padStart(2, "0");
+          const minute = String(now.getMinutes()).padStart(2, "0");
+          const second = String(now.getSeconds()).padStart(2, "0");
+          return `responsive-memory.v1.${year}${month}${day}-${hour}${minute}${second}.jsonl`;
+        };
+
+        const downloadJsonl = (content) => {
+          const blob = new Blob([typeof content === "string" ? content : ""], {
+            type: "text/plain;charset=utf-8",
+          });
+          const url = URL.createObjectURL(blob);
+          const anchor = document.createElement("a");
+          anchor.href = url;
+          anchor.download = buildDownloadFileName();
+          document.body.appendChild(anchor);
+          anchor.click();
+          anchor.remove();
+          setTimeout(() => {
+            URL.revokeObjectURL(url);
+          }, 0);
+        };
+
+        exportButton.addEventListener("click", () => {
+          if (busyMode) {
+            return;
+          }
+
+          applyBusy("export");
+          statusNote.textContent = "JSONL 파일을 준비하는 중입니다.";
+          postPluginMessage({ type: "export-responsive-memory-jsonl" });
+        });
+
+        learnButton.addEventListener("click", () => {
+          if (busyMode) {
+            return;
+          }
+
+          applyBusy("learn");
+          statusNote.textContent = "선택한 두 프레임을 학습 메모리로 분석하는 중입니다.";
+          postPluginMessage({ type: "run-responsive-pair-analysis" });
+        });
+
+        importButton.addEventListener("click", () => {
+          if (busyMode) {
+            return;
+          }
+
+          importInput.value = "";
+          importInput.click();
+        });
+
+        clearButton.addEventListener("click", () => {
+          if (busyMode) {
+            return;
+          }
+
+          const shouldClear = window.confirm("현재 플러그인에 저장된 학습 메모리 캐시를 비울까요? 내보내기하지 않은 내용은 복구할 수 없습니다.");
+          if (!shouldClear) {
+            return;
+          }
+
+          applyBusy("clear");
+          statusNote.textContent = "학습 메모리 캐시를 비우는 중입니다.";
+          postPluginMessage({ type: "clear-responsive-memory" });
+        });
+
+        importInput.addEventListener("change", async () => {
+          const file = importInput.files && importInput.files[0];
+          if (!file) {
+            return;
+          }
+
+          applyBusy("import");
+          statusNote.textContent = `${file.name} 파일을 읽는 중입니다.`;
+
+          try {
+            const content = await file.text();
+            postPluginMessage({
+              type: "import-responsive-memory-jsonl",
+              content,
+              mode: "merge",
+            });
+          } catch (error) {
+            applyBusy("");
+            statusNote.textContent = error instanceof Error && error.message ? error.message : "메모리 파일을 읽지 못했습니다.";
+          }
+        });
+
+        window.addEventListener("message", (event) => {
+          const message = event.data?.pluginMessage;
+          if (!message || typeof message.type !== "string") {
+            return;
+          }
+
+          if (message.type === "responsive-memory-state") {
+            applyState(message.state);
+            return;
+          }
+
+          if (message.type === "responsive-memory-export") {
+            downloadJsonl(message.content);
+            applyBusy("");
+            applyState(message.state, message.state && message.state.recordCount ? "JSONL 파일을 내려받았습니다." : "빈 메모리 JSONL 파일을 내려받았습니다.");
+            return;
+          }
+
+          if (message.type === "responsive-pair-analysis-status") {
+            statusNote.textContent = typeof message.message === "string" && message.message.trim() ? message.message.trim() : "학습 메모리 분석 중입니다.";
+            return;
+          }
+
+          if (message.type === "responsive-pair-analysis-result") {
+            applyBusy("");
+            const summary = message.result && typeof message.result.summary === "string" ? message.result.summary : "PC/MO pair 초안을 메모리에 저장했습니다.";
+            applyLearningPreview(message.result);
+            applyState(message.state, `학습 완료 · ${summary}`);
+            return;
+          }
+
+          if (message.type === "responsive-pair-analysis-error") {
+            applyBusy("");
+            statusNote.textContent = typeof message.message === "string" && message.message.trim() ? message.message.trim() : "PC/MO pair 분석에 실패했습니다.";
+            return;
+          }
+
+          if (message.type === "responsive-memory-import-result") {
+            applyBusy("");
+            const importedCount = Number.isFinite(message.importedCount) ? message.importedCount : 0;
+            const skippedCount = Number.isFinite(message.skippedCount) ? message.skippedCount : 0;
+            applyState(message.state, `불러오기 완료 · ${importedCount}개 반영 · ${skippedCount}개 건너뜀`);
+            return;
+          }
+
+          if (message.type === "responsive-memory-clear-result") {
+            applyBusy("");
+            applyLearningPreview(defaultLearningResult);
+            applyState(message.state, "학습 메모리 캐시를 비웠습니다.");
+            return;
+          }
+
+          if (message.type === "responsive-memory-error") {
+            applyBusy("");
+            statusNote.textContent = typeof message.message === "string" && message.message.trim() ? message.message.trim() : "학습 메모리 작업에 실패했습니다.";
+          }
+        });
+
+        applyState(defaultState, "플러그인 캐시 상태를 확인하는 중입니다.");
+        applyLearningPreview(defaultLearningResult);
+        applyBusy("");
+        setTimeout(requestState, 250);
       })();
     </script>
     <script>

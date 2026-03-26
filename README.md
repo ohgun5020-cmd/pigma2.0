@@ -2,6 +2,33 @@
 
 Clean local workspace for the Figma-to-PSD plugin.
 
+## Responsive Memory Planning
+
+PC <-> MO design AI assist planning, the locked phase-1 decisions, the schema notes, and the safe implementation order live in:
+
+- [RESPONSIVE_MEMORY_PLAN.md](RESPONSIVE_MEMORY_PLAN.md)
+- [RESPONSIVE_MEMORY_SCHEMA.md](RESPONSIVE_MEMORY_SCHEMA.md)
+
+Phase 1 currently fixes these decisions:
+
+- UI entry lives in `Settings > 학습 메모리`, not in the `AI 보정` tab.
+- The canonical memory format is `JSONL`.
+- `clientStorage` is cache-only, not the canonical source of truth.
+- Node-level plugin data stores only lightweight anchors such as ids, roles, and fingerprints.
+- Existing `AI 보정` runtime flows stay untouched until memory import/export and dry-run analysis are stable.
+
+Safe implementation order:
+
+1. Lock product decisions and freeze schemas.
+2. Add a dedicated responsive memory storage layer.
+3. Add `Settings > 학습 메모리` UI controls.
+4. Ship `JSONL` export and import before any live design mutation.
+5. Add read-only pair analysis for two selected frames.
+6. Append dry-run pair, match, and rule records into memory.
+7. Add lightweight node anchors.
+8. Add internal app sync.
+9. Only then retrieve memory inside `AI 보정`.
+
 ## Plugin Manifest
 
 - Name: `Pigma 2.0 - Figma to PSD`
@@ -28,6 +55,10 @@ Clean local workspace for the Figma-to-PSD plugin.
   - Source of truth for the PSD export message boundary patch.
 - `ai-settings-storage.js`
   - Source of truth for plugin-side AI settings persistence via `figma.clientStorage`.
+- `ai-responsive-memory.js`
+  - Source of truth for responsive memory cache state and JSONL import/export plumbing.
+- `ai-responsive-pair-analyzer.js`
+  - Source of truth for the read-only PC/MO pair analyzer that classifies two selected frames and appends draft pair records into responsive memory.
 - `ai-llm-client.js`
   - Source of truth for provider-aware OpenAI/Gemini API requests and JSON parsing.
 - `ai-design-read.js`
