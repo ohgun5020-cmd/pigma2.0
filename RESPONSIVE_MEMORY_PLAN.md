@@ -109,3 +109,9 @@ Phase 1 starts here:
 
 - If internal app sync is introduced later, `manifest.json` network allowlists will need to be expanded beyond the current OpenAI and Gemini domains.
 - If memory is shared across teammates later, the JSONL schema should remain stable even if storage moves from local cache to an internal app backend.
+
+## 2026-04 Update
+
+- Keep the planner provider-agnostic so the same flow can run on OpenAI or Gemini.
+- Recognize modern mobile widths such as `390` and `393` in addition to the earlier `360` and `375` memory profiles.
+- Keep `360` compatibility for older memories until a deliberate default-width migration is done.

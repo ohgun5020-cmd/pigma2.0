@@ -5,10 +5,10 @@
   }
 
   const originalOnMessage = figma.ui.onmessage;
-  const MOBILE_KNOWN_WIDTHS = [360, 375];
+  const MOBILE_KNOWN_WIDTHS = [360, 375, 390, 393];
   const MOBILE_MAX_WIDTH = 480;
   const DESKTOP_MIN_WIDTH = 1024;
-  const PATCH_VERSION = 2;
+  const PATCH_VERSION = 5;
   const MAX_MATCH_RECORDS = 240;
   const MAX_CANDIDATE_MATCH_RECORDS = 64;
   const HIERARCHICAL_MATCH_THRESHOLD = 0.6;
@@ -17,6 +17,9 @@
   const CANDIDATE_MATCH_THRESHOLD = 0.82;
   const LOW_CONFIDENCE_RULE_THRESHOLD = 0.82;
   const AGGREGATE_RULE_VERSION = 1;
+  const TEXT_ROLE_PROFILE_VERSION = 1;
+  const FRAME_SHAPE_PROFILE_VERSION = 1;
+  const CONTAINER_PROFILE_VERSION = 1;
   const CONTAINER_TYPES = {
     FRAME: true,
     GROUP: true,
@@ -201,9 +204,16 @@
     };
 
     const matching = await buildNodeMatches(classifiedPair.pc, classifiedPair.mo, pairId, createdAt);
+    const sectionRecords = buildSectionExampleRecords(classifiedPair, pairId, createdAt, matching);
+    const frameTransformRecords = buildFrameTransformRecords(classifiedPair, pairId, createdAt);
+    const frameShapeProfiles = buildFrameShapeProfileRecords(currentStore, frameTransformRecords, createdAt);
+    const containerTransformRecords = buildContainerTransformRecords(classifiedPair, pairId, createdAt, matching, sectionRecords);
+    const containerProfiles = buildContainerProfileRecords(currentStore, containerTransformRecords, createdAt);
+    const nodeTransformRecords = buildNodeTransformRecords(classifiedPair, pairId, createdAt, matching, sectionRecords);
+    const textRoleProfiles = buildTextRoleProfileRecords(currentStore, nodeTransformRecords, createdAt);
     const ruleRecords = buildRuleRecords(classifiedPair, pairId, createdAt, matching);
     const aggregate = buildAggregateRuleRecords(currentStore, ruleRecords, pairRecord, createdAt);
-    const preview = buildAnalysisPreview(matching, ruleRecords, aggregate.preview);
+    const preview = buildAnalysisPreview(matching, sectionRecords, ruleRecords, aggregate.preview);
     const summaryRecord = {
       type: "summary",
       id: summaryId,
@@ -225,16 +235,30 @@
         unmatchedPcCount: matching.stats.unmatchedPcCount,
         unmatchedMoCount: matching.stats.unmatchedMoCount,
         cappedAtMatchLimit: matching.stats.cappedAtMatchLimit,
+        frameTransformCount: frameTransformRecords.length,
+        containerTransformCount: containerTransformRecords.length,
+        nodeTransformCount: nodeTransformRecords.length,
+        sectionExampleCount: sectionRecords.length,
         ruleCount: ruleRecords.length,
         aggregateRuleCount: aggregate.records.length,
+        frameShapeProfileCount: frameShapeProfiles.length,
+        containerProfileCount: containerProfiles.length,
+        textRoleProfileCount: textRoleProfiles.length,
       },
       createdAt: createdAt,
     };
 
     const records = [pairRecord, rootMatchRecord]
       .concat(matching.records)
+      .concat(frameTransformRecords)
+      .concat(containerTransformRecords)
+      .concat(nodeTransformRecords)
+      .concat(sectionRecords)
       .concat(ruleRecords)
       .concat(aggregate.records)
+      .concat(frameShapeProfiles)
+      .concat(containerProfiles)
+      .concat(textRoleProfiles)
       .concat([summaryRecord]);
 
     return {
@@ -252,8 +276,15 @@
         confirmedMatchCount: matching.stats.confirmedMatchCount,
         candidateMatchCount: matching.stats.candidateMatchCount,
         lowConfidenceCount: matching.stats.lowConfidenceMatchCount,
+        frameTransformCount: frameTransformRecords.length,
+        containerTransformCount: containerTransformRecords.length,
+        nodeTransformCount: nodeTransformRecords.length,
+        sectionExampleCount: sectionRecords.length,
         ruleCount: ruleRecords.length,
         aggregateRuleCount: aggregate.records.length,
+        frameShapeProfileCount: frameShapeProfiles.length,
+        containerProfileCount: containerProfiles.length,
+        textRoleProfileCount: textRoleProfiles.length,
         preview: preview,
         pc: simplifyRootDescriptor(classifiedPair.pc),
         mo: simplifyRootDescriptor(classifiedPair.mo),
@@ -1764,11 +1795,2182 @@
     };
   }
 
+  function buildSectionExampleRecords(classifiedPair, pairId, createdAt, matching) {
+    const pairs = matching && Array.isArray(matching.pairs) ? matching.pairs.slice() : [];
+    const records = [];
+    const seen = new Set();
+
+    pairs.sort((left, right) => right.score - left.score);
+
+    for (let index = 0; index < pairs.length; index += 1) {
+      const pair = pairs[index];
+      if (!pair || pair.tier !== "confirmed") {
+        continue;
+      }
+      if (!pair.pc || !pair.mo || pair.pc.depth !== 1 || pair.mo.depth !== 1) {
+        continue;
+      }
+      if (!isSectionLikeDescriptor(pair.pc) && !isSectionLikeDescriptor(pair.mo)) {
+        continue;
+      }
+
+      const sectionSignature = buildSectionSignature(pair.pc) || buildSectionSignature(pair.mo) || buildRuleNodeSignatureFromPair(pair);
+      const dedupeKey = `${sectionSignature}|${pair.pc.id}|${pair.mo.id}`;
+      if (seen.has(dedupeKey)) {
+        continue;
+      }
+
+      seen.add(dedupeKey);
+      records.push(createSectionExampleRecord(classifiedPair, pairId, createdAt, pair, sectionSignature));
+      if (records.length >= 12) {
+        break;
+      }
+    }
+
+    return records;
+  }
+
+  function createSectionExampleRecord(classifiedPair, pairId, createdAt, pair, sectionSignature) {
+    const pcStats = collectNodeStats(pair.pc.node);
+    const moStats = collectNodeStats(pair.mo.node);
+    const sectionType = classifySectionExampleType(pair, pcStats, moStats);
+    const mobilePattern = classifyMobileSectionPattern(pair, sectionType, pcStats, moStats);
+    const sectionLabel = summarizePairLabel(pair.pc, pair.mo);
+    const heroGuidance = sectionType === "hero" ? buildHeroSectionGuidance(pair.pc.node, pair.mo.node) : null;
+    const sectionGuidance = buildSectionGuidance(sectionType, pair, pcStats, moStats, mobilePattern, heroGuidance);
+
+    return {
+      type: "section-example",
+      id: createRecordId("section"),
+      version: PATCH_VERSION,
+      pairId: pairId,
+      direction: "pc-to-mo",
+      confidence: roundConfidence(pair.score),
+      sectionType: sectionType,
+      mobilePattern: mobilePattern,
+      sectionSignature: sectionSignature,
+      summary: `${sectionLabel} · ${sectionType} -> ${mobilePattern}`,
+      heroGuidance: heroGuidance,
+      sectionGuidance: sectionGuidance,
+      pcNodeId: pair.pc.id,
+      moNodeId: pair.mo.id,
+      pc: buildSectionSidePayload(classifiedPair.pc, pair.pc, pcStats),
+      mo: buildSectionSidePayload(classifiedPair.mo, pair.mo, moStats),
+      createdAt: createdAt,
+    };
+  }
+
+  function buildSectionSidePayload(rootDescriptor, descriptor, stats) {
+    const bounds = descriptor && descriptor.bounds ? descriptor.bounds : null;
+    const layout = descriptor && descriptor.layoutInfo ? descriptor.layoutInfo : getLayoutInfo(descriptor && descriptor.node);
+    const width = bounds ? roundPixel(bounds.width) : 0;
+    const height = bounds ? roundPixel(bounds.height) : 0;
+    return {
+      id: descriptor.id,
+      name: descriptor.name,
+      semanticPath: descriptor.semanticPath,
+      topLevelSemanticPath: descriptor.topLevelSemanticPath,
+      layoutMode: layout ? layout.mode : "",
+      gap: layout ? layout.gap : 0,
+      paddingX: layout ? layout.paddingX : 0,
+      paddingY: layout ? layout.paddingY : 0,
+      columns: estimateColumnCount(descriptor && descriptor.node),
+      width: width,
+      height: height,
+      aspectRatio: getFrameAspectRatio(width, height),
+      widthRatio: descriptor.relativeBounds ? descriptor.relativeBounds.widthRatio : 0,
+      heightRatio: descriptor.relativeBounds ? descriptor.relativeBounds.heightRatio : 0,
+      orderIndex: descriptor.orderIndex,
+      childCount: descriptor.childCount,
+      meaningfulChildCount: descriptor.meaningfulChildCount,
+      textFingerprint: descriptor.textFingerprint,
+      childSemanticSignature: descriptor.childSemanticSignature,
+      stats: {
+        totalNodes: stats.totalNodes,
+        textNodes: stats.textNodes,
+        imageFillNodes: stats.imageFillNodes,
+        autoLayoutNodes: stats.autoLayoutNodes,
+        containerNodes: stats.containerNodes,
+      },
+      rootWidth: rootDescriptor.width,
+      rootHeight: rootDescriptor.height,
+    };
+  }
+
+  function classifySectionExampleType(pair, pcStats, moStats) {
+    const corpus = [
+      pair.pc.name,
+      pair.mo.name,
+      pair.pc.canonicalName,
+      pair.mo.canonicalName,
+      pair.pc.componentInfo.componentName,
+      pair.mo.componentInfo.componentName,
+      pair.pc.semanticSegment,
+      pair.mo.semanticSegment,
+    ]
+      .join(" ")
+      .toLowerCase();
+    const imageHeavy = Math.max(pcStats.imageFillNodes, moStats.imageFillNodes) >= 1;
+    const textHeavy = Math.max(pcStats.textNodes, moStats.textNodes) >= 3;
+    const repeatedChildren = Math.max(pair.pc.meaningfulChildCount, pair.mo.meaningfulChildCount) >= 3;
+    const largeVisual = isLargeVisualSectionPair(pair);
+
+    if (containsKeyword(corpus, ["hero", "banner", "kv", "masthead", "main visual"]) || (largeVisual && imageHeavy && textHeavy)) {
+      return "hero";
+    }
+    if (containsKeyword(corpus, ["header", "gnb", "nav", "navigation"])) {
+      return "header";
+    }
+    if (containsKeyword(corpus, ["footer"])) {
+      return "footer";
+    }
+    if (containsKeyword(corpus, ["promo", "promotion", "offer", "coupon", "discount", "deal", "event"])) {
+      return "promo";
+    }
+    if (containsKeyword(corpus, ["video", "media", "gallery", "carousel", "slider"])) {
+      return "media";
+    }
+    if (repeatedChildren && containsKeyword(corpus, ["card", "product", "grid", "collection", "list"])) {
+      return "card-list";
+    }
+    if (repeatedChildren && pair.pc.layoutInfo && pair.mo.layoutInfo && pair.pc.layoutInfo.mode === "HORIZONTAL" && pair.mo.layoutInfo.mode === "VERTICAL") {
+      return "card-list";
+    }
+    if (imageHeavy && textHeavy) {
+      return "editorial";
+    }
+    if (textHeavy) {
+      return "article";
+    }
+    if (imageHeavy) {
+      return "visual";
+    }
+    return "section";
+  }
+
+  function classifyMobileSectionPattern(pair, sectionType, pcStats, moStats) {
+    const pcMode = pair.pc.layoutInfo ? pair.pc.layoutInfo.mode : "";
+    const moMode = pair.mo.layoutInfo ? pair.mo.layoutInfo.mode : "";
+    const imageHeavy = Math.max(pcStats.imageFillNodes, moStats.imageFillNodes) >= 1;
+    const repeatedChildren = Math.max(pair.pc.meaningfulChildCount, pair.mo.meaningfulChildCount) >= 3;
+
+    if (sectionType === "hero") {
+      return imageHeavy ? "hero-crop-stack" : "hero-stack";
+    }
+    if (sectionType === "promo") {
+      return "promo-card";
+    }
+    if (sectionType === "card-list") {
+      return moMode === "VERTICAL" || pcMode === "HORIZONTAL" ? "single-column-stack" : "card-stack";
+    }
+    if (sectionType === "editorial" || sectionType === "article") {
+      return "stacked-article";
+    }
+    if (sectionType === "media") {
+      return repeatedChildren ? "media-stack" : "media-focus";
+    }
+    if (pcMode === "HORIZONTAL" && moMode === "VERTICAL") {
+      return "horizontal-to-vertical";
+    }
+    if (pair.pc.orderIndex !== pair.mo.orderIndex) {
+      return "reordered-stack";
+    }
+    return "mobile-fit";
+  }
+
+  function buildHeroSectionGuidance(pcNode, moNode) {
+    const mobileCopy = findHeroCopyBlockMeta(moNode) || findHeroCopyBlockMeta(pcNode);
+    const focalTargets = buildHeroFocalTargets(moNode, pcNode);
+    return {
+      headlinePreserve: true,
+      copyIntegrity: "required",
+      copyBlockPreferred: !!mobileCopy,
+      overlayPosition: mobileCopy ? mobileCopy.overlayPosition : "top-center",
+      focalTargets: focalTargets,
+      cropPriority: "headline-first",
+      compositionPreset: "overlay-copy-bottom-visual",
+      textAlignment: "center",
+      visualAnchor: "bottom",
+    };
+  }
+
+  function buildSectionGuidance(sectionType, pair, pcStats, moStats, mobilePattern, heroGuidance) {
+    const contentPriority = classifySectionContentPriority(sectionType, pair, mobilePattern);
+    const reflowPattern = classifySectionReflowPattern(sectionType, pair, mobilePattern);
+    return {
+      transformPriority: buildSectionTransformPriority(),
+      contentPriority: contentPriority,
+      reflowPattern: reflowPattern,
+      textGroupRoles: buildSectionTextGroupRoles(sectionType, pair),
+      textPreservation: buildSectionTextPreservation(sectionType, heroGuidance),
+      textLayoutGuidance: buildSectionTextLayoutGuidance(sectionType, mobilePattern, heroGuidance),
+      visualRole: buildSectionVisualRoleGuidance(sectionType, mobilePattern),
+      mobileAspectPreference: buildSectionMobileAspectPreference(sectionType, pair, mobilePattern),
+      cropSafeZone: buildSectionCropSafeZone(sectionType, pair, heroGuidance, contentPriority),
+      dropRules: buildSectionDropRules(sectionType, pair, mobilePattern, pcStats, moStats, contentPriority, reflowPattern),
+    };
+  }
+
+  function buildSectionTransformPriority() {
+    return ["text-content", "text-scale", "text-align", "image-size", "image-align"];
+  }
+
+  function buildFrameTransformRecords(classifiedPair, pairId, createdAt) {
+    const pcSide = buildFrameTransformSidePayload(classifiedPair && classifiedPair.pc);
+    const moSide = buildFrameTransformSidePayload(classifiedPair && classifiedPair.mo);
+    const direct = createFrameTransformRecord(pairId, createdAt, "pc-to-mo", pcSide, moSide);
+    const reverse = createFrameTransformRecord(pairId, createdAt, "mo-to-pc", moSide, pcSide);
+    return [direct, reverse].filter(Boolean);
+  }
+
+  function createFrameTransformRecord(pairId, createdAt, direction, source, target) {
+    if (!source || !target || !(source.width > 0) || !(target.width > 0)) {
+      return null;
+    }
+
+    return {
+      type: "frame-transform",
+      id: createRecordId("frame-transform"),
+      version: PATCH_VERSION,
+      pairId: pairId,
+      direction: direction,
+      scope: "root",
+      sourceShape: source.shape,
+      targetShape: target.shape,
+      sourceAspectBucket: source.aspectBucket,
+      targetWidthBucket: bucketFrameWidth(target.width),
+      sourceLayoutMode: source.layoutMode,
+      sectionCountBucket: source.sectionCountBucket,
+      profileKey: [
+        direction,
+        source.shape,
+        source.aspectBucket,
+        source.layoutMode,
+        source.sectionCountBucket,
+        bucketFrameWidth(target.width),
+      ].join("|"),
+      source: source,
+      target: target,
+      delta: {
+        widthScaleRatio: roundRatio(target.width / Math.max(1, source.width)),
+        heightScaleRatio: roundRatio(target.height / Math.max(1, source.height)),
+        aspectRatioShift: roundRatio(target.aspectRatio - source.aspectRatio),
+        shapeChanged: source.shape !== target.shape,
+        layoutModeChanged: source.layoutMode !== target.layoutMode,
+      },
+      createdAt: createdAt,
+    };
+  }
+
+  function buildFrameTransformSidePayload(rootDescriptor) {
+    if (!rootDescriptor || !rootDescriptor.node) {
+      return null;
+    }
+
+    const layout = getLayoutInfo(rootDescriptor.node);
+    const childCount = Array.isArray(rootDescriptor.node.children) ? rootDescriptor.node.children.filter(Boolean).length : 0;
+    const aspectRatio = getFrameAspectRatio(rootDescriptor.width, rootDescriptor.height);
+
+    return {
+      nodeId: rootDescriptor.id,
+      name: rootDescriptor.name,
+      width: roundPixel(rootDescriptor.width),
+      height: roundPixel(rootDescriptor.height),
+      aspectRatio: aspectRatio,
+      shape: classifyFrameShape(aspectRatio),
+      aspectBucket: bucketFrameAspectRatio(aspectRatio),
+      layoutMode: normalizeFrameLayoutMode(layout.mode),
+      columns: estimateColumnCount(rootDescriptor.node),
+      childCount: childCount,
+      sectionCount: childCount,
+      sectionCountBucket: bucketFrameSectionCount(childCount),
+      representativeFontSize: getRepresentativeFontSize(rootDescriptor.node),
+    };
+  }
+
+  function buildFrameShapeProfileRecords(currentStore, currentFrameTransformRecords, createdAt) {
+    const existingRecords = currentStore && Array.isArray(currentStore.records) ? currentStore.records : [];
+    const observationRecords = [];
+    const groupMap = new Map();
+
+    for (let index = 0; index < existingRecords.length; index += 1) {
+      if (isFrameTransformRecord(existingRecords[index])) {
+        observationRecords.push(existingRecords[index]);
+      }
+    }
+    for (let index = 0; index < currentFrameTransformRecords.length; index += 1) {
+      if (isFrameTransformRecord(currentFrameTransformRecords[index])) {
+        observationRecords.push(currentFrameTransformRecords[index]);
+      }
+    }
+
+    for (let index = 0; index < observationRecords.length; index += 1) {
+      const record = observationRecords[index];
+      const key = buildFrameShapeProfileKey(record);
+      if (!key) {
+        continue;
+      }
+
+      if (!groupMap.has(key)) {
+        groupMap.set(key, {
+          key: key,
+          direction: string(record.direction, "pc-to-mo"),
+          sourceShape: string(record.sourceShape, "balanced"),
+          sourceAspectBucket: string(record.sourceAspectBucket, "0.85-1.09"),
+          sourceLayoutMode: string(record.sourceLayoutMode, "none"),
+          sectionCountBucket: string(record.sectionCountBucket, "1"),
+          targetWidthBucket: string(record.targetWidthBucket, "320-399"),
+          sourceAspectRatios: [],
+          targetAspectRatios: [],
+          widthScaleRatios: [],
+          heightScaleRatios: [],
+          pairIds: [],
+          observationIds: [],
+          targetShapeCounts: {},
+        });
+      }
+
+      const group = groupMap.get(key);
+      group.sourceAspectRatios.push(numeric(record.source && record.source.aspectRatio));
+      group.targetAspectRatios.push(numeric(record.target && record.target.aspectRatio));
+      group.widthScaleRatios.push(numeric(record.delta && record.delta.widthScaleRatio));
+      group.heightScaleRatios.push(numeric(record.delta && record.delta.heightScaleRatio));
+
+      const targetShape = string(record.targetShape, "");
+      if (targetShape) {
+        group.targetShapeCounts[targetShape] = (group.targetShapeCounts[targetShape] || 0) + 1;
+      }
+      if (record.pairId && group.pairIds.indexOf(record.pairId) < 0) {
+        group.pairIds.push(record.pairId);
+      }
+      if (record.id && group.observationIds.indexOf(record.id) < 0) {
+        group.observationIds.push(record.id);
+      }
+    }
+
+    const profiles = [];
+    groupMap.forEach((group) => {
+      const targetAspectSummary = buildRatioPercentileSummary(group.targetAspectRatios);
+      const targetAspectSpread = Math.max(0, numeric(targetAspectSummary.p75) - numeric(targetAspectSummary.p25));
+      profiles.push({
+        type: "frame-shape-profile",
+        id: `frame-shape-profile:${hashString(group.key)}`,
+        version: FRAME_SHAPE_PROFILE_VERSION,
+        profileKey: group.key,
+        direction: group.direction,
+        sourceShape: group.sourceShape,
+        sourceAspectBucket: group.sourceAspectBucket,
+        sourceLayoutMode: group.sourceLayoutMode,
+        sectionCountBucket: group.sectionCountBucket,
+        targetWidthBucket: group.targetWidthBucket,
+        sampleCount: group.targetAspectRatios.length,
+        pairCount: group.pairIds.length,
+        dominantTargetShape: getDominantGroupValue(group.targetShapeCounts),
+        targetShapeDistribution: buildShapeDistribution(group.targetShapeCounts),
+        sourceAspectRatio: buildRatioPercentileSummary(group.sourceAspectRatios),
+        targetAspectRatio: targetAspectSummary,
+        widthScaleRatio: buildRatioPercentileSummary(group.widthScaleRatios),
+        heightScaleRatio: buildRatioPercentileSummary(group.heightScaleRatios),
+        confidence: computeFrameShapeProfileConfidence(group.targetAspectRatios.length, group.targetShapeCounts, targetAspectSpread),
+        pairIds: group.pairIds.slice(0, 24),
+        exampleFrameTransformIds: group.observationIds.slice(0, 12),
+        createdAt: createdAt,
+        updatedAt: createdAt,
+      });
+    });
+
+    profiles.sort((left, right) => {
+      if (right.sampleCount !== left.sampleCount) {
+        return right.sampleCount - left.sampleCount;
+      }
+      if (right.confidence !== left.confidence) {
+        return right.confidence - left.confidence;
+      }
+      return String(left.id || "").localeCompare(String(right.id || ""));
+    });
+
+    return profiles;
+  }
+
+  function isFrameTransformRecord(record) {
+    return !!(record && record.type === "frame-transform" && record.scope === "root");
+  }
+
+  function buildFrameShapeProfileKey(record) {
+    if (!record) {
+      return "";
+    }
+    return [
+      string(record.direction, "pc-to-mo"),
+      string(record.sourceShape, "balanced"),
+      string(record.sourceAspectBucket, "0.85-1.09"),
+      string(record.sourceLayoutMode, "none"),
+      string(record.sectionCountBucket, "1"),
+      string(record.targetWidthBucket, "320-399"),
+    ].join("|");
+  }
+
+  function computeFrameShapeProfileConfidence(sampleCount, targetShapeCounts, targetAspectSpread) {
+    const safeCount = Math.max(0, numeric(sampleCount));
+    const keys = targetShapeCounts && typeof targetShapeCounts === "object" ? Object.keys(targetShapeCounts) : [];
+    let total = 0;
+    let dominant = 0;
+    for (let index = 0; index < keys.length; index += 1) {
+      const count = Math.max(0, numeric(targetShapeCounts[keys[index]]));
+      total += count;
+      dominant = Math.max(dominant, count);
+    }
+    const dominance = total > 0 ? dominant / total : 0;
+    const stability = clampScore(1 - Math.min(1, numeric(targetAspectSpread) / 0.9));
+    return roundConfidence(Math.min(1, safeCount / 5) * 0.56 + dominance * 0.28 + stability * 0.16);
+  }
+
+  function buildShapeDistribution(counts) {
+    const safeCounts = counts && typeof counts === "object" ? counts : {};
+    const keys = Object.keys(safeCounts).filter(Boolean);
+    let total = 0;
+    for (let index = 0; index < keys.length; index += 1) {
+      total += Math.max(0, numeric(safeCounts[keys[index]]));
+    }
+    const entries = keys
+      .map((shape) => {
+        const count = Math.max(0, numeric(safeCounts[shape]));
+        return {
+          shape: shape,
+          count: count,
+          ratio: total > 0 ? roundConfidence(count / total) : 0,
+        };
+      })
+      .sort((left, right) => {
+        if (right.count !== left.count) {
+          return right.count - left.count;
+        }
+        return String(left.shape || "").localeCompare(String(right.shape || ""));
+      });
+    return {
+      dominant: entries.length > 0 ? entries[0].shape : "",
+      entries: entries,
+    };
+  }
+
+  function getFrameAspectRatio(width, height) {
+    return roundRatio(numeric(height) / Math.max(1, numeric(width)));
+  }
+
+  function classifyFrameShape(aspectRatio) {
+    const ratio = numeric(aspectRatio);
+    if (ratio >= 1.18) {
+      return "tall";
+    }
+    if (ratio <= 0.82) {
+      return "wide";
+    }
+    return "balanced";
+  }
+
+  function bucketFrameAspectRatio(aspectRatio) {
+    const ratio = numeric(aspectRatio);
+    if (ratio <= 0.64) {
+      return "0.00-0.64";
+    }
+    if (ratio <= 0.84) {
+      return "0.65-0.84";
+    }
+    if (ratio <= 1.09) {
+      return "0.85-1.09";
+    }
+    if (ratio <= 1.39) {
+      return "1.10-1.39";
+    }
+    if (ratio <= 1.79) {
+      return "1.40-1.79";
+    }
+    return "1.80+";
+  }
+
+  function bucketFrameWidth(width) {
+    const value = Math.max(0, numeric(width));
+    if (value <= 399) {
+      return "320-399";
+    }
+    if (value <= 767) {
+      return "400-767";
+    }
+    if (value <= 1023) {
+      return "768-1023";
+    }
+    if (value <= 1439) {
+      return "1024-1439";
+    }
+    if (value <= 1919) {
+      return "1440-1919";
+    }
+    return "1920+";
+  }
+
+  function bucketFrameSectionCount(count) {
+    const value = Math.max(0, Math.round(numeric(count)));
+    if (value <= 1) {
+      return "1";
+    }
+    if (value <= 3) {
+      return "2-3";
+    }
+    if (value <= 6) {
+      return "4-6";
+    }
+    return "7+";
+  }
+
+  function normalizeFrameLayoutMode(mode) {
+    const value = string(mode, "NONE").toUpperCase();
+    if (value === "HORIZONTAL" || value === "VERTICAL" || value === "NONE") {
+      return value.toLowerCase();
+    }
+    return "none";
+  }
+
+  function buildContainerTransformRecords(classifiedPair, pairId, createdAt, matching, sectionRecords) {
+    const records = [];
+    const seen = new Set();
+    const topLevelSectionByKey = {};
+    const topLevelSignatureByKey = {};
+    const sectionList = Array.isArray(sectionRecords) ? sectionRecords : [];
+    const pairs = matching && Array.isArray(matching.pairs) ? matching.pairs.slice() : [];
+
+    for (let index = 0; index < sectionList.length; index += 1) {
+      const record = sectionList[index];
+      if (!record) {
+        continue;
+      }
+      const key = `${string(record.pcNodeId, "")}|${string(record.moNodeId, "")}`;
+      if (!key || key === "|") {
+        continue;
+      }
+      topLevelSectionByKey[key] = string(record.sectionType, "section");
+      topLevelSignatureByKey[key] = string(record.sectionSignature, "");
+    }
+
+    pairs.sort((left, right) => right.score - left.score);
+
+    for (let index = 0; index < pairs.length; index += 1) {
+      const pair = pairs[index];
+      if (!pair || pair.tier !== "confirmed" || !pair.pc || !pair.mo) {
+        continue;
+      }
+      if (!CONTAINER_TYPES[pair.pc.type] || !CONTAINER_TYPES[pair.mo.type]) {
+        continue;
+      }
+      if (!shouldObserveContainerTransform(pair)) {
+        continue;
+      }
+
+      const dedupeKey = `${pair.pc.id}|${pair.mo.id}`;
+      if (seen.has(dedupeKey)) {
+        continue;
+      }
+
+      const direct = createContainerTransformRecord(
+        classifiedPair,
+        pairId,
+        createdAt,
+        "pc-to-mo",
+        pair,
+        pair.pc,
+        pair.mo,
+        topLevelSectionByKey,
+        topLevelSignatureByKey
+      );
+      if (direct) {
+        records.push(direct);
+        seen.add(dedupeKey);
+      }
+
+      const reverse = createContainerTransformRecord(
+        classifiedPair,
+        pairId,
+        createdAt,
+        "mo-to-pc",
+        pair,
+        pair.mo,
+        pair.pc,
+        topLevelSectionByKey,
+        topLevelSignatureByKey
+      );
+      if (reverse) {
+        records.push(reverse);
+      }
+    }
+
+    return records;
+  }
+
+  function shouldObserveContainerTransform(pair) {
+    const left = pair && pair.pc ? pair.pc : null;
+    const right = pair && pair.mo ? pair.mo : null;
+    if (!left || !right) {
+      return false;
+    }
+    if (isSectionLikeDescriptor(left) || isSectionLikeDescriptor(right)) {
+      return true;
+    }
+    const leftLayout = left.layoutInfo || {};
+    const rightLayout = right.layoutInfo || {};
+    if (left.meaningfulChildCount >= 2 || right.meaningfulChildCount >= 2) {
+      return true;
+    }
+    if (leftLayout.mode !== "NONE" || rightLayout.mode !== "NONE") {
+      return true;
+    }
+    const leftBounds = left.bounds;
+    const rightBounds = right.bounds;
+    return !!(
+      leftBounds &&
+      rightBounds &&
+      Math.max(numeric(leftBounds.width), numeric(rightBounds.width)) >= 120 &&
+      Math.max(numeric(leftBounds.height), numeric(rightBounds.height)) >= 72
+    );
+  }
+
+  function createContainerTransformRecord(classifiedPair, pairId, createdAt, direction, pair, sourceDescriptor, targetDescriptor, topLevelSectionByKey, topLevelSignatureByKey) {
+    const rootKey =
+      direction === "pc-to-mo"
+        ? `${string(pair.pc.topLevelId, pair.pc.id)}|${string(pair.mo.topLevelId, pair.mo.id)}`
+        : `${string(pair.mo.topLevelId, pair.mo.id)}|${string(pair.pc.topLevelId, pair.pc.id)}`;
+    const sectionType = string(topLevelSectionByKey[rootKey], "") || inferContainerSectionType(pair);
+    const sectionSignature =
+      string(topLevelSignatureByKey[rootKey], "") || buildSectionSignature(sourceDescriptor) || buildSectionSignature(targetDescriptor) || rootKey;
+    const sourceRoot = direction === "pc-to-mo" ? classifiedPair.pc : classifiedPair.mo;
+    const targetRoot = direction === "pc-to-mo" ? classifiedPair.mo : classifiedPair.pc;
+    const source = buildContainerTransformSidePayload(sourceRoot, sourceDescriptor);
+    const target = buildContainerTransformSidePayload(targetRoot, targetDescriptor);
+    if (!source || !target || !(source.width > 0) || !(target.width > 0)) {
+      return null;
+    }
+
+    return {
+      type: "container-transform",
+      id: createRecordId("container-transform"),
+      version: PATCH_VERSION,
+      pairId: pairId,
+      direction: direction,
+      nodeKind: "container",
+      confidence: roundConfidence(pair.score),
+      scope: pair.scope || "matched-node",
+      sectionType: sectionType || "section",
+      sectionSignature: sectionSignature,
+      sourceLayoutMode: source.layoutMode,
+      sourceWidthBucket: bucketContainerWidth(source.width),
+      childCountBucket: bucketContainerChildCount(source.meaningfulChildCount || source.childCount),
+      targetWidthBucket: bucketContainerWidth(target.width),
+      profileKey: [
+        direction,
+        sectionType || "section",
+        source.layoutMode,
+        bucketContainerWidth(source.width),
+        bucketContainerChildCount(source.meaningfulChildCount || source.childCount),
+        bucketContainerWidth(target.width),
+      ].join("|"),
+      source: source,
+      target: target,
+      delta: {
+        widthScaleRatio: roundRatio(target.width / Math.max(1, source.width)),
+        heightScaleRatio: roundRatio(target.height / Math.max(1, source.height)),
+        gapScaleRatio: source.gap > 0 ? roundRatio(target.gap / Math.max(1, source.gap)) : 0,
+        paddingXScaleRatio: source.paddingX > 0 ? roundRatio(target.paddingX / Math.max(1, source.paddingX)) : 0,
+        paddingYScaleRatio: source.paddingY > 0 ? roundRatio(target.paddingY / Math.max(1, source.paddingY)) : 0,
+        aspectRatioShift: roundRatio(target.aspectRatio - source.aspectRatio),
+        columnsDelta: Math.round(target.columns - source.columns),
+        layoutChanged: source.layoutMode !== target.layoutMode,
+      },
+      createdAt: createdAt,
+    };
+  }
+
+  function buildContainerTransformSidePayload(rootDescriptor, descriptor) {
+    if (!rootDescriptor || !descriptor || !descriptor.node) {
+      return null;
+    }
+    const bounds = descriptor.bounds || getNodeBounds(descriptor.node);
+    const layout = descriptor.layoutInfo || getLayoutInfo(descriptor.node);
+    const width = bounds ? roundPixel(bounds.width) : 0;
+    const height = bounds ? roundPixel(bounds.height) : 0;
+    return {
+      nodeId: descriptor.id,
+      name: descriptor.name,
+      semanticPath: descriptor.semanticPath,
+      topLevelSemanticPath: descriptor.topLevelSemanticPath,
+      layoutMode: normalizeFrameLayoutMode(layout.mode),
+      gap: numeric(layout.gap),
+      paddingX: numeric(layout.paddingX),
+      paddingY: numeric(layout.paddingY),
+      width: width,
+      height: height,
+      aspectRatio: getFrameAspectRatio(width, height),
+      widthRatio: descriptor.relativeBounds ? descriptor.relativeBounds.widthRatio : 0,
+      heightRatio: descriptor.relativeBounds ? descriptor.relativeBounds.heightRatio : 0,
+      columns: estimateColumnCount(descriptor.node),
+      childCount: descriptor.childCount,
+      meaningfulChildCount: descriptor.meaningfulChildCount,
+      imageFillCount: numeric(descriptor.stats && descriptor.stats.imageFillNodes),
+      rootWidth: rootDescriptor.width,
+      rootHeight: rootDescriptor.height,
+    };
+  }
+
+  function inferContainerSectionType(pair) {
+    if (!pair || !pair.pc || !pair.mo) {
+      return "section";
+    }
+    const stats = {
+      pc: collectNodeStats(pair.pc.node),
+      mo: collectNodeStats(pair.mo.node),
+    };
+    return classifySectionExampleType(pair, stats.pc, stats.mo);
+  }
+
+  function buildContainerProfileRecords(currentStore, currentContainerTransformRecords, createdAt) {
+    const existingRecords = currentStore && Array.isArray(currentStore.records) ? currentStore.records : [];
+    const observationRecords = [];
+    const groupMap = new Map();
+
+    for (let index = 0; index < existingRecords.length; index += 1) {
+      if (isContainerTransformRecord(existingRecords[index])) {
+        observationRecords.push(existingRecords[index]);
+      }
+    }
+    for (let index = 0; index < currentContainerTransformRecords.length; index += 1) {
+      if (isContainerTransformRecord(currentContainerTransformRecords[index])) {
+        observationRecords.push(currentContainerTransformRecords[index]);
+      }
+    }
+
+    for (let index = 0; index < observationRecords.length; index += 1) {
+      const record = observationRecords[index];
+      const key = buildContainerProfileKey(record);
+      if (!key) {
+        continue;
+      }
+
+      if (!groupMap.has(key)) {
+        groupMap.set(key, {
+          key: key,
+          direction: string(record.direction, "pc-to-mo"),
+          sectionType: string(record.sectionType, "section"),
+          sourceLayoutMode: string(record.sourceLayoutMode, "none"),
+          sourceWidthBucket: string(record.sourceWidthBucket, "0-159"),
+          childCountBucket: string(record.childCountBucket, "1"),
+          targetWidthBucket: string(record.targetWidthBucket, "0-159"),
+          targetGapValues: [],
+          targetPaddingXValues: [],
+          targetPaddingYValues: [],
+          targetAspectRatios: [],
+          widthScaleRatios: [],
+          heightScaleRatios: [],
+          gapScaleRatios: [],
+          paddingXScaleRatios: [],
+          paddingYScaleRatios: [],
+          pairIds: [],
+          observationIds: [],
+          targetLayoutCounts: {},
+          targetColumnCounts: {},
+        });
+      }
+
+      const group = groupMap.get(key);
+      group.targetGapValues.push(numeric(record.target && record.target.gap));
+      group.targetPaddingXValues.push(numeric(record.target && record.target.paddingX));
+      group.targetPaddingYValues.push(numeric(record.target && record.target.paddingY));
+      group.targetAspectRatios.push(numeric(record.target && record.target.aspectRatio));
+      group.widthScaleRatios.push(numeric(record.delta && record.delta.widthScaleRatio));
+      group.heightScaleRatios.push(numeric(record.delta && record.delta.heightScaleRatio));
+      if (numeric(record.delta && record.delta.gapScaleRatio) > 0) {
+        group.gapScaleRatios.push(numeric(record.delta && record.delta.gapScaleRatio));
+      }
+      if (numeric(record.delta && record.delta.paddingXScaleRatio) > 0) {
+        group.paddingXScaleRatios.push(numeric(record.delta && record.delta.paddingXScaleRatio));
+      }
+      if (numeric(record.delta && record.delta.paddingYScaleRatio) > 0) {
+        group.paddingYScaleRatios.push(numeric(record.delta && record.delta.paddingYScaleRatio));
+      }
+
+      const targetLayoutMode = string(record.target && record.target.layoutMode, "");
+      if (targetLayoutMode) {
+        group.targetLayoutCounts[targetLayoutMode] = (group.targetLayoutCounts[targetLayoutMode] || 0) + 1;
+      }
+      const targetColumns = String(Math.max(1, Math.round(numeric(record.target && record.target.columns) || 1)));
+      group.targetColumnCounts[targetColumns] = (group.targetColumnCounts[targetColumns] || 0) + 1;
+
+      if (record.pairId && group.pairIds.indexOf(record.pairId) < 0) {
+        group.pairIds.push(record.pairId);
+      }
+      if (record.id && group.observationIds.indexOf(record.id) < 0) {
+        group.observationIds.push(record.id);
+      }
+    }
+
+    const profiles = [];
+    groupMap.forEach((group) => {
+      const aspectSummary = buildRatioPercentileSummary(group.targetAspectRatios);
+      const aspectSpread = Math.max(0, numeric(aspectSummary.p75) - numeric(aspectSummary.p25));
+      profiles.push({
+        type: "container-profile",
+        id: `container-profile:${hashString(group.key)}`,
+        version: CONTAINER_PROFILE_VERSION,
+        profileKey: group.key,
+        direction: group.direction,
+        sectionType: group.sectionType,
+        sourceLayoutMode: group.sourceLayoutMode,
+        sourceWidthBucket: group.sourceWidthBucket,
+        childCountBucket: group.childCountBucket,
+        targetWidthBucket: group.targetWidthBucket,
+        sampleCount: group.targetAspectRatios.length,
+        pairCount: group.pairIds.length,
+        preferredTargetLayoutMode: getDominantGroupValue(group.targetLayoutCounts),
+        preferredTargetColumns: Math.max(1, Math.round(numeric(getDominantGroupValue(group.targetColumnCounts)) || 1)),
+        targetLayoutDistribution: buildCountDistribution(group.targetLayoutCounts, "layoutMode"),
+        targetColumnDistribution: buildCountDistribution(group.targetColumnCounts, "columns"),
+        targetGap: buildRangeSummary(group.targetGapValues),
+        targetPaddingX: buildRangeSummary(group.targetPaddingXValues),
+        targetPaddingY: buildRangeSummary(group.targetPaddingYValues),
+        targetAspectRatio: aspectSummary,
+        widthScaleRatio: buildRatioPercentileSummary(group.widthScaleRatios),
+        heightScaleRatio: buildRatioPercentileSummary(group.heightScaleRatios),
+        gapScaleRatio: buildRatioPercentileSummary(group.gapScaleRatios),
+        paddingXScaleRatio: buildRatioPercentileSummary(group.paddingXScaleRatios),
+        paddingYScaleRatio: buildRatioPercentileSummary(group.paddingYScaleRatios),
+        collapseToSingleColumn:
+          Math.max(1, Math.round(numeric(getDominantGroupValue(group.targetColumnCounts)) || 1)) <= 1 ||
+          getDominantGroupValue(group.targetLayoutCounts) === "vertical",
+        confidence: computeContainerProfileConfidence(group.targetAspectRatios.length, group.targetLayoutCounts, aspectSpread),
+        pairIds: group.pairIds.slice(0, 24),
+        exampleContainerTransformIds: group.observationIds.slice(0, 12),
+        createdAt: createdAt,
+        updatedAt: createdAt,
+      });
+    });
+
+    profiles.sort((left, right) => {
+      if (right.sampleCount !== left.sampleCount) {
+        return right.sampleCount - left.sampleCount;
+      }
+      if (right.confidence !== left.confidence) {
+        return right.confidence - left.confidence;
+      }
+      return String(left.id || "").localeCompare(String(right.id || ""));
+    });
+
+    return profiles;
+  }
+
+  function isContainerTransformRecord(record) {
+    return !!(record && record.type === "container-transform" && record.nodeKind === "container");
+  }
+
+  function buildContainerProfileKey(record) {
+    if (!record) {
+      return "";
+    }
+    return [
+      string(record.direction, "pc-to-mo"),
+      string(record.sectionType, "section"),
+      string(record.sourceLayoutMode, "none"),
+      string(record.sourceWidthBucket, "0-159"),
+      string(record.childCountBucket, "1"),
+      string(record.targetWidthBucket, "0-159"),
+    ].join("|");
+  }
+
+  function computeContainerProfileConfidence(sampleCount, targetLayoutCounts, targetAspectSpread) {
+    const safeCount = Math.max(0, numeric(sampleCount));
+    const keys = targetLayoutCounts && typeof targetLayoutCounts === "object" ? Object.keys(targetLayoutCounts) : [];
+    let total = 0;
+    let dominant = 0;
+    for (let index = 0; index < keys.length; index += 1) {
+      const count = Math.max(0, numeric(targetLayoutCounts[keys[index]]));
+      total += count;
+      dominant = Math.max(dominant, count);
+    }
+    const dominance = total > 0 ? dominant / total : 0;
+    const stability = clampScore(1 - Math.min(1, numeric(targetAspectSpread) / 0.9));
+    return roundConfidence(Math.min(1, safeCount / 6) * 0.52 + dominance * 0.28 + stability * 0.2);
+  }
+
+  function buildCountDistribution(counts, fieldName) {
+    const safeCounts = counts && typeof counts === "object" ? counts : {};
+    const keys = Object.keys(safeCounts).filter(Boolean);
+    let total = 0;
+    for (let index = 0; index < keys.length; index += 1) {
+      total += Math.max(0, numeric(safeCounts[keys[index]]));
+    }
+    const field = string(fieldName, "value");
+    const entries = keys
+      .map((value) => {
+        const count = Math.max(0, numeric(safeCounts[value]));
+        const entry = {
+          count: count,
+          ratio: total > 0 ? roundConfidence(count / total) : 0,
+        };
+        entry[field] = value;
+        return entry;
+      })
+      .sort((left, right) => {
+        if (right.count !== left.count) {
+          return right.count - left.count;
+        }
+        return String(left[field] || "").localeCompare(String(right[field] || ""));
+      });
+    const dominant = entries.length > 0 ? entries[0][field] : "";
+    return {
+      dominant: dominant,
+      entries: entries,
+    };
+  }
+
+  function bucketContainerWidth(width) {
+    const value = Math.max(0, numeric(width));
+    if (value < 160) {
+      return "0-159";
+    }
+    if (value < 280) {
+      return "160-279";
+    }
+    if (value < 400) {
+      return "280-399";
+    }
+    if (value < 560) {
+      return "400-559";
+    }
+    if (value < 800) {
+      return "560-799";
+    }
+    if (value < 1120) {
+      return "800-1119";
+    }
+    return "1120+";
+  }
+
+  function bucketContainerChildCount(count) {
+    const value = Math.max(0, Math.round(numeric(count)));
+    if (value <= 1) {
+      return "1";
+    }
+    if (value <= 3) {
+      return "2-3";
+    }
+    if (value <= 6) {
+      return "4-6";
+    }
+    return "7+";
+  }
+
+  function buildNodeTransformRecords(classifiedPair, pairId, createdAt, matching, sectionRecords) {
+    const records = [];
+    const seen = new Set();
+    const topLevelSectionByKey = {};
+    const topLevelSignatureByKey = {};
+    const sectionList = Array.isArray(sectionRecords) ? sectionRecords : [];
+    const pairs = matching && Array.isArray(matching.pairs) ? matching.pairs.slice() : [];
+
+    for (let index = 0; index < sectionList.length; index += 1) {
+      const record = sectionList[index];
+      if (!record) {
+        continue;
+      }
+      const key = `${string(record.pcNodeId, "")}|${string(record.moNodeId, "")}`;
+      if (!key || key === "|") {
+        continue;
+      }
+      topLevelSectionByKey[key] = string(record.sectionType, "section");
+      topLevelSignatureByKey[key] = string(record.sectionSignature, "");
+    }
+
+    pairs.sort((left, right) => right.score - left.score);
+
+    for (let index = 0; index < pairs.length; index += 1) {
+      const pair = pairs[index];
+      if (!pair || pair.tier !== "confirmed") {
+        continue;
+      }
+      if (!pair.pc || !pair.mo || pair.pc.type !== "TEXT" || pair.mo.type !== "TEXT") {
+        continue;
+      }
+
+      const dedupeKey = `${pair.pc.id}|${pair.mo.id}`;
+      if (seen.has(dedupeKey)) {
+        continue;
+      }
+
+      const forwardRecord = createTextNodeTransformRecord(
+        classifiedPair,
+        pairId,
+        createdAt,
+        pair,
+        topLevelSectionByKey,
+        topLevelSignatureByKey,
+        "pc-to-mo"
+      );
+      const reverseRecord = createTextNodeTransformRecord(
+        classifiedPair,
+        pairId,
+        createdAt,
+        pair,
+        topLevelSectionByKey,
+        topLevelSignatureByKey,
+        "mo-to-pc"
+      );
+      if (!forwardRecord && !reverseRecord) {
+        continue;
+      }
+
+      seen.add(dedupeKey);
+      if (forwardRecord) {
+        records.push(forwardRecord);
+      }
+      if (reverseRecord) {
+        records.push(reverseRecord);
+      }
+    }
+
+    return records;
+  }
+
+  function createTextNodeTransformRecord(classifiedPair, pairId, createdAt, pair, topLevelSectionByKey, topLevelSignatureByKey, direction) {
+    const rootKey = `${string(pair.pc.topLevelId, pair.pc.id)}|${string(pair.mo.topLevelId, pair.mo.id)}`;
+    const sectionType = string(topLevelSectionByKey[rootKey], "") || inferTextSectionType(pair);
+    const sectionSignature = string(topLevelSignatureByKey[rootKey], "") || buildSectionSignature(pair.pc) || buildSectionSignature(pair.mo);
+    const textRole = classifyResponsiveTextRole(pair, sectionType);
+    const pcSide = buildTextTransformSidePayload(classifiedPair.pc, pair.pc, textRole);
+    const moSide = buildTextTransformSidePayload(classifiedPair.mo, pair.mo, textRole);
+
+    if (!pcSide || !moSide || !pcSide.fontSize || !moSide.fontSize) {
+      return null;
+    }
+
+    const safeDirection = direction === "mo-to-pc" ? "mo-to-pc" : "pc-to-mo";
+    const sourceSide = safeDirection === "mo-to-pc" ? moSide : pcSide;
+    const targetSide = safeDirection === "mo-to-pc" ? pcSide : moSide;
+    const fontScaleRatio = roundConfidence(targetSide.fontSize / Math.max(1, sourceSide.fontSize));
+    const lineHeightRatio =
+      sourceSide.lineHeight > 0 && targetSide.lineHeight > 0
+        ? roundConfidence(targetSide.lineHeight / Math.max(1, sourceSide.lineHeight))
+        : 0;
+    const widthRatio =
+      sourceSide.width > 0 && targetSide.width > 0 ? roundConfidence(targetSide.width / Math.max(1, sourceSide.width)) : 0;
+    const charBucket = bucketTextCharacterCount(Math.max(sourceSide.charCount, targetSide.charCount));
+    const sourceFontBucket = bucketTextFontSize(sourceSide.fontSize);
+    const alignChanged = pcSide.textAlign && moSide.textAlign ? pcSide.textAlign !== moSide.textAlign : false;
+    const componentFamily = string(pair.pc.componentInfo.componentFamily, "") || string(pair.mo.componentInfo.componentFamily, "");
+
+    return {
+      type: "node-transform",
+      id: createRecordId("node-transform"),
+      version: PATCH_VERSION,
+      pairId: pairId,
+      direction: safeDirection,
+      nodeKind: "text",
+      confidence: roundConfidence(pair.score),
+      scope: pair.scope || "matched-node",
+      sectionType: sectionType || "section",
+      sectionSignature: sectionSignature || rootKey,
+      textRole: textRole,
+      componentFamily: componentFamily,
+      sourceFontBucket: sourceFontBucket,
+      charBucket: charBucket,
+      profileKey: [safeDirection, sectionType || "section", textRole, sourceFontBucket, charBucket].join("|"),
+      pc: pcSide,
+      mo: moSide,
+      delta: {
+        fontScaleRatio: fontScaleRatio,
+        lineHeightRatio: lineHeightRatio,
+        widthRatio: widthRatio,
+        lineCountDelta: targetSide.lineCount - sourceSide.lineCount,
+        alignmentChanged: alignChanged,
+      },
+      createdAt: createdAt,
+    };
+  }
+
+  function buildTextTransformSidePayload(rootDescriptor, descriptor, textRole) {
+    const node = descriptor && descriptor.node ? descriptor.node : null;
+    const bounds = descriptor && descriptor.bounds ? descriptor.bounds : getNodeBounds(node);
+    const fontSize = getTextFontSize(node);
+    const charCount = getTextCharacterCount(node);
+    const lineHeight = getTextLineHeight(node, bounds, fontSize);
+    const lineCount = estimateTextLineCount(node, bounds, fontSize, lineHeight);
+    const fontInfo = getTextFontInfo(node);
+
+    return {
+      nodeId: descriptor.id,
+      name: descriptor.name,
+      semanticPath: descriptor.semanticPath,
+      topLevelSemanticPath: descriptor.topLevelSemanticPath,
+      textRole: textRole,
+      width: bounds ? roundPixel(bounds.width) : 0,
+      height: bounds ? roundPixel(bounds.height) : 0,
+      widthRatio: descriptor.relativeBounds ? descriptor.relativeBounds.widthRatio : 0,
+      heightRatio: descriptor.relativeBounds ? descriptor.relativeBounds.heightRatio : 0,
+      fontSize: fontSize,
+      lineHeight: lineHeight,
+      charCount: charCount,
+      lineCount: lineCount,
+      textAlign: getTextAlignLabel(node),
+      fontFamily: fontInfo.family,
+      fontStyle: fontInfo.style,
+      fontWeight: fontInfo.weight,
+      rootWidth: rootDescriptor.width,
+      rootHeight: rootDescriptor.height,
+    };
+  }
+
+  function buildTextRoleProfileRecords(currentStore, currentNodeTransformRecords, createdAt) {
+    const existingRecords = currentStore && Array.isArray(currentStore.records) ? currentStore.records : [];
+    const observationRecords = [];
+    const groupMap = new Map();
+
+    for (let index = 0; index < existingRecords.length; index += 1) {
+      if (isTextNodeTransformRecord(existingRecords[index])) {
+        observationRecords.push(existingRecords[index]);
+      }
+    }
+    for (let index = 0; index < currentNodeTransformRecords.length; index += 1) {
+      if (isTextNodeTransformRecord(currentNodeTransformRecords[index])) {
+        observationRecords.push(currentNodeTransformRecords[index]);
+      }
+    }
+
+    for (let index = 0; index < observationRecords.length; index += 1) {
+      const record = observationRecords[index];
+      const key = buildTextRoleProfileKey(record);
+      if (!key) {
+        continue;
+      }
+
+      if (!groupMap.has(key)) {
+        groupMap.set(key, {
+          key: key,
+          direction: string(record.direction, "pc-to-mo"),
+          sectionType: string(record.sectionType, "section"),
+          textRole: string(record.textRole, "body"),
+          sourceFontBucket: string(record.sourceFontBucket, "0-15"),
+          charBucket: string(record.charBucket, "1-5"),
+          fontRatios: [],
+          lineHeightRatios: [],
+          widthRatios: [],
+          targetFontSizes: [],
+          targetLineCounts: [],
+          pairIds: [],
+          observationIds: [],
+          alignCounts: {},
+        });
+      }
+
+      const group = groupMap.get(key);
+      const fontRatio = numeric(record.delta && record.delta.fontScaleRatio);
+      const lineHeightRatio = numeric(record.delta && record.delta.lineHeightRatio);
+      const widthRatio = numeric(record.delta && record.delta.widthRatio);
+      const targetSide = getTextTransformTargetSide(record);
+      const targetFontSize = numeric(targetSide && targetSide.fontSize);
+      const targetLineCount = numeric(targetSide && targetSide.lineCount);
+      const align = string(targetSide && targetSide.textAlign, "");
+
+      if (fontRatio > 0) {
+        group.fontRatios.push(fontRatio);
+      }
+      if (lineHeightRatio > 0) {
+        group.lineHeightRatios.push(lineHeightRatio);
+      }
+      if (widthRatio > 0) {
+        group.widthRatios.push(widthRatio);
+      }
+      if (targetFontSize > 0) {
+        group.targetFontSizes.push(targetFontSize);
+      }
+      if (targetLineCount > 0) {
+        group.targetLineCounts.push(targetLineCount);
+      }
+      if (align) {
+        group.alignCounts[align] = (group.alignCounts[align] || 0) + 1;
+      }
+      if (group.pairIds.indexOf(record.pairId) < 0) {
+        group.pairIds.push(record.pairId);
+      }
+      if (group.observationIds.length < 12) {
+        group.observationIds.push(record.id);
+      }
+    }
+
+    const profiles = [];
+    groupMap.forEach((group) => {
+      if (group.fontRatios.length === 0 || group.targetFontSizes.length === 0) {
+        return;
+      }
+
+      const fontRatioSpread = Math.abs(getPercentile(group.fontRatios, 0.75) - getPercentile(group.fontRatios, 0.25));
+      profiles.push({
+        type: "text-role-profile",
+        id: `text-role-profile:${hashString(group.key)}`,
+        version: TEXT_ROLE_PROFILE_VERSION,
+        direction: group.direction,
+        sectionType: group.sectionType,
+        textRole: group.textRole,
+        sourceFontBucket: group.sourceFontBucket,
+        charBucket: group.charBucket,
+        sampleCount: group.fontRatios.length,
+        pairCount: group.pairIds.length,
+        confidence: computeTextRoleProfileConfidence(group.fontRatios.length, fontRatioSpread),
+        preferredAlign: getDominantGroupValue(group.alignCounts),
+        alignDistribution: buildAlignmentDistribution(group.alignCounts),
+        fontScaleRatio: buildPercentileSummary(group.fontRatios),
+        lineHeightRatio: buildPercentileSummary(group.lineHeightRatios),
+        widthRatio: buildPercentileSummary(group.widthRatios),
+        targetFontSize: buildRangeSummary(group.targetFontSizes),
+        targetLineCount: buildIntegerRangeSummary(group.targetLineCounts),
+        pairIds: group.pairIds.slice(0, 24),
+        exampleNodeTransformIds: group.observationIds.slice(0, 12),
+        createdAt: createdAt,
+        updatedAt: createdAt,
+      });
+    });
+
+    profiles.sort((left, right) => {
+      if (right.sampleCount !== left.sampleCount) {
+        return right.sampleCount - left.sampleCount;
+      }
+      if (right.confidence !== left.confidence) {
+        return right.confidence - left.confidence;
+      }
+      return String(left.id || "").localeCompare(String(right.id || ""));
+    });
+
+    return profiles;
+  }
+
+  function isTextNodeTransformRecord(record) {
+    return !!(record && record.type === "node-transform" && record.nodeKind === "text");
+  }
+
+  function getTextTransformTargetSide(record) {
+    if (!record) {
+      return null;
+    }
+    return string(record.direction, "pc-to-mo") === "mo-to-pc" ? record.pc : record.mo;
+  }
+
+  function buildTextRoleProfileKey(record) {
+    if (!record) {
+      return "";
+    }
+    return [
+      string(record.direction, "pc-to-mo"),
+      string(record.sectionType, "section"),
+      string(record.textRole, "body"),
+      string(record.sourceFontBucket, "0-15"),
+      string(record.charBucket, "1-5"),
+    ].join("|");
+  }
+
+  function inferTextSectionType(pair) {
+    if (!pair || !pair.pc || !pair.mo) {
+      return "section";
+    }
+    const corpus = [pair.pc.topLevelSemanticSegment, pair.mo.topLevelSemanticSegment, pair.pc.parentSemanticSegment, pair.mo.parentSemanticSegment]
+      .join(" ")
+      .toLowerCase();
+    if (containsKeyword(corpus, ["hero", "banner", "kv", "masthead"])) {
+      return "hero";
+    }
+    if (containsKeyword(corpus, ["promo", "promotion", "offer", "coupon", "deal", "event"])) {
+      return "promo";
+    }
+    if (containsKeyword(corpus, ["article", "editorial", "story", "news"])) {
+      return "article";
+    }
+    if (containsKeyword(corpus, ["header", "nav", "gnb"])) {
+      return "header";
+    }
+    if (containsKeyword(corpus, ["footer"])) {
+      return "footer";
+    }
+    return "section";
+  }
+
+  function classifyResponsiveTextRole(pair, sectionType) {
+    const pcNode = pair && pair.pc ? pair.pc.node : null;
+    const moNode = pair && pair.mo ? pair.mo.node : null;
+    const corpus = [safeName(pcNode), safeName(moNode), string(pcNode && pcNode.characters, ""), string(moNode && moNode.characters, "")]
+      .join(" ")
+      .toLowerCase();
+    const fontSize = Math.max(getTextFontSize(pcNode), getTextFontSize(moNode));
+    const charCount = Math.max(getTextCharacterCount(pcNode), getTextCharacterCount(moNode));
+
+    if (containsKeyword(corpus, ["cta", "button", "shop", "buy", "learn more", "discover", "apply"])) {
+      return "cta";
+    }
+    if (containsKeyword(corpus, ["eyebrow", "meta", "date", "tag", "badge", "label"])) {
+      return "meta";
+    }
+    if (containsKeyword(corpus, ["subtitle", "sub title", "subheading", "supporting copy"])) {
+      return "subtitle";
+    }
+    if (sectionType === "hero" && fontSize >= 36) {
+      return "headline";
+    }
+    if ((sectionType === "promo" || sectionType === "article") && fontSize >= 24) {
+      return "headline";
+    }
+    if (fontSize >= 32) {
+      return "headline";
+    }
+    if (fontSize >= 20 && charCount <= 28) {
+      return "headline";
+    }
+    if (fontSize >= 18) {
+      return "subtitle";
+    }
+    return "body";
+  }
+
+  function buildPercentileSummary(values) {
+    const list = normalizeNumericArray(values);
+    if (list.length === 0) {
+      return { p25: 0, p50: 0, p75: 0 };
+    }
+    return {
+      p25: roundConfidence(getPercentile(list, 0.25)),
+      p50: roundConfidence(getPercentile(list, 0.5)),
+      p75: roundConfidence(getPercentile(list, 0.75)),
+    };
+  }
+
+  function buildRatioPercentileSummary(values) {
+    const list = normalizeNumericArray(values);
+    if (list.length === 0) {
+      return { p25: 0, p50: 0, p75: 0 };
+    }
+    return {
+      p25: roundRatio(getPercentile(list, 0.25)),
+      p50: roundRatio(getPercentile(list, 0.5)),
+      p75: roundRatio(getPercentile(list, 0.75)),
+    };
+  }
+
+  function buildRangeSummary(values) {
+    const list = normalizeNumericArray(values);
+    if (list.length === 0) {
+      return { min: 0, p50: 0, max: 0 };
+    }
+    return {
+      min: roundPixel(list[0]),
+      p50: roundPixel(getPercentile(list, 0.5)),
+      max: roundPixel(list[list.length - 1]),
+    };
+  }
+
+  function buildIntegerRangeSummary(values) {
+    const list = normalizeNumericArray(values);
+    if (list.length === 0) {
+      return { min: 0, median: 0, max: 0 };
+    }
+    return {
+      min: Math.max(1, Math.round(list[0])),
+      median: Math.max(1, Math.round(getPercentile(list, 0.5))),
+      max: Math.max(1, Math.round(list[list.length - 1])),
+    };
+  }
+
+  function normalizeNumericArray(values) {
+    const list = [];
+    const source = Array.isArray(values) ? values : [];
+    for (let index = 0; index < source.length; index += 1) {
+      const value = numeric(source[index]);
+      if (value > 0) {
+        list.push(value);
+      }
+    }
+    list.sort((left, right) => left - right);
+    return list;
+  }
+
+  function getPercentile(values, ratio) {
+    const list = normalizeNumericArray(values);
+    if (list.length === 0) {
+      return 0;
+    }
+    if (list.length === 1) {
+      return list[0];
+    }
+
+    const clampedRatio = Math.max(0, Math.min(1, numeric(ratio)));
+    const index = (list.length - 1) * clampedRatio;
+    const lowerIndex = Math.floor(index);
+    const upperIndex = Math.min(list.length - 1, Math.ceil(index));
+    const weight = index - lowerIndex;
+    if (lowerIndex === upperIndex) {
+      return list[lowerIndex];
+    }
+    return list[lowerIndex] + (list[upperIndex] - list[lowerIndex]) * weight;
+  }
+
+  function computeTextRoleProfileConfidence(sampleCount, fontRatioSpread) {
+    const countScore = Math.min(0.42, Math.max(0, sampleCount - 1) * 0.07);
+    const spreadPenalty = Math.min(0.22, Math.max(0, fontRatioSpread) * 0.5);
+    return roundConfidence(clampScore(0.44 + countScore - spreadPenalty));
+  }
+
+  function getDominantGroupValue(counts) {
+    const source = counts && typeof counts === "object" ? counts : {};
+    const keys = Object.keys(source);
+    let bestKey = "";
+    let bestCount = 0;
+    for (let index = 0; index < keys.length; index += 1) {
+      const key = keys[index];
+      const count = numeric(source[key]);
+      if (count > bestCount) {
+        bestKey = key;
+        bestCount = count;
+      }
+    }
+    return bestKey;
+  }
+
+  function buildAlignmentDistribution(counts) {
+    const source = counts && typeof counts === "object" ? counts : {};
+    const keys = Object.keys(source);
+    const entries = [];
+    let total = 0;
+
+    for (let index = 0; index < keys.length; index += 1) {
+      total += numeric(source[keys[index]]);
+    }
+
+    for (let index = 0; index < keys.length; index += 1) {
+      const key = keys[index];
+      const count = numeric(source[key]);
+      if (count <= 0 || total <= 0) {
+        continue;
+      }
+      entries.push({
+        align: key,
+        count: count,
+        ratio: roundConfidence(count / total),
+      });
+    }
+
+    entries.sort((left, right) => {
+      if (right.count !== left.count) {
+        return right.count - left.count;
+      }
+      return String(left.align || "").localeCompare(String(right.align || ""));
+    });
+
+    return {
+      totalCount: total,
+      entries: entries,
+    };
+  }
+
+  function getTextFontSize(node) {
+    if (!node || String(node.type || "") !== "TEXT") {
+      return 0;
+    }
+    if (typeof node.fontSize === "number" && isFinite(node.fontSize)) {
+      return roundPixel(node.fontSize);
+    }
+    return 0;
+  }
+
+  function getTextCharacterCount(node) {
+    const text = string(node && node.characters, "").replace(/\s+/g, " ").trim();
+    return text ? text.length : 0;
+  }
+
+  function getTextLineHeight(node, bounds, fontSize) {
+    const lineHeight = node && typeof node === "object" ? node.lineHeight : null;
+    if (lineHeight && typeof lineHeight === "object") {
+      const unit = string(lineHeight.unit, "").toUpperCase();
+      const value = numeric(lineHeight.value);
+      if (unit === "PIXELS" && value > 0) {
+        return roundPixel(value);
+      }
+      if (unit === "PERCENT" && value > 0 && fontSize > 0) {
+        return roundPixel((fontSize * value) / 100);
+      }
+    }
+    if (bounds && fontSize > 0) {
+      const explicitLines = countExplicitTextLines(node);
+      if (explicitLines > 0) {
+        return roundPixel(bounds.height / explicitLines);
+      }
+    }
+    return 0;
+  }
+
+  function estimateTextLineCount(node, bounds, fontSize, lineHeight) {
+    const explicit = countExplicitTextLines(node);
+    if (explicit > 1) {
+      return explicit;
+    }
+    if (bounds && lineHeight > 0) {
+      return Math.max(1, Math.round(bounds.height / Math.max(1, lineHeight)));
+    }
+    if (bounds && fontSize > 0) {
+      return Math.max(1, Math.round(bounds.height / Math.max(1, fontSize * 1.25)));
+    }
+    return 1;
+  }
+
+  function countExplicitTextLines(node) {
+    const text = string(node && node.characters, "");
+    if (!text) {
+      return 0;
+    }
+    return text.split(/\r?\n/).length;
+  }
+
+  function getTextAlignLabel(node) {
+    return string(node && node.textAlignHorizontal, "").toLowerCase();
+  }
+
+  function getTextFontInfo(node) {
+    const info = {
+      family: "",
+      style: "",
+      weight: "",
+    };
+    const fontName = node && node.fontName && node.fontName !== figma.mixed ? node.fontName : null;
+    if (fontName && typeof fontName === "object") {
+      info.family = string(fontName.family, "");
+      info.style = string(fontName.style, "");
+      info.weight = normalizeFontWeightLabel(info.style);
+    }
+    return info;
+  }
+
+  function normalizeFontWeightLabel(style) {
+    const text = string(style, "").toLowerCase();
+    if (!text) {
+      return "";
+    }
+    if (text.indexOf("thin") >= 0) {
+      return "100";
+    }
+    if (text.indexOf("extra light") >= 0 || text.indexOf("ultra light") >= 0) {
+      return "200";
+    }
+    if (text.indexOf("light") >= 0) {
+      return "300";
+    }
+    if (text.indexOf("medium") >= 0) {
+      return "500";
+    }
+    if (text.indexOf("semi bold") >= 0 || text.indexOf("semibold") >= 0) {
+      return "600";
+    }
+    if (text.indexOf("extra bold") >= 0 || text.indexOf("ultra bold") >= 0) {
+      return "800";
+    }
+    if (text.indexOf("black") >= 0 || text.indexOf("heavy") >= 0) {
+      return "900";
+    }
+    if (text.indexOf("bold") >= 0) {
+      return "700";
+    }
+    return "400";
+  }
+
+  function bucketTextFontSize(size) {
+    const value = numeric(size);
+    if (value < 16) {
+      return "0-15";
+    }
+    if (value < 24) {
+      return "16-23";
+    }
+    if (value < 32) {
+      return "24-31";
+    }
+    if (value < 48) {
+      return "32-47";
+    }
+    if (value < 64) {
+      return "48-63";
+    }
+    if (value < 80) {
+      return "64-79";
+    }
+    if (value < 112) {
+      return "80-111";
+    }
+    if (value < 160) {
+      return "112-159";
+    }
+    if (value < 220) {
+      return "160-219";
+    }
+    if (value < 320) {
+      return "220-319";
+    }
+    return "320+";
+  }
+
+  function bucketTextCharacterCount(count) {
+    const value = numeric(count);
+    if (value <= 5) {
+      return "1-5";
+    }
+    if (value <= 11) {
+      return "6-11";
+    }
+    if (value <= 19) {
+      return "12-19";
+    }
+    if (value <= 31) {
+      return "20-31";
+    }
+    if (value <= 47) {
+      return "32-47";
+    }
+    return "48+";
+  }
+
+  function buildSectionTextGroupRoles(sectionType, pair) {
+    const entries = collectOrderedSectionTextEntries(pair && pair.mo ? pair.mo.node : null);
+    const detected = [];
+    const seen = new Set();
+
+    for (let index = 0; index < entries.length; index += 1) {
+      const role = classifySectionTextRole(entries[index], sectionType, index, entries.length);
+      if (!role || seen.has(role)) {
+        continue;
+      }
+      seen.add(role);
+      detected.push(role);
+    }
+
+    if (!detected.length) {
+      if (sectionType === "hero") {
+        detected.push("eyebrow", "headline", "subtitle", "body");
+      } else if (sectionType === "promo") {
+        detected.push("meta", "headline", "body");
+      } else {
+        detected.push("headline", "body");
+      }
+    }
+
+    const required = [];
+    if (detected.indexOf("headline") >= 0) {
+      required.push("headline");
+    }
+    if (detected.indexOf("body") >= 0) {
+      required.push("body");
+    }
+    if (sectionType === "promo" && detected.indexOf("meta") >= 0) {
+      required.unshift("meta");
+    }
+    if (sectionType === "hero" && detected.indexOf("subtitle") >= 0) {
+      required.push("subtitle");
+    }
+
+    return {
+      order: detected.slice(0, 6),
+      required: uniqueValues(required),
+      detected: detected.slice(0, 8),
+    };
+  }
+
+  function buildSectionTextPreservation(sectionType, heroGuidance) {
+    const strictHero = sectionType === "hero" || !!(heroGuidance && heroGuidance.headlinePreserve);
+    return {
+      allTextMustSurvive: true,
+      preserveReadingOrder: true,
+      preserveHeadlineVerbatim: strictHero,
+      copyBlockPreferred: !!(heroGuidance && heroGuidance.copyBlockPreferred),
+    };
+  }
+
+  function classifySectionContentPriority(sectionType, pair, mobilePattern) {
+    if (sectionType === "hero" || sectionType === "promo") {
+      return "text-first";
+    }
+    if (sectionType === "article" || sectionType === "editorial") {
+      return "text-first";
+    }
+    if (containsKeyword(String(mobilePattern || ""), ["horizontal-to-vertical", "stack"])) {
+      return "text-first";
+    }
+    if (pair && pair.pc && pair.mo && pair.pc.layoutInfo && pair.mo.layoutInfo && pair.pc.layoutInfo.mode === "HORIZONTAL" && pair.mo.layoutInfo.mode === "VERTICAL") {
+      return "text-first";
+    }
+    return "balanced";
+  }
+
+  function classifySectionReflowPattern(sectionType, pair, mobilePattern) {
+    if (sectionType === "hero") {
+      return "overlay-copy-bottom-visual";
+    }
+    if (sectionType === "promo") {
+      return "meta-title-body-product";
+    }
+    if (sectionType === "article" || sectionType === "editorial") {
+      return "title-body-media";
+    }
+    if (containsKeyword(String(mobilePattern || ""), ["horizontal-to-vertical"])) {
+      return "horizontal-to-vertical";
+    }
+    if (pair && pair.pc && pair.mo && pair.pc.layoutInfo && pair.mo.layoutInfo && pair.pc.layoutInfo.mode === "HORIZONTAL" && pair.mo.layoutInfo.mode === "VERTICAL") {
+      return "horizontal-to-vertical";
+    }
+    return "mobile-fit";
+  }
+
+  function buildSectionTextLayoutGuidance(sectionType, mobilePattern, heroGuidance) {
+    if (sectionType === "hero") {
+      return {
+        alignment: heroGuidance && heroGuidance.textAlignment ? heroGuidance.textAlignment : "center",
+        rewrapRequired: true,
+        headlineMaxWidthRatio: 0.88,
+        preferredLineBreakCount: 3,
+        maxLineCount: {
+          eyebrow: 2,
+          headline: 4,
+          subtitle: 3,
+          body: 5,
+        },
+        minFontSize: {
+          headline: 40,
+          subtitle: 22,
+          body: 16,
+          meta: 14,
+        },
+      };
+    }
+    if (sectionType === "promo") {
+      return {
+        alignment: "center",
+        rewrapRequired: true,
+        headlineMaxWidthRatio: 0.9,
+        preferredLineBreakCount: 3,
+        maxLineCount: {
+          meta: 2,
+          headline: 4,
+          subtitle: 3,
+          body: 5,
+        },
+        minFontSize: {
+          headline: 28,
+          subtitle: 18,
+          body: 16,
+          meta: 14,
+        },
+      };
+    }
+    if (sectionType === "article" || sectionType === "editorial") {
+      return {
+        alignment: "left",
+        rewrapRequired: containsKeyword(String(mobilePattern || ""), ["stack"]),
+        headlineMaxWidthRatio: 0.92,
+        preferredLineBreakCount: 3,
+        maxLineCount: {
+          meta: 2,
+          headline: 4,
+          subtitle: 3,
+          body: 7,
+        },
+        minFontSize: {
+          headline: 24,
+          subtitle: 18,
+          body: 15,
+          meta: 13,
+        },
+      };
+    }
+    return {
+      alignment: "left",
+      rewrapRequired: false,
+      headlineMaxWidthRatio: 0.92,
+      preferredLineBreakCount: 2,
+      maxLineCount: {
+        headline: 4,
+        subtitle: 3,
+        body: 5,
+        meta: 2,
+      },
+      minFontSize: {
+        headline: 22,
+        subtitle: 16,
+        body: 14,
+        meta: 12,
+      },
+    };
+  }
+
+  function buildSectionVisualRoleGuidance(sectionType, mobilePattern) {
+    if (sectionType === "hero") {
+      return {
+        primary: "background",
+        focal: "product",
+        anchor: "bottom",
+      };
+    }
+    if (sectionType === "promo") {
+      return {
+        primary: "product",
+        focal: "product",
+        anchor: "bottom",
+      };
+    }
+    if (sectionType === "article" || sectionType === "editorial") {
+      return {
+        primary: "supporting",
+        focal: "supporting",
+        anchor: containsKeyword(String(mobilePattern || ""), ["stack"]) ? "after-copy" : "inline",
+      };
+    }
+    return {
+      primary: "supporting",
+      focal: "supporting",
+      anchor: "inline",
+    };
+  }
+
+  function buildSectionMobileAspectPreference(sectionType, pair, mobilePattern) {
+    const moBounds = pair && pair.mo && pair.mo.bounds ? pair.mo.bounds : null;
+    const width = moBounds ? numeric(moBounds.width) : 0;
+    const height = moBounds ? numeric(moBounds.height) : 0;
+    let preferredRatio = width > 0 && height > 0 ? roundPixel(height / width) : 0;
+
+    if (!preferredRatio || !isFinite(preferredRatio)) {
+      if (sectionType === "hero") {
+        preferredRatio = 1.48;
+      } else if (sectionType === "promo") {
+        preferredRatio = 1.18;
+      } else if (containsKeyword(String(mobilePattern || ""), ["stack"])) {
+        preferredRatio = 1.02;
+      } else {
+        preferredRatio = 0.86;
+      }
+    }
+
+    const minRatio = roundPixel(Math.max(0.7, preferredRatio - 0.24));
+    const maxRatio = roundPixel(Math.min(2.4, preferredRatio + 0.32));
+    return {
+      preferredRatio: preferredRatio,
+      minRatio: minRatio,
+      maxRatio: maxRatio,
+    };
+  }
+
+  function buildSectionCropSafeZone(sectionType, pair, heroGuidance, contentPriority) {
+    const overlayPosition = string(heroGuidance && heroGuidance.overlayPosition, "");
+    const horizontalBias = overlayPosition.indexOf("left") >= 0 ? "left" : overlayPosition.indexOf("right") >= 0 ? "right" : "center";
+    const preserveTargets = Array.isArray(heroGuidance && heroGuidance.focalTargets) && heroGuidance.focalTargets.length
+      ? heroGuidance.focalTargets.slice(0, 4)
+      : sectionType === "hero"
+        ? ["headline", "product"]
+        : contentPriority === "text-first"
+          ? ["headline", "body"]
+          : ["product"];
+    return {
+      horizontalBias: sectionType === "hero" ? horizontalBias : "center",
+      verticalBias: sectionType === "hero" ? "top" : contentPriority === "text-first" ? "top" : "center",
+      preserveTargets: preserveTargets,
+      allowBackgroundTrim: sectionType === "hero" || sectionType === "visual",
+    };
+  }
+
+  function buildSectionDropRules(sectionType, pair, mobilePattern, pcStats, moStats, contentPriority, reflowPattern) {
+    return {
+      hideDecorative: countDecorativeLeafNodes(pair && pair.pc ? pair.pc.node : null) >= 3,
+      hideDesktopOnlyElements: sectionType === "header" || sectionType === "footer",
+      hideRedundantMeta: !!(pcStats && moStats && pcStats.textNodes > moStats.textNodes + 1),
+      prioritizeTextOverVisual: contentPriority === "text-first",
+      collapseHorizontalLayout: reflowPattern === "horizontal-to-vertical" || containsKeyword(String(mobilePattern || ""), ["stack", "vertical"]),
+      preserveAllText: true,
+    };
+  }
+
+  function collectOrderedSectionTextEntries(rootNode) {
+    const entries = [];
+    walk(rootNode);
+    entries.sort(compareBoundsForReadingOrder);
+    return entries;
+
+    function walk(current) {
+      if (!current) {
+        return;
+      }
+      if (String(current.type || "") === "TEXT" && typeof current.characters === "string") {
+        const text = current.characters.replace(/\s+/g, " ").trim();
+        const bounds = getNodeBounds(current);
+        if (text && bounds) {
+          entries.push({
+            node: current,
+            name: safeName(current),
+            text: text,
+            bounds: bounds,
+            fontSize: getNodeRepresentativeFontSize(current),
+          });
+        }
+      }
+      if (!hasChildren(current)) {
+        return;
+      }
+      for (let index = 0; index < current.children.length; index += 1) {
+        walk(current.children[index]);
+      }
+    }
+  }
+
+  function classifySectionTextRole(entry, sectionType, index, totalCount) {
+    const name = canonicalizeName(entry && entry.name ? entry.name : "");
+    const text = String(entry && entry.text ? entry.text : "");
+    const fontSize = numeric(entry && entry.fontSize);
+
+    if (containsKeyword(name, ["cta", "button", "shop", "buy", "copy"])) {
+      return "cta";
+    }
+    if (containsKeyword(name, ["meta", "date", "eyebrow", "label", "tag"])) {
+      return "meta";
+    }
+    if (containsKeyword(name, ["headline", "title", "hero", "kv"])) {
+      return index === 0 && sectionType === "hero" ? "eyebrow" : "headline";
+    }
+    if (containsKeyword(name, ["subtitle", "sub title", "subheading"])) {
+      return "subtitle";
+    }
+    if (fontSize >= 42) {
+      return index === 0 && sectionType === "hero" && totalCount >= 3 ? "eyebrow" : "headline";
+    }
+    if (fontSize >= 24) {
+      return index <= 1 ? "headline" : "subtitle";
+    }
+    if (fontSize >= 18 && text.length <= 40) {
+      return index === 0 ? "meta" : "subtitle";
+    }
+    return "body";
+  }
+
+  function compareBoundsForReadingOrder(left, right) {
+    const leftBounds = left && left.bounds ? left.bounds : null;
+    const rightBounds = right && right.bounds ? right.bounds : null;
+    if (!leftBounds || !rightBounds) {
+      return 0;
+    }
+    const yDiff = numeric(leftBounds.y) - numeric(rightBounds.y);
+    if (Math.abs(yDiff) > 6) {
+      return yDiff;
+    }
+    const xDiff = numeric(leftBounds.x) - numeric(rightBounds.x);
+    if (Math.abs(xDiff) > 4) {
+      return xDiff;
+    }
+    return 0;
+  }
+
+  function countDecorativeLeafNodes(rootNode) {
+    let count = 0;
+    walk(rootNode);
+    return count;
+
+    function walk(current) {
+      if (!current) {
+        return;
+      }
+      if (!hasChildren(current) && DECORATIVE_LEAF_TYPES[String(current.type || "")]) {
+        count += 1;
+      }
+      if (!hasChildren(current)) {
+        return;
+      }
+      for (let index = 0; index < current.children.length; index += 1) {
+        walk(current.children[index]);
+      }
+    }
+  }
+
+  function uniqueValues(values) {
+    const out = [];
+    const seen = new Set();
+    const list = Array.isArray(values) ? values : [];
+    for (let index = 0; index < list.length; index += 1) {
+      const value = list[index];
+      if (!value || seen.has(value)) {
+        continue;
+      }
+      seen.add(value);
+      out.push(value);
+    }
+    return out;
+  }
+
+  function buildHeroFocalTargets(moNode, pcNode) {
+    const out = ["headline"];
+    if (findNamedNode(moNode, ["refrigerator", "fridge", "instaview", "product", "oled", "tv", "monitor", "device"]) ||
+        findNamedNode(pcNode, ["refrigerator", "fridge", "instaview", "product", "oled", "tv", "monitor", "device"])) {
+      out.push("product");
+    }
+    if (findNamedNode(moNode, ["person", "model", "woman", "man", "people", "hand", "face", "arm"]) ||
+        findNamedNode(pcNode, ["person", "model", "woman", "man", "people", "hand", "face", "arm"])) {
+      out.push("person");
+    }
+    return out.slice(0, 3);
+  }
+
+  function findHeroCopyBlockMeta(rootNode) {
+    const rootBounds = getNodeBounds(rootNode);
+    if (!rootNode || !rootBounds) {
+      return null;
+    }
+
+    let best = null;
+    let bestScore = 0;
+    walk(rootNode);
+    return best;
+
+    function walk(current) {
+      if (!current || !hasChildren(current)) {
+        return;
+      }
+
+      const bounds = getNodeBounds(current);
+      if (bounds) {
+        const info = measureHeroCopyCandidate(current, bounds, rootBounds);
+        if (info && info.score > bestScore) {
+          best = info;
+          bestScore = info.score;
+        }
+      }
+
+      for (let index = 0; index < current.children.length; index += 1) {
+        walk(current.children[index]);
+      }
+    }
+  }
+
+  function measureHeroCopyCandidate(node, bounds, rootBounds) {
+    const textStats = collectNodeTextStats(node);
+    if (textStats.textCount < 2 || textStats.totalLength < 18) {
+      return null;
+    }
+
+    const relativeX = (numeric(bounds.x) - numeric(rootBounds.x)) / Math.max(1, numeric(rootBounds.width));
+    const relativeY = (numeric(bounds.y) - numeric(rootBounds.y)) / Math.max(1, numeric(rootBounds.height));
+    const areaRatio = (numeric(bounds.width) * numeric(bounds.height)) / Math.max(1, numeric(rootBounds.width) * numeric(rootBounds.height));
+    if (relativeY > 0.58 || relativeX > 0.62 || areaRatio <= 0 || areaRatio >= 0.58) {
+      return null;
+    }
+
+    const corpus = String((node && node.name) || "").toLowerCase();
+    let score = textStats.textCount * 1.8 + Math.min(1.2, textStats.totalLength / 80);
+    if (containsKeyword(corpus, ["copy", "text", "title", "headline", "hero", "kv", "visual"])) {
+      score += 1;
+    }
+    if (relativeY <= 0.18) {
+      score += 0.5;
+    }
+    if (relativeX <= 0.18) {
+      score += 0.35;
+    }
+
+    return {
+      nodeId: String(node.id || ""),
+      overlayPosition: relativeX <= 0.22 ? "top-left" : relativeX >= 0.58 ? "top-right" : "top-center",
+      textCount: textStats.textCount,
+      score: roundConfidence(score / 8),
+    };
+  }
+
+  function collectNodeTextStats(rootNode) {
+    const stats = {
+      textCount: 0,
+      totalLength: 0,
+    };
+
+    walk(rootNode);
+    return stats;
+
+    function walk(current) {
+      if (!current) {
+        return;
+      }
+      if (String(current.type || "") === "TEXT" && typeof current.characters === "string") {
+        const text = current.characters.replace(/\s+/g, " ").trim();
+        if (text) {
+          stats.textCount += 1;
+          stats.totalLength += text.length;
+        }
+      }
+      if (!hasChildren(current)) {
+        return;
+      }
+      for (let index = 0; index < current.children.length; index += 1) {
+        walk(current.children[index]);
+      }
+    }
+  }
+
+  function findNamedNode(rootNode, keywords) {
+    let found = false;
+    walk(rootNode);
+    return found;
+
+    function walk(current) {
+      if (!current || found) {
+        return;
+      }
+      if (containsKeyword(String((current && current.name) || "").toLowerCase(), keywords)) {
+        found = true;
+        return;
+      }
+      if (!hasChildren(current)) {
+        return;
+      }
+      for (let index = 0; index < current.children.length; index += 1) {
+        walk(current.children[index]);
+      }
+    }
+  }
+
+  function isLargeVisualSectionPair(pair) {
+    const pcBounds = pair && pair.pc ? pair.pc.bounds : null;
+    const moBounds = pair && pair.mo ? pair.mo.bounds : null;
+    const pcLarge = !!(pcBounds && pcBounds.width >= 640 && pcBounds.height >= 260);
+    const moLarge = !!(moBounds && moBounds.width >= 280 && moBounds.height >= 180);
+    const pcWide = pair && pair.pc && pair.pc.relativeBounds ? pair.pc.relativeBounds.widthRatio >= 0.68 : false;
+    const moWide = pair && pair.mo && pair.mo.relativeBounds ? pair.mo.relativeBounds.widthRatio >= 0.82 : false;
+    return (pcLarge || moLarge) && (pcWide || moWide);
+  }
+
+  function containsKeyword(text, keywords) {
+    const corpus = typeof text === "string" ? text : "";
+    for (let index = 0; index < keywords.length; index += 1) {
+      if (corpus.indexOf(String(keywords[index]).toLowerCase()) >= 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   function buildRuleRecords(classifiedPair, pairId, createdAt, matching) {
     const records = [];
     const pcLayout = getLayoutInfo(classifiedPair.pc.node);
     const moLayout = getLayoutInfo(classifiedPair.mo.node);
     const widthRatio = roundRatio(classifiedPair.mo.width / Math.max(1, classifiedPair.pc.width));
+    const pcAspectRatio = getFrameAspectRatio(classifiedPair.pc.width, classifiedPair.pc.height);
+    const moAspectRatio = getFrameAspectRatio(classifiedPair.mo.width, classifiedPair.mo.height);
+    const pcShape = classifyFrameShape(pcAspectRatio);
+    const moShape = classifyFrameShape(moAspectRatio);
+    const rootChildCount = Array.isArray(classifiedPair && classifiedPair.pc && classifiedPair.pc.node && classifiedPair.pc.node.children)
+      ? classifiedPair.pc.node.children.filter(Boolean).length
+      : 0;
+    const rootRuleContext = {
+      rootSourceShape: pcShape,
+      rootSourceAspectBucket: bucketFrameAspectRatio(pcAspectRatio),
+      rootSourceLayoutMode: pcLayout.mode,
+      rootSectionCountBucket: bucketFrameSectionCount(rootChildCount),
+      rootTargetWidthBucket: bucketFrameWidth(classifiedPair.mo.width),
+    };
 
     records.push(
       createRuleRecord(
@@ -1783,9 +3985,58 @@
           pcWidth: classifiedPair.pc.width,
           moWidth: classifiedPair.mo.width,
           widthRatio: widthRatio,
+          rootTargetWidthBucket: rootRuleContext.rootTargetWidthBucket,
         }
       )
     );
+
+    if (pcAspectRatio && moAspectRatio && Math.abs(pcAspectRatio - moAspectRatio) >= 0.08) {
+      records.push(
+        createRuleRecord(
+          pairId,
+          createdAt,
+          "frame-aspect-ratio",
+          "root",
+          0.94,
+          "deterministic",
+          `frame aspect ${pcAspectRatio} to ${moAspectRatio}`,
+          {
+            pcAspectRatio: pcAspectRatio,
+            moAspectRatio: moAspectRatio,
+            rootSourceShape: rootRuleContext.rootSourceShape,
+            rootSourceAspectBucket: rootRuleContext.rootSourceAspectBucket,
+            rootSourceLayoutMode: rootRuleContext.rootSourceLayoutMode,
+            rootSectionCountBucket: rootRuleContext.rootSectionCountBucket,
+            rootTargetWidthBucket: rootRuleContext.rootTargetWidthBucket,
+          }
+        )
+      );
+    }
+
+    if (pcShape !== moShape) {
+      records.push(
+        createRuleRecord(
+          pairId,
+          createdAt,
+          "frame-shape",
+          "root",
+          0.96,
+          "deterministic",
+          `${pcShape} frame to ${moShape} frame`,
+          {
+            pcShape: pcShape,
+            moShape: moShape,
+            pcAspectRatio: pcAspectRatio,
+            moAspectRatio: moAspectRatio,
+            rootSourceShape: rootRuleContext.rootSourceShape,
+            rootSourceAspectBucket: rootRuleContext.rootSourceAspectBucket,
+            rootSourceLayoutMode: rootRuleContext.rootSourceLayoutMode,
+            rootSectionCountBucket: rootRuleContext.rootSectionCountBucket,
+            rootTargetWidthBucket: rootRuleContext.rootTargetWidthBucket,
+          }
+        )
+      );
+    }
 
     if (pcLayout.mode !== moLayout.mode && (pcLayout.mode !== "NONE" || moLayout.mode !== "NONE")) {
       records.push(
@@ -1802,6 +4053,11 @@
             moMode: moLayout.mode,
             pcSource: pcLayout.source,
             moSource: moLayout.source,
+            rootSourceShape: rootRuleContext.rootSourceShape,
+            rootSourceAspectBucket: rootRuleContext.rootSourceAspectBucket,
+            rootSourceLayoutMode: rootRuleContext.rootSourceLayoutMode,
+            rootSectionCountBucket: rootRuleContext.rootSectionCountBucket,
+            rootTargetWidthBucket: rootRuleContext.rootTargetWidthBucket,
           }
         )
       );
@@ -1820,6 +4076,11 @@
           {
             pcGap: pcLayout.gap,
             moGap: moLayout.gap,
+            rootSourceShape: rootRuleContext.rootSourceShape,
+            rootSourceAspectBucket: rootRuleContext.rootSourceAspectBucket,
+            rootSourceLayoutMode: rootRuleContext.rootSourceLayoutMode,
+            rootSectionCountBucket: rootRuleContext.rootSectionCountBucket,
+            rootTargetWidthBucket: rootRuleContext.rootTargetWidthBucket,
           }
         )
       );
@@ -1840,6 +4101,11 @@
             pcPaddingY: pcLayout.paddingY,
             moPaddingX: moLayout.paddingX,
             moPaddingY: moLayout.paddingY,
+            rootSourceShape: rootRuleContext.rootSourceShape,
+            rootSourceAspectBucket: rootRuleContext.rootSourceAspectBucket,
+            rootSourceLayoutMode: rootRuleContext.rootSourceLayoutMode,
+            rootSectionCountBucket: rootRuleContext.rootSectionCountBucket,
+            rootTargetWidthBucket: rootRuleContext.rootTargetWidthBucket,
           }
         )
       );
@@ -1860,6 +4126,11 @@
           {
             pcColumns: pcColumns,
             moColumns: moColumns,
+            rootSourceShape: rootRuleContext.rootSourceShape,
+            rootSourceAspectBucket: rootRuleContext.rootSourceAspectBucket,
+            rootSourceLayoutMode: rootRuleContext.rootSourceLayoutMode,
+            rootSectionCountBucket: rootRuleContext.rootSectionCountBucket,
+            rootTargetWidthBucket: rootRuleContext.rootTargetWidthBucket,
           }
         )
       );
@@ -1874,12 +4145,17 @@
           createdAt,
           "font-scale",
           "root",
-          0.78,
+          0.58,
           "deterministic",
           `representative font ${pcFontSize}px to ${moFontSize}px`,
           {
             pcFontSize: pcFontSize,
             moFontSize: moFontSize,
+            rootSourceShape: rootRuleContext.rootSourceShape,
+            rootSourceAspectBucket: rootRuleContext.rootSourceAspectBucket,
+            rootSourceLayoutMode: rootRuleContext.rootSourceLayoutMode,
+            rootSectionCountBucket: rootRuleContext.rootSectionCountBucket,
+            rootTargetWidthBucket: rootRuleContext.rootTargetWidthBucket,
           }
         )
       );
@@ -1895,8 +4171,9 @@
     return records;
   }
 
-  function buildAnalysisPreview(matching, ruleRecords, aggregatePreview) {
+  function buildAnalysisPreview(matching, sectionRecords, ruleRecords, aggregatePreview) {
     const pairs = matching && Array.isArray(matching.pairs) ? matching.pairs.slice() : [];
+    const sections = Array.isArray(sectionRecords) ? sectionRecords.slice() : [];
     const rules = Array.isArray(ruleRecords) ? ruleRecords.slice() : [];
     const aggregate = aggregatePreview && typeof aggregatePreview === "object" ? aggregatePreview : {};
     const lowConfidenceMatches = pairs
@@ -1919,6 +4196,16 @@
       .slice(0, 4)
       .map((rule) => String(rule.summary || "").trim())
       .filter(Boolean);
+    const representativeSections = sections
+      .slice()
+      .sort((left, right) => {
+        const leftConfidence = typeof left.confidence === "number" ? left.confidence : 0;
+        const rightConfidence = typeof right.confidence === "number" ? right.confidence : 0;
+        return rightConfidence - leftConfidence;
+      })
+      .slice(0, 4)
+      .map((record) => String(record.summary || "").trim())
+      .filter(Boolean);
     const countsByRuleType = {};
 
     for (let index = 0; index < rules.length; index += 1) {
@@ -1930,6 +4217,7 @@
       lowConfidenceCount: matching && matching.stats ? matching.stats.lowConfidenceMatchCount : 0,
       lowConfidenceMatches: lowConfidenceMatches,
       representativeMatches: representativeMatches,
+      representativeSections: representativeSections,
       representativeRules: representativeRules,
       countsByRuleType: countsByRuleType,
       repeatedRules: Array.isArray(aggregate.repeatedRules) ? aggregate.repeatedRules : [],
@@ -2720,6 +5008,21 @@
   }
 
   function buildRuleSubjectSignature(ruleType, scope, payload) {
+    if (scope === "root" && isContextualRootAggregateRuleType(ruleType)) {
+      const parts = [
+        payload.rootSourceShape,
+        payload.rootSourceAspectBucket,
+        payload.rootSourceLayoutMode,
+        payload.rootSectionCountBucket,
+        payload.rootTargetWidthBucket,
+      ]
+        .map((value) => normalizeAggregateToken(value))
+        .filter(Boolean);
+      if (parts.length > 0) {
+        return parts.join("|");
+      }
+    }
+
     if (ruleType === "variant-switch") {
       return normalizeAggregateToken(payload.componentFamily || payload.componentKey || scope);
     }
@@ -2747,9 +5050,29 @@
     return normalizeAggregateToken(scope);
   }
 
+  function isContextualRootAggregateRuleType(ruleType) {
+    return (
+      ruleType === "frame-aspect-ratio" ||
+      ruleType === "frame-shape" ||
+      ruleType === "layout-axis" ||
+      ruleType === "gap-scale" ||
+      ruleType === "padding-scale" ||
+      ruleType === "estimated-columns" ||
+      ruleType === "font-scale"
+    );
+  }
+
   function buildRuleOutcomeSignature(ruleType, payload, summary) {
     if (ruleType === "viewport-width") {
       return `${bucketPixel(payload.pcWidth)}->${bucketPixel(payload.moWidth)}`;
+    }
+
+    if (ruleType === "frame-aspect-ratio") {
+      return `${bucketFrameAspectRatio(payload.pcAspectRatio)}->${bucketFrameAspectRatio(payload.moAspectRatio)}`;
+    }
+
+    if (ruleType === "frame-shape") {
+      return `${normalizeAggregateToken(payload.pcShape)}->${normalizeAggregateToken(payload.moShape)}`;
     }
 
     if (ruleType === "layout-axis") {
@@ -2873,6 +5196,7 @@
 
   function simplifyRootDescriptor(root) {
     const layout = getLayoutInfo(root.node);
+    const aspectRatio = getFrameAspectRatio(root.width, root.height);
 
     return {
       id: root.id,
@@ -2880,6 +5204,8 @@
       type: root.type,
       width: root.width,
       height: root.height,
+      aspectRatio: aspectRatio,
+      frameShape: classifyFrameShape(aspectRatio),
       estimatedColumns: estimateColumnCount(root.node),
       representativeFontSize: getRepresentativeFontSize(root.node),
       layout: {
@@ -2899,6 +5225,8 @@
       textNodes: 0,
       visibleNodes: 0,
       containerNodes: 0,
+      autoLayoutNodes: 0,
+      imageFillNodes: 0,
     };
 
     walk(node);
@@ -2918,6 +5246,18 @@
       }
       if (CONTAINER_TYPES[String(current.type || "")]) {
         stats.containerNodes += 1;
+      }
+      if (typeof current.layoutMode === "string" && current.layoutMode && current.layoutMode !== "NONE") {
+        stats.autoLayoutNodes += 1;
+      }
+      if (Array.isArray(current.fills)) {
+        for (let fillIndex = 0; fillIndex < current.fills.length; fillIndex += 1) {
+          const fill = current.fills[fillIndex];
+          if (fill && fill.visible !== false && fill.type === "IMAGE") {
+            stats.imageFillNodes += 1;
+            break;
+          }
+        }
       }
 
       if (!hasChildren(current)) {
@@ -3079,6 +5419,14 @@
     return !!(node && Array.isArray(node.children) && node.children.length);
   }
 
+  function numeric(value) {
+    return typeof value === "number" && isFinite(value) ? value : 0;
+  }
+
+  function string(value, fallback) {
+    return typeof value === "string" && value.trim() ? value.trim() : fallback;
+  }
+
   function roundPixel(value) {
     const number = typeof value === "number" && isFinite(value) ? value : 0;
     return Math.round(number * 100) / 100;
@@ -3195,6 +5543,10 @@
     }
 
     return roundPixel((values[middle - 1] + values[middle]) / 2);
+  }
+
+  function getNodeRepresentativeFontSize(node) {
+    return getRepresentativeFontSize(node);
   }
 
   function collectFontSizes(node, values) {

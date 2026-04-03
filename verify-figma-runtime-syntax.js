@@ -11,6 +11,7 @@ const defaultFiles = [
   "ai-responsive-memory.js",
   "ai-responsive-pair-analyzer.js",
   "ai-llm-client.js",
+  "ai-design-assist.js",
   "ai-design-read.js",
   "ai-accessibility-diagnosis.js",
   "ai-design-consistency.js",
@@ -18,6 +19,7 @@ const defaultFiles = [
   "ai-typo-audit.js",
   "ai-pixel-perfect.js",
   "delete-hidden-layers.js",
+  "original-image-download.js",
 ];
 
 const inputFiles = process.argv.slice(2);
@@ -214,6 +216,59 @@ function readLine(text, lineNumber) {
   return lines[lineNumber - 1] || "";
 }
 
+function buildCommentLineMap(source) {
+  const lines = source.split(/\r?\n/);
+  const map = {};
+  let inBlockComment = false;
+
+  for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+    const lineNumber = lineIndex + 1;
+    const line = lines[lineIndex];
+    let cursor = 0;
+
+    if (inBlockComment) {
+      map[lineNumber] = true;
+    }
+
+    while (cursor < line.length) {
+      if (inBlockComment) {
+        const blockEnd = line.indexOf("*/", cursor);
+        map[lineNumber] = true;
+        if (blockEnd < 0) {
+          cursor = line.length;
+          continue;
+        }
+        inBlockComment = false;
+        cursor = blockEnd + 2;
+        continue;
+      }
+
+      const lineCommentStart = line.indexOf("//", cursor);
+      const blockCommentStart = line.indexOf("/*", cursor);
+
+      if (lineCommentStart >= 0 && (blockCommentStart < 0 || lineCommentStart < blockCommentStart)) {
+        map[lineNumber] = true;
+        break;
+      }
+
+      if (blockCommentStart >= 0) {
+        map[lineNumber] = true;
+        const blockEnd = line.indexOf("*/", blockCommentStart + 2);
+        if (blockEnd < 0) {
+          inBlockComment = true;
+          break;
+        }
+        cursor = blockEnd + 2;
+        continue;
+      }
+
+      break;
+    }
+  }
+
+  return map;
+}
+
 let failureCount = 0;
 
 for (const file of files) {
@@ -225,12 +280,17 @@ for (const file of files) {
 
   const source = fs.readFileSync(file, "utf8");
   const codeOnly = stripStringsAndComments(source);
+  const commentLineMap = buildCommentLineMap(source);
 
   for (const pattern of unsupportedPatterns) {
     pattern.regex.lastIndex = 0;
     let match = pattern.regex.exec(codeOnly);
     while (match) {
       const location = indexToLineColumn(codeOnly, match.index);
+      if (commentLineMap[location.line]) {
+        match = pattern.regex.exec(codeOnly);
+        continue;
+      }
       const lineText = readLine(source, location.line).trim();
       console.error(
         `[figma-runtime-syntax] ${path.basename(file)}:${location.line}:${location.column} ` +

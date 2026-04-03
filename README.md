@@ -8,6 +8,20 @@ PC <-> MO design AI assist planning, the locked phase-1 decisions, the schema no
 
 - [RESPONSIVE_MEMORY_PLAN.md](RESPONSIVE_MEMORY_PLAN.md)
 - [RESPONSIVE_MEMORY_SCHEMA.md](RESPONSIVE_MEMORY_SCHEMA.md)
+- [PC_MO_ENGINE_REFACTOR.md](PC_MO_ENGINE_REFACTOR.md)
+
+The current refactor direction is:
+
+- keep provider support model-agnostic with OpenAI/Gemini adapters
+- keep the section-rebuilt renderer as the main path
+- keep responsive memory as reusable evidence, not as prompt stuffing
+- move more authority into deterministic rules for target width, safe area, minimum text, and touch targets
+- treat clone-first mobile draft logic as legacy fallback only
+
+Execution README for the next internal-app flow:
+
+- [AI_APP_INTERNAL_PROCESS_README.md](AI_APP_INTERNAL_PROCESS_README.md)
+  - Defines the target plugin state machine, the one-call planner rule, cache strategy, width-profile handling, validator/repair layer, and rollout order for the in-app PC -> MO flow.
 
 Phase 1 currently fixes these decisions:
 
@@ -58,9 +72,11 @@ Safe implementation order:
 - `ai-responsive-memory.js`
   - Source of truth for responsive memory cache state and JSONL import/export plumbing.
 - `ai-responsive-pair-analyzer.js`
-  - Source of truth for the read-only PC/MO pair analyzer that classifies two selected frames and appends draft pair records into responsive memory.
+  - Source of truth for the read-only PC/MO pair analyzer that classifies two selected frames and appends draft pair, section-example, rule, and aggregate records into responsive memory.
 - `ai-llm-client.js`
   - Source of truth for provider-aware OpenAI/Gemini API requests and JSON parsing.
+- `ai-design-assist.js`
+  - Source of truth for AI-tab responsive design assist, memory retrieval, and PC -> MO draft generation experiments.
 - `ai-design-read.js`
   - Source of truth for the `디자인 읽기` plugin-side analysis and cache pipeline.
 - `ai-regroup-rename.js`

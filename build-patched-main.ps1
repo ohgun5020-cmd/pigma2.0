@@ -6,6 +6,7 @@ $aiSettingsPatch = Join-Path $root "ai-settings-storage.js"
 $aiResponsiveMemoryPatch = Join-Path $root "ai-responsive-memory.js"
 $aiResponsivePairAnalyzerPatch = Join-Path $root "ai-responsive-pair-analyzer.js"
 $aiLlmClientPatch = Join-Path $root "ai-llm-client.js"
+$aiDesignAssistPatch = Join-Path $root "ai-design-assist.js"
 $aiDesignReadPatch = Join-Path $root "ai-design-read.js"
 $aiAccessibilityDiagnosisPatch = Join-Path $root "ai-accessibility-diagnosis.js"
 $aiDesignConsistencyPatch = Join-Path $root "ai-design-consistency.js"
@@ -13,6 +14,7 @@ $aiRegroupRenamePatch = Join-Path $root "ai-regroup-rename.js"
 $aiTypoAuditPatch = Join-Path $root "ai-typo-audit.js"
 $aiPixelPerfectPatch = Join-Path $root "ai-pixel-perfect.js"
 $deleteHiddenLayersPatch = Join-Path $root "delete-hidden-layers.js"
+$originalImageDownloadPatch = Join-Path $root "original-image-download.js"
 $destination = Join-Path $root "code.patched.js"
 $uiSource = Join-Path $root "ui.html"
 $uiExternalizer = Join-Path $root "externalize-embedded-ui.js"
@@ -54,6 +56,10 @@ if (-not (Test-Path $aiLlmClientPatch)) {
   throw "Missing AI LLM client patch: $aiLlmClientPatch"
 }
 
+if (-not (Test-Path $aiDesignAssistPatch)) {
+  throw "Missing AI design assist patch: $aiDesignAssistPatch"
+}
+
 if (-not (Test-Path $aiDesignReadPatch)) {
   throw "Missing AI design read patch: $aiDesignReadPatch"
 }
@@ -80,6 +86,10 @@ if (-not (Test-Path $aiPixelPerfectPatch)) {
 
 if (-not (Test-Path $deleteHiddenLayersPatch)) {
   throw "Missing hidden layer delete patch: $deleteHiddenLayersPatch"
+}
+
+if (-not (Test-Path $originalImageDownloadPatch)) {
+  throw "Missing original image download patch: $originalImageDownloadPatch"
 }
 
 if (-not (Test-Path $uiSource)) {
@@ -139,13 +149,15 @@ $runtimeSyntaxSourceFiles = @(
   $aiResponsiveMemoryPatch,
   $aiResponsivePairAnalyzerPatch,
   $aiLlmClientPatch,
+  $aiDesignAssistPatch,
   $aiDesignReadPatch,
   $aiAccessibilityDiagnosisPatch,
   $aiDesignConsistencyPatch,
   $aiRegroupRenamePatch,
   $aiTypoAuditPatch,
   $aiPixelPerfectPatch,
-  $deleteHiddenLayersPatch
+  $deleteHiddenLayersPatch,
+  $originalImageDownloadPatch
 )
 
 & node $figmaRuntimeSyntaxVerifier @runtimeSyntaxSourceFiles
@@ -1077,13 +1089,15 @@ $aiSettingsPatchContent = [System.IO.File]::ReadAllText($aiSettingsPatch, [Syste
 $aiResponsiveMemoryPatchContent = [System.IO.File]::ReadAllText($aiResponsiveMemoryPatch, [System.Text.Encoding]::UTF8)
 $aiResponsivePairAnalyzerPatchContent = [System.IO.File]::ReadAllText($aiResponsivePairAnalyzerPatch, [System.Text.Encoding]::UTF8)
 $aiLlmClientPatchContent = [System.IO.File]::ReadAllText($aiLlmClientPatch, [System.Text.Encoding]::UTF8)
+$aiDesignAssistPatchContent = [System.IO.File]::ReadAllText($aiDesignAssistPatch, [System.Text.Encoding]::UTF8)
 $aiAccessibilityDiagnosisPatchContent = [System.IO.File]::ReadAllText($aiAccessibilityDiagnosisPatch, [System.Text.Encoding]::UTF8)
 $aiDesignConsistencyPatchContent = [System.IO.File]::ReadAllText($aiDesignConsistencyPatch, [System.Text.Encoding]::UTF8)
 $aiRegroupRenamePatchContent = [System.IO.File]::ReadAllText($aiRegroupRenamePatch, [System.Text.Encoding]::UTF8)
 $aiTypoAuditPatchContent = [System.IO.File]::ReadAllText($aiTypoAuditPatch, [System.Text.Encoding]::UTF8)
 $aiPixelPerfectPatchContent = [System.IO.File]::ReadAllText($aiPixelPerfectPatch, [System.Text.Encoding]::UTF8)
 $deleteHiddenLayersPatchContent = [System.IO.File]::ReadAllText($deleteHiddenLayersPatch, [System.Text.Encoding]::UTF8)
-[System.IO.File]::WriteAllText($destination, $bundle + "`r`n" + $importPatch + "`r`n" + $exportPatchContent + "`r`n" + $aiSettingsPatchContent + "`r`n" + $aiResponsiveMemoryPatchContent + "`r`n" + $aiResponsivePairAnalyzerPatchContent + "`r`n" + $aiLlmClientPatchContent + "`r`n" + $aiAccessibilityDiagnosisPatchContent + "`r`n" + $aiDesignConsistencyPatchContent + "`r`n" + $aiRegroupRenamePatchContent + "`r`n" + $aiTypoAuditPatchContent + "`r`n" + $aiPixelPerfectPatchContent + "`r`n" + $deleteHiddenLayersPatchContent, $utf8NoBom)
+$originalImageDownloadPatchContent = [System.IO.File]::ReadAllText($originalImageDownloadPatch, [System.Text.Encoding]::UTF8)
+[System.IO.File]::WriteAllText($destination, $bundle + "`r`n" + $importPatch + "`r`n" + $exportPatchContent + "`r`n" + $aiSettingsPatchContent + "`r`n" + $aiResponsiveMemoryPatchContent + "`r`n" + $aiResponsivePairAnalyzerPatchContent + "`r`n" + $aiLlmClientPatchContent + "`r`n" + $aiDesignAssistPatchContent + "`r`n" + $aiAccessibilityDiagnosisPatchContent + "`r`n" + $aiDesignConsistencyPatchContent + "`r`n" + $aiRegroupRenamePatchContent + "`r`n" + $aiTypoAuditPatchContent + "`r`n" + $aiPixelPerfectPatchContent + "`r`n" + $deleteHiddenLayersPatchContent + "`r`n" + $originalImageDownloadPatchContent, $utf8NoBom)
 
 & node $uiExternalizer $destination
 if ($LASTEXITCODE -ne 0) {

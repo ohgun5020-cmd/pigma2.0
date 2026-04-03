@@ -935,6 +935,18 @@
         gap: 10px;
       }
 
+      .design-assist-config {
+        display: grid;
+        gap: 6px;
+      }
+
+      .design-assist-config-label {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        color: var(--muted);
+      }
+
       .ai-read-status[data-tone="running"] {
         color: var(--accent);
         background: var(--accent-soft);
@@ -1304,6 +1316,21 @@
         flex: 1 1 160px;
       }
 
+      .settings-ai-run-log-actions button {
+        flex: 0 0 auto;
+        min-width: 132px;
+      }
+
+      .settings-ai-run-log-card .list {
+        gap: 8px;
+      }
+
+      .settings-ai-run-log-list .list-detail {
+        color: var(--text-faint);
+        line-height: 1.4;
+        word-break: break-word;
+      }
+
       .responsive-memory-status-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
@@ -1369,6 +1396,36 @@
       }
 
       .responsive-memory-preview-block span {
+        color: var(--text-faint);
+        font-size: 10px;
+        line-height: 1.45;
+      }
+
+      .responsive-memory-detail-grid {
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      }
+
+      .responsive-memory-detail-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .responsive-memory-detail-item {
+        display: grid;
+        gap: 2px;
+      }
+
+      .responsive-memory-detail-item + .responsive-memory-detail-item {
+        padding-top: 8px;
+        border-top: 1px solid var(--border);
+      }
+
+      .responsive-memory-detail-item strong {
+        font-size: 11px;
+        line-height: 1.35;
+      }
+
+      .responsive-memory-detail-item span {
         color: var(--text-faint);
         font-size: 10px;
         line-height: 1.45;
@@ -2855,21 +2912,55 @@
                       id="designAssistMoButton"
                       type="button"
                       data-design-assist-action="mobile-design"
-                      title="선택한 PC 디자인 프레임을 기준으로 모바일 시안을 준비하는 버튼입니다."
-                      aria-label="MO 디자인. 선택한 PC 디자인 프레임을 기준으로 모바일 시안을 준비합니다."
+                      title="선택한 PC 루트를 기준으로 MO dry-run과 MO 초안 생성을 준비하는 버튼입니다."
+                      aria-label="PC -> MO 초안. 선택한 PC 루트를 기준으로 MO dry-run과 MO 초안 생성을 준비합니다."
                     >
-                      MO 디자인
+                      PC -> MO 초안
                     </button>
                     <button
                       class="button-secondary ai-correction-action"
                       id="designAssistPcButton"
                       type="button"
                       data-design-assist-action="pc-design"
-                      title="현재 선택을 PC 기준 디자인으로 설정하는 버튼입니다."
-                      aria-label="PC 디자인. 현재 선택을 PC 기준 디자인으로 설정합니다."
+                      title="선택한 MO 루트를 기준으로 PC dry-run 제안을 준비하는 버튼입니다."
+                      aria-label="MO -> PC 초안. 선택한 MO 루트를 기준으로 PC dry-run 제안을 준비합니다."
                     >
-                      PC 디자인
+                      MO -> PC 초안
                     </button>
+                  </div>
+                  <div class="design-assist-config">
+                    <label class="design-assist-config-label" for="designAssistMobileWidthSelect">MO width</label>
+                    <select id="designAssistMobileWidthSelect" aria-label="Target mobile width">
+                      <option value="360">360</option>
+                      <option value="390">390</option>
+                      <option value="393">393</option>
+                    </select>
+                    <p class="setting-hint" id="designAssistMobileWidthHint" aria-live="polite">
+                      Current width 360px. No saved default width yet.
+                    </p>
+                    <p class="setting-hint" id="designAssistMobileWidthReason">
+                      Automatic comparison history will surface the safer default width here.
+                    </p>
+                    <button
+                      class="button-secondary ai-correction-action"
+                      id="designAssistUsePreferredWidthButton"
+                      type="button"
+                      disabled
+                      title="Apply the saved default width to the MO width selector."
+                      aria-label="Use the saved default width for mobile planning."
+                    >
+                      Use Saved Width
+                    </button>
+                    <p class="setting-hint" id="designAssistModeSplitHint">
+                      Analyze prepares a cached plan. Create Draft applies that validated plan to a new frame.
+                    </p>
+                    <label class="toggle-row" for="designAssistLegacySafeModeCheckbox">
+                      <input id="designAssistLegacySafeModeCheckbox" type="checkbox" />
+                      <span>
+                        Legacy safe mode
+                        <span class="setting-hint">Keeps clone-first fallback on for fragile mobile sections.</span>
+                      </span>
+                    </label>
                   </div>
                   <button
                     class="button-secondary ai-correction-action"
@@ -2877,9 +2968,9 @@
                     type="button"
                     data-design-assist-action="train-design-pairs"
                     title="완성된 PC와 MO 예제를 학습 데이터로 등록하는 버튼입니다."
-                    aria-label="학습하기. 완성된 PC와 MO 예제를 학습 데이터로 등록합니다."
+                    aria-label="PC/MO 학습하기. 완성된 PC와 MO 예제를 학습 데이터로 등록합니다."
                   >
-                    학습하기
+                    PC/MO 학습하기
                   </button>
                 </div>
               </details>
@@ -2898,6 +2989,16 @@
                     aria-label="숨겨진 레이어 삭제. 현재 선택 내부의 숨겨진 레이어를 정리하기 위한 버튼입니다."
                   >
                     숨겨진 레이어 삭제
+                  </button>
+                  <button
+                    class="button-secondary ai-correction-action"
+                    id="aiOriginalImageDownloadButton"
+                    type="button"
+                    data-ai-action="original-image-download"
+                    title="?꾩옱 ?좏깮 踰붿쐞???ъ슜??IMAGE fill??썝蹂??대?吏瑜??쒖감 ?ㅻⅨ?④?濡? ?ㅼ슫濡쒕뱶?⑸땲??"
+                    aria-label="썝蹂??대?吏 異붿텧. ?꾩옱 ?좏깮 踰붿쐞???ъ슜??IMAGE fill??썝蹂??대?吏瑜??쒖감 ?ㅻⅨ?④?濡? ?ㅼ슫濡쒕뱶?⑸땲??"
+                  >
+                    썝蹂??대?吏 異붿텧
                   </button>
                   <button
                     class="button-secondary ai-correction-action"
@@ -3028,6 +3129,111 @@
             </div>
 
             <div id="aiCorrectionDebugPanels" class="stack ai-correction-debug-panels" hidden aria-hidden="true">
+              <details class="panel soft collapsible ai-read-summary-panel" id="designAssistSummaryPanel">
+                <summary>
+                  <div class="panel-copy">
+                    <p class="section-kicker">디자인 어시스트</p>
+                    <p class="panel-title" id="designAssistPanelTitle">디자인 어시스트 준비</p>
+                  </div>
+                  <div class="summary-side">
+                    <span class="pill ai-read-status" id="designAssistStatusPill" data-tone="idle">대기</span>
+                  </div>
+                </summary>
+
+                <div class="ai-read-summary-body">
+                  <p class="panel-text" id="designAssistPanelCopy">
+                    학습 메모리와 AI를 함께 읽어 PC/MO 변환 dry-run 제안을 여기에 표시합니다.
+                  </p>
+
+                  <div class="surface-card">
+                    <div class="surface-card-head">
+                      <p class="meta-fold-label">선택 요약</p>
+                      <p class="surface-card-note" id="designAssistAnalyzedAt">마지막 실행 없음</p>
+                    </div>
+                    <p class="surface-card-title" id="designAssistSelectionSummary">프레임 1개를 선택한 뒤 MO 디자인 또는 PC 디자인을 실행하세요.</p>
+                    <p class="view-note" id="designAssistSelectionNote">
+                      지금 단계에서는 실제 프레임을 바로 수정하지 않고, 학습 메모리와 AI를 기반으로 변환 가이드를 먼저 제안합니다.
+                    </p>
+                  </div>
+
+                  <div class="card-grid detail-list ai-read-metrics">
+                    <article class="detail-row metric-card">
+                      <span class="detail-label">원본 폭</span>
+                      <strong id="designAssistSourceWidthValue">0px</strong>
+                    </article>
+                    <article class="detail-row metric-card">
+                      <span class="detail-label">목표 폭</span>
+                      <strong id="designAssistTargetWidthValue">0px</strong>
+                    </article>
+                    <article class="detail-row metric-card">
+                      <span class="detail-label">유사 pair</span>
+                      <strong id="designAssistPairCountValue">0건</strong>
+                    </article>
+                    <article class="detail-row metric-card">
+                      <span class="detail-label">참고 규칙</span>
+                      <strong id="designAssistRuleCountValue">0개</strong>
+                    </article>
+                  </div>
+
+                  <div class="surface-card ai-read-compact-list">
+                    <div class="surface-card-head">
+                      <p class="meta-fold-label">제안 메모</p>
+                      <p class="surface-card-note">AI와 학습 메모리를 함께 사용합니다.</p>
+                    </div>
+                    <div class="ai-read-compact-row">
+                      <span class="detail-label">AI 상태</span>
+                      <strong id="designAssistAiStatusValue">대기</strong>
+                    </div>
+                    <div class="ai-read-compact-row">
+                      <span class="detail-label">대상 프로필</span>
+                      <strong id="designAssistTargetProfileValue">대기</strong>
+                    </div>
+                    <div class="ai-read-compact-row">
+                      <span class="detail-label">Plan cache</span>
+                      <strong id="designAssistPlanCacheValue">Waiting</strong>
+                    </div>
+                    <div class="ai-read-compact-row">
+                      <span class="detail-label">Plan repair</span>
+                      <strong id="designAssistPlanRepairValue">Waiting</strong>
+                    </div>
+                    <div class="ai-read-compact-row">
+                      <span class="detail-label">메모리 상태</span>
+                      <strong id="designAssistMemoryStatusValue">대기</strong>
+                    </div>
+                    <div class="ai-read-compact-row">
+                      <span class="detail-label">유사 예제</span>
+                      <strong id="designAssistSimilarPairsValue">대기</strong>
+                    </div>
+                    <div class="ai-read-compact-row">
+                      <span class="detail-label">핵심 규칙</span>
+                      <strong id="designAssistRuleSummaryValue">대기</strong>
+                    </div>
+                    <div class="ai-read-compact-row">
+                      <span class="detail-label">생성 초안</span>
+                      <strong id="designAssistDraftValue">아직 생성 안 함</strong>
+                    </div>
+                    <div class="ai-read-compact-row">
+                      <span class="detail-label">주의</span>
+                      <strong id="designAssistWarningValue">대기</strong>
+                    </div>
+                  </div>
+
+                  <div class="list-card ai-read-insights">
+                    <div class="surface-card-head">
+                      <p class="meta-fold-label">변환 가이드</p>
+                      <p class="surface-card-note" id="designAssistInsightMeta">아직 실행 기록이 없습니다.</p>
+                    </div>
+                    <ul class="list" id="designAssistInsightList"></ul>
+                  </div>
+
+                  <div class="ai-correction-group-actions">
+                    <button class="button-primary" id="designAssistCreateDraftButton" type="button" disabled>
+                      MO 초안 프레임 생성
+                    </button>
+                  </div>
+                </div>
+              </details>
+
               <details class="panel soft collapsible ai-read-summary-panel" id="aiReadSummaryPanel">
               <summary>
                 <div class="panel-copy">
@@ -3698,6 +3904,42 @@
                   <span class="setting-label">저장 위치</span>
                   <strong>이 기기 브라우저 저장소</strong>
                 </div>
+                <div class="setting-row">
+                  <span class="setting-label">최근 LLM 실행</span>
+                  <div class="responsive-memory-actions settings-ai-run-log-actions">
+                    <button id="settingsAiRunLogRefreshButton" class="button-secondary" type="button">로그 새로고침</button>
+                  </div>
+                  <span class="setting-hint" id="settingsAiRunLogStatus">최근 실행 기록을 확인하는 중입니다.</span>
+                </div>
+                <div class="list-card settings-ai-run-log-card">
+                  <div class="surface-card-head">
+                    <p class="meta-fold-label">최근 LLM 실행</p>
+                    <p class="surface-card-note" id="settingsAiRunLogMeta" aria-live="polite">아직 기록이 없습니다.</p>
+                  </div>
+                  <ul class="list settings-ai-run-log-list" id="settingsAiRunLogList"></ul>
+                </div>
+                <div class="setting-row">
+                  <span class="setting-label">추천 조치</span>
+                  <div class="responsive-memory-actions settings-ai-run-log-actions">
+                    <button id="settingsAiRunLogRecommendationButton" class="button-primary" type="button" disabled>추천 대기</button>
+                  </div>
+                  <span class="setting-hint" id="settingsAiRunLogRecommendation">최근 실패 패턴을 읽으면 다음 조치가 여기에 표시됩니다.</span>
+                  <span class="setting-hint" id="settingsAiRunLogDiagnostic">최근 실행 근거가 여기에 표시됩니다.</span>
+                </div>
+                <div class="list-card settings-ai-run-log-card">
+                  <div class="surface-card-head">
+                    <p class="meta-fold-label">추천 체크리스트</p>
+                    <p class="surface-card-note">추천 버튼을 누르기 전에 확인할 항목</p>
+                  </div>
+                  <ul class="list settings-ai-run-log-list" id="settingsAiRunLogChecklist"></ul>
+                </div>
+                <div class="list-card settings-ai-run-log-card">
+                  <div class="surface-card-head">
+                    <p class="meta-fold-label">추천 결과 비교</p>
+                    <p class="surface-card-note" id="settingsAiRunLogComparisonMeta">자동 재실행 전후 비교가 여기에 표시됩니다.</p>
+                  </div>
+                  <ul class="list settings-ai-run-log-list" id="settingsAiRunLogComparisonList"></ul>
+                </div>
               </div>
             </details>
 
@@ -3785,6 +4027,21 @@
                   <span class="setting-label">누적 집계 상태</span>
                   <strong id="responsiveMemoryAggregateSummary">아직 집계된 규칙이 없습니다.</strong>
                   <span class="setting-hint" id="responsiveMemoryAggregateNote">pair를 여러 개 학습하면 반복 규칙과 충돌 버킷이 여기서 보입니다.</span>
+                </div>
+
+                <div class="responsive-memory-preview-list responsive-memory-detail-grid">
+                  <div class="responsive-memory-preview-block">
+                    <strong>반복 규칙 상세</strong>
+                    <div class="responsive-memory-detail-list" id="responsiveMemoryAggregateRepeatedDetail"></div>
+                  </div>
+                  <div class="responsive-memory-preview-block">
+                    <strong>충돌 버킷 상세</strong>
+                    <div class="responsive-memory-detail-list" id="responsiveMemoryAggregateConflictDetail"></div>
+                  </div>
+                  <div class="responsive-memory-preview-block">
+                    <strong>고신뢰 aggregate</strong>
+                    <div class="responsive-memory-detail-list" id="responsiveMemoryAggregateHighConfidenceDetail"></div>
+                  </div>
                 </div>
 
                 <div class="setting-row">
@@ -4211,6 +4468,9 @@
     <script>
       (() => {
         const storageKey = "pigma-ai-settings-cache-v1";
+        const designAssistWidthStorageKey = "pigma:design-assist-mobile-width:v1";
+        const designAssistWidthOutcomeStorageKey = "pigma:design-assist-width-outcomes:v1";
+        const designAssistComparisonWidths = ["360", "390", "393"];
         const defaultSettings = Object.freeze({
           enabled: false,
           provider: "openai",
@@ -4231,6 +4491,18 @@
         const dictionaryInput = document.getElementById("settingsAiDictionaryInput");
         const protectedTermsRow = document.getElementById("settingsAiProtectedTermsRow");
         const protectedTermsInput = document.getElementById("settingsAiProtectedTermsInput");
+        const aiTab = document.getElementById("tabAi");
+        const settingsTab = document.getElementById("tabSettings");
+        const runLogRefreshButton = document.getElementById("settingsAiRunLogRefreshButton");
+        const runLogStatus = document.getElementById("settingsAiRunLogStatus");
+        const runLogMeta = document.getElementById("settingsAiRunLogMeta");
+        const runLogList = document.getElementById("settingsAiRunLogList");
+        const runLogRecommendationButton = document.getElementById("settingsAiRunLogRecommendationButton");
+        const runLogRecommendation = document.getElementById("settingsAiRunLogRecommendation");
+        const runLogDiagnostic = document.getElementById("settingsAiRunLogDiagnostic");
+        const runLogChecklist = document.getElementById("settingsAiRunLogChecklist");
+        const runLogComparisonMeta = document.getElementById("settingsAiRunLogComparisonMeta");
+        const runLogComparisonList = document.getElementById("settingsAiRunLogComparisonList");
 
         if (
           !(toggle instanceof HTMLButtonElement) ||
@@ -4244,12 +4516,29 @@
           !(dictionaryRow instanceof HTMLElement) ||
           !(dictionaryInput instanceof HTMLTextAreaElement) ||
           !(protectedTermsRow instanceof HTMLElement) ||
-          !(protectedTermsInput instanceof HTMLTextAreaElement)
+          !(protectedTermsInput instanceof HTMLTextAreaElement) ||
+          !(runLogRefreshButton instanceof HTMLButtonElement) ||
+          !(runLogStatus instanceof HTMLElement) ||
+          !(runLogMeta instanceof HTMLElement) ||
+          !(runLogList instanceof HTMLElement) ||
+          !(runLogRecommendationButton instanceof HTMLButtonElement) ||
+          !(runLogRecommendation instanceof HTMLElement) ||
+          !(runLogDiagnostic instanceof HTMLElement) ||
+          !(runLogChecklist instanceof HTMLElement) ||
+          !(runLogComparisonMeta instanceof HTMLElement) ||
+          !(runLogComparisonList instanceof HTMLElement)
         ) {
           return;
         }
 
         let currentSettings = { ...defaultSettings };
+        let currentRunLogEntries = [];
+        let currentRunLogRecommendation = null;
+        let isRunLogLoading = false;
+        let runLogRefreshTimerId = 0;
+        let pendingRecommendationComparison = null;
+        let lastRecommendationComparison = null;
+        let currentWidthOutcomeStore = null;
         const availableProofingLocales = new Set(Array.from(proofingLocaleSelect.options).map((option) => option.value));
 
         const postPluginMessage = (message) => {
@@ -4289,6 +4578,345 @@
         };
 
         const stringifyTermList = (value) => parseTermList(value).join("\n");
+
+        const normalizeRecommendationMobileWidth = (value) => {
+          const next = String(value || "").trim();
+          return next === "390" || next === "393" ? next : "360";
+        };
+
+        const normalizeTrackedMobileWidth = (value) => {
+          const next = String(value || "").trim();
+          return designAssistComparisonWidths.includes(next) ? next : "";
+        };
+
+        const createEmptyWidthOutcomeBucket = () => ({
+          attempts: 0,
+          wins: 0,
+          losses: 0,
+          ties: 0,
+          totalQualityScore: 0,
+          bestQualityScore: 0,
+          lastQualityScore: 0,
+          lastQualityLabel: "",
+          updatedAt: "",
+        });
+
+        const normalizeWidthOutcomeBucket = (value) => {
+          const bucket = value && typeof value === "object" ? value : {};
+          return {
+            attempts: Math.max(0, Math.round(Number(bucket.attempts) || 0)),
+            wins: Math.max(0, Math.round(Number(bucket.wins) || 0)),
+            losses: Math.max(0, Math.round(Number(bucket.losses) || 0)),
+            ties: Math.max(0, Math.round(Number(bucket.ties) || 0)),
+            totalQualityScore: Math.max(0, Math.round(Number(bucket.totalQualityScore) || 0)),
+            bestQualityScore: Math.max(0, Math.min(100, Math.round(Number(bucket.bestQualityScore) || 0))),
+            lastQualityScore: Math.max(0, Math.min(100, Math.round(Number(bucket.lastQualityScore) || 0))),
+            lastQualityLabel: typeof bucket.lastQualityLabel === "string" ? bucket.lastQualityLabel.trim() : "",
+            updatedAt: typeof bucket.updatedAt === "string" ? bucket.updatedAt.trim() : "",
+          };
+        };
+
+        const normalizeWidthOutcomeStore = (value) => {
+          const store = value && typeof value === "object" ? value : {};
+          const widths = {};
+          designAssistComparisonWidths.forEach((width) => {
+            const source = store.widths && typeof store.widths === "object" ? store.widths[width] : null;
+            widths[width] = normalizeWidthOutcomeBucket(source);
+          });
+          return {
+            version: 1,
+            preferredWidth: normalizeTrackedMobileWidth(store.preferredWidth),
+            widths,
+            updatedAt: typeof store.updatedAt === "string" ? store.updatedAt.trim() : "",
+          };
+        };
+
+        const readWidthOutcomeStore = () => {
+          try {
+            const raw = window.localStorage.getItem(designAssistWidthOutcomeStorageKey);
+            return raw ? normalizeWidthOutcomeStore(JSON.parse(raw)) : normalizeWidthOutcomeStore(null);
+          } catch (error) {
+            return normalizeWidthOutcomeStore(null);
+          }
+        };
+
+        const writeWidthOutcomeStore = (value) => {
+          const next = normalizeWidthOutcomeStore(value);
+          currentWidthOutcomeStore = next;
+          try {
+            window.localStorage.setItem(designAssistWidthOutcomeStorageKey, JSON.stringify(next));
+          } catch (error) {}
+          window.dispatchEvent(
+            new CustomEvent("pigma:design-assist-width-outcome-updated", {
+              detail: next,
+            })
+          );
+          return next;
+        };
+
+        const getWidthOutcomeBucketStrength = (bucket) => {
+          const next = normalizeWidthOutcomeBucket(bucket);
+          if (next.attempts <= 0) {
+            return -Infinity;
+          }
+          const averageQualityScore = next.attempts > 0 ? next.totalQualityScore / next.attempts : 0;
+          return next.wins * 18 - next.losses * 12 + next.ties * 4 + averageQualityScore + next.bestQualityScore * 0.25;
+        };
+
+        const computePreferredWidthFromOutcomeStore = (store) => {
+          const next = normalizeWidthOutcomeStore(store);
+          let preferredWidth = "";
+          let preferredScore = -Infinity;
+          designAssistComparisonWidths.forEach((width) => {
+            const bucketScore = getWidthOutcomeBucketStrength(next.widths[width]);
+            if (bucketScore > preferredScore) {
+              preferredScore = bucketScore;
+              preferredWidth = width;
+            }
+          });
+          return Number.isFinite(preferredScore) ? preferredWidth : "";
+        };
+
+        const getStoredPreferredMobileWidth = (excludeWidth) => {
+          const preferredWidth =
+            currentWidthOutcomeStore && typeof currentWidthOutcomeStore === "object"
+              ? normalizeTrackedMobileWidth(currentWidthOutcomeStore.preferredWidth)
+              : "";
+          const excluded = normalizeTrackedMobileWidth(excludeWidth);
+          if (!preferredWidth || preferredWidth === excluded) {
+            return "";
+          }
+          return preferredWidth;
+        };
+
+        const parseRunLogTaskContext = (value) => {
+          const raw = String(value || "")
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9/_-]+/g, "-")
+            .replace(/\/{2,}/g, "/")
+            .replace(/-{2,}/g, "-")
+            .replace(/^[-/]+|[-/]+$/g, "");
+          const parts = raw ? raw.split("/").filter(Boolean) : [];
+          const action = parts.length > 1 ? parts[1] : "";
+          const targetWidth = parts.length > 2 ? normalizeRecommendationMobileWidth(parts[2]) : "";
+          const phase = parts.length > 3 ? parts[3] : "";
+          return {
+            raw,
+            kind: parts.length ? parts[0] : "",
+            action,
+            targetWidth,
+            phase,
+            isMobileDesign: parts.length > 0 && parts[0] === "design-assist" && action === "mobile-design",
+          };
+        };
+
+        const describeRunLogTaskContext = (value) => {
+          const parsed = parseRunLogTaskContext(value);
+          if (parsed.kind !== "design-assist") {
+            return "";
+          }
+          const parts = [];
+          if (parsed.action) {
+            parts.push(parsed.action);
+          }
+          if (parsed.targetWidth) {
+            parts.push(`${parsed.targetWidth}px`);
+          }
+          if (parsed.phase) {
+            parts.push(parsed.phase);
+          }
+          return parts.join(" / ");
+        };
+
+        const getComparisonMobileWidth = (value) => {
+          const current = normalizeRecommendationMobileWidth(value);
+          const index = designAssistComparisonWidths.indexOf(current);
+          if (index < 0) {
+            return designAssistComparisonWidths[0];
+          }
+          if (current === "393") {
+            return "390";
+          }
+          return designAssistComparisonWidths[Math.min(designAssistComparisonWidths.length - 1, index + 1)];
+        };
+
+        const getRecommendedComparisonMobileWidth = (value) => {
+          const preferredWidth = getStoredPreferredMobileWidth(value);
+          if (preferredWidth) {
+            return preferredWidth;
+          }
+          return getComparisonMobileWidth(value);
+        };
+
+        const describeStoredPreferredMobileWidth = () => {
+          const preferredWidth = getStoredPreferredMobileWidth("");
+          return preferredWidth ? `${preferredWidth}px` : "";
+        };
+
+        const isLowQualityRunLog = (entry) => {
+          const label = entry && typeof entry.qualityLabel === "string" ? entry.qualityLabel.trim() : "";
+          return label === "low" || label === "empty";
+        };
+
+        const collectDistinctTaskContextWidths = (entries, parser) => {
+          const values = [];
+          const seen = new Set();
+          const items = Array.isArray(entries) ? entries : [];
+          const read = typeof parser === "function" ? parser : parseRunLogTaskContext;
+          items.forEach((entry) => {
+            const parsed = read(entry && entry.taskContext);
+            if (!parsed || !parsed.targetWidth || seen.has(parsed.targetWidth)) {
+              return;
+            }
+            seen.add(parsed.targetWidth);
+            values.push(parsed.targetWidth);
+          });
+          return values;
+        };
+
+        const applyRecommendedMobileWidth = (value) => {
+          const normalized = normalizeRecommendationMobileWidth(value);
+          try {
+            window.localStorage.setItem(designAssistWidthStorageKey, normalized);
+          } catch (error) {}
+          const widthSelect = document.getElementById("designAssistMobileWidthSelect");
+          if (widthSelect instanceof HTMLSelectElement) {
+            widthSelect.value = normalized;
+          }
+          window.dispatchEvent(
+            new CustomEvent("pigma:design-assist-mobile-width-updated", {
+              detail: {
+                value: normalized,
+              },
+            })
+          );
+          return normalized;
+        };
+
+        currentWidthOutcomeStore = readWidthOutcomeStore();
+        window.__PIGMA_AI_WIDTH_OUTCOME__ = {
+          getStore: () => currentWidthOutcomeStore,
+        };
+
+        const getAssistSnapshotStrength = (snapshot) => {
+          const next = snapshot && typeof snapshot === "object" ? snapshot : {};
+          const label = typeof next.qualityLabel === "string" ? next.qualityLabel.trim() : "";
+          const repairLabel = typeof next.planRepairLabel === "string" ? next.planRepairLabel.trim() : "";
+          let score = Math.max(0, Math.min(100, Math.round(Number(next.qualityScore) || 0)));
+          if (label === "high") {
+            score += 24;
+          } else if (label === "medium") {
+            score += 12;
+          } else if (label === "low") {
+            score -= 12;
+          } else if (label === "empty") {
+            score -= 20;
+          } else if (label === "error") {
+            score -= 36;
+          }
+          score += next.ok === false ? -20 : 4;
+          if (/fallback/i.test(repairLabel)) {
+            score -= 16;
+          } else if (/repair/i.test(repairLabel)) {
+            score -= 8;
+          } else if (/no repair needed/i.test(repairLabel)) {
+            score += 4;
+          }
+          return score;
+        };
+
+        const updateWidthOutcomeBucketFromSnapshot = (bucket, snapshot) => {
+          const next = normalizeWidthOutcomeBucket(bucket);
+          const normalizedSnapshot = normalizeAssistSnapshot(snapshot);
+          next.attempts += 1;
+          next.totalQualityScore += normalizedSnapshot.qualityScore;
+          next.bestQualityScore = Math.max(next.bestQualityScore, normalizedSnapshot.qualityScore);
+          next.lastQualityScore = normalizedSnapshot.qualityScore;
+          next.lastQualityLabel = normalizedSnapshot.qualityLabel || "";
+          next.updatedAt = new Date().toISOString();
+          return next;
+        };
+
+        const recordWidthComparisonOutcome = (before, after, recommendation) => {
+          const previous = normalizeAssistSnapshot(before);
+          const current = normalizeAssistSnapshot(after);
+          const currentAction = typeof current.action === "string" ? current.action.trim() : "";
+          const previousWidth = normalizeTrackedMobileWidth(previous.targetWidth);
+          const currentWidth = normalizeTrackedMobileWidth(current.targetWidth);
+          if (currentAction !== "mobile-design" || !previousWidth || !currentWidth || previousWidth === currentWidth) {
+            return null;
+          }
+
+          const nextStore = normalizeWidthOutcomeStore(currentWidthOutcomeStore);
+          nextStore.widths[previousWidth] = updateWidthOutcomeBucketFromSnapshot(nextStore.widths[previousWidth], previous);
+          nextStore.widths[currentWidth] = updateWidthOutcomeBucketFromSnapshot(nextStore.widths[currentWidth], current);
+
+          const previousStrength = getAssistSnapshotStrength(previous);
+          const currentStrength = getAssistSnapshotStrength(current);
+          let winnerWidth = "";
+          if (currentStrength >= previousStrength + 4) {
+            winnerWidth = currentWidth;
+          } else if (previousStrength >= currentStrength + 4) {
+            winnerWidth = previousWidth;
+          }
+
+          if (winnerWidth === currentWidth) {
+            nextStore.widths[currentWidth].wins += 1;
+            nextStore.widths[previousWidth].losses += 1;
+          } else if (winnerWidth === previousWidth) {
+            nextStore.widths[previousWidth].wins += 1;
+            nextStore.widths[currentWidth].losses += 1;
+          } else {
+            nextStore.widths[previousWidth].ties += 1;
+            nextStore.widths[currentWidth].ties += 1;
+          }
+
+          const previousPreferredWidth = normalizeTrackedMobileWidth(nextStore.preferredWidth);
+          nextStore.preferredWidth = computePreferredWidthFromOutcomeStore(nextStore);
+          nextStore.updatedAt = new Date().toISOString();
+          writeWidthOutcomeStore(nextStore);
+
+          if (nextStore.preferredWidth) {
+            applyRecommendedMobileWidth(nextStore.preferredWidth);
+          }
+
+          const nextRecommendation =
+            recommendation && typeof recommendation === "object"
+              ? recommendation
+              : createRunLogRecommendation("idle", "No recommendation available.", "Waiting", { disabled: true });
+          let note = "";
+          if (winnerWidth === currentWidth) {
+            note =
+              nextStore.preferredWidth === currentWidth
+                ? `Saved default width promoted to ${currentWidth}px from this ${nextRecommendation.kind || "comparison"}.`
+                : `${currentWidth}px improved this comparison, but saved default remains ${nextStore.preferredWidth || currentWidth}px.`;
+          } else if (winnerWidth === previousWidth) {
+            note = `${previousWidth}px stayed safer than ${currentWidth}px, so the saved default remains ${nextStore.preferredWidth || previousWidth}px.`;
+          } else {
+            note = nextStore.preferredWidth
+              ? `This comparison was effectively tied, so saved default stays ${nextStore.preferredWidth}px.`
+              : "This comparison was effectively tied, so no saved default width changed.";
+          }
+
+          return {
+            winnerWidth,
+            preferredWidth: nextStore.preferredWidth,
+            preferredWidthChanged:
+              !!nextStore.preferredWidth && nextStore.preferredWidth !== previousPreferredWidth,
+            note,
+          };
+        };
+
+        const activateAiTabFromSettings = () => {
+          if (window.__PIGMA_AI_CORRECTION__ && typeof window.__PIGMA_AI_CORRECTION__.activate === "function") {
+            window.__PIGMA_AI_CORRECTION__.activate();
+            return;
+          }
+          if (aiTab instanceof HTMLElement) {
+            aiTab.click();
+          }
+        };
 
         const normalizeSettings = (value) => {
           const settings = value && typeof value === "object" ? value : {};
@@ -4369,10 +4997,562 @@
           );
         };
 
+        const getOtherProvider = (provider) => (provider === "gemini" ? "openai" : "gemini");
+
+        const formatRunLogTime = (isoString) => {
+          if (typeof isoString !== "string" || !isoString.trim()) {
+            return "시간 정보 없음";
+          }
+
+          const date = new Date(isoString);
+          if (!Number.isFinite(date.getTime())) {
+            return "시간 정보 없음";
+          }
+
+          return date.toLocaleString("ko-KR", {
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+        };
+
+        const renderEmptyRunLogState = (message) => {
+          runLogList.replaceChildren();
+          const item = document.createElement("li");
+          item.className = "is-empty";
+          const title = document.createElement("strong");
+          title.className = "list-title";
+          title.textContent = "아직 LLM 실행 기록이 없습니다.";
+          const detail = document.createElement("span");
+          detail.className = "list-detail";
+          detail.textContent = message || "디자인 어시스트나 AI 기반 기능을 실행하면 최근 호출 품질과 실패 원인이 여기에 표시됩니다.";
+          item.append(title, detail);
+          runLogList.append(item);
+        };
+
+        const createRunLogRecommendation = (kind, label, buttonLabel, extra) => ({
+          kind,
+          label,
+          buttonLabel,
+          targetProvider: extra && extra.targetProvider ? extra.targetProvider : "",
+          targetWidth: extra && extra.targetWidth ? normalizeRecommendationMobileWidth(extra.targetWidth) : "",
+          taskContext: extra && extra.taskContext ? String(extra.taskContext).trim() : "",
+          focusTarget: extra && extra.focusTarget ? extra.focusTarget : "",
+          disabled: extra && extra.disabled === true,
+        });
+
+        const describeRunLogEvidence = (entry) => {
+          if (!entry || typeof entry !== "object") {
+            return "No recent log evidence available.";
+          }
+          const parts = [];
+          if (typeof entry.provider === "string" && entry.provider.trim()) {
+            parts.push(entry.provider.trim());
+          }
+          const taskContextLabel = describeRunLogTaskContext(entry.taskContext);
+          if (taskContextLabel) {
+            parts.push(taskContextLabel);
+          }
+          if (entry.ok === true) {
+            if (typeof entry.qualityLabel === "string" && entry.qualityLabel.trim()) {
+              const score = Number.isFinite(Number(entry.qualityScore)) ? Math.round(Number(entry.qualityScore)) : 0;
+              parts.push(`quality ${entry.qualityLabel.trim()}${score > 0 ? ` ${score}` : ""}`);
+            } else {
+              parts.push("success");
+            }
+          } else if (typeof entry.failureType === "string" && entry.failureType.trim()) {
+            parts.push(`failure ${entry.failureType.trim()}`);
+          }
+          if (Number.isFinite(Number(entry.durationMs)) && Number(entry.durationMs) > 0) {
+            parts.push(`${Math.round(Number(entry.durationMs))}ms`);
+          }
+          return parts.length ? parts.join(" / ") : "No recent log evidence available.";
+        };
+
+        const buildRunLogDiagnostic = (logs, recommendation, settings) => {
+          const entries = Array.isArray(logs) ? logs.filter((entry) => entry && typeof entry === "object") : [];
+          const latest = entries.length ? entries[0] : null;
+          const currentProvider = settings && settings.provider === "gemini" ? "gemini" : "openai";
+          const otherProvider = getOtherProvider(currentProvider);
+          const next =
+            recommendation && typeof recommendation === "object"
+              ? recommendation
+              : createRunLogRecommendation("idle", "No recommendation available.", "Waiting", { disabled: true });
+          const latestContext = parseRunLogTaskContext(latest && latest.taskContext);
+
+          if (!latest) {
+            return "Evidence will appear after the next LLM run.";
+          }
+
+          if (next.kind === "switch-width") {
+            const sameWidthLowQualityEntries = entries.filter((entry) => {
+              if (!entry || entry.ok !== true || !isLowQualityRunLog(entry) || entry.provider !== latest.provider) {
+                return false;
+              }
+              const parsed = parseRunLogTaskContext(entry.taskContext);
+              return latestContext.isMobileDesign && parsed.targetWidth === latestContext.targetWidth;
+            });
+            const storedPreferredWidth = describeStoredPreferredMobileWidth();
+            return storedPreferredWidth
+              ? `Evidence: ${describeRunLogEvidence(latest)}. Same-width low-quality runs: ${sameWidthLowQualityEntries.length}. Saved default width: ${storedPreferredWidth}.`
+              : `Evidence: ${describeRunLogEvidence(latest)}. Same-width low-quality runs: ${sameWidthLowQualityEntries.length}.`;
+          }
+
+          if (next.kind === "review-mobile-plan") {
+            const lowQualityMobileEntries = entries.filter((entry) => {
+              if (!entry || entry.ok !== true || !isLowQualityRunLog(entry) || entry.provider !== latest.provider) {
+                return false;
+              }
+              return parseRunLogTaskContext(entry.taskContext).isMobileDesign;
+            });
+            const widths = collectDistinctTaskContextWidths(lowQualityMobileEntries);
+            return `Evidence: ${describeRunLogEvidence(latest)}. Low-quality widths seen: ${widths.length ? widths.join(", ") : "none"}.`;
+          }
+
+          if (next.kind === "switch-provider") {
+            const recentCurrentProvider = entries.filter((entry) => entry.provider === currentProvider).slice(0, 4);
+            const currentFailures = recentCurrentProvider.filter((entry) => entry.ok !== true).length;
+            const recentOtherProvider = entries.filter((entry) => entry.provider === otherProvider).slice(0, 4);
+            const otherSuccesses = recentOtherProvider.filter((entry) => entry.ok === true).length;
+            return `Evidence: ${currentProvider} failures ${currentFailures}/${recentCurrentProvider.length || 0}, ${otherProvider} successes ${otherSuccesses}/${recentOtherProvider.length || 0}.`;
+          }
+
+          if (next.kind === "focus-config") {
+            return `Evidence: ${describeRunLogEvidence(latest)}. Configuration or auth should be checked first.`;
+          }
+
+          if (next.kind === "enable-ai") {
+            return latest ? `Latest stored run: ${describeRunLogEvidence(latest)}.` : "AI is off and no recent log is stored.";
+          }
+
+          if (next.kind === "stable") {
+            const storedPreferredWidth = describeStoredPreferredMobileWidth();
+            return storedPreferredWidth
+              ? `Latest stable run: ${describeRunLogEvidence(latest)}. Saved default width: ${storedPreferredWidth}.`
+              : `Latest stable run: ${describeRunLogEvidence(latest)}.`;
+          }
+
+          if (next.kind === "open-ai-tab") {
+            const storedPreferredWidth = describeStoredPreferredMobileWidth();
+            return storedPreferredWidth
+              ? `Latest run: ${describeRunLogEvidence(latest)}. Saved default width: ${storedPreferredWidth}.`
+              : `Latest run: ${describeRunLogEvidence(latest)}.`;
+          }
+
+          const storedPreferredWidth = describeStoredPreferredMobileWidth();
+          return storedPreferredWidth
+            ? `Latest run: ${describeRunLogEvidence(latest)}. Saved default width: ${storedPreferredWidth}.`
+            : `Latest run: ${describeRunLogEvidence(latest)}.`;
+        };
+
+        const buildRunLogChecklist = (recommendation) => {
+          const next =
+            recommendation && typeof recommendation === "object"
+              ? recommendation
+              : createRunLogRecommendation("idle", "No recommendation available.", "Waiting", { disabled: true });
+
+          if (next.kind === "switch-width") {
+            const storedPreferredWidth =
+              next.focusTarget === "learned-width" && next.targetWidth ? `${next.targetWidth}px` : "";
+            return [
+              storedPreferredWidth
+                ? `Keep the same selection and rerun mobile planning with the learned width ${storedPreferredWidth}.`
+                : "Keep the same selection and rerun mobile planning with the suggested width.",
+              "Compare plan cache, repair count, and quality after the rerun.",
+              "Only switch provider if the new width still stays low quality.",
+            ];
+          }
+
+          if (next.kind === "review-mobile-plan") {
+            return [
+              "Learn at least one clean PC/MO pair if the current file has no strong memory examples.",
+              "Check whether deterministic repair or fallback is masking a weak AI plan.",
+              "Review similar pairs and rule summary before changing provider settings.",
+            ];
+          }
+
+          if (next.kind === "switch-provider") {
+            return [
+              "Confirm the current provider failed more than once on the same task family.",
+              "Switch provider once and compare quality or failure type on the next run.",
+              "Keep the provider that gives the more stable plan, not just the faster response.",
+            ];
+          }
+
+          if (next.kind === "focus-config") {
+            return [
+              "Confirm AI is enabled and the API key is present.",
+              "Check the selected provider before rerunning.",
+              "Retry after config is saved.",
+            ];
+          }
+
+          if (next.kind === "enable-ai") {
+            return [
+              "Turn AI on first.",
+              "Save a valid API key.",
+              "Run the same task again so new log evidence can be collected.",
+            ];
+          }
+
+          if (next.kind === "open-ai-tab") {
+            return [
+              "Open the AI tab with the same selection.",
+              "Run the same action once to compare with the latest log.",
+              "Check cache, repair, and quality together instead of only reading the final copy.",
+            ];
+          }
+
+          return ["No checklist yet. Run one more AI task to generate clearer operating guidance."];
+        };
+
+        const renderRunLogChecklist = (recommendation) => {
+          const items = buildRunLogChecklist(recommendation);
+          runLogChecklist.replaceChildren();
+          items.forEach((entry) => {
+            const item = document.createElement("li");
+            const title = document.createElement("strong");
+            title.className = "list-title";
+            title.textContent = entry;
+            item.appendChild(title);
+            runLogChecklist.appendChild(item);
+          });
+        };
+
+        const normalizeAssistSnapshot = (value) => {
+          const next = value && typeof value === "object" ? value : {};
+          return {
+            ok: next.ok !== false,
+            source: typeof next.source === "string" ? next.source.trim() : "",
+            action: typeof next.action === "string" ? next.action.trim() : "",
+            targetWidth: Math.max(0, Math.round(Number(next.targetWidth) || 0)),
+            qualityScore: Math.max(0, Math.min(100, Math.round(Number(next.qualityScore) || 0))),
+            qualityLabel: typeof next.qualityLabel === "string" ? next.qualityLabel.trim() : "",
+            qualitySummary: typeof next.qualitySummary === "string" ? next.qualitySummary.trim() : "",
+            planRepairLabel: typeof next.planRepairLabel === "string" ? next.planRepairLabel.trim() : "",
+            planCacheLabel: typeof next.planCacheLabel === "string" ? next.planCacheLabel.trim() : "",
+            analyzedAt: typeof next.analyzedAt === "string" ? next.analyzedAt.trim() : "",
+            warningText: typeof next.warningText === "string" ? next.warningText.trim() : "",
+          };
+        };
+
+        const readLatestAssistSnapshot = () => {
+          if (
+            !window.__PIGMA_AI_DESIGN_ASSIST__ ||
+            typeof window.__PIGMA_AI_DESIGN_ASSIST__.getLatestSnapshot !== "function"
+          ) {
+            return null;
+          }
+          return normalizeAssistSnapshot(window.__PIGMA_AI_DESIGN_ASSIST__.getLatestSnapshot());
+        };
+
+        const renderRecommendationComparison = (comparison) => {
+          const next = comparison && typeof comparison === "object" ? comparison : null;
+          lastRecommendationComparison = next;
+          runLogComparisonList.replaceChildren();
+          if (!next) {
+            runLogComparisonMeta.textContent = "자동 재실행 전후 비교가 여기에 표시됩니다.";
+            const item = document.createElement("li");
+            item.className = "is-empty";
+            const title = document.createElement("strong");
+            title.className = "list-title";
+            title.textContent = "비교 대기";
+            item.appendChild(title);
+            runLogComparisonList.appendChild(item);
+            return;
+          }
+
+          runLogComparisonMeta.textContent = next.meta || "최근 자동 재실행 비교";
+          const items = Array.isArray(next.lines) ? next.lines : [];
+          items.forEach((entry) => {
+            const item = document.createElement("li");
+            const title = document.createElement("strong");
+            title.className = "list-title";
+            title.textContent = entry;
+            item.appendChild(title);
+            runLogComparisonList.appendChild(item);
+          });
+        };
+
+        const describeComparisonDelta = (beforeValue, afterValue, betterWhenHigher) => {
+          const before = Math.round(Number(beforeValue) || 0);
+          const after = Math.round(Number(afterValue) || 0);
+          if (before === after) {
+            return `unchanged ${before}`;
+          }
+          const delta = after - before;
+          if (betterWhenHigher) {
+            return delta > 0 ? `improved ${before} -> ${after}` : `dropped ${before} -> ${after}`;
+          }
+          return delta < 0 ? `improved ${before} -> ${after}` : `increased ${before} -> ${after}`;
+        };
+
+        const buildRecommendationComparison = (before, after, recommendation, outcome) => {
+          const previous = normalizeAssistSnapshot(before);
+          const current = normalizeAssistSnapshot(after);
+          const nextRecommendation =
+            recommendation && typeof recommendation === "object"
+              ? recommendation
+              : createRunLogRecommendation("idle", "No recommendation available.", "Waiting", { disabled: true });
+          const nextOutcome = outcome && typeof outcome === "object" ? outcome : null;
+          const beforeWidth = previous.targetWidth > 0 ? `${previous.targetWidth}px` : "unknown";
+          const afterWidth = current.targetWidth > 0 ? `${current.targetWidth}px` : "unknown";
+          const lines = [];
+          lines.push(`Width ${beforeWidth} -> ${afterWidth}`);
+          lines.push(`Quality ${describeComparisonDelta(previous.qualityScore, current.qualityScore, true)} (${previous.qualityLabel || "pending"} -> ${current.qualityLabel || "pending"})`);
+          lines.push(`Repair ${previous.planRepairLabel || "Waiting"} -> ${current.planRepairLabel || "Waiting"}`);
+          lines.push(`Cache ${previous.planCacheLabel || "No cached plan"} -> ${current.planCacheLabel || "No cached plan"}`);
+          if (current.qualitySummary) {
+            lines.push(`Current summary: ${current.qualitySummary}`);
+          }
+          if (current.ok === false && current.warningText) {
+            lines.push(`Current warning: ${current.warningText}`);
+          }
+          if (nextOutcome && nextOutcome.note) {
+            lines.push(nextOutcome.note);
+          }
+          return {
+            meta:
+              nextOutcome && nextOutcome.preferredWidth
+                ? `Latest ${nextRecommendation.kind || "automation"} comparison · default ${nextOutcome.preferredWidth}px`
+                : `Latest ${nextRecommendation.kind || "automation"} comparison`,
+            lines,
+          };
+        };
+
+        const startRecommendationComparison = (recommendation) => {
+          const next =
+            recommendation && typeof recommendation === "object"
+              ? recommendation
+              : createRunLogRecommendation("idle", "No recommendation available.", "Waiting", { disabled: true });
+          pendingRecommendationComparison = {
+            recommendation: next,
+            before: readLatestAssistSnapshot(),
+            expectedTargetWidth: next.targetWidth ? Math.max(0, Math.round(Number(next.targetWidth) || 0)) : 0,
+            startedAt: Date.now(),
+          };
+        };
+
+        const buildRunLogRecommendation = (logs, settings) => {
+          const entries = Array.isArray(logs) ? logs.filter((entry) => entry && typeof entry === "object") : [];
+          const currentProvider = settings && settings.provider === "gemini" ? "gemini" : "openai";
+          const otherProvider = getOtherProvider(currentProvider);
+          const latest = entries.length ? entries[0] : null;
+          const latestContext = parseRunLogTaskContext(latest && latest.taskContext);
+
+          if (!latest) {
+            return createRunLogRecommendation(
+              "idle",
+              "디자인 어시스트나 AI 기반 기능을 실행하면 다음 조치 추천이 여기에 표시됩니다.",
+              "추천 대기",
+              { disabled: true }
+            );
+          }
+
+          if (settings && settings.enabled !== true) {
+            return createRunLogRecommendation("enable-ai", "AI 옵션이 꺼져 있습니다. 먼저 AI를 켠 뒤 다시 실행해 보세요.", "AI 켜기");
+          }
+
+          if (latest.ok === true) {
+            if (isLowQualityRunLog(latest)) {
+              const lowQualityMobileEntries = entries.filter((entry) => {
+                if (!entry || entry.ok !== true || !isLowQualityRunLog(entry) || entry.provider !== latest.provider) {
+                  return false;
+                }
+                return parseRunLogTaskContext(entry.taskContext).isMobileDesign;
+              });
+              const lowQualityMobileWidths = collectDistinctTaskContextWidths(lowQualityMobileEntries);
+              const sameWidthLowQualityEntries = lowQualityMobileEntries.filter((entry) => {
+                const parsed = parseRunLogTaskContext(entry.taskContext);
+                return latestContext.isMobileDesign && parsed.targetWidth === latestContext.targetWidth;
+              });
+              if (latestContext.isMobileDesign && lowQualityMobileWidths.length >= 2) {
+                return createRunLogRecommendation(
+                  "review-mobile-plan",
+                  `Mobile plan quality stayed low across ${lowQualityMobileWidths.join(", ")}px. Compare widths was not enough, so review learned pairs and plan structure before switching provider.`,
+                  "학습/플랜 점검",
+                  { focusTarget: "memory-learn", taskContext: latest.taskContext, targetWidth: latestContext.targetWidth }
+                );
+              }
+              if (latestContext.isMobileDesign && sameWidthLowQualityEntries.length >= 2) {
+                const storedPreferredWidth = getStoredPreferredMobileWidth(latestContext.targetWidth);
+                const targetWidth = getRecommendedComparisonMobileWidth(latestContext.targetWidth);
+                return createRunLogRecommendation(
+                  "switch-width",
+                  storedPreferredWidth
+                    ? `Recent mobile plans stayed ${latest.qualityLabel || "low"} on ${latestContext.targetWidth || "360"}px. Saved comparison history favors ${targetWidth}px, so use that width before changing provider or prompt rules.`
+                    : `Recent mobile plans stayed ${latest.qualityLabel || "low"} on ${latestContext.targetWidth || "360"}px. Compare with ${targetWidth}px before changing provider or prompt rules.`,
+                  storedPreferredWidth ? `Use saved ${targetWidth}px` : `Try ${targetWidth}px`,
+                  { targetWidth, taskContext: latest.taskContext, focusTarget: storedPreferredWidth ? "learned-width" : "" }
+                );
+              }
+              return createRunLogRecommendation(
+                "open-ai-tab",
+                "최근 호출은 성공했지만 응답 품질이 낮았습니다. AI 탭에서 같은 작업을 한 번 더 실행해 결과를 비교해 보세요.",
+                "AI 탭 열기"
+              );
+            }
+            return createRunLogRecommendation(
+              "stable",
+              `현재 provider ${currentProvider} 흐름은 최근 로그 기준으로 안정적입니다.`,
+              "문제 없음",
+              { disabled: true }
+            );
+          }
+
+          const recentCurrentProvider = entries.filter((entry) => entry.provider === currentProvider).slice(0, 4);
+          const currentFailures = recentCurrentProvider.filter((entry) => entry.ok !== true);
+          const recentOtherProvider = entries.filter((entry) => entry.provider === otherProvider).slice(0, 4);
+          const hasOtherProviderSuccess = recentOtherProvider.some((entry) => entry.ok === true);
+          const failureType = typeof latest.failureType === "string" ? latest.failureType.trim() : "";
+
+          if (failureType === "configuration" || failureType === "auth") {
+            return createRunLogRecommendation(
+              "focus-config",
+              "API 키 또는 제공사 설정을 먼저 확인해야 합니다. 설정을 바로 점검한 뒤 다시 실행해 보세요.",
+              "AI 설정 확인",
+              { focusTarget: "api-key" }
+            );
+          }
+
+          if (["timeout", "rate-limit", "provider", "network", "bridge"].includes(failureType) && currentFailures.length >= 2) {
+            return createRunLogRecommendation(
+              "switch-provider",
+              hasOtherProviderSuccess
+                ? `최근 ${currentProvider} 실패가 반복되고 ${otherProvider} 성공 이력이 있어 제공사 전환을 추천합니다.`
+                : `최근 ${currentProvider} 실패가 반복되어 ${otherProvider}로 전환해 비교해 보는 편이 좋습니다.`,
+              otherProvider === "gemini" ? "Gemini로 전환" : "OpenAI로 전환",
+              { targetProvider: otherProvider }
+            );
+          }
+
+          return createRunLogRecommendation(
+            "open-ai-tab",
+            failureType
+              ? `최근 실패 원인은 ${failureType}입니다. AI 탭에서 같은 작업을 다시 실행해 재현 여부를 먼저 확인해 보세요.`
+              : "최근 실패가 일시적일 수 있습니다. AI 탭에서 같은 작업을 다시 실행해 보세요.",
+            "AI 탭 열기"
+          );
+        };
+
+        const renderRunLogRecommendation = (recommendation) => {
+          const next = recommendation && typeof recommendation === "object" ? recommendation : createRunLogRecommendation("idle", "추천 조치가 없습니다.", "추천 대기", { disabled: true });
+          currentRunLogRecommendation = next;
+          runLogRecommendation.textContent = next.label || "추천 조치가 없습니다.";
+          runLogRecommendationButton.textContent = next.buttonLabel || "추천 대기";
+          runLogRecommendationButton.disabled = next.disabled === true;
+          runLogDiagnostic.textContent = buildRunLogDiagnostic(currentRunLogEntries, next, currentSettings);
+          renderRunLogChecklist(next);
+        };
+
+        const buildRunLogTitle = (entry) => {
+          const provider = typeof entry.provider === "string" && entry.provider ? entry.provider : "AI";
+          const model = typeof entry.model === "string" && entry.model ? entry.model : "";
+          const status = entry.ok === true ? "성공" : "실패";
+          return model ? `${status} · ${provider} / ${model}` : `${status} · ${provider}`;
+        };
+
+        const buildRunLogDetail = (entry) => {
+          const parts = [];
+          if (typeof entry.providerProfile === "string" && entry.providerProfile.trim()) {
+            parts.push(entry.providerProfile.trim());
+          }
+          const taskContextLabel = describeRunLogTaskContext(entry.taskContext);
+          if (taskContextLabel) {
+            parts.push(taskContextLabel);
+          }
+          if (entry.ok === true) {
+            if (typeof entry.qualityLabel === "string" && entry.qualityLabel.trim()) {
+              const score = Number.isFinite(Number(entry.qualityScore)) ? Math.round(Number(entry.qualityScore)) : 0;
+              parts.push(`quality ${entry.qualityLabel.trim()}${score > 0 ? ` ${score}` : ""}`);
+            }
+          } else {
+            if (typeof entry.failureType === "string" && entry.failureType.trim()) {
+              parts.push(`failure ${entry.failureType.trim()}`);
+            }
+            if (typeof entry.message === "string" && entry.message.trim()) {
+              parts.push(entry.message.trim());
+            }
+          }
+          if (Number.isFinite(Number(entry.durationMs)) && Number(entry.durationMs) > 0) {
+            parts.push(`${Math.round(Number(entry.durationMs))}ms`);
+          }
+          return parts.length ? parts.join(" · ") : "세부 정보 없음";
+        };
+
+        const renderRunLog = (logs) => {
+          const entries = Array.isArray(logs) ? logs.filter((entry) => entry && typeof entry === "object") : [];
+          currentRunLogEntries = entries;
+          runLogList.replaceChildren();
+          if (!entries.length) {
+            runLogMeta.textContent = "아직 기록이 없습니다.";
+            runLogStatus.textContent = "최근 실행 기록이 없습니다.";
+            renderEmptyRunLogState();
+            renderRunLogRecommendation(buildRunLogRecommendation(entries, currentSettings));
+            return;
+          }
+
+          const visibleEntries = entries.slice(0, 6);
+          const latest = visibleEntries[0];
+          runLogMeta.textContent = `최근 ${visibleEntries.length}개 · 마지막 ${formatRunLogTime(latest.createdAt)}`;
+          runLogStatus.textContent =
+            latest.ok === true
+              ? `마지막 호출 성공 · ${typeof latest.provider === "string" && latest.provider ? latest.provider : "AI"}`
+              : `마지막 호출 실패 · ${typeof latest.failureType === "string" && latest.failureType ? latest.failureType : "원인 확인 필요"}`;
+
+          visibleEntries.forEach((entry) => {
+            const item = document.createElement("li");
+            if (entry.ok !== true) {
+              item.classList.add("warning-item");
+            }
+            const meta = document.createElement("span");
+            meta.className = "list-meta";
+            meta.textContent = formatRunLogTime(entry.createdAt);
+            const title = document.createElement("strong");
+            title.className = "list-title";
+            title.textContent = buildRunLogTitle(entry);
+            const detail = document.createElement("span");
+            detail.className = "list-detail";
+            detail.textContent = buildRunLogDetail(entry);
+            item.append(meta, title, detail);
+            runLogList.append(item);
+          });
+          renderRunLogRecommendation(buildRunLogRecommendation(entries, currentSettings));
+        };
+
+        const requestRunLog = () => {
+          if (isRunLogLoading) {
+            return;
+          }
+          isRunLogLoading = true;
+          runLogRefreshButton.disabled = true;
+          runLogRefreshButton.setAttribute("aria-busy", "true");
+          runLogMeta.textContent = "최근 실행 기록을 불러오는 중입니다.";
+          runLogStatus.textContent = "최근 실행 기록을 확인하는 중입니다.";
+          postPluginMessage({ type: "request-ai-llm-run-log" });
+        };
+
+        const scheduleRunLogRefresh = (delayMs) => {
+          const delay = Math.max(0, Math.round(Number(delayMs) || 0));
+          if (runLogRefreshTimerId) {
+            window.clearTimeout(runLogRefreshTimerId);
+          }
+          runLogRefreshTimerId = window.setTimeout(() => {
+            runLogRefreshTimerId = 0;
+            if (isRunLogLoading) {
+              scheduleRunLogRefresh(160);
+              return;
+            }
+            requestRunLog();
+          }, delay);
+        };
+
         const writeSettings = (settings) => {
           const next = applySettings(settings);
           currentSettings = next;
           writeCachedSettings(next);
+          renderRunLogRecommendation(buildRunLogRecommendation(currentRunLogEntries, next));
 
           postPluginMessage({
             type: "update-ai-settings",
@@ -4418,8 +5598,46 @@
         };
 
         currentSettings = applySettings(readSettings());
+        renderEmptyRunLogState("디자인 어시스트나 AI 기반 기능을 실행하면 최근 호출 품질과 실패 원인이 여기에 표시됩니다.");
+        renderRunLogRecommendation(buildRunLogRecommendation([], currentSettings));
+        renderRecommendationComparison(null);
+        window.__PIGMA_AI_RUN_LOG__ = {
+          requestRefresh: requestRunLog,
+          refreshSoon: scheduleRunLogRefresh,
+        };
+        window.addEventListener("pigma:design-assist-updated", (event) => {
+          if (!pendingRecommendationComparison) {
+            return;
+          }
+          const snapshot = normalizeAssistSnapshot(event && event.detail);
+          if (snapshot.action !== "mobile-design") {
+            return;
+          }
+          if (
+            pendingRecommendationComparison.expectedTargetWidth > 0 &&
+            snapshot.targetWidth > 0 &&
+            pendingRecommendationComparison.expectedTargetWidth !== snapshot.targetWidth
+          ) {
+            return;
+          }
+          const widthOutcome = recordWidthComparisonOutcome(
+            pendingRecommendationComparison.before,
+            snapshot,
+            pendingRecommendationComparison.recommendation
+          );
+          renderRecommendationComparison(
+            buildRecommendationComparison(
+              pendingRecommendationComparison.before,
+              snapshot,
+              pendingRecommendationComparison.recommendation,
+              widthOutcome
+            )
+          );
+          pendingRecommendationComparison = null;
+        });
         setTimeout(() => {
           postPluginMessage({ type: "request-ai-settings" });
+          requestRunLog();
         }, 250);
 
         toggle.addEventListener("click", () => {
@@ -4459,13 +5677,26 @@
         */
         window.addEventListener("message", (event) => {
           const message = event.data?.pluginMessage;
-          if (!message || message.type !== "ai-settings") {
+          if (!message || typeof message !== "object") {
+            return;
+          }
+
+          if (message.type === "ai-llm-run-log") {
+            isRunLogLoading = false;
+            runLogRefreshButton.disabled = false;
+            runLogRefreshButton.setAttribute("aria-busy", "false");
+            renderRunLog(message.logs);
+            return;
+          }
+
+          if (message.type !== "ai-settings") {
             return;
           }
 
           const next = applySettings(message.settings);
           currentSettings = next;
           writeCachedSettings(next);
+          renderRunLogRecommendation(buildRunLogRecommendation(currentRunLogEntries, next));
 
           dispatchSettingsChanged(next);
         });
@@ -4484,6 +5715,95 @@
             apiKeyInput.blur();
           }
         });
+        runLogRefreshButton.addEventListener("click", requestRunLog);
+        runLogRecommendationButton.addEventListener("click", () => {
+          const recommendation = currentRunLogRecommendation && typeof currentRunLogRecommendation === "object" ? currentRunLogRecommendation : null;
+          if (!recommendation || recommendation.disabled === true) {
+            return;
+          }
+
+          if (recommendation.kind === "enable-ai") {
+            const next = {
+              ...currentSettings,
+              enabled: true,
+            };
+            writeSettings(next);
+            requestAnimationFrame(() => {
+              apiKeyInput.focus();
+            });
+            return;
+          }
+
+          if (recommendation.kind === "focus-config") {
+            requestAnimationFrame(() => {
+              if (recommendation.focusTarget === "provider") {
+                providerSelect.focus();
+              } else {
+                apiKeyInput.focus();
+              }
+            });
+            return;
+          }
+
+          if (recommendation.kind === "switch-provider" && recommendation.targetProvider) {
+            const next = {
+              ...currentSettings,
+              provider: recommendation.targetProvider === "gemini" ? "gemini" : "openai",
+            };
+            writeSettings(next);
+            requestAnimationFrame(() => {
+              providerSelect.focus();
+            });
+            return;
+          }
+
+          if (recommendation.kind === "switch-width" && recommendation.targetWidth) {
+            startRecommendationComparison(recommendation);
+            if (
+              window.__PIGMA_AI_DESIGN_ASSIST__ &&
+              typeof window.__PIGMA_AI_DESIGN_ASSIST__.runMobileAssist === "function"
+            ) {
+              window.__PIGMA_AI_DESIGN_ASSIST__.runMobileAssist(recommendation.targetWidth);
+              return;
+            }
+            applyRecommendedMobileWidth(recommendation.targetWidth);
+            activateAiTabFromSettings();
+            return;
+          }
+
+          if (recommendation.kind === "review-mobile-plan") {
+            if (
+              recommendation.focusTarget === "memory-learn" &&
+              window.__PIGMA_AI_DESIGN_ASSIST__ &&
+              typeof window.__PIGMA_AI_DESIGN_ASSIST__.openTrainingWorkflow === "function"
+            ) {
+              window.__PIGMA_AI_DESIGN_ASSIST__.openTrainingWorkflow();
+              return;
+            }
+            if (recommendation.focusTarget === "memory-learn") {
+              const learnButton = document.getElementById("responsiveMemoryLearnButton");
+              if (learnButton instanceof HTMLButtonElement) {
+                requestAnimationFrame(() => {
+                  learnButton.scrollIntoView({
+                    block: "center",
+                    behavior: "smooth",
+                  });
+                  learnButton.focus();
+                });
+                return;
+              }
+            }
+            activateAiTabFromSettings();
+            return;
+          }
+
+          if (recommendation.kind === "open-ai-tab") {
+            activateAiTabFromSettings();
+          }
+        });
+        if (settingsTab instanceof HTMLElement) {
+          settingsTab.addEventListener("click", requestRunLog, true);
+        }
       })();
     </script>
     <script>
@@ -4505,6 +5825,9 @@
         const statusNote = document.getElementById("responsiveMemoryStatusNote");
         const aggregateSummaryValue = document.getElementById("responsiveMemoryAggregateSummary");
         const aggregateNoteValue = document.getElementById("responsiveMemoryAggregateNote");
+        const aggregateRepeatedDetailValue = document.getElementById("responsiveMemoryAggregateRepeatedDetail");
+        const aggregateConflictDetailValue = document.getElementById("responsiveMemoryAggregateConflictDetail");
+        const aggregateHighConfidenceDetailValue = document.getElementById("responsiveMemoryAggregateHighConfidenceDetail");
         const lastSummaryValue = document.getElementById("responsiveMemoryLastSummary");
         const lastDetailValue = document.getElementById("responsiveMemoryLastDetail");
         const lastMatchCountValue = document.getElementById("responsiveMemoryLastMatchCount");
@@ -4536,6 +5859,9 @@
           !(statusNote instanceof HTMLElement) ||
           !(aggregateSummaryValue instanceof HTMLElement) ||
           !(aggregateNoteValue instanceof HTMLElement) ||
+          !(aggregateRepeatedDetailValue instanceof HTMLElement) ||
+          !(aggregateConflictDetailValue instanceof HTMLElement) ||
+          !(aggregateHighConfidenceDetailValue instanceof HTMLElement) ||
           !(lastSummaryValue instanceof HTMLElement) ||
           !(lastDetailValue instanceof HTMLElement) ||
           !(lastMatchCountValue instanceof HTMLElement) ||
@@ -4570,6 +5896,11 @@
             highConfidenceCount: 0,
             averageSupportCount: 0,
             pairCount: 0,
+          },
+          aggregatePreview: {
+            repeatedRules: [],
+            conflictingRules: [],
+            highConfidenceRules: [],
           },
         };
 
@@ -4625,6 +5956,30 @@
           };
         };
 
+        const normalizeAggregateDetailItem = (value) => {
+          const next = value && typeof value === "object" ? value : {};
+          return {
+            title: typeof next.title === "string" && next.title.trim() ? next.title.trim() : "규칙 요약 없음",
+            detail: typeof next.detail === "string" && next.detail.trim() ? next.detail.trim() : "",
+            meta: typeof next.meta === "string" && next.meta.trim() ? next.meta.trim() : "",
+          };
+        };
+
+        const normalizeAggregatePreview = (value) => {
+          const next = value && typeof value === "object" ? value : {};
+          const normalizeList = (items) =>
+            Array.isArray(items)
+              ? items
+                  .map((entry) => normalizeAggregateDetailItem(entry))
+                  .filter((entry) => entry.title || entry.detail || entry.meta)
+              : [];
+          return {
+            repeatedRules: normalizeList(next.repeatedRules),
+            conflictingRules: normalizeList(next.conflictingRules),
+            highConfidenceRules: normalizeList(next.highConfidenceRules),
+          };
+        };
+
         const defaultStatusNote = (state) => {
           if (!state || !state.recordCount) {
             return "아직 저장된 학습 메모리가 없습니다.";
@@ -4667,9 +6022,46 @@
           return `현재 ${aggregate.pairCount}개 pair 기준으로 평균 support ${aggregate.averageSupportCount}를 추적 중입니다.`;
         };
 
+        const renderAggregateDetailList = (target, items, fallback) => {
+          target.replaceChildren();
+          const list = Array.isArray(items) ? items : [];
+          if (!list.length) {
+            const empty = document.createElement("span");
+            empty.className = "setting-hint";
+            empty.textContent = fallback;
+            target.appendChild(empty);
+            return;
+          }
+
+          list.forEach((item) => {
+            const normalized = normalizeAggregateDetailItem(item);
+            const row = document.createElement("div");
+            row.className = "responsive-memory-detail-item";
+
+            const title = document.createElement("strong");
+            title.textContent = normalized.title;
+            row.appendChild(title);
+
+            if (normalized.detail) {
+              const detail = document.createElement("span");
+              detail.textContent = normalized.detail;
+              row.appendChild(detail);
+            }
+
+            if (normalized.meta) {
+              const meta = document.createElement("span");
+              meta.textContent = normalized.meta;
+              row.appendChild(meta);
+            }
+
+            target.appendChild(row);
+          });
+        };
+
         const applyState = (state, note) => {
           const next = state && typeof state === "object" ? state : defaultState;
           const aggregate = normalizeAggregateStats(next.aggregateStats);
+          const aggregatePreview = normalizeAggregatePreview(next.aggregatePreview);
           recordCountValue.textContent = formatRecordCount(next.recordCount);
           updatedAtValue.textContent = formatUpdatedAt(next.updatedAt);
           pairCountValue.textContent = formatShortCount(aggregate.pairCount, "건");
@@ -4681,6 +6073,21 @@
           aggregateSummaryValue.textContent = formatAggregateSummary(aggregate);
           aggregateNoteValue.textContent = formatAggregateNote(aggregate);
           statusNote.textContent = typeof note === "string" && note.trim() ? note.trim() : defaultStatusNote(next);
+          renderAggregateDetailList(
+            aggregateRepeatedDetailValue,
+            aggregatePreview.repeatedRules,
+            "반복 규칙은 2개 이상 pair를 학습하면 여기에 나타납니다."
+          );
+          renderAggregateDetailList(
+            aggregateConflictDetailValue,
+            aggregatePreview.conflictingRules,
+            "충돌 버킷이 생기면 어떤 패턴끼리 갈리는지 여기에 표시합니다."
+          );
+          renderAggregateDetailList(
+            aggregateHighConfidenceDetailValue,
+            aggregatePreview.highConfidenceRules,
+            "고신뢰 aggregate가 쌓이면 support와 근거 pair를 여기에 표시합니다."
+          );
         };
 
         const applyLearningPreview = (result) => {
@@ -5045,7 +6452,7 @@
               ? request.model
               : provider === "gemini"
                 ? "gemini-2.5-flash"
-                : "gpt-4o-mini";
+                : "gpt-5.4";
           const apiKey = sanitizeUiBridgeValue(request.apiKey);
           const prompt = typeof request.prompt === "string" ? request.prompt : "";
 
@@ -5300,6 +6707,10 @@
             aiDeleteHiddenLayersButton: {
               title: "현재 선택 내부의 숨겨진 레이어를 정리하기 위한 준비 단계입니다.",
               ariaLabel: "숨겨진 레이어 삭제. 현재 선택 내부의 숨겨진 레이어를 정리하기 위한 준비 단계입니다.",
+            },
+            aiOriginalImageDownloadButton: {
+              title: "?꾩옱 ?좏깮 踰붿쐞???ъ슜??IMAGE fill??썝蹂??대?吏瑜??쒖감 ?ㅻⅨ?④?濡? ?ㅼ슫濡쒕뱶?⑸땲??",
+              ariaLabel: "썝蹂??대?吏 異붿텧. ?꾩옱 ?좏깮 踰붿쐞???ъ슜??IMAGE fill??썝蹂??대?吏瑜??쒖감 ?ㅻⅨ?④?濡? ?ㅼ슫濡쒕뱶?⑸땲??",
             },
           };
           const AI_READ_SUMMARY_OPEN_KEY = "pigma:ai-read-summary-open:v1";
@@ -5890,17 +7301,17 @@
           syncAiActionDescriptions();
           renderEmptyState();
 
-          window.__PIGMA_AI_CORRECTION__ = {
-            activate: activateAiTab,
-            deactivate: deactivateAiTab,
-            requestCachedDesignRead,
-          };
-          window.__PIGMA_AI_CORRECTION_DESIGN_READ__ = {
-            requestCachedDesignRead,
-          };
-        }
+        window.__PIGMA_AI_CORRECTION__ = {
+          activate: activateAiTab,
+          deactivate: deactivateAiTab,
+          requestCachedDesignRead,
+        };
+        window.__PIGMA_AI_CORRECTION_DESIGN_READ__ = {
+          requestCachedDesignRead,
+        };
+      }
 
-        return;
+      return;
 
         /* PIGMA_DEAD_UI_BLOCK: legacy AI correction tab bootstrap kept only for history reference.
            Runtime source of truth now lives above. Do not revive this block without removing the
@@ -6018,6 +7429,844 @@
           deactivate: deactivateAiTab,
         };
         */
+      })();
+    </script>
+    <script>
+      (() => {
+        if (window.__PIGMA_AI_DESIGN_ASSIST_UI__) {
+          return;
+        }
+
+        const rootElement = document.documentElement;
+        const aiTab = document.getElementById("tabAi");
+        const settingsTab = document.getElementById("tabSettings");
+        const debugPanels = document.getElementById("aiCorrectionDebugPanels");
+        const elements = {
+          panel: document.getElementById("designAssistSummaryPanel"),
+          panelTitle: document.getElementById("designAssistPanelTitle"),
+          panelCopy: document.getElementById("designAssistPanelCopy"),
+          statusPill: document.getElementById("designAssistStatusPill"),
+          analyzedAt: document.getElementById("designAssistAnalyzedAt"),
+          selectionSummary: document.getElementById("designAssistSelectionSummary"),
+          selectionNote: document.getElementById("designAssistSelectionNote"),
+          sourceWidthValue: document.getElementById("designAssistSourceWidthValue"),
+          targetWidthValue: document.getElementById("designAssistTargetWidthValue"),
+          pairCountValue: document.getElementById("designAssistPairCountValue"),
+          ruleCountValue: document.getElementById("designAssistRuleCountValue"),
+          aiStatusValue: document.getElementById("designAssistAiStatusValue"),
+          targetProfileValue: document.getElementById("designAssistTargetProfileValue"),
+          planCacheValue: document.getElementById("designAssistPlanCacheValue"),
+          planRepairValue: document.getElementById("designAssistPlanRepairValue"),
+          memoryStatusValue: document.getElementById("designAssistMemoryStatusValue"),
+          similarPairsValue: document.getElementById("designAssistSimilarPairsValue"),
+          ruleSummaryValue: document.getElementById("designAssistRuleSummaryValue"),
+          draftValue: document.getElementById("designAssistDraftValue"),
+          warningValue: document.getElementById("designAssistWarningValue"),
+          insightMeta: document.getElementById("designAssistInsightMeta"),
+          insightList: document.getElementById("designAssistInsightList"),
+          createDraftButton: document.getElementById("designAssistCreateDraftButton"),
+          mobileWidthSelect: document.getElementById("designAssistMobileWidthSelect"),
+          mobileWidthHint: document.getElementById("designAssistMobileWidthHint"),
+          mobileWidthReason: document.getElementById("designAssistMobileWidthReason"),
+          usePreferredWidthButton: document.getElementById("designAssistUsePreferredWidthButton"),
+          legacySafeModeCheckbox: document.getElementById("designAssistLegacySafeModeCheckbox"),
+          moButton: document.getElementById("designAssistMoButton"),
+          pcButton: document.getElementById("designAssistPcButton"),
+          trainButton: document.getElementById("designAssistTrainButton"),
+          learnButton: document.getElementById("responsiveMemoryLearnButton"),
+        };
+
+        if (
+          !(rootElement instanceof HTMLElement) ||
+          !(aiTab instanceof HTMLElement) ||
+          !(settingsTab instanceof HTMLElement) ||
+          !(elements.panel instanceof HTMLDetailsElement) ||
+          !(elements.panelTitle instanceof HTMLElement) ||
+          !(elements.panelCopy instanceof HTMLElement) ||
+          !(elements.statusPill instanceof HTMLElement) ||
+          !(elements.analyzedAt instanceof HTMLElement) ||
+          !(elements.selectionSummary instanceof HTMLElement) ||
+          !(elements.selectionNote instanceof HTMLElement) ||
+          !(elements.sourceWidthValue instanceof HTMLElement) ||
+          !(elements.targetWidthValue instanceof HTMLElement) ||
+          !(elements.pairCountValue instanceof HTMLElement) ||
+          !(elements.ruleCountValue instanceof HTMLElement) ||
+          !(elements.aiStatusValue instanceof HTMLElement) ||
+          !(elements.targetProfileValue instanceof HTMLElement) ||
+          !(elements.planCacheValue instanceof HTMLElement) ||
+          !(elements.planRepairValue instanceof HTMLElement) ||
+          !(elements.memoryStatusValue instanceof HTMLElement) ||
+          !(elements.similarPairsValue instanceof HTMLElement) ||
+          !(elements.ruleSummaryValue instanceof HTMLElement) ||
+          !(elements.draftValue instanceof HTMLElement) ||
+          !(elements.warningValue instanceof HTMLElement) ||
+          !(elements.insightMeta instanceof HTMLElement) ||
+          !(elements.insightList instanceof HTMLElement) ||
+          !(elements.createDraftButton instanceof HTMLButtonElement) ||
+          !(elements.mobileWidthSelect instanceof HTMLSelectElement) ||
+          !(elements.mobileWidthHint instanceof HTMLElement) ||
+          !(elements.mobileWidthReason instanceof HTMLElement) ||
+          !(elements.usePreferredWidthButton instanceof HTMLButtonElement) ||
+          !(elements.legacySafeModeCheckbox instanceof HTMLInputElement) ||
+          !(elements.moButton instanceof HTMLButtonElement) ||
+          !(elements.pcButton instanceof HTMLButtonElement) ||
+          !(elements.trainButton instanceof HTMLButtonElement)
+        ) {
+          return;
+        }
+
+        window.__PIGMA_AI_DESIGN_ASSIST_UI__ = true;
+
+        const postPluginMessage = (message) => {
+          parent.postMessage({ pluginMessage: message }, "*");
+        };
+
+        const DESIGN_ASSIST_MOBILE_WIDTH_KEY = "pigma:design-assist-mobile-width:v1";
+        const DESIGN_ASSIST_WIDTH_OUTCOME_KEY = "pigma:design-assist-width-outcomes:v1";
+        const DESIGN_ASSIST_LEGACY_SAFE_MODE_KEY = "pigma:design-assist-legacy-safe-mode:v1";
+        let busyAction = "";
+        let lastRenderedResult = null;
+        let lastAssistSnapshot = null;
+
+        const normalizeDesignAssistMobileWidth = (value) => {
+          const next = String(value || "").trim();
+          return next === "390" || next === "393" ? next : "360";
+        };
+
+        const normalizeTrackedDesignAssistWidth = (value) => {
+          const next = String(value || "").trim();
+          return next === "360" || next === "390" || next === "393" ? next : "";
+        };
+
+        const normalizeDesignAssistWidthOutcomeBucket = (value) => {
+          const bucket = value && typeof value === "object" ? value : {};
+          return {
+            attempts: Math.max(0, Math.round(Number(bucket.attempts) || 0)),
+            wins: Math.max(0, Math.round(Number(bucket.wins) || 0)),
+            losses: Math.max(0, Math.round(Number(bucket.losses) || 0)),
+            ties: Math.max(0, Math.round(Number(bucket.ties) || 0)),
+            totalQualityScore: Math.max(0, Math.round(Number(bucket.totalQualityScore) || 0)),
+            bestQualityScore: Math.max(0, Math.min(100, Math.round(Number(bucket.bestQualityScore) || 0))),
+            lastQualityScore: Math.max(0, Math.min(100, Math.round(Number(bucket.lastQualityScore) || 0))),
+            lastQualityLabel: typeof bucket.lastQualityLabel === "string" ? bucket.lastQualityLabel.trim() : "",
+            updatedAt: typeof bucket.updatedAt === "string" ? bucket.updatedAt.trim() : "",
+          };
+        };
+
+        const normalizeDesignAssistWidthOutcomeStore = (value) => {
+          const source = value && typeof value === "object" ? value : {};
+          const widths = source.widths && typeof source.widths === "object" ? source.widths : {};
+          return {
+            preferredWidth: normalizeTrackedDesignAssistWidth(source.preferredWidth),
+            widths: {
+              "360": normalizeDesignAssistWidthOutcomeBucket(widths["360"]),
+              "390": normalizeDesignAssistWidthOutcomeBucket(widths["390"]),
+              "393": normalizeDesignAssistWidthOutcomeBucket(widths["393"]),
+            },
+          };
+        };
+
+        const readDesignAssistWidthOutcomeStore = () => {
+          if (
+            window.__PIGMA_AI_WIDTH_OUTCOME__ &&
+            typeof window.__PIGMA_AI_WIDTH_OUTCOME__.getStore === "function"
+          ) {
+            return normalizeDesignAssistWidthOutcomeStore(window.__PIGMA_AI_WIDTH_OUTCOME__.getStore());
+          }
+          try {
+            const raw = window.localStorage.getItem(DESIGN_ASSIST_WIDTH_OUTCOME_KEY);
+            return raw ? normalizeDesignAssistWidthOutcomeStore(JSON.parse(raw)) : normalizeDesignAssistWidthOutcomeStore(null);
+          } catch (error) {
+            return normalizeDesignAssistWidthOutcomeStore(null);
+          }
+        };
+
+        const renderMobileWidthHint = (storeOverride) => {
+          const store = normalizeDesignAssistWidthOutcomeStore(storeOverride || readDesignAssistWidthOutcomeStore());
+          const preferredWidth = normalizeTrackedDesignAssistWidth(store.preferredWidth);
+          const currentWidth = normalizeTrackedDesignAssistWidth(elements.mobileWidthSelect.value) || "360";
+
+          if (!preferredWidth) {
+            elements.mobileWidthHint.textContent = `현재 ${currentWidth}px 선택 · 저장된 기본 폭은 아직 없습니다.`;
+            elements.mobileWidthReason.textContent =
+              "최근 자동 비교 결과가 쌓이면 더 안정적인 기본 폭과 근거가 여기에 표시됩니다.";
+            return;
+          }
+
+          const bucket = normalizeDesignAssistWidthOutcomeBucket(store.widths[preferredWidth]);
+          const averageQualityScore =
+            bucket.attempts > 0 ? Math.round(bucket.totalQualityScore / Math.max(1, bucket.attempts)) : 0;
+          elements.mobileWidthHint.textContent =
+            currentWidth === preferredWidth
+              ? `저장된 기본 폭 ${preferredWidth}px 적용 중`
+              : `저장된 기본 폭 ${preferredWidth}px · 현재 ${currentWidth}px 수동 선택`;
+          elements.mobileWidthReason.textContent =
+            bucket.attempts > 0
+              ? `최근 자동 비교 ${bucket.attempts}회 기준 · 우세 ${bucket.wins}회 · 평균 quality ${averageQualityScore}${
+                  bucket.bestQualityScore > 0 ? ` · 최고 ${bucket.bestQualityScore}` : ""
+                }`
+              : "최근 자동 비교 기준으로 저장된 기본 폭입니다.";
+        };
+
+        const syncUsePreferredWidthButton = (storeOverride) => {
+          const store = normalizeDesignAssistWidthOutcomeStore(storeOverride || readDesignAssistWidthOutcomeStore());
+          const preferredWidth = normalizeTrackedDesignAssistWidth(store.preferredWidth);
+          const currentWidth = normalizeTrackedDesignAssistWidth(elements.mobileWidthSelect.value) || "360";
+          const disabled = !preferredWidth || preferredWidth === currentWidth || !!busyAction;
+          elements.usePreferredWidthButton.disabled = disabled;
+          elements.usePreferredWidthButton.setAttribute("aria-disabled", disabled ? "true" : "false");
+
+          if (!preferredWidth) {
+            elements.usePreferredWidthButton.textContent = "No Saved Width";
+            elements.usePreferredWidthButton.title =
+              "Automatic comparison will enable a saved default width after more runs.";
+            return;
+          }
+
+          if (preferredWidth === currentWidth) {
+            elements.usePreferredWidthButton.textContent = `Saved ${preferredWidth}px Active`;
+            elements.usePreferredWidthButton.title =
+              `Saved default width ${preferredWidth}px is already active in the MO width selector.`;
+            return;
+          }
+
+          elements.usePreferredWidthButton.textContent = `Use Saved ${preferredWidth}px`;
+          elements.usePreferredWidthButton.title =
+            `Apply the saved default width ${preferredWidth}px to the MO width selector.`;
+        };
+
+        const readDesignAssistMobileWidth = () => {
+          try {
+            return normalizeDesignAssistMobileWidth(window.localStorage.getItem(DESIGN_ASSIST_MOBILE_WIDTH_KEY));
+          } catch (error) {
+            return "360";
+          }
+        };
+
+        const writeDesignAssistMobileWidth = (value) => {
+          const normalized = normalizeDesignAssistMobileWidth(value);
+          try {
+            window.localStorage.setItem(DESIGN_ASSIST_MOBILE_WIDTH_KEY, normalized);
+          } catch (error) {}
+          return normalized;
+        };
+
+        const getSelectedDesignAssistMobileWidth = () => Number(normalizeDesignAssistMobileWidth(elements.mobileWidthSelect.value));
+
+        const readDesignAssistLegacySafeMode = () => {
+          try {
+            return window.localStorage.getItem(DESIGN_ASSIST_LEGACY_SAFE_MODE_KEY) === "true";
+          } catch (error) {
+            return false;
+          }
+        };
+
+        const writeDesignAssistLegacySafeMode = (value) => {
+          const next = value === true;
+          try {
+            window.localStorage.setItem(DESIGN_ASSIST_LEGACY_SAFE_MODE_KEY, next ? "true" : "false");
+          } catch (error) {}
+          return next;
+        };
+
+        elements.mobileWidthSelect.value = readDesignAssistMobileWidth();
+        elements.legacySafeModeCheckbox.checked = readDesignAssistLegacySafeMode();
+        renderMobileWidthHint();
+        syncUsePreferredWidthButton();
+
+        const requestCachedAssist = () => {
+          postPluginMessage({ type: "request-ai-design-assist-cache" });
+        };
+
+        const setSelectedDesignAssistMobileWidth = (value) => {
+          const normalized = writeDesignAssistMobileWidth(value);
+          elements.mobileWidthSelect.value = normalized;
+          renderMobileWidthHint();
+          syncUsePreferredWidthButton();
+          return Number(normalized);
+        };
+
+        const ensurePanelVisible = () => {
+          if (debugPanels instanceof HTMLElement && debugPanels.hidden) {
+            debugPanels.hidden = false;
+            debugPanels.setAttribute("aria-hidden", "false");
+          }
+
+          elements.panel.open = true;
+
+          if (
+            window.__PIGMA_AI_CORRECTION_PANEL_VISIBILITY__ &&
+            typeof window.__PIGMA_AI_CORRECTION_PANEL_VISIBILITY__.revealAndFocusPanel === "function"
+          ) {
+            window.__PIGMA_AI_CORRECTION_PANEL_VISIBILITY__.revealAndFocusPanel(elements.panel);
+            return;
+          }
+
+          requestAnimationFrame(() => {
+            elements.panel.scrollIntoView({
+              block: "start",
+              behavior: "smooth",
+            });
+          });
+        };
+
+        const setStatus = (tone, label) => {
+          elements.statusPill.dataset.tone = tone;
+          elements.statusPill.textContent = label;
+          elements.statusPill.classList.toggle("active", tone === "ready" || tone === "running");
+        };
+
+        const setBusy = (action) => {
+          busyAction = typeof action === "string" ? action : "";
+          const busy = !!busyAction;
+          elements.moButton.disabled = busy;
+          elements.pcButton.disabled = busy;
+          elements.mobileWidthSelect.disabled = busy;
+          elements.legacySafeModeCheckbox.disabled = busy;
+          elements.createDraftButton.disabled = busy || !canCreateDraft(lastRenderedResult);
+          elements.moButton.setAttribute("aria-busy", busyAction === "mobile-design" ? "true" : "false");
+          elements.pcButton.setAttribute("aria-busy", busyAction === "pc-design" ? "true" : "false");
+          elements.createDraftButton.setAttribute("aria-busy", busyAction === "create-mobile-draft" ? "true" : "false");
+          elements.moButton.textContent =
+            busyAction === "mobile-design" ? "PC -> MO 초안 생성 중..." : "PC -> MO 초안";
+          elements.pcButton.textContent =
+            busyAction === "pc-design" ? "MO -> PC 초안 생성 중..." : "MO -> PC 초안";
+          elements.createDraftButton.textContent =
+            busyAction === "create-mobile-draft"
+              ? "MO 초안 프레임 생성 중..."
+              : hasDraft(lastRenderedResult)
+                ? "MO 초안 다시 생성"
+                : "MO 초안 프레임 생성";
+          syncUsePreferredWidthButton();
+        };
+
+        const canCreateDraft = (result) => {
+          return !!result && result.action === "mobile-design";
+        };
+
+        const hasDraft = (result) => {
+          return !!(result && result.draft && typeof result.draft === "object" && typeof result.draft.name === "string");
+        };
+
+        const formatAnalyzedAt = (isoString) => {
+          if (typeof isoString !== "string" || !isoString.trim()) {
+            return "마지막 실행 없음";
+          }
+
+          const date = new Date(isoString);
+          if (!Number.isFinite(date.getTime())) {
+            return "마지막 실행 없음";
+          }
+
+          return `마지막 실행 ${date.toLocaleString("ko-KR", {
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+          })}`;
+        };
+
+        const extractTargetWidth = (result) => {
+          if (result && typeof result.targetWidth === "number" && Number.isFinite(result.targetWidth)) {
+            return Math.round(result.targetWidth);
+          }
+
+          const targetLabel =
+            result && result.summary && typeof result.summary.targetLabel === "string" ? result.summary.targetLabel : "";
+          const match = targetLabel.match(/(\d+)/);
+          return match ? Number(match[1]) : 0;
+        };
+
+        const fillMetric = (element, value) => {
+          element.textContent = String(value);
+        };
+
+        const renderInsightList = (items) => {
+          elements.insightList.replaceChildren();
+
+          const list = Array.isArray(items) ? items.filter((entry) => typeof entry === "string" && entry.trim()).slice(0, 6) : [];
+          if (!list.length) {
+            const item = document.createElement("li");
+            const title = document.createElement("strong");
+            const detail = document.createElement("span");
+            title.className = "list-title";
+            detail.className = "list-detail";
+            title.textContent = "아직 제안이 없습니다.";
+            detail.textContent = "PC 또는 MO 디자인 어시스트를 실행하면 학습 메모리와 AI 기반 변환 가이드를 여기에 보여줍니다.";
+            item.append(title, detail);
+            elements.insightList.append(item);
+            return;
+          }
+
+          list.forEach((entry) => {
+            const item = document.createElement("li");
+            const title = document.createElement("strong");
+            title.className = "list-title";
+            title.textContent = entry;
+            item.append(title);
+            elements.insightList.append(item);
+          });
+        };
+
+        const resolvePlanCacheLabel = (cacheMeta, matchesCurrentSelection) => {
+          const meta = cacheMeta && typeof cacheMeta === "object" ? cacheMeta : {};
+          const label = typeof meta.label === "string" ? meta.label.trim() : "";
+          if (label) {
+            return matchesCurrentSelection === false && meta.status === "stored" ? `${label} (selection changed)` : label;
+          }
+          return "No cached plan";
+        };
+
+        const resolvePlanRepairLabel = (result) => {
+          const planning = result && typeof result.planning === "object" ? result.planning : {};
+          if (planning.deterministicRepairApplied === true) {
+            const repairedCount = Math.max(0, Math.round(Number(planning.repairedSectionCount) || 0));
+            const fallbackCount = Math.max(0, Math.round(Number(planning.fallbackSectionCount) || 0));
+            if (fallbackCount > 0) {
+              return `Repair ${repairedCount} / fallback ${fallbackCount}`;
+            }
+            return `Repair ${Math.max(1, repairedCount)} section(s)`;
+          }
+          if (Math.max(0, Math.round(Number(planning.outputSectionCount) || 0)) > 0) {
+            return "No repair needed";
+          }
+          return "Waiting";
+        };
+
+        const publishAssistSnapshot = (snapshot) => {
+          const next = snapshot && typeof snapshot === "object" ? snapshot : null;
+          lastAssistSnapshot = next;
+          if (!next) {
+            return;
+          }
+
+          window.dispatchEvent(
+            new CustomEvent("pigma:design-assist-updated", {
+              detail: next,
+            })
+          );
+        };
+
+        const buildAssistSnapshotFromResult = (result, matchesCurrentSelection, cacheMeta, warningText) => {
+          const planning = result && typeof result.planning === "object" ? result.planning : {};
+          const summary = result && result.summary && typeof result.summary === "object" ? result.summary : {};
+          return {
+            ok: true,
+            source: matchesCurrentSelection === false ? "cache" : "result",
+            action: result && typeof result.action === "string" ? result.action.trim() : "",
+            targetWidth: extractTargetWidth(result),
+            qualityScore: Math.max(0, Math.min(100, Math.round(Number(planning.qualityScore) || 0))),
+            qualityLabel: typeof planning.qualityLabel === "string" ? planning.qualityLabel.trim() : "",
+            qualitySummary:
+              typeof planning.qualitySummary === "string" && planning.qualitySummary.trim()
+                ? planning.qualitySummary.trim()
+                : typeof summary.aiStatusLabel === "string"
+                  ? summary.aiStatusLabel.trim()
+                  : "",
+            planRepairLabel: resolvePlanRepairLabel(result),
+            planCacheLabel: resolvePlanCacheLabel(cacheMeta, matchesCurrentSelection),
+            analyzedAt: result && typeof result.analyzedAt === "string" ? result.analyzedAt.trim() : "",
+            warningText: typeof warningText === "string" ? warningText.trim() : "",
+          };
+        };
+
+        const resolveCurrentAssistAction = () => {
+          if (busyAction === "pc-design" || busyAction === "mobile-design") {
+            return busyAction;
+          }
+          if (lastRenderedResult && typeof lastRenderedResult.action === "string" && lastRenderedResult.action.trim()) {
+            return lastRenderedResult.action.trim();
+          }
+          return "mobile-design";
+        };
+
+        const buildAssistSnapshotFromError = (message, cacheMeta, action) => {
+          return {
+            ok: false,
+            source: "error",
+            action: typeof action === "string" && action.trim() ? action.trim() : "mobile-design",
+            targetWidth: getSelectedDesignAssistMobileWidth(),
+            qualityScore: 0,
+            qualityLabel: "error",
+            qualitySummary: "",
+            planRepairLabel: "Waiting",
+            planCacheLabel: resolvePlanCacheLabel(cacheMeta, true),
+            analyzedAt: new Date().toISOString(),
+            warningText: typeof message === "string" ? message.trim() : "",
+          };
+        };
+
+        const renderEmptyState = (cacheMeta) => {
+          lastRenderedResult = null;
+          lastAssistSnapshot = null;
+          setBusy("");
+          setStatus("idle", "대기");
+          elements.panelTitle.textContent = "디자인 어시스트 준비";
+          elements.panelCopy.textContent = "학습 메모리와 AI를 함께 읽어 PC/MO 변환 dry-run 제안을 여기에 표시합니다.";
+          elements.analyzedAt.textContent = "마지막 실행 없음";
+          elements.selectionSummary.textContent = "루트 프레임 1개를 선택한 뒤 MO 또는 PC 디자인 어시스트를 실행하세요.";
+          elements.selectionNote.textContent =
+            "이 단계에서는 바로 레이어를 수정하지 않고, 누적된 학습 메모리와 AI 해석을 기반으로 변환 가이드를 먼저 보여줍니다.";
+          fillMetric(elements.sourceWidthValue, "0px");
+          fillMetric(elements.targetWidthValue, "0px");
+          fillMetric(elements.pairCountValue, "0건");
+          fillMetric(elements.ruleCountValue, "0개");
+          elements.aiStatusValue.textContent = "대기";
+          elements.targetProfileValue.textContent = `${getSelectedDesignAssistMobileWidth()}px MO`;
+          elements.planCacheValue.textContent = resolvePlanCacheLabel(cacheMeta, true);
+          elements.planRepairValue.textContent = "Waiting";
+          elements.memoryStatusValue.textContent = "학습 메모리 없음";
+          elements.similarPairsValue.textContent = "유사 예제 없음";
+          elements.ruleSummaryValue.textContent = "참고 규칙이 없으면 여기에 표시합니다.";
+          elements.draftValue.textContent = "아직 생성 안 함";
+          elements.warningValue.textContent = "주의 사항이 생기면 여기에 표시합니다.";
+          elements.insightMeta.textContent = "dry-run 준비";
+          renderInsightList([]);
+        };
+
+        const renderErrorState = (message, cacheMeta) => {
+          const action = resolveCurrentAssistAction();
+          setBusy("");
+          setStatus("error", "오류");
+          elements.panelTitle.textContent = "디자인 어시스트 실패";
+          elements.panelCopy.textContent = message || "디자인 어시스트를 실행하지 못했습니다.";
+          elements.selectionSummary.textContent = message || "현재 선택을 다시 확인한 뒤 다시 실행해 주세요.";
+          elements.selectionNote.textContent = "루트 프레임 1개만 선택해야 하고, 학습 메모리나 AI 설정 상태도 함께 점검해 주세요.";
+          elements.aiStatusValue.textContent = "재시도 필요";
+          elements.warningValue.textContent = message || "실행 오류";
+
+          if (!lastRenderedResult) {
+            fillMetric(elements.sourceWidthValue, "0px");
+            fillMetric(elements.targetWidthValue, "0px");
+            fillMetric(elements.pairCountValue, "0건");
+            fillMetric(elements.ruleCountValue, "0개");
+            elements.targetProfileValue.textContent = `${getSelectedDesignAssistMobileWidth()}px MO`;
+            elements.planCacheValue.textContent = resolvePlanCacheLabel(cacheMeta, true);
+            elements.planRepairValue.textContent = "Waiting";
+            elements.memoryStatusValue.textContent = "상태 확인 필요";
+            elements.similarPairsValue.textContent = "유사 예제 없음";
+            elements.ruleSummaryValue.textContent = "실행 후 다시 확인해 주세요.";
+            elements.draftValue.textContent = "생성 상태 확인 필요";
+            elements.insightMeta.textContent = "실패";
+            renderInsightList([]);
+          }
+          publishAssistSnapshot(buildAssistSnapshotFromError(message, cacheMeta, action));
+        };
+
+        const renderResult = (result, matchesCurrentSelection, cacheMeta) => {
+          if (!result || typeof result !== "object") {
+            renderEmptyState(cacheMeta);
+            return;
+          }
+
+          lastRenderedResult = result;
+          setBusy("");
+          ensurePanelVisible();
+
+          const selection = result.selection && typeof result.selection === "object" ? result.selection : {};
+          const summary = result.summary && typeof result.summary === "object" ? result.summary : {};
+          const retrieval = result.retrieval && typeof result.retrieval === "object" ? result.retrieval : {};
+          const guidance = result.guidance && typeof result.guidance === "object" ? result.guidance : {};
+          const targetWidth = extractTargetWidth(result);
+          if (result.action === "mobile-design" && targetWidth > 0) {
+            elements.mobileWidthSelect.value = writeDesignAssistMobileWidth(targetWidth);
+            renderMobileWidthHint();
+            syncUsePreferredWidthButton();
+          }
+          const similarPairs = Array.isArray(retrieval.similarPairs) ? retrieval.similarPairs.filter(Boolean) : [];
+          const draft = result.draft && typeof result.draft === "object" ? result.draft : null;
+          const referenceCount =
+            result.memory && Array.isArray(result.memory.pairRuleReferences) ? result.memory.pairRuleReferences.length : 0;
+          const ruleSummary =
+            Array.isArray(guidance.layoutChanges) && guidance.layoutChanges.length
+              ? guidance.layoutChanges[0]
+              : Array.isArray(guidance.memoryReferences) && guidance.memoryReferences.length
+                ? guidance.memoryReferences[0]
+                : "참고 규칙이 아직 충분하지 않습니다.";
+          const warningText =
+            result.aiError && typeof result.aiError === "string" && result.aiError.trim()
+              ? result.aiError.trim()
+              : Array.isArray(guidance.warnings) && guidance.warnings.length
+                ? guidance.warnings[0]
+                : "주의 사항 없음";
+          const insightItems =
+            Array.isArray(result.insights) && result.insights.length
+              ? result.insights
+              : Array.isArray(guidance.suggestedSteps)
+                ? guidance.suggestedSteps
+                : [];
+
+          setStatus(matchesCurrentSelection === false ? "stale" : "ready", matchesCurrentSelection === false ? "캐시" : "완료");
+          elements.panelTitle.textContent =
+            result.action === "pc-design" ? "MO -> PC dry-run 제안 완료" : "PC -> MO dry-run 제안 완료";
+          elements.panelCopy.textContent =
+            typeof guidance.conversionSummary === "string" && guidance.conversionSummary.trim()
+              ? guidance.conversionSummary.trim()
+              : summary.contentSummary || "학습 메모리와 AI를 기반으로 변환 가이드를 준비했습니다.";
+          elements.analyzedAt.textContent = `${formatAnalyzedAt(result.analyzedAt)} · ${
+            summary.aiStatusLabel || "메모리 기반 초안"
+          }`;
+          elements.selectionSummary.textContent = `${selection.name || "현재 선택"} · ${selection.width || 0} x ${
+            selection.height || 0
+          }px`;
+          elements.selectionNote.textContent =
+            draft && typeof draft.name === "string"
+              ? `${draft.name}${draft.width ? ` (${draft.width}px)` : ""} 초안을 생성했습니다. 원본은 그대로 유지되고, 새 draft frame만 옆에 배치됩니다.`
+              : typeof guidance.targetSummary === "string" && guidance.targetSummary.trim()
+                ? guidance.targetSummary.trim()
+                : "실제 프레임은 아직 수정하지 않았고, 변환 가이드만 dry-run으로 제안하고 있습니다.";
+
+          fillMetric(elements.sourceWidthValue, `${selection.width || 0}px`);
+          fillMetric(elements.targetWidthValue, `${targetWidth || 0}px`);
+          fillMetric(elements.pairCountValue, `${retrieval.similarPairCount || 0}건`);
+          fillMetric(elements.ruleCountValue, `${referenceCount || 0}개`);
+
+          elements.aiStatusValue.textContent = summary.aiStatusLabel || "메모리 기반 초안";
+          elements.targetProfileValue.textContent =
+            summary.targetLabel || (targetWidth > 0 ? `${targetWidth}px MO` : "대상 프로필 없음");
+          elements.planCacheValue.textContent = resolvePlanCacheLabel(cacheMeta, matchesCurrentSelection);
+          elements.planRepairValue.textContent = resolvePlanRepairLabel(result);
+          elements.memoryStatusValue.textContent = summary.memoryStatusLabel || "학습 메모리 없음";
+          elements.similarPairsValue.textContent = similarPairs.length
+            ? similarPairs.slice(0, 2).join(" · ")
+            : "유사 예제 없음";
+          elements.ruleSummaryValue.textContent = ruleSummary;
+          elements.draftValue.textContent =
+            draft && typeof draft.name === "string"
+              ? `${draft.name}${draft.width ? ` · ${draft.width}px` : ""}`
+              : "아직 생성 안 함";
+          elements.warningValue.textContent =
+            draft && Array.isArray(draft.warnings) && draft.warnings.length ? draft.warnings[0] : warningText;
+          elements.insightMeta.textContent =
+            (matchesCurrentSelection === false ? "최근 캐시" : "현재 선택 기준") +
+            ` · ${guidance.confidenceLabel || "신뢰도 정보 없음"}`;
+          renderInsightList(insightItems);
+          setBusy("");
+          publishAssistSnapshot(
+            buildAssistSnapshotFromResult(
+              result,
+              matchesCurrentSelection,
+              cacheMeta,
+              draft && Array.isArray(draft.warnings) && draft.warnings.length ? draft.warnings[0] : warningText
+            )
+          );
+        };
+
+        const runAssist = (action) => {
+          if (busyAction) {
+            return;
+          }
+
+          const targetWidth = action === "mobile-design" ? getSelectedDesignAssistMobileWidth() : 0;
+          if (action === "mobile-design") {
+            writeDesignAssistMobileWidth(targetWidth);
+          }
+          ensurePanelVisible();
+          setBusy(action);
+          setStatus("running", "실행 중");
+          elements.panelTitle.textContent = action === "pc-design" ? "MO -> PC dry-run 생성 중" : "PC -> MO dry-run 생성 중";
+          elements.panelCopy.textContent =
+            action === "pc-design"
+              ? "현재 선택을 PC 기준으로 재구성하기 위한 학습 메모리와 AI 근거를 모으고 있습니다."
+              : "현재 선택을 MO 기준으로 재구성하기 위한 학습 메모리와 AI 근거를 모으고 있습니다.";
+          elements.selectionSummary.textContent = "현재 선택을 분석 중입니다.";
+          elements.selectionNote.textContent = "유사 예제 retrieval, 반복 규칙, AI 응답을 순서대로 조합하고 있습니다.";
+          elements.panelCopy.textContent =
+            action === "pc-design"
+              ? "Analyze mode is gathering learned memory and AI planning evidence for a desktop rebuild."
+              : "Analyze mode is gathering learned memory and AI planning evidence for a mobile rebuild.";
+          elements.selectionSummary.textContent = "Analyze step only. No new draft frame is created yet.";
+          elements.selectionNote.textContent =
+            "Use Create Draft after the plan looks good. Cache, repair, and memory status above show what will be applied.";
+          postPluginMessage({
+            type: "run-ai-design-assist",
+            action,
+            targetWidth,
+            legacySafeMode: elements.legacySafeModeCheckbox.checked,
+          });
+        };
+
+        const openTrainingWorkflow = () => {
+          if (window.__PIGMA_AI_CORRECTION__ && typeof window.__PIGMA_AI_CORRECTION__.deactivate === "function") {
+            window.__PIGMA_AI_CORRECTION__.deactivate();
+          }
+
+          settingsTab.click();
+
+          if (elements.learnButton instanceof HTMLButtonElement) {
+            requestAnimationFrame(() => {
+              elements.learnButton.scrollIntoView({
+                block: "center",
+                behavior: "smooth",
+              });
+              elements.learnButton.focus();
+            });
+          }
+        };
+
+        const runRecommendedMobileAssist = (targetWidth) => {
+          const nextWidth = setSelectedDesignAssistMobileWidth(targetWidth);
+          if (window.__PIGMA_AI_CORRECTION__ && typeof window.__PIGMA_AI_CORRECTION__.activate === "function") {
+            window.__PIGMA_AI_CORRECTION__.activate();
+          } else {
+            aiTab.click();
+          }
+          requestAnimationFrame(() => {
+            setSelectedDesignAssistMobileWidth(nextWidth);
+            runAssist("mobile-design");
+          });
+        };
+
+        elements.moButton.addEventListener("click", () => {
+          runAssist("mobile-design");
+        });
+
+        elements.pcButton.addEventListener("click", () => {
+          runAssist("pc-design");
+        });
+
+        elements.mobileWidthSelect.addEventListener("change", () => {
+          elements.mobileWidthSelect.value = writeDesignAssistMobileWidth(elements.mobileWidthSelect.value);
+          renderMobileWidthHint();
+          syncUsePreferredWidthButton();
+        });
+
+        elements.legacySafeModeCheckbox.addEventListener("change", () => {
+          elements.legacySafeModeCheckbox.checked = writeDesignAssistLegacySafeMode(elements.legacySafeModeCheckbox.checked);
+        });
+
+        window.addEventListener("pigma:design-assist-width-outcome-updated", (event) => {
+          window.setTimeout(() => {
+            renderMobileWidthHint(event && event.detail);
+            syncUsePreferredWidthButton(event && event.detail);
+          }, 0);
+        });
+
+        window.addEventListener("pigma:design-assist-mobile-width-updated", () => {
+          renderMobileWidthHint();
+          syncUsePreferredWidthButton();
+        });
+
+        elements.usePreferredWidthButton.addEventListener("click", () => {
+          if (busyAction) {
+            return;
+          }
+          const store = readDesignAssistWidthOutcomeStore();
+          const preferredWidth = normalizeTrackedDesignAssistWidth(store.preferredWidth);
+          if (!preferredWidth) {
+            syncUsePreferredWidthButton(store);
+            return;
+          }
+          setSelectedDesignAssistMobileWidth(preferredWidth);
+        });
+
+        elements.createDraftButton.addEventListener("click", () => {
+          if (busyAction || !canCreateDraft(lastRenderedResult)) {
+            return;
+          }
+
+          const targetWidth = getSelectedDesignAssistMobileWidth();
+          writeDesignAssistMobileWidth(targetWidth);
+          ensurePanelVisible();
+          setBusy("create-mobile-draft");
+          setStatus("running", "생성 중");
+          elements.panelTitle.textContent = "PC -> MO 초안 프레임 생성 중";
+          elements.panelCopy.textContent =
+            `현재 선택을 복제해서 ${targetWidth}px MO draft frame을 만들고, confirmed 규칙 중심으로 안전한 변환만 적용하고 있습니다.`;
+          elements.panelCopy.textContent = `Applying the validated plan into a new ${targetWidth}px MO draft frame.${
+            elements.legacySafeModeCheckbox.checked ? " Legacy safe mode keeps clone-first fallback on for fragile sections." : ""
+          }`;
+          postPluginMessage({
+            type: "create-ai-design-assist-draft",
+            action: lastRenderedResult && lastRenderedResult.action ? lastRenderedResult.action : "mobile-design",
+            targetWidth,
+            legacySafeMode: elements.legacySafeModeCheckbox.checked,
+          });
+        });
+
+        elements.trainButton.addEventListener("click", () => {
+          openTrainingWorkflow();
+        });
+
+        aiTab.addEventListener("click", () => {
+          requestCachedAssist();
+        }, true);
+
+        aiTab.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            requestCachedAssist();
+          }
+        });
+
+        const rootObserver = new MutationObserver(() => {
+          if (rootElement.dataset.aiCorrectionTab === "active") {
+            requestCachedAssist();
+          }
+        });
+
+        rootObserver.observe(rootElement, {
+          attributes: true,
+          attributeFilter: ["data-ai-correction-tab"],
+        });
+
+        window.addEventListener("message", (event) => {
+          const message = event.data?.pluginMessage;
+          if (!message || typeof message !== "object") {
+            return;
+          }
+
+          if (message.type === "ai-design-assist-cache") {
+            if (message.result) {
+              renderResult(message.result, message.matchesCurrentSelection !== false, message.cacheMeta);
+            } else if (!lastRenderedResult) {
+              renderEmptyState(message.cacheMeta);
+            } else {
+              elements.planCacheValue.textContent = resolvePlanCacheLabel(message.cacheMeta, message.matchesCurrentSelection !== false);
+            }
+            return;
+          }
+
+          if (message.type === "ai-design-assist-status") {
+            if (message.status === "running") {
+              ensurePanelVisible();
+              setStatus("running", "실행 중");
+              if (typeof message.message === "string" && message.message.trim()) {
+                elements.panelCopy.textContent = message.message.trim();
+              }
+            }
+            return;
+          }
+
+          if (message.type === "ai-design-assist-result") {
+            renderResult(message.result, message.matchesCurrentSelection !== false, message.cacheMeta);
+            if (window.__PIGMA_AI_RUN_LOG__ && typeof window.__PIGMA_AI_RUN_LOG__.refreshSoon === "function") {
+              window.__PIGMA_AI_RUN_LOG__.refreshSoon(180);
+            }
+            return;
+          }
+
+          if (message.type === "ai-design-assist-error") {
+            if (message.matchesCurrentSelection === false) {
+              setBusy("");
+              return;
+            }
+            ensurePanelVisible();
+            renderErrorState(message.message, message.cacheMeta);
+            if (window.__PIGMA_AI_RUN_LOG__ && typeof window.__PIGMA_AI_RUN_LOG__.refreshSoon === "function") {
+              window.__PIGMA_AI_RUN_LOG__.refreshSoon(180);
+            }
+          }
+        });
+
+        renderEmptyState();
+
+        window.__PIGMA_AI_DESIGN_ASSIST__ = {
+          requestCachedAssist,
+          runMobileAssist: runRecommendedMobileAssist,
+          setMobileWidth: setSelectedDesignAssistMobileWidth,
+          openTrainingWorkflow,
+          getLatestSnapshot: () => lastAssistSnapshot,
+        };
       })();
     </script>
     <script>
@@ -9185,6 +11434,221 @@
         window.__PIGMA_AI_CORRECTION_PIXEL_PERFECT_CLEAR__ = {
           requestCachedResult,
         };
+      })();
+    </script>
+    <script>
+      (() => {
+        if (window.__PIGMA_AI_CORRECTION_ORIGINAL_IMAGE_DOWNLOAD__) {
+          return;
+        }
+
+        const button = document.getElementById("aiOriginalImageDownloadButton");
+        if (!(button instanceof HTMLButtonElement)) {
+          return;
+        }
+
+        /*
+        const defaultLabel = button.textContent || "썝蹂??대?吏 異붿텧";
+        const postPluginMessage = (message) => {
+          parent.postMessage({ pluginMessage: message }, "*");
+        };
+
+        let isBusy = false;
+        let pluginFinished = false;
+        let queueRunning = false;
+        let queuedDownloads = [];
+        let completedCount = 0;
+        let totalCount = 0;
+
+        */
+        const defaultLabel = "\uC6D0\uBCF8 \uC774\uBBF8\uC9C0 \uCD94\uCD9C";
+        const defaultBusyLabel = "\uC6D0\uBCF8 \uC774\uBBF8\uC9C0 \uC900\uBE44 \uC911...";
+        const scanningLabel = "\uC6D0\uBCF8 \uC774\uBBF8\uC9C0 \uCC3E\uB294 \uC911...";
+        const postPluginMessage = (message) => {
+          parent.postMessage({ pluginMessage: message }, "*");
+        };
+
+        let isBusy = false;
+        let pluginFinished = false;
+        let queueRunning = false;
+        let queuedDownloads = [];
+        let completedCount = 0;
+        let totalCount = 0;
+
+        button.textContent = defaultLabel;
+        button.title =
+          "\uD604\uC7AC \uC120\uD0DD \uBC94\uC704\uC5D0\uC11C \uC0AC\uC6A9 \uC911\uC778 IMAGE fill \uC6D0\uBCF8 \uC774\uBBF8\uC9C0\uB97C \uC21C\uCC28 \uB2E4\uC6B4\uB85C\uB4DC\uD569\uB2C8\uB2E4.";
+        button.setAttribute(
+          "aria-label",
+          "\uC6D0\uBCF8 \uC774\uBBF8\uC9C0 \uCD94\uCD9C. \uD604\uC7AC \uC120\uD0DD \uBC94\uC704\uC5D0\uC11C \uC0AC\uC6A9 \uC911\uC778 IMAGE fill \uC6D0\uBCF8 \uC774\uBBF8\uC9C0\uB97C \uC21C\uCC28 \uB2E4\uC6B4\uB85C\uB4DC\uD569\uB2C8\uB2E4."
+        );
+
+        const delay = (ms) =>
+          new Promise((resolve) => {
+            window.setTimeout(resolve, ms);
+          });
+
+        const setButtonBusy = (busy, label) => {
+          isBusy = busy;
+          button.disabled = busy;
+          button.textContent = busy ? label || defaultBusyLabel : defaultLabel;
+          button.textContent = busy ? label || "썝蹂??대?吏 以鍮??." : defaultLabel;
+          button.setAttribute("aria-busy", busy ? "true" : "false");
+          button.textContent = busy ? label || defaultBusyLabel : defaultLabel;
+          if (busy && totalCount > 0) {
+            button.textContent =
+              "\uC6D0\uBCF8 \uC774\uBBF8\uC9C0 " + Math.min(completedCount, totalCount) + "/" + totalCount;
+          }
+        };
+
+        const normalizeTotalCount = (value) => {
+          return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+        };
+
+        const syncBusyLabel = (fallbackLabel) => {
+          if (!isBusy) {
+            return;
+          }
+
+          if (totalCount > 0) {
+            setButtonBusy(true, `썝蹂??대?吏 ${Math.min(completedCount, totalCount)}/${totalCount}`);
+            return;
+          }
+
+          setButtonBusy(true, fallbackLabel || "썝蹂??대?吏 以鍮??.");
+        };
+
+        const normalizeBytes = (value) => {
+          if (value instanceof Uint8Array) {
+            return value;
+          }
+
+          if (value instanceof ArrayBuffer) {
+            return new Uint8Array(value);
+          }
+
+          if (typeof ArrayBuffer !== "undefined" && typeof ArrayBuffer.isView === "function" && ArrayBuffer.isView(value)) {
+            return new Uint8Array(value.buffer);
+          }
+
+          if (Array.isArray(value)) {
+            return new Uint8Array(value);
+          }
+
+          return new Uint8Array(0);
+        };
+
+        const triggerDownload = (file) => {
+          const bytes = normalizeBytes(file && file.bytes);
+          const blob = new Blob([bytes]);
+          const url = URL.createObjectURL(blob);
+          const anchor = document.createElement("a");
+          anchor.href = url;
+          anchor.download = file && typeof file.fileName === "string" && file.fileName ? file.fileName : "figma-image.bin";
+          document.body.appendChild(anchor);
+          anchor.click();
+          anchor.remove();
+
+          window.setTimeout(() => {
+            URL.revokeObjectURL(url);
+          }, 1000);
+        };
+
+        const finalizeIfIdle = () => {
+          if (!pluginFinished || queueRunning || queuedDownloads.length > 0) {
+            return;
+          }
+
+          setButtonBusy(false);
+        };
+
+        const pumpQueue = async () => {
+          if (queueRunning) {
+            return;
+          }
+
+          queueRunning = true;
+          try {
+            while (queuedDownloads.length > 0) {
+              const file = queuedDownloads.shift();
+              triggerDownload(file);
+              completedCount += 1;
+              syncBusyLabel();
+              await delay(140);
+            }
+          } finally {
+            queueRunning = false;
+            finalizeIfIdle();
+          }
+        };
+
+        button.addEventListener("click", () => {
+          if (isBusy) {
+            return;
+          }
+
+          pluginFinished = false;
+          queueRunning = false;
+          queuedDownloads = [];
+          completedCount = 0;
+          totalCount = 0;
+          setButtonBusy(true, "썝蹂??대?吏 ?쒕뒗 以?...");
+          setButtonBusy(true, scanningLabel);
+          postPluginMessage({ type: "run-original-image-download" });
+        });
+
+        window.addEventListener("message", (event) => {
+          const payload = event && event.data ? event.data.pluginMessage : null;
+          if (!payload || typeof payload !== "object") {
+            return;
+          }
+
+          if (payload.type === "original-image-download-start") {
+            pluginFinished = false;
+            totalCount = normalizeTotalCount(payload.totalCount);
+            completedCount = 0;
+            syncBusyLabel("썝蹂??대?吏 以鍮??.");
+            return;
+          }
+
+          if (payload.type === "original-image-download-status") {
+            totalCount = normalizeTotalCount(payload.totalCount) || totalCount;
+            syncBusyLabel("썝蹂??대?吏 以鍮??.");
+            return;
+          }
+
+          if (payload.type === "original-image-download-file") {
+            const file = payload.file && typeof payload.file === "object" ? payload.file : null;
+            if (!file) {
+              return;
+            }
+
+            totalCount = normalizeTotalCount(file.totalCount) || totalCount;
+            queuedDownloads.push(file);
+            syncBusyLabel("썝蹂??대?吏 以鍮??.");
+            pumpQueue();
+            return;
+          }
+
+          if (payload.type === "original-image-download-result") {
+            pluginFinished = true;
+            const summary = payload.result && payload.result.summary ? payload.result.summary : null;
+            if (summary) {
+              totalCount = normalizeTotalCount(summary.downloadedCount) || totalCount;
+            }
+            finalizeIfIdle();
+            return;
+          }
+
+          if (payload.type === "original-image-download-error") {
+            pluginFinished = true;
+            queuedDownloads = [];
+            queueRunning = false;
+            setButtonBusy(false);
+          }
+        });
+
+        window.__PIGMA_AI_CORRECTION_ORIGINAL_IMAGE_DOWNLOAD__ = true;
       })();
     </script>
     <script>
