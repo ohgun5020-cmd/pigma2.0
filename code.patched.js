@@ -36219,11 +36219,10 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return "bin";
   }
 
-  function buildFileName(entry, index, extension) {
-    const prefix = String(index + 1).padStart(3, "0");
+  function buildFileName(entry, _index, extension) {
     const baseName = sanitizeFileName(entry && entry.nodeName ? entry.nodeName : "figma-image");
     const hash = entry && typeof entry.imageHash === "string" ? entry.imageHash.slice(0, 8) : "image";
-    return prefix + "-" + baseName + "-" + hash + "." + extension;
+    return baseName + "-" + hash + "." + extension;
   }
 
   function sanitizeFileName(value) {
