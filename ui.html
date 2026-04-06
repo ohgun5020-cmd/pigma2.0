@@ -924,6 +924,10 @@
         gap: 12px;
       }
 
+      .design-assist-group {
+        display: none !important;
+      }
+
       .design-assist-body {
         display: grid;
         gap: 10px;
@@ -3943,7 +3947,7 @@
               </div>
             </details>
 
-            <details class="panel collapsible settings-subpanel">
+            <details class="panel collapsible settings-subpanel" id="settingsPlanStatusPanel" hidden aria-hidden="true">
               <summary>
                 <div class="panel-copy">
                   <p class="section-kicker">계정 / 플랜</p>
@@ -3971,7 +3975,7 @@
               </div>
             </details>
 
-            <details class="panel collapsible settings-subpanel">
+            <details class="panel collapsible settings-subpanel" id="settingsResponsiveMemoryPanel" hidden aria-hidden="true">
               <summary>
                 <div class="panel-copy">
                   <p class="section-kicker">AI / 학습 메모리</p>
@@ -6314,6 +6318,18 @@
         const toggle = document.getElementById("settingsScreenDebugToggle");
         const toggleState = document.getElementById("settingsScreenDebugState");
         const debugPanels = document.getElementById("aiCorrectionDebugPanels");
+        const aiRunLogRow = document.getElementById("settingsAiRunLogRefreshButton")?.closest(".setting-row");
+        const aiStorageRow = aiRunLogRow instanceof HTMLElement ? aiRunLogRow.previousElementSibling : null;
+        const debugOnlyPanels = [
+          document.getElementById("settingsPlanStatusPanel"),
+          document.getElementById("settingsResponsiveMemoryPanel"),
+          aiStorageRow,
+          aiRunLogRow,
+          document.getElementById("settingsAiRunLogList")?.closest(".list-card"),
+          document.getElementById("settingsAiRunLogRecommendationButton")?.closest(".setting-row"),
+          document.getElementById("settingsAiRunLogChecklist")?.closest(".list-card"),
+          document.getElementById("settingsAiRunLogComparisonList")?.closest(".list-card"),
+        ].filter((panel) => panel instanceof HTMLElement);
 
         if (
           !(toggle instanceof HTMLButtonElement) ||
@@ -6366,6 +6382,10 @@
           toggleState.textContent = next ? "활성" : "비활성";
           debugPanels.hidden = !next;
           debugPanels.setAttribute("aria-hidden", next ? "false" : "true");
+          debugOnlyPanels.forEach((panel) => {
+            panel.hidden = !next;
+            panel.setAttribute("aria-hidden", next ? "false" : "true");
+          });
           document.documentElement.dataset.aiCorrectionDebugMode = next ? "true" : "false";
           window.__PIGMA_AI_CORRECTION_DEBUG_MODE__ = next;
           return next;
@@ -6389,7 +6409,8 @@
           });
         };
 
-        let currentDebugMode = applyDebugMode(readDebugMode());
+        let currentDebugMode = applyDebugMode(false);
+        writeDebugMode(false);
 
         window.__PIGMA_AI_CORRECTION_PANEL_VISIBILITY__ = {
           revealAndFocusPanel,
@@ -7687,11 +7708,6 @@
         };
 
         const ensurePanelVisible = () => {
-          if (debugPanels instanceof HTMLElement && debugPanels.hidden) {
-            debugPanels.hidden = false;
-            debugPanels.setAttribute("aria-hidden", "false");
-          }
-
           elements.panel.open = true;
 
           if (
