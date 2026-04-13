@@ -15,8 +15,10 @@ $aiTypoAuditPatch = Join-Path $root "ai-typo-audit.js"
 $aiPixelPerfectPatch = Join-Path $root "ai-pixel-perfect.js"
 $deleteHiddenLayersPatch = Join-Path $root "delete-hidden-layers.js"
 $originalImageDownloadPatch = Join-Path $root "original-image-download.js"
+$aiImageUpscalePatch = Join-Path $root "ai-image-upscale.js"
 $destination = Join-Path $root "code.patched.js"
 $uiSource = Join-Path $root "ui.html"
+$pdfJsInlineAssetSync = Join-Path $root "sync-pdfjs-inline-assets.js"
 $uiExternalizer = Join-Path $root "externalize-embedded-ui.js"
 $uiVerifier = Join-Path $root "verify-externalized-ui.js"
 $textGuardContract = Join-Path $root "text-import-guard.contract.json"
@@ -88,12 +90,24 @@ if (-not (Test-Path $deleteHiddenLayersPatch)) {
   throw "Missing hidden layer delete patch: $deleteHiddenLayersPatch"
 }
 
-if (-not (Test-Path $originalImageDownloadPatch)) {
-  throw "Missing original image download patch: $originalImageDownloadPatch"
+$hasOriginalImageDownloadPatch = Test-Path $originalImageDownloadPatch
+
+if (-not (Test-Path $aiImageUpscalePatch)) {
+  throw "Missing AI image upscale patch: $aiImageUpscalePatch"
 }
 
 if (-not (Test-Path $uiSource)) {
   throw "Missing UI source: $uiSource"
+}
+
+$uiSourceText = [System.IO.File]::ReadAllText($uiSource, [System.Text.Encoding]::UTF8)
+
+if ((-not $hasOriginalImageDownloadPatch) -and $uiSourceText.Contains("run-original-image-download")) {
+  throw "UI still references original image download, but the source patch is missing: $originalImageDownloadPatch"
+}
+
+if (-not (Test-Path $pdfJsInlineAssetSync)) {
+  throw "Missing PDF.js inline asset sync script: $pdfJsInlineAssetSync"
 }
 
 if (-not (Test-Path $uiExternalizer)) {
@@ -132,6 +146,11 @@ if (-not (Test-Path $figmaRuntimeSyntaxVerifier)) {
   throw "Missing Figma runtime syntax verifier: $figmaRuntimeSyntaxVerifier"
 }
 
+& node $pdfJsInlineAssetSync
+if ($LASTEXITCODE -ne 0) {
+  throw "Failed to sync inline PDF.js assets into ui.html"
+}
+
 & node $uiExternalizer $source
 if ($LASTEXITCODE -ne 0) {
   throw "Failed to externalize embedded UI in $source"
@@ -157,8 +176,12 @@ $runtimeSyntaxSourceFiles = @(
   $aiTypoAuditPatch,
   $aiPixelPerfectPatch,
   $deleteHiddenLayersPatch,
-  $originalImageDownloadPatch
+  $aiImageUpscalePatch
 )
+
+if ($hasOriginalImageDownloadPatch) {
+  $runtimeSyntaxSourceFiles += $originalImageDownloadPatch
+}
 
 & node $figmaRuntimeSyntaxVerifier @runtimeSyntaxSourceFiles
 if ($LASTEXITCODE -ne 0) {
@@ -1096,8 +1119,34 @@ $aiRegroupRenamePatchContent = [System.IO.File]::ReadAllText($aiRegroupRenamePat
 $aiTypoAuditPatchContent = [System.IO.File]::ReadAllText($aiTypoAuditPatch, [System.Text.Encoding]::UTF8)
 $aiPixelPerfectPatchContent = [System.IO.File]::ReadAllText($aiPixelPerfectPatch, [System.Text.Encoding]::UTF8)
 $deleteHiddenLayersPatchContent = [System.IO.File]::ReadAllText($deleteHiddenLayersPatch, [System.Text.Encoding]::UTF8)
-$originalImageDownloadPatchContent = [System.IO.File]::ReadAllText($originalImageDownloadPatch, [System.Text.Encoding]::UTF8)
-[System.IO.File]::WriteAllText($destination, $bundle + "`r`n" + $importPatch + "`r`n" + $exportPatchContent + "`r`n" + $aiSettingsPatchContent + "`r`n" + $aiResponsiveMemoryPatchContent + "`r`n" + $aiResponsivePairAnalyzerPatchContent + "`r`n" + $aiLlmClientPatchContent + "`r`n" + $aiDesignAssistPatchContent + "`r`n" + $aiAccessibilityDiagnosisPatchContent + "`r`n" + $aiDesignConsistencyPatchContent + "`r`n" + $aiRegroupRenamePatchContent + "`r`n" + $aiTypoAuditPatchContent + "`r`n" + $aiPixelPerfectPatchContent + "`r`n" + $deleteHiddenLayersPatchContent + "`r`n" + $originalImageDownloadPatchContent, $utf8NoBom)
+$aiImageUpscalePatchContent = [System.IO.File]::ReadAllText($aiImageUpscalePatch, [System.Text.Encoding]::UTF8)
+$originalImageDownloadPatchContent = ""
+if ($hasOriginalImageDownloadPatch) {
+  $originalImageDownloadPatchContent = [System.IO.File]::ReadAllText($originalImageDownloadPatch, [System.Text.Encoding]::UTF8)
+}
+$patchedRuntimeParts = @(
+  $bundle,
+  $importPatch,
+  $exportPatchContent,
+  $aiSettingsPatchContent,
+  $aiResponsiveMemoryPatchContent,
+  $aiResponsivePairAnalyzerPatchContent,
+  $aiLlmClientPatchContent,
+  $aiDesignAssistPatchContent,
+  $aiAccessibilityDiagnosisPatchContent,
+  $aiDesignConsistencyPatchContent,
+  $aiRegroupRenamePatchContent,
+  $aiTypoAuditPatchContent,
+  $aiPixelPerfectPatchContent,
+  $deleteHiddenLayersPatchContent,
+  $aiImageUpscalePatchContent
+)
+
+if ($hasOriginalImageDownloadPatch -and $originalImageDownloadPatchContent.Trim().Length -gt 0) {
+  $patchedRuntimeParts += $originalImageDownloadPatchContent
+}
+
+[System.IO.File]::WriteAllText($destination, [string]::Join("`r`n", $patchedRuntimeParts), $utf8NoBom)
 
 & node $uiExternalizer $destination
 if ($LASTEXITCODE -ne 0) {

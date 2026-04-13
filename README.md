@@ -57,6 +57,12 @@ Safe implementation order:
   - Local Figma plugin manifest.
 - `ui.html`
   - Single source of truth for UI edits.
+  - Also owns the PSD/AI/EPS/PDF/SVG import dispatcher, including the PDF.js-backed AI/PDF SVG-first path and the Ghostscript/PDF.js-backed EPS SVG-first path with bitmap fallback rules.
+- `vendor/pdfjs`
+  - Vendored PDF.js runtime used by the UI-side AI/PDF/SVG conversion path.
+- `vendor/ghostpdl`
+  - Vendored Ghostscript WASM runtime used to convert PostScript EPS into PDF before reusing the SVG conversion path.
+  - License note: this vendor is AGPL-3.0-or-later unless replaced with a commercial build.
 - `code.js`
   - Base main/plugin bundle.
 - `code.patched.js`
@@ -83,14 +89,20 @@ Safe implementation order:
   - Source of truth for the second AI button's safe regroup/rename apply pipeline and cache.
 - `ai-typo-audit.js`
   - Source of truth for the third AI button's typo audit and Figma annotation apply pipeline.
+  - Keep this audit conservative: skip cosmetic bracket/spacing cleanup and only keep spacing issues when a word is visibly broken into fragments, such as `app le -> apple`.
 - `ai-pixel-perfect.js`
   - Source of truth for the pixel-perfect button's decimal filtering, AI snap decisions, and apply pipeline.
 - `delete-hidden-layers.js`
   - Source of truth for the hidden-layer delete button's local cleanup and apply pipeline.
+- `original-image-download.js`
+  - Source of truth for the original-image download button's plugin-side image-hash collection and byte export pipeline.
+  - In the externalized UI, 1-2 images download individually and 3 or more are packaged into a ZIP automatically.
 - `ui-ai-correction.js`
   - Source of truth for `Ai 보정` feature logic and AI-only behavior. The `Ai 보정` UI itself lives in `ui.html`.
 - `externalize-embedded-ui.js`
   - Replaces embedded `figma.showUI(...)` HTML with `__html__`.
+- `sync-pdfjs-inline-assets.js`
+  - Syncs the bundled PDF.js module and worker into the generated `ui.html` inline asset block used by the AI import adapter in Figma's UI runtime.
 - `verify-externalized-ui.js`
   - Fails if a bundle stops using `figma.showUI(__html__, ...)`.
 - `text-import-guard.contract.json`
@@ -145,8 +157,12 @@ Runtime note: the active AI correction UI logic currently lives inline in `ui.ht
    - Keep `Ai 보정` feature logic in `ui-ai-correction.js` so Make/Import behavior stays isolated.
 2. Edit `code.js` or a source-of-truth patch file only when main/plugin behavior changes.
    - Export-only routing/normalization changes should go to `psd-export-boundary.js`.
+   - SVG import runtime changes should go to `psd-import-text-fix.js`.
+   - Original image download runtime changes should go to `original-image-download.js`.
    - AI settings persistence changes should go to `ai-settings-storage.js`.
 3. Run `build-patched-main.ps1` after logic or patch changes.
+   - This now refreshes the inline PDF.js asset block in `ui.html` before the rest of the build.
+   - It also fails fast if `ui.html` still references `run-original-image-download` while `original-image-download.js` is missing.
 4. Re-run the verification scripts before loading in Figma:
    - `node verify-externalized-ui.js code.patched.js`
    - `node verify-text-import-guard.js`
@@ -160,8 +176,14 @@ Runtime note: the active AI correction UI logic currently lives inline in `ui.ht
 ## Important Rules
 
 - `ui.html` is the live UI source. Do not treat embedded HTML inside a bundle as canonical.
+- PDF-backed `AI`, `EPS`, and `PDF` import behavior currently lives in `ui.html`.
+  - `pdf-compatible-ai`, `ai-pdf-wrapper`, `eps-pdf-wrapper`, and native `pdf` files try SVG conversion first.
+  - `eps-postscript` and `eps-preview-tiff` now run through Ghostscript WASM to create a temporary PDF before reusing the SVG conversion path.
+  - `ai-preview-tiff` still stays on the bitmap fallback path.
+  - `AI` / `EPS` inspection scans beyond the first header chunk so embedded PDF wrappers near the file tail are still discoverable.
 - `code.patched.js` is the runtime bundle that Figma actually runs from `manifest.json`.
 - Keep import-only runtime fixes in `psd-import-text-fix.js` and export-only runtime fixes in `psd-export-boundary.js`.
+- Keep original-image-download runtime fixes in `original-image-download.js` instead of relying on a leftover block inside `code.patched.js`.
 - If a UI edit does not show up, externalize the bundle again:
   - `node externalize-embedded-ui.js code.patched.js`
   - optionally `node externalize-embedded-ui.js code.js`

@@ -1,0 +1,169 @@
+Version: 1.6
+Button: 이미지 업스케일 (사람)
+
+The Ultimate Production-Grade Portrait Restoration & Upscaling Master Prompt (Final 1.6 - Absolute Complete Version)
+
+[ADAPTIVE RESTORATION & INTENSITY CONTROL]
+
+Adaptive Strength: Dynamically adjust restoration intensity based on input quality; prioritize degraded regions while minimizing intervention on already sharp areas.
+Clean-Area Protection: Preserve naturally sharp eyelashes, eyebrows, lip edges, hairline, and existing textures. Do not re-render intact regions.
+Source Integrity: Maintain strict 1:1 consistency with original pixel landmarks and geometry.
+Noise vs. Grain: Remove digital noise and compression artifacts while preserving micro-detail. Optionally reintroduce subtle, organic film grain. No waxy or over-denoised surfaces.
+
+[DEGRADATION AWARENESS & RESTORATION MASKING]
+
+Degradation Detection: Identify motion blur, defocus blur, compression, low resolution, and localized damage.
+Targeted Recovery: Apply restoration only where degradation exists; avoid uniform enhancement.
+Masking Logic: Stronger recovery on damaged facial zones; softer intervention on background and clean regions.
+No Over-Hallucination: Reconstruct only what is plausibly supported by original structure.
+
+[STRUCTURAL RECONSTRUCTION & LENS CORRECTION]
+
+Targeted De-blurring: Reverse motion/defocus/compression blur with physically plausible reconstruction.
+Distortion & Perspective: Correct wide-angle distortion; restore natural 85mm portrait proportions.
+Dynamic Range Recovery: Restore shadow/highlight detail; prevent crushed blacks and blown highlights.
+Edge Precision: Clean, crisp boundaries with no haloing, glow, ghosting, or edge breakup.
+
+[LOCAL CONTRAST & MICRO-EDGE CONTROL]
+
+Enhance clarity via controlled local contrast, not aggressive sharpening.
+Preserve fine edges (eyelashes, hair strands, lips) without crunchy artifacts.
+Maintain smooth tonal transitions in skin.
+
+[COMPRESSION & ARTIFACT SUPPRESSION]
+
+Remove JPEG macroblocking, mosquito noise, ringing, tiling seams, and edge breakup.
+Restore smooth gradients in damaged regions.
+Do not convert compression damage into fake texture.
+
+[PRIORITY RESOLUTION SYSTEM]
+
+Priority Order:
+
+Identity & Geometry
+Structural Reconstruction
+Detail Enhancement
+Optical Rendering
+
+Conflict Rule: Always preserve identity, anatomy, and geometry over enhancement.
+
+[CONSISTENCY & PRODUCTION STABILITY]
+
+Identity Consistency: Maintain identical facial structure and landmarks across outputs.
+Texture Consistency: Stable pore density and micro-detail distribution.
+Lighting Consistency: No drift in lighting logic or tonal balance.
+Deterministic Stability: Avoid stochastic reinterpretation across runs.
+
+[MULTI-SUBJECT & SPATIAL LOGIC]
+
+Distinct Identity: Each subject retains unique features; no blending or leakage.
+Focus Hierarchy: Primary subject = critical sharpness; others follow natural DOF falloff.
+Spatial Consistency: Maintain accurate scale, depth, and perspective.
+Occlusion Handling: Clean separation for overlapping faces, hair, hands, accessories.
+
+[FACIAL REGION PRIORITY MAP]
+
+Highest: eyes, eyelashes, irises, brows, lips, nostrils, teeth line
+Secondary: skin texture, hairline, ears, jaw
+Lower: background and non-critical regions
+
+[LATENT DETAIL, MATERIAL PHYSICS & BIO-REALISM]
+
+Microstructure: Reconstruct pores, vellus hair, wrinkles, iris fibers with non-repeating variation.
+Specular & Moisture: Natural eye wetness, lip hydration, and skin oil highlights reacting to light.
+Subsurface Scattering: Realistic skin light diffusion (ears, nose, cheeks).
+Material Fidelity: Accurate rendering of fabric, metal, glass, accessories.
+Anatomical Tension: Preserve realistic skin stretch, fold direction, and muscle-driven surface dynamics.
+
+[LIMB, HAND & FOOT ANATOMY INTEGRITY]
+
+Preserve anatomically correct hands, fingers, feet, and toes whenever visible.
+Correct digit count, joint articulation, tendon flow, nail placement, and pose coherence.
+No fused digits, broken joints, unnatural bends, mirrored anatomy, or malformed extremities.
+
+[SUBJECT CLASS & AGE CONSISTENCY]
+
+Preserve original sex-linked anatomy, age-consistent proportions, and body structure.
+Do not reinterpret as younger, older, more masculine, more feminine, or childlike.
+Maintain skeletal proportions, facial maturity, skin aging cues, and body-type consistency.
+
+[POSE & POSTURE PRESERVATION]
+
+Preserve original pose, gesture logic, weight distribution, and limb alignment.
+Maintain realistic relationships between torso, shoulders, pelvis, knees, ankles, hands, and feet.
+Do not artificially "correct" natural posture.
+
+[ACCESSORY & OCCLUSION INTEGRITY]
+
+Preserve geometry of glasses, earrings, piercings, masks, hats, etc.
+Maintain correct reflections/refractions without distorting underlying face.
+No boundary merging between accessories, skin, and hair.
+
+[STYLE NEUTRALIZATION]
+
+Enforce neutral, documentary-style rendering.
+No cinematic grading bias or artistic reinterpretation.
+No model-specific beautification tendencies.
+
+[BACKGROUND PRESERVATION CONTROL]
+
+Preserve original background blur, noise, and depth characteristics.
+Do not over-enhance background unnecessarily.
+Maintain subject-background separation.
+
+[RESOLUTION & DETAIL SCALING CONTROL]
+
+Match detail density to output resolution.
+Avoid unrealistic micro-detail beyond pixel limits.
+Maintain balanced realism across the image.
+
+[CAMERA & OPTICS: SONY A1 + G-MASTER AUTHENTICITY]
+
+Optical Profile: Sony A1 + 85mm f1.4 (f/1.6, ISO100, 1/200s).
+Focus Roll-off: Natural transition from eyes outward.
+Bokeh: Smooth, circular, no onion-ring artifacts.
+Optical Purity: No fake HDR glow, no digital CA, minimal natural vignetting.
+
+[LIGHTING, DEPTH & COLOR SCIENCE]
+
+Global Illumination: Consistent light direction with realistic AO and softbox shaping.
+Light Wrap: Subtle environmental edge lighting.
+Atmospheric Depth: Natural subject-background separation.
+Color Accuracy: Preserve skin tones; remove compression tint bias.
+Gamma Stability: Maintain consistent luminance and contrast.
+Tonal Depth: Smooth 10-bit-like gradients, no banding.
+
+[EDGE CASE FAILURE PREVENTION]
+
+Handle partial faces, occlusions, extreme angles, and low-resolution inputs without reconstructing incorrect identity.
+Do not force symmetry or complete unseen regions artificially.
+
+[ANTI-BEAUTIFICATION CONSTRAINT]
+
+Do not beautify, stylize, slim, symmetrize, or cosmetically enhance.
+Preserve natural asymmetry, imperfections, and identity-defining features.
+
+[NEGATIVE INSTRUCTIONS]
+
+No identity change
+No facial distortion
+No beauty-filter reshaping
+No cosmetic idealization
+No plastic/waxy skin
+No over-smoothing
+No over-sharpening
+No haloing or edge glow
+No HDR overprocessing
+No pixelation
+No ghosting or double edges
+No JPEG artifacts (macroblocking, mosquito noise, ringing)
+No tiling seams
+No AI repeating patterns
+No hallucinated features
+No unrealistic anatomy or proportions
+No painterly or CGI look
+No identity leakage
+No wide-angle distortion
+No crushed blacks
+No blown highlights
+No unnecessary enhancement on clean regions

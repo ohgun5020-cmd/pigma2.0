@@ -22,10 +22,11 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   // PIGMA_TEXT_IMPORT_GUARD::SOURCE_ID_MATCHING
   // PIGMA_TEXT_IMPORT_GUARD::SOURCE_ID_TAGGING
   const originalOnMessage = figma.ui.onmessage;
-  const DEFAULT_BATCH_FRAME_GAP = 100;
+  const DEFAULT_BATCH_FRAME_GAP = 10;
   const IMPORT_SOURCE_ID_KEY = "__pigmaImportSourceId";
   const IMPORT_SYNTHETIC_ROOT_KEY = "__pigmaSyntheticImportRoot";
   const IMPORT_POSTPROCESS_DEBUG = true;
+  const SVG_IMPORT_BATCH_ROOT_NAME = "SVG Import";
   let availableFontsPromise = null;
 
   if (typeof originalOnMessage !== "function") {
@@ -33,6 +34,10 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   }
 
   figma.ui.onmessage = async message => {
+    if (isSvgImportMessage(message)) {
+      return handleSvgImportMessage(message);
+    }
+
     if (!isImportMessage(message)) {
       return originalOnMessage(message);
     }
@@ -54,6 +59,132 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
   function isImportMessage(message) {
     return !!message && (message.type === "request-import" || message.type === "request-import-batch");
+  }
+
+  function isSvgImportMessage(message) {
+    return !!message && (message.type === "request-svg-import" || message.type === "request-svg-import-batch");
+  }
+
+  async function handleSvgImportMessage(message) {
+    const batch = normalizeSvgImportBatch(message);
+    if (!batch || batch.items.length === 0) {
+      figma.notify("가져올 SVG 파일이 없습니다.", { error: true });
+      return;
+    }
+
+    const targetPage = await resolveSvgImportPage(batch);
+    if (targetPage !== figma.currentPage) {
+      await figma.setCurrentPageAsync(targetPage);
+    }
+
+    try {
+      const importedNodes = [];
+      for (const item of batch.items) {
+        importedNodes.push(await importSvgPayload(item));
+      }
+
+      layoutImportedSvgNodes(importedNodes, batch.gap, figma.viewport.center);
+      figma.currentPage.selection = importedNodes;
+      figma.viewport.scrollAndZoomIntoView(importedNodes);
+      figma.notify(
+        importedNodes.length > 1
+          ? `SVG ${importedNodes.length}개를 가져왔습니다.`
+          : "SVG를 가져왔습니다."
+      );
+    } catch (error) {
+      console.warn("[pigma-svg-import]", error);
+      figma.notify(getSvgImportErrorMessage(error), { error: true });
+    }
+  }
+
+  function normalizeSvgImportBatch(message) {
+    if (message && message.type === "request-svg-import" && message.payload) {
+      return {
+        placement: normalizeSvgPlacement(message.payload.placement),
+        gap: DEFAULT_BATCH_FRAME_GAP,
+        rootName: normalizeSvgName(message.payload.rootName || SVG_IMPORT_BATCH_ROOT_NAME),
+        items: [message.payload],
+      };
+    }
+
+    if (!message || message.type !== "request-svg-import-batch" || !message.batch) {
+      return null;
+    }
+
+    return {
+      placement: normalizeSvgPlacement(message.batch.placement),
+      gap: normalizeSvgGap(message.batch.gap),
+      rootName: normalizeSvgName(message.batch.rootName || SVG_IMPORT_BATCH_ROOT_NAME),
+      items: Array.isArray(message.batch.items) ? message.batch.items.filter(Boolean) : [],
+    };
+  }
+
+  function normalizeSvgPlacement(value) {
+    return value === "new-page" ? "new-page" : "current-page";
+  }
+
+  function normalizeSvgGap(value) {
+    return Number.isFinite(value) ? Math.max(0, Math.round(value)) : DEFAULT_BATCH_FRAME_GAP;
+  }
+
+  function normalizeSvgName(value) {
+    const normalized = typeof value === "string" ? value.trim() : "";
+    return normalized.length > 0 ? normalized : SVG_IMPORT_BATCH_ROOT_NAME;
+  }
+
+  async function resolveSvgImportPage(batch) {
+    if (!batch || batch.placement !== "new-page") {
+      return figma.currentPage;
+    }
+
+    const page = figma.createPage();
+    page.name = batch.rootName;
+    return page;
+  }
+
+  async function importSvgPayload(payload) {
+    const svgText = payload && typeof payload.svgText === "string" ? payload.svgText.trim() : "";
+    if (!svgText) {
+      const fileLabel = payload && typeof payload.fileName === "string" && payload.fileName.trim().length > 0
+        ? payload.fileName.trim()
+        : "SVG";
+      throw new Error(`${fileLabel} 파일 내용이 비어 있습니다.`);
+    }
+
+    const importedNode = figma.createNodeFromSvg(svgText);
+    importedNode.name = normalizeSvgName(payload.rootName || payload.fileName || SVG_IMPORT_BATCH_ROOT_NAME);
+    return importedNode;
+  }
+
+  function layoutImportedSvgNodes(nodes, gap, center) {
+    if (!Array.isArray(nodes) || nodes.length === 0) {
+      return;
+    }
+
+    const resolvedGap = normalizeSvgGap(gap);
+    const totalHeight =
+      nodes.reduce((sum, node) => sum + Math.max(1, roundNumber(node.height)), 0) +
+      Math.max(0, nodes.length - 1) * resolvedGap;
+    const maxWidth = nodes.reduce((max, node) => Math.max(max, Math.max(1, roundNumber(node.width))), 1);
+    const centerX = center && Number.isFinite(center.x) ? center.x : 0;
+    const centerY = center && Number.isFinite(center.y) ? center.y : 0;
+    const startX = roundNumber(centerX - maxWidth / 2);
+    let cursorY = roundNumber(centerY - totalHeight / 2);
+
+    for (const node of nodes) {
+      const nodeWidth = Math.max(1, roundNumber(node.width));
+      node.x = roundNumber(startX + (maxWidth - nodeWidth) / 2);
+      node.y = cursorY;
+      cursorY += Math.max(1, roundNumber(node.height)) + resolvedGap;
+    }
+  }
+
+  function getSvgImportErrorMessage(error) {
+    if (error instanceof Error && typeof error.message === "string" && error.message.trim().length > 0) {
+      return `SVG 가져오기에 실패했습니다. ${error.message.trim()}`;
+    }
+
+    return "SVG 가져오기에 실패했습니다.";
   }
 
   async function prepareImportPayload(message) {
@@ -1492,6 +1623,8 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     enabled: false,
     provider: "openai",
     apiKey: "",
+    openAiApiKey: "",
+    geminiApiKey: "",
     proofingLocale: "",
     userDictionary: [],
     protectedTerms: []
@@ -1551,11 +1684,29 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
   function normalizeAiSettings(value) {
     const source = value && typeof value === "object" ? value : {};
+    const legacyProvider = source.provider === "gemini" ? "gemini" : DEFAULT_AI_SETTINGS.provider;
+    const legacyApiKey = typeof source.apiKey === "string" ? sanitizeApiKey(source.apiKey) : DEFAULT_AI_SETTINGS.apiKey;
+    const openAiApiKey =
+      typeof source.openAiApiKey === "string"
+        ? sanitizeApiKey(source.openAiApiKey)
+        : legacyProvider === "openai"
+          ? legacyApiKey
+          : DEFAULT_AI_SETTINGS.openAiApiKey;
+    const geminiApiKey =
+      typeof source.geminiApiKey === "string"
+        ? sanitizeApiKey(source.geminiApiKey)
+        : legacyProvider === "gemini"
+          ? legacyApiKey
+          : DEFAULT_AI_SETTINGS.geminiApiKey;
+    const provider = openAiApiKey ? "openai" : geminiApiKey ? "gemini" : legacyProvider;
+    const apiKey = provider === "gemini" ? geminiApiKey : openAiApiKey;
 
     return {
       enabled: source.enabled === true,
-      provider: source.provider === "gemini" ? "gemini" : DEFAULT_AI_SETTINGS.provider,
-      apiKey: typeof source.apiKey === "string" ? sanitizeApiKey(source.apiKey) : DEFAULT_AI_SETTINGS.apiKey,
+      provider,
+      apiKey,
+      openAiApiKey,
+      geminiApiKey,
       proofingLocale: normalizeProofingLocale(source.proofingLocale),
       userDictionary: normalizeTermList(source.userDictionary),
       protectedTerms: normalizeTermList(source.protectedTerms)
@@ -7905,12 +8056,14 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     enabled: false,
     provider: "openai",
     apiKey: "",
+    openAiApiKey: "",
+    geminiApiKey: "",
     proofingLocale: "",
     userDictionary: [],
     protectedTerms: [],
   });
   const DEFAULT_MODEL_BY_PROVIDER = Object.freeze({
-    openai: "gpt-5.4",
+    openai: "gpt-5-mini",
     gemini: "gemini-2.5-flash",
   });
   const pendingUiRequests = new Map();
@@ -7952,15 +8105,16 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
   async function hasConfiguredAiAsync() {
     const settings = await getAiSettingsAsync();
-    return settings.enabled === true && settings.apiKey.length > 0;
+    const runInfo = getResolvedRunInfo(settings);
+    return settings.enabled === true && runInfo.apiKey.length > 0;
   }
 
   async function requestJsonTask(options) {
     const settings = await getAiSettingsAsync();
-    if (settings.enabled !== true || !settings.apiKey) {
+    const runInfo = getResolvedRunInfo(settings, options);
+    if (settings.enabled !== true || !runInfo.apiKey) {
       return null;
     }
-    const runInfo = getResolvedRunInfo(settings, options);
     const provider = runInfo.provider;
     const model = runInfo.model;
     const requestMeta = buildRequestMeta(options, runInfo);
@@ -7972,7 +8126,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       result = await requestJsonTaskViaUiBridge({
         provider,
         model,
-        apiKey: settings.apiKey,
+        apiKey: runInfo.apiKey,
         prompt,
         meta: requestMeta,
       });
@@ -8053,7 +8207,8 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         Object.prototype.hasOwnProperty.call(settingsOrOptions, "enabled"));
     const settings = hasSettingsShape ? settingsOrOptions : normalizeAiSettings(null);
     const options = hasSettingsShape ? maybeOptions : settingsOrOptions;
-    const provider = settings && settings.provider === "gemini" ? "gemini" : "openai";
+    const provider = resolveTextTaskProvider(settings);
+    const apiKey = getApiKeyForProvider(settings, provider);
     const model =
       options && typeof options.modelByProvider === "object" && options.modelByProvider && options.modelByProvider[provider]
         ? options.modelByProvider[provider]
@@ -8061,6 +8216,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
     return {
       provider,
+      apiKey,
       model,
       providerProfile: buildProviderProfile("", provider, model, "", ""),
     };
@@ -8068,15 +8224,53 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
   function normalizeAiSettings(value) {
     const source = value && typeof value === "object" ? value : {};
+    const legacyProvider = source.provider === "gemini" ? "gemini" : DEFAULT_AI_SETTINGS.provider;
+    const legacyApiKey = typeof source.apiKey === "string" ? sanitizeApiKey(source.apiKey) : DEFAULT_AI_SETTINGS.apiKey;
+    const openAiApiKey =
+      typeof source.openAiApiKey === "string"
+        ? sanitizeApiKey(source.openAiApiKey)
+        : legacyProvider === "openai"
+          ? legacyApiKey
+          : DEFAULT_AI_SETTINGS.openAiApiKey;
+    const geminiApiKey =
+      typeof source.geminiApiKey === "string"
+        ? sanitizeApiKey(source.geminiApiKey)
+        : legacyProvider === "gemini"
+          ? legacyApiKey
+          : DEFAULT_AI_SETTINGS.geminiApiKey;
+    const provider = resolveTextTaskProvider({
+      provider: legacyProvider,
+      openAiApiKey,
+      geminiApiKey,
+    });
+    const apiKey = getApiKeyForProvider({ openAiApiKey, geminiApiKey }, provider);
 
     return {
       enabled: source.enabled === true,
-      provider: source.provider === "gemini" ? "gemini" : DEFAULT_AI_SETTINGS.provider,
-      apiKey: typeof source.apiKey === "string" ? sanitizeApiKey(source.apiKey) : DEFAULT_AI_SETTINGS.apiKey,
+      provider,
+      apiKey,
+      openAiApiKey,
+      geminiApiKey,
       proofingLocale: normalizeProofingLocale(source.proofingLocale),
       userDictionary: normalizeTermList(source.userDictionary),
       protectedTerms: normalizeTermList(source.protectedTerms),
     };
+  }
+
+  function getApiKeyForProvider(settings, provider) {
+    const source = settings && typeof settings === "object" ? settings : {};
+    return provider === "gemini" ? sanitizeApiKey(source.geminiApiKey) : sanitizeApiKey(source.openAiApiKey);
+  }
+
+  function resolveTextTaskProvider(settings) {
+    const source = settings && typeof settings === "object" ? settings : {};
+    if (getApiKeyForProvider(source, "openai")) {
+      return "openai";
+    }
+    if (getApiKeyForProvider(source, "gemini")) {
+      return "gemini";
+    }
+    return source.provider === "gemini" ? "gemini" : "openai";
   }
 
   function buildPrompt(options, requestMeta) {
@@ -9632,7 +9826,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         providerProfile: buildDesignAssistProviderProfile(action, "plan"),
         modelByProvider: {
           openai: "gpt-5.4",
-          gemini: "gemini-2.5-flash",
+          gemini: "gemini-2.5-pro",
         },
         instructions:
           "You are the LLM planner for a Figma plugin that converts a desktop-origin design into a mobile editorial draft. This is not responsive resize. It is semantic extraction plus mobile recomposition. Do not preserve original coordinates, overlaps, absolute stacking, or tiny desktop fragments. Decide what to keep, what to discard, and how to rebuild. Return a design spec, not pixel placements. You are not the writer: do not choose exact coordinates, widths, heights, spacing tokens, safe-area values, target width, or minimum touch target sizes. Those are deterministic rules owned by code. Your job is to choose section priority, keep or hide decisions, mobile pattern selection, copy grouping, and visual emphasis. The renderer contract in the payload is authoritative. Plan only structures that this deterministic renderer can actually build well. Avoid plans that require many nested helper frames, free absolute composition, ultra narrow text columns, or letter-by-letter line breaks. Headlines must stay readable in roughly 1 to 3 lines, never degrade into 1 to 3 characters per line, and should prefer the safer variant when the renderer contract says a variant is unstable. First identify section boundaries and content priority. Then output a top-level sections array describing how each section should be rendered by code. Prefer one strong hero and one clear promo or benefit section when the source supports that reading. For hero sections, choose layoutVariant editorial-overlay or rebuilt-stack, provide heroCopyBlock, visualFocus, backgroundTreatment, and discardTextTokens when useful. For promo sections, choose layoutVariant benefit-card-list or promo-card, provide sectionHeader, date, cards, and discardTextTokens when useful. Use sectionIndex whenever possible to map plans to input sections. When sections include textEntries, infer textPlan from them. For textPlan, only use alignment left/center, copyMode grouped-copy/stacked, roleOrder from eyebrow/headline/subtitle/body/meta/cta, and gapAfterRatioByRole values as relative ratios without pixel math. Enum-like fields must stay in exact English schema tokens: type, sectionType, builderType, layoutVariant, visualPriority, cropPriority, focalTargets, textPlan.alignment, textPlan.copyMode, and textPlan.roleOrder. Only prose strings such as summaries, notes, copy text, labels, titles, and body text may be in Korean. Never return coordinates, widths, heights, or pixel math. Return concise Korean JSON only.",
@@ -9809,7 +10003,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         providerProfile: buildDesignAssistProviderProfile("mobile-design", "supplemental"),
         modelByProvider: {
           openai: "gpt-5.4",
-          gemini: "gemini-2.5-flash",
+          gemini: "gemini-2.5-pro",
         },
         instructions:
           "You are filling only the missing mobile design spec sections for a Figma mobile redesign pass. This is not resize. Every section spec must map to one input section, and when possible preserve the input section index. The renderer contract in the payload is authoritative. You are not the writer: do not choose exact coordinates, target width, safe-area values, spacing tokens, or minimum touch target sizes. Those are deterministic code rules. Plan only sections that the deterministic renderer can build stably. Avoid nested helper-frame-heavy structures, ultra narrow text columns, and headline layouts that would break into tiny vertical fragments. Prefer the safer variant when unsure. Rebuild the source into readable mobile sections instead of preserving desktop layering. Prefer hero, promo, article, or keep decisions that are actually applicable to the given section profiles. For hero sections, choose layoutVariant editorial-overlay or rebuilt-stack and provide heroCopyBlock, visualFocus, backgroundTreatment, and discardTextTokens when useful. For promo sections, choose layoutVariant benefit-card-list or promo-card and provide sectionHeader, date, cards, and discardTextTokens when useful. Enum-like fields must stay in exact English schema tokens: type, sectionType, builderType, layoutVariant, visualPriority, cropPriority, focalTargets, textPlan.alignment, textPlan.copyMode, and textPlan.roleOrder. Only prose strings may be in Korean. Return concise Korean JSON only. For textPlan, only use alignment left/center, copyMode grouped-copy/stacked, roleOrder from eyebrow/headline/subtitle/body/meta/cta, and gapAfterRatioByRole values as relative ratios. Never return pixel values or coordinates.",
@@ -9935,7 +10129,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         providerProfile: buildDesignAssistProviderProfile("mobile-design", "forced"),
         modelByProvider: {
           openai: "gpt-5.4",
-          gemini: "gemini-2.5-flash",
+          gemini: "gemini-2.5-pro",
         },
         instructions:
           "You are creating the minimum mobile planning skeleton for a Figma desktop-to-mobile redesign. The renderer contract in the payload is authoritative. Return exactly one section spec for each input section. Never return an empty sections array. You are not the writer, so do not decide exact target width, safe-area values, touch sizes, spacing tokens, coordinates, or pixel math. If unsure, use type keep. Avoid unstable variants that would create narrow text columns or helper-frame-heavy structures. Enum-like fields must stay in exact English schema tokens. Allowed type values: hero, promo, article, keep. Allowed layoutVariant values: editorial-overlay, rebuilt-stack, benefit-card-list, promo-card, stacked-article, media-first-article, keep. Use concise Korean only in notes. Do not return coordinates, widths, heights, or pixel math.",
@@ -29811,18 +30005,33 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
   const originalOnMessage = figma.ui.onmessage;
   const AI_DESIGN_READ_CACHE_KEY = "pigma:ai-design-read-cache:v1";
-  const AI_TYPO_AUDIT_CACHE_KEY = "pigma:ai-typo-audit-cache:v1";
-  const AI_TYPO_FIX_CACHE_KEY = "pigma:ai-typo-fix-cache:v1";
+  const AI_TYPO_AUDIT_CACHE_KEY = "pigma:ai-typo-audit-cache:v2";
+  const AI_TYPO_FIX_CACHE_KEY = "pigma:ai-typo-fix-cache:v2";
   const AI_TYPO_CLEAR_CACHE_KEY = "pigma:ai-typo-clear-cache:v1";
-  const PATCH_VERSION = 6;
+  const AI_TRANSLATE_CACHE_KEY = "pigma:ai-translate-cache:v1";
+  const PATCH_VERSION = 9;
   const TYPO_AUDIT_MODEL_BY_PROVIDER = Object.freeze({
     openai: "gpt-5-mini",
+    gemini: "gemini-2.5-pro",
+  });
+  const AI_TRANSLATE_MODEL_BY_PROVIDER = Object.freeze({
+    openai: "gpt-5.4",
     gemini: "gemini-2.5-pro",
   });
   const ANNOTATION_PREFIX = "[Ai 판단]";
   const LEGACY_ANNOTATION_PREFIXES = ["[AI Typo]", ANNOTATION_PREFIX, "[Pigma Ai Audit]"];
   const ANNOTATION_CATEGORY_LABEL = "Pigma Ai Audit";
   const ANNOTATION_CATEGORY_COLOR = "yellow";
+  const TRANSLATION_LANGUAGE_METADATA = Object.freeze({
+    "en-US": { label: "영어 (미국)", aiLabel: "English (United States)", latinLocaleHint: "english" },
+    "ja-JP": { label: "일본어 (일본)", aiLabel: "Japanese (Japan)", latinLocaleHint: "" },
+    "zh-CN": { label: "중국어 간체 (중국)", aiLabel: "Chinese Simplified (China)", latinLocaleHint: "" },
+    "ko-KR": { label: "한국어 (대한민국)", aiLabel: "Korean (South Korea)", latinLocaleHint: "" },
+    "es-ES": { label: "스페인어 (스페인)", aiLabel: "Spanish (Spain)", latinLocaleHint: "spanish" },
+    "fr-FR": { label: "프랑스어 (프랑스)", aiLabel: "French (France)", latinLocaleHint: "french" },
+    "de-DE": { label: "독일어 (독일)", aiLabel: "German (Germany)", latinLocaleHint: "german" },
+    "pt-BR": { label: "포르투갈어 (브라질)", aiLabel: "Portuguese (Brazil)", latinLocaleHint: "portuguese" },
+  });
   const TYPO_REPLACEMENT_RULES = [
     {
       id: "bangapseubnida-direct",
@@ -30082,6 +30291,33 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       .concat(LATIN_UI_TOKEN_HINTS_BY_LOCALE.dutch)
   );
   const LATIN_UI_TOKEN_SET = new Set(LATIN_UI_TOKEN_HINTS.map((token) => normalizeLatinTokenForLookup(token)).filter(Boolean));
+  const LATIN_COMMON_SHORT_WORDS = new Set([
+    "a",
+    "an",
+    "as",
+    "at",
+    "be",
+    "by",
+    "do",
+    "go",
+    "he",
+    "i",
+    "if",
+    "in",
+    "is",
+    "it",
+    "me",
+    "my",
+    "no",
+    "of",
+    "on",
+    "or",
+    "so",
+    "to",
+    "up",
+    "us",
+    "we",
+  ]);
   const PROOFING_LOCALE_METADATA = Object.freeze({
     "cs-CZ": { label: "체코어 (체코)", aiLabel: "Czech (Czech Republic)", latinLocaleHint: "" },
     "da-DK": { label: "덴마크어 (덴마크)", aiLabel: "Danish (Denmark)", latinLocaleHint: "" },
@@ -30140,6 +30376,11 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         return;
       }
 
+      if (message.type === "request-ai-translate-cache") {
+        await postCachedTranslateResult();
+        return;
+      }
+
       if (message.type === "run-ai-typo-fix") {
         await withTypoTaskLock("fix", runTypoFix);
         return;
@@ -30147,6 +30388,13 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
       if (message.type === "run-ai-typo-clear") {
         await withTypoTaskLock("clear", runTypoClear);
+        return;
+      }
+
+      if (message.type === "run-ai-translate") {
+        await withTypoTaskLock("translate", async () => {
+          await runAiTranslate(message);
+        });
         return;
       }
 
@@ -30167,7 +30415,9 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         message.type === "request-ai-typo-fix-cache" ||
         message.type === "run-ai-typo-fix" ||
         message.type === "request-ai-typo-clear-cache" ||
-        message.type === "run-ai-typo-clear")
+        message.type === "run-ai-typo-clear" ||
+        message.type === "request-ai-translate-cache" ||
+        message.type === "run-ai-translate")
     );
   }
 
@@ -30176,7 +30426,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       if (activeTypoTask === task) {
         postTypoTaskStatus(task, "running", getTypoTaskRunningMessage(task));
       } else {
-        postTypoTaskError(task, "다른 오타 작업이 이미 진행 중입니다. 현재 작업이 끝난 뒤 다시 실행해 주세요.");
+        postTypoTaskError(task, "다른 텍스트 작업이 이미 진행 중입니다. 현재 작업이 끝난 뒤 다시 실행해 주세요.");
       }
       return false;
     }
@@ -30197,6 +30447,9 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     if (task === "clear") {
       return "현재 선택 범위에 남아 있는 AI 오타 주석을 정리하는 중입니다.";
     }
+    if (task === "translate") {
+      return "선택한 화면의 텍스트를 선택한 언어로 AI 번역하고 있으며, 선택이 없으면 현재 페이지 전체를 번역합니다.";
+    }
     return "오타 후보를 찾고 Dev Mode 주석 또는 결과 패널로 정리하는 중입니다.";
   }
 
@@ -30207,6 +30460,10 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
     if (task === "clear") {
       postClearStatus(status, message);
+      return;
+    }
+    if (task === "translate") {
+      postTranslateStatus(status, message);
       return;
     }
     postStatus(status, message);
@@ -30223,6 +30480,13 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     if (task === "clear") {
       figma.ui.postMessage({
         type: "ai-typo-clear-error",
+        message,
+      });
+      return;
+    }
+    if (task === "translate") {
+      figma.ui.postMessage({
+        type: "ai-translate-error",
         message,
       });
       return;
@@ -30326,6 +30590,39 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
   }
 
+  async function runAiTranslate(message) {
+    const runSelectionSignature = getSelectionSignature(figma.currentPage.selection);
+    const targetLanguage = getTranslationLanguageMetadata(message && message.targetLanguage);
+    postTranslateStatus("running", `${targetLanguage.label}로 번역하는 중입니다.`);
+
+    try {
+      const designReadResult = await readDesignReadCache();
+      const result = await applyAiTranslation(designReadResult, targetLanguage);
+      await writeTranslateCache(result);
+
+      figma.ui.postMessage({
+        type: "ai-translate-result",
+        result,
+        matchesCurrentSelection: matchesSelectionSignature(result.selectionSignature || runSelectionSignature),
+      });
+
+      figma.notify(
+        result.summary && result.summary.translatedCount > 0
+          ? `번역 완료 (${result.summary.translatedCount}개 텍스트, ${result.summary.targetLanguageLabel})`
+          : `번역 완료 (${result.summary.textNodeCount || 0}개 확인, 변경 없음)`,
+        { timeout: 2200 }
+      );
+    } catch (error) {
+      const messageText = normalizeErrorMessage(error, "AI 번역에 실패했습니다.");
+      figma.ui.postMessage({
+        type: "ai-translate-error",
+        message: messageText,
+        matchesCurrentSelection: matchesSelectionSignature(runSelectionSignature),
+      });
+      figma.notify(messageText, { error: true, timeout: 2200 });
+    }
+  }
+
   function getManagedAnnotationCategoryColor() {
     return ANNOTATION_CATEGORY_COLOR;
   }
@@ -30357,6 +30654,15 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     });
   }
 
+  async function postCachedTranslateResult() {
+    const result = await readTranslateCache();
+    figma.ui.postMessage({
+      type: "ai-translate-cache",
+      result,
+      matchesCurrentSelection: matchesCurrentSelection(result),
+    });
+  }
+
   function postStatus(status, message) {
     figma.ui.postMessage({
       type: "ai-typo-audit-status",
@@ -30376,6 +30682,14 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   function postClearStatus(status, message) {
     figma.ui.postMessage({
       type: "ai-typo-clear-status",
+      status,
+      message,
+    });
+  }
+
+  function postTranslateStatus(status, message) {
+    figma.ui.postMessage({
+      type: "ai-translate-status",
       status,
       message,
     });
@@ -30417,6 +30731,15 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
   }
 
+  async function readTranslateCache() {
+    try {
+      const value = await figma.clientStorage.getAsync(AI_TRANSLATE_CACHE_KEY);
+      return value && typeof value === "object" ? value : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
   async function writeTypoAuditCache(result) {
     if (!result || typeof result !== "object") {
       return null;
@@ -30448,6 +30771,18 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
     try {
       await figma.clientStorage.setAsync(AI_TYPO_CLEAR_CACHE_KEY, result);
+    } catch (error) {}
+
+    return result;
+  }
+
+  async function writeTranslateCache(result) {
+    if (!result || typeof result !== "object") {
+      return null;
+    }
+
+    try {
+      await figma.clientStorage.setAsync(AI_TRANSLATE_CACHE_KEY, result);
     } catch (error) {}
 
     return result;
@@ -30552,6 +30887,18 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     );
   }
 
+  function getTranslationLanguageMetadata(code) {
+    const normalized = typeof code === "string" ? code.trim() : "";
+    const fallback = "en-US";
+    const resolved = normalized && Object.prototype.hasOwnProperty.call(TRANSLATION_LANGUAGE_METADATA, normalized) ? normalized : fallback;
+    return Object.assign(
+      {
+        code: resolved,
+      },
+      TRANSLATION_LANGUAGE_METADATA[resolved]
+    );
+  }
+
   function isWholeTextProtected(text, proofingSettings) {
     if (!proofingSettings || !(proofingSettings.exactBlockedSet instanceof Set)) {
       return false;
@@ -30638,8 +30985,12 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       return false;
     }
 
+    if (isLowSignalCosmeticCorrection(currentValue, suggestionValue, kindLabels)) {
+      return false;
+    }
+
     if (isSpacingOrPunctuationOnlyCorrection(currentValue, suggestionValue)) {
-      return true;
+      return looksLikeCriticalBrokenLatinSpacing(currentValue, suggestionValue);
     }
 
     const currentFamilies = getActiveScriptFamilies(currentValue);
@@ -30651,6 +31002,31 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return tokensLookLikeMinorCorrections(currentValue, suggestionValue, kindLabels);
   }
 
+  function isLowSignalCosmeticCorrection(currentText, suggestion, kindLabels) {
+    const currentValue = normalizeLineEndings(currentText);
+    const suggestionValue = normalizeLineEndings(suggestion);
+    if (!currentValue || !suggestionValue || currentValue === suggestionValue) {
+      return false;
+    }
+
+    if (!containsSubstantiveText(currentValue) && !containsSubstantiveText(suggestionValue)) {
+      return true;
+    }
+
+    if (
+      stripCosmeticCharacters(currentValue) === stripCosmeticCharacters(suggestionValue) &&
+      !looksLikeCriticalBrokenLatinSpacing(currentValue, suggestionValue)
+    ) {
+      return true;
+    }
+
+    if (Array.isArray(kindLabels) && kindLabels.includes("띄어쓰기") && !looksLikeCriticalBrokenLatinSpacing(currentValue, suggestionValue)) {
+      return true;
+    }
+
+    return false;
+  }
+
   function isSpacingOrPunctuationOnlyCorrection(currentText, suggestion) {
     const currentTokens = tokenizeScriptTokens(currentText);
     const suggestionTokens = tokenizeScriptTokens(suggestion);
@@ -30659,6 +31035,68 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
 
     return flattenComparableTokens(currentTokens) === flattenComparableTokens(suggestionTokens);
+  }
+
+  function containsSubstantiveText(value) {
+    return /[0-9A-Za-z\u00C0-\u024F\u0400-\u04FF\u0590-\u05FF\u0600-\u06FF\u0900-\u097F\u0E00-\u0E7F\u3040-\u30FF\u3400-\u9FFF\uAC00-\uD7AF]/.test(
+      String(value || "")
+    );
+  }
+
+  function stripCosmeticCharacters(value) {
+    return String(value || "")
+      .replace(/[\s()[\]{}<>.,;:!?"'`~\-_/\\]+/g, "")
+      .trim();
+  }
+
+  function looksLikeCriticalBrokenLatinSpacing(currentText, suggestion) {
+    const currentValue = normalizeLineEndings(currentText);
+    const suggestionValue = normalizeLineEndings(suggestion);
+    if (!currentValue || !suggestionValue || currentValue === suggestionValue) {
+      return false;
+    }
+
+    if (!/\s/.test(currentValue) || /\s/.test(suggestionValue)) {
+      return false;
+    }
+
+    const currentWords = getLatinWordRuns(currentValue);
+    const suggestionWords = getLatinWordRuns(suggestionValue);
+    if (currentWords.length < 2 || suggestionWords.length !== 1) {
+      return false;
+    }
+
+    const joinedCurrent = normalizeLatinTokenForLookup(currentWords.join(""));
+    const joinedSuggestion = normalizeLatinTokenForLookup(suggestionWords[0]);
+    if (!joinedCurrent || !joinedSuggestion || joinedCurrent !== joinedSuggestion) {
+      return false;
+    }
+
+    if (joinedSuggestion.length < 5) {
+      return false;
+    }
+
+    let hasSuspiciousShortFragment = false;
+    for (const word of currentWords) {
+      if (word.length <= 2) {
+        const normalizedWord = normalizeLatinTokenForLookup(word);
+        if (normalizedWord && !LATIN_COMMON_SHORT_WORDS.has(normalizedWord)) {
+          hasSuspiciousShortFragment = true;
+          break;
+        }
+      }
+    }
+
+    if (hasSuspiciousShortFragment) {
+      return true;
+    }
+
+    return currentWords.length >= 3 && currentWords.some((word) => word.length === 1);
+  }
+
+  function getLatinWordRuns(value) {
+    const matches = String(value || "").match(/[A-Za-z\u00C0-\u024F]+/g);
+    return Array.isArray(matches) ? matches : [];
   }
 
   function areScriptFamiliesCompatible(currentFamilies, suggestionFamilies) {
@@ -30977,10 +31415,11 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
     const issueResult = await buildTypoIssues(textNodes, context, proofingSettings);
     const issues = issueResult.issues.slice(0, 24);
-    const annotationSupported = supportsAnnotations(textNodes);
+    const annotationNodes = getAnnotatableTextNodes(textNodes);
+    const annotationSupported = annotationNodes.length > 0;
     const category = annotationSupported ? await ensureAnnotationCategory(getManagedAnnotationCategoryColor()) : null;
     const applied = annotationSupported
-      ? applyAnnotations(textNodes, issues, category)
+      ? applyAnnotations(annotationNodes, issues, category)
       : buildResultOnlyApplication(
           issues,
           "현재 환경에서는 Figma Annotation API를 사용할 수 없어 결과 패널에만 표시했습니다."
@@ -30991,12 +31430,13 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         reason: issueResult.aiError,
       });
     }
-    const insights = buildInsights(context, textNodes, issues, applied, annotationSupported, issueResult.aiMeta);
+    const auditUsesAnnotations = applied.annotationCount > 0;
+    const insights = buildInsights(context, textNodes, issues, applied, auditUsesAnnotations, issueResult.aiMeta);
 
     return {
       version: PATCH_VERSION,
       source: issueResult.strategy === "ai-primary" ? "ai-primary-annotation" : "local-fallback-annotation",
-      mode: annotationSupported ? "figma-dev-annotation" : "result-only",
+      mode: auditUsesAnnotations ? "figma-dev-annotation" : "result-only",
       selectionSignature: getSelectionSignature(selection),
       processedAt: new Date().toISOString(),
       summary: {
@@ -31008,14 +31448,14 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         annotationCount: applied.annotationCount,
         clearedNodeCount: applied.clearedNodeCount,
         skippedCount: applied.skipped.length,
-        mode: annotationSupported ? "figma-dev-annotation" : "result-only",
-        modeLabel: annotationSupported ? "Figma Dev Mode 주석" : "결과 패널만",
+        mode: auditUsesAnnotations ? "figma-dev-annotation" : "result-only",
+        modeLabel: auditUsesAnnotations ? "Figma Dev Mode 주석" : "결과 패널만",
         reviewStrategy: issueResult.strategy === "ai-primary" ? "AI 우선 + 로컬 보완" : "로컬 fallback",
         aiStatusLabel: issueResult.aiMeta ? issueResult.aiMeta.statusLabel : "AI 상태 미확인",
         aiProviderLabel: issueResult.aiMeta ? issueResult.aiMeta.providerLabel : "",
         aiModelLabel: issueResult.aiMeta ? issueResult.aiMeta.modelLabel : "",
         categoryLabel:
-          annotationSupported && category && category.label ? category.label : annotationSupported ? ANNOTATION_CATEGORY_LABEL : "결과 패널만",
+          auditUsesAnnotations && category && category.label ? category.label : auditUsesAnnotations ? ANNOTATION_CATEGORY_LABEL : "결과 패널만",
       },
       issues: summarizeIssueResults(issues).slice(0, 12),
       skipped: applied.skipped.slice(0, 8),
@@ -31038,10 +31478,11 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
     const issueResult = await buildTypoIssues(textNodes, context, proofingSettings);
     const applied = await applyDirectTextFixes(textNodes, issueResult, context, proofingSettings);
-    const annotationSupported = supportsAnnotations(textNodes);
+    const annotationNodes = getAnnotatableTextNodes(textNodes);
+    const annotationSupported = annotationNodes.length > 0;
     const category = annotationSupported ? await ensureAnnotationCategory(getManagedAnnotationCategoryColor()) : null;
     const annotationApplied = annotationSupported
-      ? applyAnnotations(textNodes, applied.annotationIssues, category)
+      ? applyAnnotations(annotationNodes, applied.annotationIssues, category)
       : applied.annotationIssues.length > 0
         ? buildResultOnlyApplication(
             applied.annotationIssues,
@@ -31064,12 +31505,13 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
     const issues = summarizeIssueResults(issueResult.issues).slice(0, 12);
     const skipped = [...applied.skipped, ...annotationApplied.skipped];
+    const fixUsesAnnotations = annotationApplied.annotationCount > 0;
     const insights = buildFixInsights(context, textNodes, issueResult.issues, applied, annotationApplied, issueResult.aiMeta);
 
     return {
       version: PATCH_VERSION,
       source: issueResult.strategy === "ai-primary" ? "ai-primary-direct-fix-annotation" : "local-fallback-direct-fix-annotation",
-      mode: annotationSupported ? "direct-text-edit-with-annotation" : "direct-text-edit",
+      mode: fixUsesAnnotations ? "direct-text-edit-with-annotation" : "direct-text-edit",
       selectionSignature: getSelectionSignature(selection),
       processedAt: new Date().toISOString(),
       summary: {
@@ -31083,13 +31525,13 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         annotatedNodeCount: annotationApplied.annotatedNodeCount,
         clearedNodeCount: annotationApplied.clearedNodeCount,
         skippedCount: skipped.length,
-        mode: annotationSupported ? "direct-text-edit-with-annotation" : "direct-text-edit",
-        modeLabel: annotationSupported ? "직접 수정 + Dev Mode 주석" : "직접 수정",
+        mode: fixUsesAnnotations ? "direct-text-edit-with-annotation" : "direct-text-edit",
+        modeLabel: fixUsesAnnotations ? "직접 수정 + Dev Mode 주석" : "직접 수정",
         reviewStrategy: issueResult.strategy === "ai-primary" ? "AI 우선 + 로컬 보완" : "로컬 fallback",
         aiStatusLabel: issueResult.aiMeta ? issueResult.aiMeta.statusLabel : "AI 상태 미확인",
         aiProviderLabel: issueResult.aiMeta ? issueResult.aiMeta.providerLabel : "",
         aiModelLabel: issueResult.aiMeta ? issueResult.aiMeta.modelLabel : "",
-        categoryLabel: annotationSupported ? "직접 수정 후 Dev Mode 주석" : "직접 수정",
+        categoryLabel: fixUsesAnnotations ? "직접 수정 후 Dev Mode 주석" : "직접 수정",
       },
       issues,
       applied: applied.applied.slice(0, 12),
@@ -31097,6 +31539,442 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       skipped: skipped.slice(0, 8),
       insights: insights.slice(0, 6),
     };
+  }
+
+  async function applyAiTranslation(designReadResult, targetLanguage) {
+    const selection = Array.from(figma.currentPage.selection || []);
+    const translationRoots = selection.length ? selection : [figma.currentPage];
+
+    const proofingSettings = await readProofingSettings();
+    const context = buildSelectionContext(translationRoots, designReadResult, proofingSettings);
+    const textNodes = collectTextNodes(translationRoots);
+    if (!textNodes.length) {
+      throw new Error("텍스트가 포함된 프레임이나 페이지를 먼저 선택하세요.");
+    }
+
+    const translationResult = await requestAiTranslations(textNodes, context, proofingSettings, targetLanguage);
+    const applied = await applyTranslatedText(textNodes, translationResult.issues, proofingSettings, targetLanguage);
+    const sourceLanguageLabel =
+      context.languageHintLabel || context.detectedLanguageLabel || context.languageLabel || "자동 감지";
+    const insights = buildTranslateInsights(context, textNodes, applied, translationResult.aiMeta, targetLanguage);
+
+    return {
+      version: PATCH_VERSION,
+      source: "ai-translation-direct-edit",
+      mode: "direct-text-translation",
+      selectionSignature: getSelectionSignature(selection),
+      processedAt: new Date().toISOString(),
+      summary: {
+        selectionLabel: context.selectionLabel,
+        contextLabel: context.contextLabel,
+        textNodeCount: textNodes.length,
+        translatedCount: applied.appliedCount,
+        unchangedCount: applied.unchangedCount,
+        skippedCount: applied.skipped.length,
+        sourceLanguageLabel,
+        targetLanguageCode: targetLanguage.code,
+        targetLanguageLabel: targetLanguage.label,
+        mode: "direct-text-translation",
+        modeLabel: "현재 선택 번역",
+        aiStatusLabel: translationResult.aiMeta ? translationResult.aiMeta.statusLabel : "AI 상태 미확인",
+        aiProviderLabel: translationResult.aiMeta ? translationResult.aiMeta.providerLabel : "",
+        aiModelLabel: translationResult.aiMeta ? translationResult.aiMeta.modelLabel : "",
+      },
+      applied: applied.applied.slice(0, 12),
+      skipped: applied.skipped.slice(0, 8),
+      insights: insights.slice(0, 6),
+    };
+  }
+
+  async function requestAiTranslations(textNodes, context, proofingSettings, targetLanguage) {
+    const ai = getAiHelper();
+    if (!ai) {
+      throw new Error("AI 번역을 사용하려면 AI 설정에서 API 키를 먼저 입력해 주세요.");
+    }
+
+    let configured = false;
+    let runInfo = { provider: "", model: "" };
+    try {
+      configured = await ai.hasConfiguredAiAsync();
+      if (typeof ai.getAiSettingsAsync === "function" && typeof ai.getResolvedRunInfo === "function") {
+        const settings = await ai.getAiSettingsAsync();
+        runInfo = ai.getResolvedRunInfo(settings, { modelByProvider: AI_TRANSLATE_MODEL_BY_PROVIDER });
+      }
+    } catch (error) {
+      configured = false;
+    }
+
+    if (!configured) {
+      throw new Error("AI 번역을 사용하려면 AI 설정에서 API 키를 먼저 입력해 주세요.");
+    }
+
+    const candidates = buildAiTranslateCandidates(textNodes, proofingSettings);
+    if (!candidates.length) {
+      return {
+        issues: [],
+        aiMeta: createAiMeta("skipped", runInfo.provider, runInfo.model, "번역할 텍스트 후보가 없습니다."),
+      };
+    }
+
+    const schema = {
+      type: "object",
+      properties: {
+        translations: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              text: { type: "string" },
+              reason: { type: "string" },
+            },
+            required: ["id", "text", "reason"],
+          },
+        },
+      },
+      required: ["translations"],
+    };
+    const instructions =
+      "You translate UI copy for a Figma plugin screen. Translate each text node from the detected source language into the requested target language. Preserve product names, brand names, protectedTerms, URLs, emails, placeholders such as {{name}}, ${name}, {name}, printf tokens such as %s or %1$d, numbers, HTML-like tags, slash commands, and code-like identifiers exactly as they appear. Keep punctuation and line breaks whenever possible. Do not summarize, censor, add explanations, or rewrite the content beyond what is needed for a faithful UI translation. If a string is already in the target language or should stay unchanged, omit it. Return the full translated string in text. Return concise reasons in Korean when possible.";
+    const chunkSize = 24;
+    const chunkCount = Math.max(1, Math.ceil(candidates.length / chunkSize));
+    const issues = [];
+    let resolvedProvider = runInfo.provider;
+    let resolvedModel = runInfo.model;
+
+    for (let start = 0; start < candidates.length; start += chunkSize) {
+      const chunk = candidates.slice(start, start + chunkSize);
+      const chunkIndex = Math.floor(start / chunkSize) + 1;
+      postTranslateStatus("running", `${targetLanguage.label}로 번역하는 중입니다. (${chunkIndex}/${chunkCount})`);
+
+      const payload = {
+        selectionLabel: context.selectionLabel,
+        contextLabel: context.contextLabel,
+        sourceLanguageLabel:
+          context.languageHintLabel || context.detectedLanguageLabel || context.languageLabel || "Auto detect",
+        targetLanguageCode: targetLanguage.code,
+        targetLanguageLabel: targetLanguage.aiLabel || targetLanguage.label,
+        latinLocaleHint: targetLanguage.latinLocaleHint || context.latinLocaleHint || "",
+        protectedTerms: proofingSettings ? proofingSettings.protectedTerms : [],
+        userDictionary: proofingSettings ? proofingSettings.userDictionary : [],
+        textNodes: chunk.map((entry) => ({
+          id: entry.id,
+          name: entry.name,
+          text: entry.text,
+          lineCount: countTextLines(entry.text),
+          lines: String(entry.text || "").split(/\r?\n/),
+          scriptFamilies: getActiveScriptFamilies(entry.text),
+        })),
+      };
+
+      let response = null;
+      try {
+        try {
+          response = await ai.requestJsonTask({
+            instructions,
+            schema,
+            payload,
+            modelByProvider: AI_TRANSLATE_MODEL_BY_PROVIDER,
+          });
+        } catch (error) {
+          if (!shouldRetryTypoAuditWithDefaultModel(error)) {
+            throw error;
+          }
+
+          response = await ai.requestJsonTask({
+            instructions,
+            schema,
+            payload,
+          });
+        }
+      } catch (error) {
+        throw new Error(normalizeErrorMessage(error, "AI 번역 요청에 실패했습니다."));
+      }
+
+      if (response && response._provider) {
+        resolvedProvider = response._provider;
+      }
+      if (response && response._model) {
+        resolvedModel = response._model;
+      }
+
+      const rows = response && Array.isArray(response.translations) ? response.translations : [];
+      const candidateMap = new Map();
+      for (const candidate of chunk) {
+        candidateMap.set(candidate.id, candidate);
+      }
+
+      for (const row of rows) {
+        if (!row || typeof row !== "object" || typeof row.id !== "string" || typeof row.text !== "string") {
+          continue;
+        }
+
+        const candidate = candidateMap.get(row.id);
+        if (!candidate || !candidate.node) {
+          continue;
+        }
+
+        const currentText = normalizeLineEndings(candidate.currentText || "");
+        const suggestion = normalizeLineEndings(String(row.text || ""));
+        if (!currentText || !suggestion || compactText(currentText) === compactText(suggestion)) {
+          continue;
+        }
+
+        if (!issueRespectsProofingTerms(currentText, suggestion, proofingSettings)) {
+          continue;
+        }
+
+        if (!translationPreservesCriticalTokens(currentText, suggestion)) {
+          continue;
+        }
+
+        issues.push(
+          createIssue(
+            candidate.node,
+            currentText,
+            suggestion,
+            "번역",
+            typeof row.reason === "string" && row.reason.trim() ? row.reason.trim() : "AI가 선택한 언어로 번역했습니다.",
+            "ai"
+          )
+        );
+      }
+    }
+
+    return {
+      issues,
+      aiMeta: createAiMeta("success", resolvedProvider, resolvedModel, ""),
+    };
+  }
+
+  function buildAiTranslateCandidates(textNodes, proofingSettings) {
+    const candidates = [];
+
+    for (const node of textNodes) {
+      const currentText = getTextValue(node);
+      if (!shouldTranslateTextNodeValue(currentText, proofingSettings)) {
+        continue;
+      }
+
+      candidates.push({
+        id: node.id,
+        node,
+        nodeId: node.id,
+        name: safeName(node),
+        currentText,
+        text: currentText,
+      });
+    }
+
+    return candidates;
+  }
+
+  function shouldTranslateTextNodeValue(text, proofingSettings) {
+    const currentText = normalizeLineEndings(text);
+    const compactValue = compactText(currentText);
+    if (!compactValue) {
+      return false;
+    }
+
+    if (isWholeTextProtected(currentText, proofingSettings)) {
+      return false;
+    }
+
+    if (getActiveScriptFamilies(currentText).length === 0) {
+      return false;
+    }
+
+    if (/^(https?:\/\/|www\.)/i.test(compactValue)) {
+      return false;
+    }
+
+    if (/^[\d\s.,:/\-+%()[\]{}<>#@_*"'!?&|=]+$/.test(compactValue)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  async function applyTranslatedText(textNodes, issues, proofingSettings, targetLanguage) {
+    const issuesByNode = new Map();
+    const applied = [];
+    const skipped = [];
+    let appliedCount = 0;
+    let unchangedCount = 0;
+
+    for (const issue of Array.isArray(issues) ? issues : []) {
+      if (!issue || !issue.node || !issue.node.id) {
+        continue;
+      }
+
+      issuesByNode.set(issue.node.id, issue);
+    }
+
+    for (const node of textNodes) {
+      const currentText = getTextValue(node);
+      if (!currentText) {
+        unchangedCount += 1;
+        continue;
+      }
+
+      const issue = issuesByNode.get(node.id);
+      if (!issue) {
+        unchangedCount += 1;
+        continue;
+      }
+
+      const nextText = normalizeTranslatedSuggestion(currentText, issue.suggestion);
+      if (!nextText || nextText === currentText) {
+        unchangedCount += 1;
+        continue;
+      }
+
+      if (!issueRespectsProofingTerms(currentText, nextText, proofingSettings)) {
+        skipped.push({
+          label: safeName(node),
+          reason: "보호된 용어가 변경될 수 있어 번역 적용을 건너뛰었습니다.",
+        });
+        unchangedCount += 1;
+        continue;
+      }
+
+      if (!translationPreservesCriticalTokens(currentText, nextText)) {
+        skipped.push({
+          label: safeName(node),
+          reason: "URL, 플레이스홀더, 코드형 토큰이 바뀔 수 있어 번역 적용을 건너뛰었습니다.",
+        });
+        unchangedCount += 1;
+        continue;
+      }
+
+      if (countTextLines(currentText) > 1 && countNonEmptyLines(nextText) < Math.max(1, countNonEmptyLines(currentText) - 1)) {
+        skipped.push({
+          label: safeName(node),
+          reason: "여러 줄 텍스트 구조가 크게 바뀌어 번역 적용을 건너뛰었습니다.",
+        });
+        unchangedCount += 1;
+        continue;
+      }
+
+      try {
+        await loadFontsForTextNode(node);
+        node.characters = nextText;
+        appliedCount += 1;
+        applied.push(
+          formatIssueResult(
+            createIssue(
+              node,
+              currentText,
+              nextText,
+              "번역",
+              issue.reason || `${targetLanguage.label}로 번역했습니다.`,
+              issue.source || "ai"
+            )
+          )
+        );
+      } catch (error) {
+        skipped.push({
+          label: safeName(node),
+          reason: normalizeErrorMessage(error, "텍스트를 번역 결과로 바꾸지 못했습니다."),
+        });
+        unchangedCount += 1;
+      }
+    }
+
+    return {
+      applied,
+      skipped,
+      appliedCount,
+      unchangedCount,
+    };
+  }
+
+  function normalizeTranslatedSuggestion(currentText, suggestion) {
+    let next = normalizeLineEndings(suggestion).trim();
+    if (!next) {
+      return "";
+    }
+
+    if (countTextLines(currentText) === 1) {
+      next = next.replace(/\s*\n+\s*/g, " ");
+    }
+
+    return next;
+  }
+
+  function translationPreservesCriticalTokens(currentText, suggestion) {
+    const tokens = collectCriticalTokens(currentText);
+    if (!tokens.length) {
+      return true;
+    }
+
+    for (const token of tokens) {
+      if (countTermOccurrences(suggestion, token, false) < countTermOccurrences(currentText, token, false)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  function collectCriticalTokens(text) {
+    const value = normalizeLineEndings(text);
+    const tokens = [];
+    const patterns = [
+      /https?:\/\/[^\s)]+/g,
+      /\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b/g,
+      /\{\{[^{}]+\}\}/g,
+      /\$\{[^{}]+\}/g,
+      /\{[^{}\n]+\}/g,
+      /%[0-9]*\$?[sdif]/g,
+      /<[^>\n]+>/g,
+    ];
+
+    for (const pattern of patterns) {
+      const matches = value.match(pattern);
+      if (!matches || !matches.length) {
+        continue;
+      }
+
+      for (const match of matches) {
+        tokens.push(match);
+      }
+    }
+
+    return normalizeTermList(tokens);
+  }
+
+  function buildTranslateInsights(context, textNodes, applied, aiMeta, targetLanguage) {
+    const sourceLanguageLabel =
+      context.languageHintLabel || context.detectedLanguageLabel || context.languageLabel || "자동 감지";
+    const insights = [
+      `맥락 기준: ${context.contextLabel}`,
+      `원본 언어: ${sourceLanguageLabel}`,
+      `목표 언어: ${targetLanguage.label}`,
+      `텍스트 레이어 ${textNodes.length}개 확인`,
+      `번역 적용 ${applied.appliedCount}개`,
+    ];
+
+    if (applied.unchangedCount > 0) {
+      insights.push(`변경 없이 유지 ${applied.unchangedCount}개`);
+    }
+
+    if (applied.skipped.length > 0) {
+      insights.push(`안전 검사로 건너뜀 ${applied.skipped.length}개`);
+    }
+
+    if (aiMeta && aiMeta.statusLabel) {
+      insights.push(`AI 상태: ${aiMeta.statusLabel}${aiMeta.providerLabel ? ` · ${aiMeta.providerLabel}` : ""}`);
+    }
+
+    if (applied.applied.length > 0) {
+      const firstApplied = applied.applied[0];
+      insights.push(`대표 변경: ${previewText(firstApplied.currentText, 32)} -> ${previewText(firstApplied.suggestion, 32)}`);
+    } else {
+      insights.push("번역 결과가 없어 기존 텍스트를 유지했습니다.");
+    }
+
+    return insights;
   }
 
   async function clearManagedTypoAnnotations(designReadResult) {
@@ -31108,10 +31986,11 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     const proofingSettings = await readProofingSettings();
     const context = buildSelectionContext(selection, designReadResult, proofingSettings);
     const textNodes = collectTextNodes(selection, { includeHidden: true, includeLocked: true });
-    const annotationSupported = supportsAnnotations(textNodes);
+    const annotationNodes = getAnnotatableTextNodes(textNodes);
+    const annotationSupported = annotationNodes.length > 0;
     const category = annotationSupported ? await ensureAnnotationCategory(getManagedAnnotationCategoryColor()) : null;
     const applied = annotationSupported
-      ? applyAnnotations(textNodes, [], category)
+      ? applyAnnotations(annotationNodes, [], category)
       : buildResultOnlyApplication([], "현재 환경에서는 Figma Annotation API를 사용할 수 없어 주석을 지울 수 없습니다.");
 
     if (textNodes.length === 0) {
@@ -31147,8 +32026,21 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   }
 
   function supportsAnnotations(textNodes) {
-    const sampleNode = Array.isArray(textNodes) && textNodes.length > 0 ? textNodes[0] : null;
-    return !!sampleNode && "annotations" in sampleNode;
+    return getAnnotatableTextNodes(textNodes).length > 0;
+  }
+
+  function getAnnotatableTextNodes(textNodes) {
+    const result = [];
+    for (const node of Array.isArray(textNodes) ? textNodes : []) {
+      if (supportsAnnotationsOnNode(node)) {
+        result.push(node);
+      }
+    }
+    return result;
+  }
+
+  function supportsAnnotationsOnNode(node) {
+    return !!node && "annotations" in node;
   }
 
   async function ensureAnnotationCategory(requestedColor) {
@@ -31190,13 +32082,36 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     const applied = [];
     const cleared = [];
     const skipped = [];
+    const availableNodeIds = new Set();
+    const unsupportedIssueNodeIds = new Set();
     let annotatedNodeCount = 0;
     let annotationCount = 0;
     let clearedNodeCount = 0;
     let removedAnnotationCount = 0;
 
+    for (const node of textNodes) {
+      if (node && node.id) {
+        availableNodeIds.add(node.id);
+      }
+    }
+
     for (const issue of issues) {
       for (const fragment of getIssueAnnotationFragments(issue)) {
+        if (!fragment || !fragment.node || !fragment.node.id) {
+          continue;
+        }
+
+        if (!availableNodeIds.has(fragment.node.id)) {
+          if (!unsupportedIssueNodeIds.has(fragment.node.id)) {
+            unsupportedIssueNodeIds.add(fragment.node.id);
+            skipped.push({
+              label: safeName(fragment.node),
+              reason: "이 텍스트 레이어는 Dev Mode 주석을 지원하지 않아 결과 패널에만 표시했습니다.",
+            });
+          }
+          continue;
+        }
+
         const bucket = issuesByNode.get(fragment.node.id) || [];
         bucket.push(fragment);
         issuesByNode.set(fragment.node.id, bucket);
@@ -32600,7 +33515,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       required: ["issues"],
     };
     const instructions =
-      "You review UI copy inside a Figma plugin. Detect only obvious spelling mistakes, broken words, malformed polite endings, spacing errors, punctuation errors, and clearly broken grammar. Be conservative: if a word is already a valid standard word in its language, keep it unless the surrounding sentence is clearly wrong with that exact word. Never replace one valid word with another valid word just because the spellings are similar. Example: keep 'optimal motion' unchanged and never change it to 'optional motion'. Preserve the original language, script, wording, product naming, and marketing intent of each string. Do not translate, localize, rewrite into the dominant language of the screen, unify terminology, smooth tone, or replace brand/product names unless the product name itself has an obvious typo. In mixed-language strings, preserve every language segment as-is and only fix the clearly broken part inside that same language segment. Some textNodes are full node strings, while others are single extracted lines from a multiline node. If an item is a single extracted line, return a corrected single line only and do not rewrite neighboring lines. If preferredLocaleHint is provided, use it only for Latin-script nodes or segments that actually fit that locale. Do not suppress Korean, English, or other script corrections just because another preferred locale is set. If latinLocaleHint is provided, keep corrections inside that locale only for matching Latin-script segments. Example: German copy with an English brand should stay mixed as needed: 'Find e deine perfekte Work-Life-Balanfce mit LG' -> 'Finde deine perfekte Work-Life-Balance mit LG', 'Jedtazt kaufenq' -> 'Jetzt kaufen', while keeping 'LG' untouched. Return the full corrected string in suggestion for the given item, never only a changed token. If the original text contains multiple lines, preserve every line and keep the same line count unless the user text itself clearly intends a merge. Never drop unrelated lower lines. Never edit any protectedTerms under any circumstances. Never mark userDictionary terms as mistakes. Example: '방갑스비난.' should be corrected to the full string '반갑습니다.' If the text looks fine, omit it. Return concise reasons in Korean when possible.";
+      "You review UI copy inside a Figma plugin. Detect only obvious spelling mistakes, broken words, malformed polite endings, spacing errors, punctuation errors, and clearly broken grammar. Be conservative: if a word is already a valid standard word in its language, keep it unless the surrounding sentence is clearly wrong with that exact word. Never replace one valid word with another valid word just because the spellings are similar. Example: keep 'optimal motion' unchanged and never change it to 'optional motion'. Preserve the original language, script, wording, product naming, and marketing intent of each string. Do not translate, localize, rewrite into the dominant language of the screen, unify terminology, smooth tone, or replace brand/product names unless the product name itself has an obvious typo. In mixed-language strings, preserve every language segment as-is and only fix the clearly broken part inside that same language segment. Some textNodes are full node strings, while others are single extracted lines from a multiline node. If an item is a single extracted line, return a corrected single line only and do not rewrite neighboring lines. If preferredLocaleHint is provided, use it only for Latin-script nodes or segments that actually fit that locale. Do not suppress Korean, English, or other script corrections just because another preferred locale is set. If latinLocaleHint is provided, keep corrections inside that locale only for matching Latin-script segments. Ignore cosmetic whitespace cleanup such as empty brackets, bracket spacing, or punctuation-only cleanup. Only flag spacing when a word is visibly broken into fragments, for example 'app le' -> 'apple'. Example: German copy with an English brand should stay mixed as needed: 'Find e deine perfekte Work-Life-Balanfce mit LG' -> 'Finde deine perfekte Work-Life-Balance mit LG', 'Jedtazt kaufenq' -> 'Jetzt kaufen', while keeping 'LG' untouched. Return the full corrected string in suggestion for the given item, never only a changed token. If the original text contains multiple lines, preserve every line and keep the same line count unless the user text itself clearly intends a merge. Never drop unrelated lower lines. Never edit any protectedTerms under any circumstances. Never mark userDictionary terms as mistakes. Example: '방갑스비난.' should be corrected to the full string '반갑습니다.' If the text looks fine, omit it. Return concise reasons in Korean when possible.";
     const payload = {
       languageHint: context.languageHintLabel || context.detectedLanguageLabel || context.languageLabel || "?먮룞 媛먯?",
       preferredLocaleHint: context.proofingLocale || "",
@@ -32630,7 +33545,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       try {
         response = await ai.requestJsonTask({
         instructions: instructions ||
-          "You review UI copy inside a Figma plugin. Detect only obvious spelling mistakes, broken words, malformed polite endings, spacing errors, punctuation errors, and clearly broken grammar. Preserve the original language, script, wording, and product naming of each string. Do not translate, localize, rewrite into the dominant language of the screen, unify terminology, smooth tone, or replace brand/product names unless the product name itself has an obvious typo. In mixed-language strings, preserve every language segment as-is and only fix the clearly broken part inside that same language segment. If preferredLocaleHint is provided, treat it as the primary locale/country hint. If latinLocaleHint is provided, keep corrections inside that locale. Example: German copy with an English brand should stay mixed as needed: 'Find e deine perfekte Work-Life-Balanfce mit LG' -> 'Finde deine perfekte Work-Life-Balance mit LG', 'Jedtazt kaufenq' -> 'Jetzt kaufen', while keeping 'LG' untouched. Return the full corrected string in suggestion, never only a changed token. If the original text contains multiple lines, preserve every line and keep the same line count unless the user text itself clearly intends a merge. Never drop unrelated lower lines. Never edit any protectedTerms under any circumstances. Never mark userDictionary terms as mistakes. Example: '방갑스비난.' should be corrected to the full string '반갑습니다.' If the text looks fine, omit it. Return concise reasons in Korean when possible.",
+          "You review UI copy inside a Figma plugin. Detect only obvious spelling mistakes, broken words, malformed polite endings, spacing errors, punctuation errors, and clearly broken grammar. Preserve the original language, script, wording, and product naming of each string. Do not translate, localize, rewrite into the dominant language of the screen, unify terminology, smooth tone, or replace brand/product names unless the product name itself has an obvious typo. In mixed-language strings, preserve every language segment as-is and only fix the clearly broken part inside that same language segment. If preferredLocaleHint is provided, treat it as the primary locale/country hint. If latinLocaleHint is provided, keep corrections inside that locale. Ignore cosmetic whitespace cleanup such as empty brackets, bracket spacing, or punctuation-only cleanup. Only flag spacing when a word is visibly broken into fragments, for example 'app le' -> 'apple'. Example: German copy with an English brand should stay mixed as needed: 'Find e deine perfekte Work-Life-Balanfce mit LG' -> 'Finde deine perfekte Work-Life-Balance mit LG', 'Jedtazt kaufenq' -> 'Jetzt kaufen', while keeping 'LG' untouched. Return the full corrected string in suggestion, never only a changed token. If the original text contains multiple lines, preserve every line and keep the same line count unless the user text itself clearly intends a merge. Never drop unrelated lower lines. Never edit any protectedTerms under any circumstances. Never mark userDictionary terms as mistakes. Example: '방갑스비난.' should be corrected to the full string '반갑습니다.' If the text looks fine, omit it. Return concise reasons in Korean when possible.",
         schema: schema,
         payload: payload || {
           languageHint:
@@ -33286,12 +34201,12 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     };
   }
 
-  function buildInsights(context, textNodes, issues, applied, annotationSupported, aiMeta) {
+  function buildInsights(context, textNodes, issues, applied, usesAnnotations, aiMeta) {
     const insights = [
       `맥락 기준: ${context.contextLabel}`,
       `언어 기준: ${context.languageHintLabel || context.detectedLanguageLabel || context.languageLabel || "자동 감지"}`,
       `텍스트 레이어 ${textNodes.length}개 검사`,
-      annotationSupported ? `주석 ${applied.annotationCount}건 적용` : "주석 대신 결과 패널에만 표시",
+      usesAnnotations ? `주석 ${applied.annotationCount}건 적용` : "주석 대신 결과 패널에만 표시",
     ];
 
     if (aiMeta && aiMeta.statusLabel) {
@@ -33300,7 +34215,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
     if (issues.length === 0) {
       insights.push(
-        annotationSupported
+        usesAnnotations
           ? "뚜렷한 오타 후보를 찾지 못해 기존 AI 오타 주석만 정리했습니다."
           : "뚜렷한 오타 후보를 찾지 못했습니다."
       );
@@ -33313,7 +34228,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
     if (applied.skipped.length > 0) {
       insights.push(`일부 주석은 구조 제한으로 건너뜀 ${applied.skipped.length}건`);
-    } else if (annotationSupported) {
+    } else if (usesAnnotations) {
       insights.push("Figma 주석은 Dev Mode에서 확인할 수 있습니다.");
     }
 
@@ -33840,6 +34755,8 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
   function normalizeTypeLabel(type) {
     switch (String(type || "").toUpperCase()) {
+      case "PAGE":
+        return "페이지";
       case "FRAME":
         return "프레임";
       case "GROUP":
@@ -35845,6 +36762,1593 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
     if (typeof error === "string" && error.trim()) {
       return error.trim();
+    }
+
+    return fallback;
+  }
+})();
+
+;(() => {
+  const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
+  if (globalScope.__PIGMA_AI_IMAGE_UPSCALE_PATCH__) {
+    return;
+  }
+
+  const originalOnMessage = figma.ui.onmessage;
+  let isPreparing = false;
+  let isApplying = false;
+  let pendingSession = null;
+  let isBoundsFitPreparing = false;
+  let isBoundsFitApplying = false;
+  let pendingBoundsFitSession = null;
+  let isReferencePreparing = false;
+
+  if (typeof originalOnMessage !== "function") {
+    return;
+  }
+
+  figma.ui.onmessage = async (message) => {
+    if (isAiImageUpscaleMessage(message)) {
+      if (message.type === "request-ai-image-upscale-source") {
+        await prepareUpscaleSource(message);
+        return;
+      }
+
+      if (message.type === "apply-ai-image-upscaled-image") {
+        await applyUpscaledImage(message);
+        return;
+      }
+
+      if (message.type === "ai-image-upscale-report-error") {
+        pendingSession = null;
+        notifyUiReportedError(message);
+        return;
+      }
+
+      if (message.type === "request-image-bounds-fit-source") {
+        await prepareImageBoundsFitSource(message);
+        return;
+      }
+
+      if (message.type === "apply-image-bounds-fit-image") {
+        await applyImageBoundsFit(message);
+        return;
+      }
+
+      if (message.type === "image-bounds-fit-report-error") {
+        pendingBoundsFitSession = null;
+        notifyUiReportedError(message);
+        return;
+      }
+
+      if (message.type === "request-image-reference-search-source") {
+        await prepareReferenceSearchSource(message);
+        return;
+      }
+
+      if (message.type === "open-image-reference-search") {
+        await openImageReferenceSearch(message);
+        return;
+      }
+
+      if (message.type === "image-reference-report-error") {
+        notifyUiReportedError(message);
+        return;
+      }
+    }
+
+    return originalOnMessage(message);
+  };
+
+  globalScope.__PIGMA_AI_IMAGE_UPSCALE_PATCH__ = true;
+
+  function isAiImageUpscaleMessage(message) {
+    return (
+      !!message &&
+      (message.type === "request-ai-image-upscale-source" ||
+        message.type === "apply-ai-image-upscaled-image" ||
+        message.type === "ai-image-upscale-report-error" ||
+        message.type === "request-image-bounds-fit-source" ||
+        message.type === "apply-image-bounds-fit-image" ||
+        message.type === "image-bounds-fit-report-error" ||
+        message.type === "request-image-reference-search-source" ||
+        message.type === "open-image-reference-search" ||
+        message.type === "image-reference-report-error")
+    );
+  }
+
+  async function prepareUpscaleSource(message) {
+    if (isPreparing || isApplying || isBoundsFitPreparing || isBoundsFitApplying) {
+      postPrepareError("이미지 업스케일이 이미 진행 중입니다.", sanitizeClientRequestId(message && message.clientRequestId));
+      return;
+    }
+
+    isPreparing = true;
+    pendingSession = null;
+
+    try {
+      const target = collectSingleUpscaleTargetFromSelection();
+      const image = figma.getImageByHash(target.entry.imageHash);
+      if (!image) {
+        throw new Error("선택한 IMAGE fill 원본을 찾지 못했습니다.");
+      }
+
+      const bytes = await image.getBytesAsync();
+      if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
+        throw new Error("선택한 IMAGE fill 원본 바이트를 읽지 못했습니다.");
+      }
+
+      const extension = detectImageExtension(bytes);
+      const mimeType = detectImageMimeType(bytes);
+      const fileName = buildFileName(target.entry, extension === "bin" ? "png" : extension);
+      const sessionId = buildSessionId();
+
+      pendingSession = {
+        id: sessionId,
+        clientRequestId: sanitizeClientRequestId(message && message.clientRequestId),
+        originalHash: target.entry.imageHash,
+        usages: target.usages,
+        selectionLabel: formatSelectionLabel(target.selection),
+        targetNodeName: target.entry.nodeName,
+        operationLabel: sanitizeOperationLabel(message && message.operationLabel),
+        preparedAt: new Date().toISOString(),
+      };
+
+      figma.ui.postMessage({
+        type: "ai-image-upscale-source-ready",
+        sessionId: sessionId,
+        clientRequestId: pendingSession.clientRequestId,
+        image: {
+          bytes: bytes,
+          mimeType: mimeType,
+          fileName: fileName,
+        },
+        summary: {
+          selectionLabel: formatSelectionLabel(target.selection),
+          targetNodeName: target.entry.nodeName,
+          targetFillCount: target.usages.length,
+          imageHash: target.entry.imageHash,
+          byteLength: bytes.length,
+        },
+      });
+    } catch (error) {
+      pendingSession = null;
+      postPrepareError(
+        normalizeErrorMessage(error, "이미지 업스케일용 원본 이미지를 준비하지 못했습니다."),
+        sanitizeClientRequestId(message && message.clientRequestId)
+      );
+    } finally {
+      isPreparing = false;
+    }
+  }
+
+  async function applyUpscaledImage(message) {
+    if (isApplying || isBoundsFitPreparing || isBoundsFitApplying) {
+      postApplyError("업스케일 결과 적용이 이미 진행 중입니다.", sanitizeClientRequestId(message && message.clientRequestId));
+      return;
+    }
+
+    isApplying = true;
+
+    try {
+      if (!pendingSession || !message || message.sessionId !== pendingSession.id) {
+        throw new Error("업스케일 세션이 만료되었습니다. 다시 실행해 주세요.");
+      }
+
+      const bytes = normalizeBytes(message.bytes);
+      if (!bytes.length) {
+        throw new Error("업스케일 결과 이미지가 비어 있습니다.");
+      }
+
+      const createdImage = figma.createImage(bytes);
+      if (!createdImage || typeof createdImage.hash !== "string" || !createdImage.hash) {
+        throw new Error("업스케일 결과 이미지 hash를 만들지 못했습니다.");
+      }
+
+      const result = await replaceSelectionImageFills(pendingSession, createdImage.hash, bytes.length);
+      figma.ui.postMessage({
+        type: "ai-image-upscale-apply-result",
+        clientRequestId: pendingSession.clientRequestId,
+        result: result,
+      });
+      notifyApplyResult(result, sanitizeOperationLabel(message && message.operationLabel) || pendingSession.operationLabel);
+      pendingSession = null;
+    } catch (error) {
+      const messageText = normalizeErrorMessage(error, "이미지 업스케일 결과를 적용하지 못했습니다.");
+      figma.ui.postMessage({
+        type: "ai-image-upscale-apply-error",
+        clientRequestId: pendingSession && pendingSession.clientRequestId ? pendingSession.clientRequestId : sanitizeClientRequestId(message && message.clientRequestId),
+        message: messageText,
+      });
+      figma.notify(messageText, { error: true, timeout: 2600 });
+    } finally {
+      isApplying = false;
+    }
+  }
+
+  async function prepareImageBoundsFitSource(message) {
+    if (isPreparing || isApplying || isBoundsFitPreparing || isBoundsFitApplying) {
+      postBoundsFitSourceError(
+        "다른 이미지 작업이 이미 진행 중입니다.",
+        sanitizeClientRequestId(message && message.clientRequestId)
+      );
+      return;
+    }
+
+    isBoundsFitPreparing = true;
+    pendingBoundsFitSession = null;
+
+    try {
+      const collection = await collectBoundsFitTargetsFromSelection();
+      if (!collection.targets.length) {
+        throw new Error(buildBoundsFitEmptySelectionMessage(collection.skipped));
+      }
+
+      const sessionId = buildBoundsFitSessionId();
+      pendingBoundsFitSession = {
+        id: sessionId,
+        clientRequestId: sanitizeClientRequestId(message && message.clientRequestId),
+        operationLabel: sanitizeOperationLabel(message && message.operationLabel),
+        selectionLabel: formatSelectionLabel(collection.selection),
+        targets: collection.targets,
+        skipped: collection.skipped,
+        requestedCount: collection.selection.length,
+        preparedAt: new Date().toISOString(),
+      };
+
+      figma.ui.postMessage({
+        type: "image-bounds-fit-source-ready",
+        sessionId: sessionId,
+        clientRequestId: pendingBoundsFitSession.clientRequestId,
+        items: collection.targets.map(function (target) {
+          return {
+            nodeId: target.nodeId,
+            nodeName: target.nodeName,
+            imageHash: target.originalHash,
+            fileName: target.fileName,
+            mimeType: target.mimeType,
+            bytes: target.bytes,
+            sourceWidth: target.sourceWidth,
+            sourceHeight: target.sourceHeight,
+          };
+        }),
+        summary: {
+          selectionLabel: pendingBoundsFitSession.selectionLabel,
+          eligibleCount: collection.targets.length,
+          skippedCount: collection.skipped.length,
+        },
+      });
+    } catch (error) {
+      pendingBoundsFitSession = null;
+      postBoundsFitSourceError(
+        normalizeErrorMessage(error, "보이는 영역에 맞출 이미지 레이어를 준비하지 못했습니다."),
+        sanitizeClientRequestId(message && message.clientRequestId)
+      );
+    } finally {
+      isBoundsFitPreparing = false;
+    }
+  }
+
+  async function prepareReferenceSearchSource(message) {
+    if (isPreparing || isApplying || isBoundsFitPreparing || isBoundsFitApplying || isReferencePreparing) {
+      postReferenceSearchSourceError(
+        "다른 이미지 작업이 이미 진행 중입니다.",
+        sanitizeClientRequestId(message && message.clientRequestId)
+      );
+      return;
+    }
+
+    isReferencePreparing = true;
+
+    try {
+      const source = await collectReferenceSearchSourceFromSelection();
+      figma.ui.postMessage({
+        type: "image-reference-search-source-ready",
+        clientRequestId: sanitizeClientRequestId(message && message.clientRequestId),
+        sourceType: source.sourceType,
+        text: source.text || "",
+        image: source.image || null,
+        summary: source.summary,
+      });
+    } catch (error) {
+      postReferenceSearchSourceError(
+        normalizeErrorMessage(error, "레퍼런스 검색 대상을 준비하지 못했습니다."),
+        sanitizeClientRequestId(message && message.clientRequestId)
+      );
+    } finally {
+      isReferencePreparing = false;
+    }
+  }
+
+  async function openImageReferenceSearch(message) {
+    const clientRequestId = sanitizeClientRequestId(message && message.clientRequestId);
+    try {
+      const query = sanitizeReferenceSearchQuery(message && message.query);
+      if (!query) {
+        throw new Error("레퍼런스 검색어가 비어 있습니다.");
+      }
+
+      const encodedQuery = encodeURIComponent(query);
+      const googleUrl = "https://www.google.com/search?tbm=isch&q=" + encodedQuery;
+      const pinterestUrl = "https://www.pinterest.com/search/pins/?q=" + encodedQuery;
+      figma.openExternal(googleUrl);
+      figma.openExternal(pinterestUrl);
+      figma.ui.postMessage({
+        type: "image-reference-search-opened",
+        clientRequestId: clientRequestId,
+        query: query,
+        urls: [googleUrl, pinterestUrl],
+      });
+      figma.notify("레퍼런스 검색 열기: " + summarizeReferenceSearchQuery(query), { timeout: 2400 });
+    } catch (error) {
+      postReferenceSearchOpenError(
+        normalizeErrorMessage(error, "레퍼런스 검색을 열지 못했습니다."),
+        clientRequestId
+      );
+    }
+  }
+
+  async function applyImageBoundsFit(message) {
+    if (isPreparing || isApplying || isBoundsFitApplying) {
+      postBoundsFitApplyError(
+        "보이는 영역 맞추기 결과 적용이 이미 진행 중입니다.",
+        pendingBoundsFitSession && pendingBoundsFitSession.clientRequestId
+          ? pendingBoundsFitSession.clientRequestId
+          : sanitizeClientRequestId(message && message.clientRequestId)
+      );
+      return;
+    }
+
+    isBoundsFitApplying = true;
+
+    try {
+      if (!pendingBoundsFitSession || !message || message.sessionId !== pendingBoundsFitSession.id) {
+        throw new Error("보이는 영역 맞추기 세션이 만료되었습니다. 다시 실행해 주세요.");
+      }
+
+      const result = await applyBoundsFitResultsToSelection(pendingBoundsFitSession, message.results);
+      figma.ui.postMessage({
+        type: "image-bounds-fit-apply-result",
+        clientRequestId: pendingBoundsFitSession.clientRequestId,
+        result: result,
+      });
+      notifyBoundsFitResult(result, pendingBoundsFitSession.operationLabel);
+      pendingBoundsFitSession = null;
+    } catch (error) {
+      const messageText = normalizeErrorMessage(error, "보이는 영역 맞추기 결과를 적용하지 못했습니다.");
+      figma.ui.postMessage({
+        type: "image-bounds-fit-apply-error",
+        clientRequestId:
+          pendingBoundsFitSession && pendingBoundsFitSession.clientRequestId
+            ? pendingBoundsFitSession.clientRequestId
+            : sanitizeClientRequestId(message && message.clientRequestId),
+        message: messageText,
+      });
+      figma.notify(messageText, { error: true, timeout: 2600 });
+    } finally {
+      isBoundsFitApplying = false;
+    }
+  }
+
+  function notifyUiReportedError(message) {
+    const text = toKoreanImageErrorMessage(
+      message && typeof message.message === "string" && message.message.trim()
+        ? message.message.trim()
+        : "이미지 작업 처리 중 오류가 발생했습니다.",
+      "이미지 작업 처리 중 오류가 발생했습니다."
+    );
+    figma.notify(text, { error: true, timeout: 2600 });
+  }
+
+  function postPrepareError(message, clientRequestId) {
+    figma.ui.postMessage({
+      type: "ai-image-upscale-source-error",
+      clientRequestId: sanitizeClientRequestId(clientRequestId),
+      message: message,
+    });
+    figma.notify(message, { error: true, timeout: 2600 });
+  }
+
+  function postApplyError(message, clientRequestId) {
+    figma.ui.postMessage({
+      type: "ai-image-upscale-apply-error",
+      clientRequestId: sanitizeClientRequestId(clientRequestId),
+      message: message,
+    });
+    figma.notify(message, { error: true, timeout: 2600 });
+  }
+
+  function postBoundsFitSourceError(message, clientRequestId) {
+    figma.ui.postMessage({
+      type: "image-bounds-fit-source-error",
+      clientRequestId: sanitizeClientRequestId(clientRequestId),
+      message: message,
+    });
+    figma.notify(message, { error: true, timeout: 2600 });
+  }
+
+  function postBoundsFitApplyError(message, clientRequestId) {
+    figma.ui.postMessage({
+      type: "image-bounds-fit-apply-error",
+      clientRequestId: sanitizeClientRequestId(clientRequestId),
+      message: message,
+    });
+    figma.notify(message, { error: true, timeout: 2600 });
+  }
+
+  function postReferenceSearchSourceError(message, clientRequestId) {
+    figma.ui.postMessage({
+      type: "image-reference-search-source-error",
+      clientRequestId: sanitizeClientRequestId(clientRequestId),
+      message: message,
+    });
+    figma.notify(message, { error: true, timeout: 2600 });
+  }
+
+  function postReferenceSearchOpenError(message, clientRequestId) {
+    figma.ui.postMessage({
+      type: "image-reference-search-error",
+      clientRequestId: sanitizeClientRequestId(clientRequestId),
+      message: message,
+    });
+    figma.notify(message, { error: true, timeout: 2600 });
+  }
+
+  function collectSingleUpscaleTargetFromSelection() {
+    const selection = Array.from(figma.currentPage.selection || []);
+    if (!selection.length) {
+      throw new Error("프레임, 그룹, 레이어를 먼저 선택하세요.");
+    }
+
+    let selectedEntry = null;
+    const usages = [];
+
+    for (let rootIndex = 0; rootIndex < selection.length; rootIndex += 1) {
+      const root = selection[rootIndex];
+      const stack = [
+        {
+          node: root,
+          path: safeName(root),
+        },
+      ];
+
+      while (stack.length > 0) {
+        const current = stack.pop();
+        const node = current && current.node;
+        if (!node || node.removed) {
+          continue;
+        }
+
+        const fills = getNodeFills(node);
+        const fillIndices = getFillIndicesInUiOrder(fills);
+        for (let orderedFillIndex = 0; orderedFillIndex < fillIndices.length; orderedFillIndex += 1) {
+          const fillIndex = fillIndices[orderedFillIndex];
+          const fill = fills[fillIndex];
+          if (!isImagePaint(fill)) {
+            continue;
+          }
+
+          if (!fill.imageHash || typeof fill.imageHash !== "string") {
+            continue;
+          }
+
+          if (!selectedEntry) {
+            selectedEntry = {
+              imageHash: fill.imageHash,
+              nodeId: node.id,
+              nodeName: safeName(node),
+              path: current.path,
+            };
+          }
+
+          if (fill.imageHash === selectedEntry.imageHash) {
+            usages.push({
+              nodeId: node.id,
+              nodeName: safeName(node),
+              fillIndex: fillIndex,
+              imageHash: fill.imageHash,
+              path: current.path,
+            });
+          }
+        }
+
+        if (!hasChildren(node)) {
+          continue;
+        }
+
+        for (let childIndex = node.children.length - 1; childIndex >= 0; childIndex -= 1) {
+          const child = node.children[childIndex];
+          stack.push({
+            node: child,
+            path: current.path + " / " + safeName(child),
+          });
+        }
+      }
+    }
+
+    if (!selectedEntry || !usages.length) {
+      throw new Error("선택 범위에서 업스케일할 IMAGE fill을 찾지 못했습니다.");
+    }
+
+    if (false) {
+      throw new Error("이미지 업스케일은 한 번에 하나의 원본 이미지에만 적용할 수 있습니다. IMAGE fill이 하나만 포함되도록 선택해 주세요.");
+    }
+
+    return {
+      selection: selection,
+      entry: selectedEntry,
+      usages: usages,
+    };
+  }
+
+  async function replaceSelectionImageFills(session, newImageHash, byteLength) {
+    const skipped = [];
+    const appliedNodeIds = {};
+    let appliedFillCount = 0;
+
+    for (let index = 0; index < session.usages.length; index += 1) {
+      const usage = session.usages[index];
+      const node = await figma.getNodeByIdAsync(usage.nodeId);
+      if (!node || node.removed) {
+        skipped.push({
+          nodeId: usage.nodeId,
+          nodeName: usage.nodeName,
+          reason: "노드를 찾지 못했습니다.",
+        });
+        continue;
+      }
+
+      const fills = getNodeFills(node);
+      if (!fills.length) {
+        skipped.push({
+          nodeId: usage.nodeId,
+          nodeName: safeName(node),
+          reason: "IMAGE fill이 더 이상 없습니다.",
+        });
+        continue;
+      }
+
+      let targetIndex = -1;
+      if (usage.fillIndex >= 0 && usage.fillIndex < fills.length) {
+        const directFill = fills[usage.fillIndex];
+        if (isImagePaint(directFill) && directFill.imageHash === session.originalHash) {
+          targetIndex = usage.fillIndex;
+        }
+      }
+
+      if (targetIndex < 0) {
+        const fillIndices = getFillIndicesInUiOrder(fills);
+        for (let orderedFillIndex = 0; orderedFillIndex < fillIndices.length; orderedFillIndex += 1) {
+          const fillIndex = fillIndices[orderedFillIndex];
+          const fill = fills[fillIndex];
+          if (isImagePaint(fill) && fill.imageHash === session.originalHash) {
+            targetIndex = fillIndex;
+            break;
+          }
+        }
+      }
+
+      if (targetIndex < 0) {
+        skipped.push({
+          nodeId: usage.nodeId,
+          nodeName: safeName(node),
+          reason: "같은 원본 hash를 가진 IMAGE fill을 찾지 못했습니다.",
+        });
+        continue;
+      }
+
+      const nextFills = fills.slice();
+      const originalFill = nextFills[targetIndex];
+      const hiddenOriginalFill = cloneImagePaintWithHashAndVisibility(originalFill, session.originalHash, false);
+      const newVisibleFill = cloneImagePaintWithHashAndVisibility(originalFill, newImageHash, true);
+      nextFills.splice(targetIndex, 1, hiddenOriginalFill, newVisibleFill);
+
+      try {
+        node.fills = nextFills;
+        appliedFillCount += 1;
+        appliedNodeIds[node.id] = safeName(node);
+      } catch (error) {
+        skipped.push({
+          nodeId: usage.nodeId,
+          nodeName: safeName(node),
+          reason: normalizeErrorMessage(error, "IMAGE fill을 교체하지 못했습니다."),
+        });
+      }
+    }
+
+    return {
+      processedAt: new Date().toISOString(),
+      summary: {
+        selectionLabel: session.selectionLabel,
+        targetNodeName: session.targetNodeName,
+        originalImageHash: session.originalHash,
+        newImageHash: newImageHash,
+        appliedFillCount: appliedFillCount,
+        appliedNodeCount: Object.keys(appliedNodeIds).length,
+        skippedCount: skipped.length,
+        resultByteLength: byteLength,
+      },
+      skipped: skipped.slice(0, 24),
+    };
+  }
+
+  function notifyApplyResult(result) {
+    const summary = result && result.summary ? result.summary : {};
+    const appliedFillCount =
+      typeof summary.appliedFillCount === "number" && Number.isFinite(summary.appliedFillCount)
+        ? summary.appliedFillCount
+        : 0;
+    const skippedCount =
+      typeof summary.skippedCount === "number" && Number.isFinite(summary.skippedCount) ? summary.skippedCount : 0;
+
+    if (!appliedFillCount) {
+      figma.notify("이미지 업스케일 결과를 적용할 IMAGE fill을 찾지 못했습니다.", { timeout: 2200 });
+      return;
+    }
+
+    let message = "이미지 업스케일 적용 완료 (" + appliedFillCount + "개 fill 교체)";
+    if (skippedCount > 0) {
+      message += " · " + skippedCount + "건 건너뜀";
+    }
+    figma.notify(message, { timeout: 2600 });
+  }
+
+  function cloneImagePaintWithHashAndVisibility(fill, imageHash, visible) {
+    const cloned = JSON.parse(JSON.stringify(fill));
+    cloned.imageHash = imageHash;
+    cloned.visible = visible !== false;
+    return cloned;
+  }
+
+  function cloneImagePaintWithHash(fill, imageHash) {
+    return cloneImagePaintWithHashAndVisibility(fill, imageHash, true);
+  }
+
+  function cloneBoundsFitImagePaint(fill, imageHash) {
+    const cloned = cloneImagePaintWithHash(fill, imageHash);
+    cloned.scaleMode = "FILL";
+    if ("imageTransform" in cloned) {
+      delete cloned.imageTransform;
+    }
+    if ("scalingFactor" in cloned) {
+      delete cloned.scalingFactor;
+    }
+    if ("rotation" in cloned) {
+      delete cloned.rotation;
+    }
+    return cloned;
+  }
+
+  function notifyApplyResult(result, operationLabel) {
+    const summary = result && result.summary ? result.summary : {};
+    const appliedFillCount =
+      typeof summary.appliedFillCount === "number" && Number.isFinite(summary.appliedFillCount)
+        ? summary.appliedFillCount
+        : 0;
+    const skippedCount =
+      typeof summary.skippedCount === "number" && Number.isFinite(summary.skippedCount) ? summary.skippedCount : 0;
+
+    if (!appliedFillCount) {
+      figma.notify("AI 이미지 결과를 적용할 IMAGE fill을 찾지 못했습니다.", { timeout: 2200 });
+      return;
+    }
+
+    let message = (operationLabel || "AI 이미지 작업") + " 완료 (" + appliedFillCount + "개 fill 교체)";
+    if (skippedCount > 0) {
+      message += " · " + skippedCount + "건 건너뜀";
+    }
+    figma.notify(message, { timeout: 2600 });
+  }
+
+  function sanitizeOperationLabel(value) {
+    const label = typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
+    return label || "AI 이미지 작업";
+  }
+
+  async function collectReferenceSearchSourceFromSelection() {
+    const selection = Array.from(figma.currentPage.selection || []);
+    if (!selection.length) {
+      throw new Error("프레임, 그룹, 레이어를 먼저 선택하세요.");
+    }
+
+    const selectedRangeText = getSelectedTextRangeSnapshot();
+    if (selectedRangeText) {
+      return {
+        sourceType: "text",
+        text: selectedRangeText.text,
+        summary: {
+          selectionLabel: selectedRangeText.selectionLabel,
+          targetNodeName: selectedRangeText.nodeName,
+          textMode: "selected-range",
+          textLength: selectedRangeText.text.length,
+        },
+      };
+    }
+
+    if (selection.every(function (node) { return node && node.type === "TEXT"; })) {
+      const directText = collectReferenceTextFromNodes(selection, {
+        maxNodes: 6,
+        maxLength: 480,
+        includeDescendants: false,
+      });
+      if (directText) {
+        return {
+          sourceType: "text",
+          text: directText,
+          summary: {
+            selectionLabel: formatSelectionLabel(selection),
+            targetNodeName: safeName(selection[0]),
+            textMode: "text-selection",
+            textLength: directText.length,
+          },
+        };
+      }
+    }
+
+    let imageTarget = null;
+    try {
+      imageTarget = collectSingleUpscaleTargetFromSelection();
+    } catch (error) {
+      imageTarget = null;
+    }
+
+    if (imageTarget) {
+      return await buildReferenceImageSource(imageTarget);
+    }
+
+    const fallbackText = collectReferenceTextFromNodes(selection, {
+      maxNodes: 8,
+      maxLength: 560,
+      includeDescendants: true,
+    });
+    if (fallbackText) {
+      return {
+        sourceType: "text",
+        text: fallbackText,
+        summary: {
+          selectionLabel: formatSelectionLabel(selection),
+          targetNodeName: safeName(selection[0]),
+          textMode: "selection-descendants",
+          textLength: fallbackText.length,
+        },
+      };
+    }
+
+    throw new Error("이미지나 텍스트가 포함된 레이어를 선택해 주세요.");
+  }
+
+  function getSelectedTextRangeSnapshot() {
+    const page = figma.currentPage;
+    const selectedTextRange = page && "selectedTextRange" in page ? page.selectedTextRange : null;
+    if (!selectedTextRange || !selectedTextRange.node || selectedTextRange.node.removed || selectedTextRange.node.type !== "TEXT") {
+      return null;
+    }
+
+    const characters = typeof selectedTextRange.node.characters === "string" ? selectedTextRange.node.characters : "";
+    const start = Math.max(0, Math.floor(Number(selectedTextRange.start) || 0));
+    const end = Math.max(start, Math.floor(Number(selectedTextRange.end) || 0));
+    const text = normalizeReferenceText(characters.slice(start, end), 480);
+    if (!text) {
+      return null;
+    }
+
+    return {
+      text: text,
+      nodeName: safeName(selectedTextRange.node),
+      selectionLabel: safeName(selectedTextRange.node),
+    };
+  }
+
+  function collectReferenceTextFromNodes(nodes, options) {
+    const list = Array.isArray(nodes) ? nodes : [];
+    const maxNodes =
+      options && Number(options.maxNodes) > 0 ? Math.max(1, Math.floor(Number(options.maxNodes))) : 6;
+    const maxLength =
+      options && Number(options.maxLength) > 0 ? Math.max(80, Math.floor(Number(options.maxLength))) : 480;
+    const includeDescendants = !(options && options.includeDescendants === false);
+    const parts = [];
+    const seen = {};
+
+    function visit(node) {
+      if (!node || node.removed || parts.length >= maxNodes) {
+        return;
+      }
+      if ("visible" in node && node.visible === false) {
+        return;
+      }
+
+      if (node.type === "TEXT" && typeof node.characters === "string") {
+        const text = normalizeReferenceText(node.characters, Math.max(40, Math.min(200, maxLength)));
+        if (text && !seen[text]) {
+          seen[text] = true;
+          parts.push(text);
+        }
+      }
+
+      if (includeDescendants && hasChildren(node)) {
+        for (let index = 0; index < node.children.length; index += 1) {
+          visit(node.children[index]);
+          if (parts.length >= maxNodes) {
+            break;
+          }
+        }
+      }
+    }
+
+    for (let index = 0; index < list.length; index += 1) {
+      visit(list[index]);
+      if (parts.length >= maxNodes) {
+        break;
+      }
+    }
+
+    return normalizeReferenceText(parts.join(" / "), maxLength);
+  }
+
+  function normalizeReferenceText(value, maxLength) {
+    const normalized = typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
+    if (!normalized) {
+      return "";
+    }
+    const limit = Number(maxLength) > 0 ? Math.floor(Number(maxLength)) : 0;
+    if (!limit || normalized.length <= limit) {
+      return normalized;
+    }
+    return normalized.slice(0, Math.max(0, limit - 1)).trim() + "…";
+  }
+
+  async function buildReferenceImageSource(target) {
+    const summary = {
+      selectionLabel: formatSelectionLabel(target.selection),
+      targetNodeName: target.entry.nodeName,
+      imageHash: target.entry.imageHash,
+      captureMode: "rendered-node",
+      byteLength: 0,
+    };
+    let bytes = new Uint8Array(0);
+    let mimeType = "image/png";
+    let fileName = buildFileName(target.entry, "png");
+
+    const node = await figma.getNodeByIdAsync(target.entry.nodeId);
+    if (node && !node.removed && typeof node.exportAsync === "function") {
+      try {
+        bytes = await node.exportAsync({
+          format: "PNG",
+          useAbsoluteBounds: false,
+        });
+      } catch (error) {
+        bytes = new Uint8Array(0);
+      }
+    }
+
+    if (!bytes.length) {
+      const image = figma.getImageByHash(target.entry.imageHash);
+      if (!image) {
+        throw new Error("선택한 IMAGE fill 원본을 찾지 못했습니다.");
+      }
+      bytes = await image.getBytesAsync();
+      if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
+        throw new Error("선택한 IMAGE fill 원본 바이트를 읽지 못했습니다.");
+      }
+      const extension = detectImageExtension(bytes);
+      mimeType = detectImageMimeType(bytes);
+      fileName = buildFileName(target.entry, extension === "bin" ? "png" : extension);
+      summary.captureMode = "source-image";
+    }
+
+    summary.byteLength = bytes.length;
+
+    return {
+      sourceType: "image",
+      image: {
+        bytes: bytes,
+        mimeType: mimeType,
+        fileName: fileName,
+      },
+      summary: summary,
+    };
+  }
+
+  function sanitizeReferenceSearchQuery(value) {
+    const normalized = typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
+    return normalized ? normalized.slice(0, 120) : "";
+  }
+
+  function summarizeReferenceSearchQuery(query) {
+    const text = sanitizeReferenceSearchQuery(query);
+    if (text.length <= 44) {
+      return text;
+    }
+    return text.slice(0, 43) + "…";
+  }
+
+  async function collectBoundsFitTargetsFromSelection() {
+    const selection = Array.from(figma.currentPage.selection || []);
+    if (!selection.length) {
+      throw new Error("프레임, 그룹, 레이어를 먼저 선택하세요.");
+    }
+
+    const targets = [];
+    const skipped = [];
+
+    for (let index = 0; index < selection.length; index += 1) {
+      const analysis = await analyzeBoundsFitSelectionNode(selection[index]);
+      if (analysis && analysis.target) {
+        targets.push(analysis.target);
+      } else if (analysis && analysis.skipped) {
+        skipped.push(analysis.skipped);
+      }
+    }
+
+    return {
+      selection: selection,
+      targets: targets,
+      skipped: skipped,
+    };
+  }
+
+  async function analyzeBoundsFitSelectionNode(node) {
+    if (!node || node.removed) {
+      return buildBoundsFitSkipped(node, "선택 레이어를 읽을 수 없습니다.");
+    }
+
+    if (hasChildren(node)) {
+      return buildBoundsFitSkipped(node, "하위 레이어가 있는 프레임이나 그룹은 아직 지원하지 않습니다.");
+    }
+
+    if ("locked" in node && node.locked) {
+      return buildBoundsFitSkipped(node, "잠금된 레이어는 보이는 영역에 맞출 수 없습니다.");
+    }
+
+    if (!("resize" in node) || typeof node.resize !== "function") {
+      return buildBoundsFitSkipped(node, "크기를 직접 바꿀 수 있는 이미지 레이어만 지원합니다.");
+    }
+
+    if ("rotation" in node && typeof node.rotation === "number" && Math.abs(node.rotation) > 0.01) {
+      return buildBoundsFitSkipped(node, "회전된 이미지 레이어는 아직 지원하지 않습니다.");
+    }
+
+    if (
+      node.parent &&
+      "layoutMode" in node.parent &&
+      typeof node.parent.layoutMode === "string" &&
+      node.parent.layoutMode !== "NONE"
+    ) {
+      return buildBoundsFitSkipped(node, "오토 레이아웃 안의 이미지 레이어는 아직 지원하지 않습니다.");
+    }
+
+    if (!hasSimpleVisibleImagePaint(node)) {
+      return buildBoundsFitSkipped(node, "보이는 IMAGE fill 하나만 가진 이미지 레이어만 지원합니다.");
+    }
+
+    if (hasVisiblePaints(node.strokes)) {
+      return buildBoundsFitSkipped(node, "스트로크가 있는 이미지 레이어는 아직 지원하지 않습니다.");
+    }
+
+    if (hasVisibleEffects(node.effects)) {
+      return buildBoundsFitSkipped(node, "레이어 효과가 있는 이미지 레이어는 아직 지원하지 않습니다.");
+    }
+
+    const fills = getNodeFills(node);
+    const fillIndex = getPrimaryVisibleImageFillIndex(fills);
+    if (fillIndex < 0) {
+      return buildBoundsFitSkipped(node, "IMAGE fill을 찾지 못했습니다.");
+    }
+
+    const fill = fills[fillIndex];
+
+    const nodeWidth = typeof node.width === "number" && Number.isFinite(node.width) ? node.width : 0;
+    const nodeHeight = typeof node.height === "number" && Number.isFinite(node.height) ? node.height : 0;
+    if (!(nodeWidth > 0) || !(nodeHeight > 0)) {
+      return buildBoundsFitSkipped(node, "현재 레이어 크기를 계산할 수 없습니다.");
+    }
+
+    const image = fill.imageHash ? figma.getImageByHash(fill.imageHash) : null;
+    if (!image) {
+      return buildBoundsFitSkipped(node, "원본 이미지 데이터를 찾지 못했습니다.");
+    }
+
+    const size = await image.getSizeAsync();
+    const sourceWidth = size && typeof size.width === "number" ? size.width : 0;
+    const sourceHeight = size && typeof size.height === "number" ? size.height : 0;
+    if (!(sourceWidth > 0) || !(sourceHeight > 0)) {
+      return buildBoundsFitSkipped(node, "원본 이미지 크기를 읽지 못했습니다.");
+    }
+
+    const scaleMode = typeof fill.scaleMode === "string" ? fill.scaleMode : "FILL";
+    const fillRotation = typeof fill.rotation === "number" && Number.isFinite(fill.rotation) ? fill.rotation : 0;
+    const needsRenderedAnalysis =
+      scaleMode === "CROP" ||
+      scaleMode === "TILE" ||
+      !!fill.imageTransform ||
+      Math.abs(fillRotation) > 0.01 ||
+      !hasMatchingAspectRatio(nodeWidth, nodeHeight, sourceWidth, sourceHeight);
+
+    const bytes = needsRenderedAnalysis
+      ? await node.exportAsync({
+          format: "PNG",
+          useAbsoluteBounds: false,
+        })
+      : await image.getBytesAsync();
+    if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
+      return buildBoundsFitSkipped(
+        node,
+        needsRenderedAnalysis ? "현재 보이는 이미지 바이트를 읽지 못했습니다." : "원본 이미지 바이트를 읽지 못했습니다."
+      );
+    }
+
+    return {
+      target: {
+        nodeId: node.id,
+        nodeName: safeName(node),
+        analysisMode: needsRenderedAnalysis ? "rendered-node" : "source-image",
+        fillIndex: fillIndex,
+        originalHash: fill.imageHash,
+        sourceWidth: sourceWidth,
+        sourceHeight: sourceHeight,
+        fileName: buildFileName(
+          {
+            nodeName: safeName(node),
+            imageHash: fill.imageHash,
+          },
+          "png"
+        ),
+        mimeType: needsRenderedAnalysis ? "image/png" : detectImageMimeType(bytes),
+        bytes: bytes,
+      },
+    };
+  }
+
+  async function applyBoundsFitResultsToSelection(session, rawResults) {
+    const normalizedResults = normalizeBoundsFitResults(rawResults);
+    const resultByNodeId = {};
+    const skipped = Array.isArray(session.skipped) ? session.skipped.slice() : [];
+    let appliedCount = 0;
+    let unchangedCount = 0;
+
+    for (let index = 0; index < normalizedResults.length; index += 1) {
+      const entry = normalizedResults[index];
+      if (entry && entry.nodeId) {
+        resultByNodeId[entry.nodeId] = entry;
+      }
+    }
+
+    for (let index = 0; index < session.targets.length; index += 1) {
+      const target = session.targets[index];
+      const processed = resultByNodeId[target.nodeId];
+      if (!processed) {
+        skipped.push({
+          nodeId: target.nodeId,
+          nodeName: target.nodeName,
+          reason: "UI 분석 결과를 받지 못했습니다.",
+        });
+        continue;
+      }
+
+      if (processed.status === "unchanged") {
+        unchangedCount += 1;
+        continue;
+      }
+
+      if (processed.status !== "trimmed") {
+        skipped.push({
+          nodeId: target.nodeId,
+          nodeName: target.nodeName,
+          reason: processed.reason || "보이는 픽셀을 찾지 못했습니다.",
+        });
+        continue;
+      }
+
+      const node = await figma.getNodeByIdAsync(target.nodeId);
+      if (!node || node.removed) {
+        skipped.push({
+          nodeId: target.nodeId,
+          nodeName: target.nodeName,
+          reason: "레이어를 다시 찾지 못했습니다.",
+        });
+        continue;
+      }
+
+      if (!("resize" in node) || typeof node.resize !== "function") {
+        skipped.push({
+          nodeId: target.nodeId,
+          nodeName: safeName(node),
+          reason: "현재 레이어는 크기를 변경할 수 없습니다.",
+        });
+        continue;
+      }
+
+      const fills = getNodeFills(node);
+      if (!fills.length) {
+        skipped.push({
+          nodeId: target.nodeId,
+          nodeName: safeName(node),
+          reason: "IMAGE fill이 더 이상 없습니다.",
+        });
+        continue;
+      }
+
+      let targetIndex = -1;
+      if (target.fillIndex >= 0 && target.fillIndex < fills.length) {
+        const directFill = fills[target.fillIndex];
+        if (isImagePaint(directFill) && directFill.imageHash === target.originalHash) {
+          targetIndex = target.fillIndex;
+        }
+      }
+
+      if (targetIndex < 0) {
+        targetIndex = findVisibleImageFillIndexByHash(fills, target.originalHash);
+      }
+
+      if (targetIndex < 0) {
+        skipped.push({
+          nodeId: target.nodeId,
+          nodeName: safeName(node),
+          reason: "같은 원본 hash를 가진 IMAGE fill을 찾지 못했습니다.",
+        });
+        continue;
+      }
+
+      const currentWidth = typeof node.width === "number" && Number.isFinite(node.width) ? node.width : 0;
+      const currentHeight = typeof node.height === "number" && Number.isFinite(node.height) ? node.height : 0;
+      if (!(currentWidth > 0) || !(currentHeight > 0)) {
+        skipped.push({
+          nodeId: target.nodeId,
+          nodeName: safeName(node),
+          reason: "현재 레이어 크기를 계산할 수 없습니다.",
+        });
+        continue;
+      }
+
+      if (!hasMatchingAspectRatio(currentWidth, currentHeight, processed.sourceWidth, processed.sourceHeight)) {
+        skipped.push({
+          nodeId: target.nodeId,
+          nodeName: safeName(node),
+          reason: "실행 도중 레이어 비율이 바뀌어 적용을 건너뛰었습니다.",
+        });
+        continue;
+      }
+
+      const bytes = normalizeBytes(processed.bytes);
+      if (!bytes.length) {
+        skipped.push({
+          nodeId: target.nodeId,
+          nodeName: safeName(node),
+          reason: "잘라낸 이미지 바이트가 비어 있습니다.",
+        });
+        continue;
+      }
+
+      const cropWidth = Number(processed.cropWidth) || 0;
+      const cropHeight = Number(processed.cropHeight) || 0;
+      const cropX = Number(processed.cropX) || 0;
+      const cropY = Number(processed.cropY) || 0;
+      if (!(cropWidth > 0) || !(cropHeight > 0)) {
+        skipped.push({
+          nodeId: target.nodeId,
+          nodeName: safeName(node),
+          reason: "잘라낸 이미지 크기가 올바르지 않습니다.",
+        });
+        continue;
+      }
+
+      const scaleX = currentWidth / processed.sourceWidth;
+      const scaleY = currentHeight / processed.sourceHeight;
+      const nextWidth = Math.max(1, Math.round(cropWidth * scaleX * 1000) / 1000);
+      const nextHeight = Math.max(1, Math.round(cropHeight * scaleY * 1000) / 1000);
+      const shiftX = Math.round(cropX * scaleX * 1000) / 1000;
+      const shiftY = Math.round(cropY * scaleY * 1000) / 1000;
+
+      try {
+        const createdImage = figma.createImage(bytes);
+        const nextFills = fills.slice();
+        nextFills[targetIndex] =
+          target.analysisMode === "rendered-node"
+            ? cloneBoundsFitImagePaint(nextFills[targetIndex], createdImage.hash)
+            : cloneImagePaintWithHash(nextFills[targetIndex], createdImage.hash);
+        node.fills = nextFills;
+        applyBoundsFitGeometry(node, nextWidth, nextHeight, shiftX, shiftY);
+        appliedCount += 1;
+      } catch (error) {
+        skipped.push({
+          nodeId: target.nodeId,
+          nodeName: safeName(node),
+          reason: normalizeErrorMessage(error, "보이는 영역 맞추기를 적용하지 못했습니다."),
+        });
+      }
+    }
+
+    return {
+      processedAt: new Date().toISOString(),
+      summary: {
+        selectionLabel: session.selectionLabel,
+        requestedCount: session.requestedCount,
+        eligibleCount: session.targets.length,
+        appliedCount: appliedCount,
+        unchangedCount: unchangedCount,
+        skippedCount: skipped.length,
+      },
+      skipped: skipped.slice(0, 24),
+    };
+  }
+
+  function applyBoundsFitGeometry(node, width, height, shiftX, shiftY) {
+    if ("x" in node && typeof node.x === "number" && "y" in node && typeof node.y === "number") {
+      node.x = node.x + shiftX;
+      node.y = node.y + shiftY;
+    } else if ("relativeTransform" in node && Array.isArray(node.relativeTransform)) {
+      node.relativeTransform = [
+        [node.relativeTransform[0][0], node.relativeTransform[0][1], node.relativeTransform[0][2] + shiftX],
+        [node.relativeTransform[1][0], node.relativeTransform[1][1], node.relativeTransform[1][2] + shiftY],
+      ];
+    } else if (shiftX !== 0 || shiftY !== 0) {
+      throw new Error("현재 레이어 위치를 이동할 수 없습니다.");
+    }
+
+    node.resize(width, height);
+  }
+
+  function normalizeBoundsFitResults(value) {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value.map(function (entry) {
+      return {
+        nodeId: entry && typeof entry.nodeId === "string" ? entry.nodeId : "",
+        status: entry && typeof entry.status === "string" ? entry.status : "",
+        reason: entry && typeof entry.reason === "string" ? entry.reason : "",
+        sourceWidth: entry && Number(entry.sourceWidth) > 0 ? Number(entry.sourceWidth) : 0,
+        sourceHeight: entry && Number(entry.sourceHeight) > 0 ? Number(entry.sourceHeight) : 0,
+        cropX: entry && Number.isFinite(Number(entry.cropX)) ? Number(entry.cropX) : 0,
+        cropY: entry && Number.isFinite(Number(entry.cropY)) ? Number(entry.cropY) : 0,
+        cropWidth: entry && Number(entry.cropWidth) > 0 ? Number(entry.cropWidth) : 0,
+        cropHeight: entry && Number(entry.cropHeight) > 0 ? Number(entry.cropHeight) : 0,
+        bytes: normalizeBytes(entry && entry.bytes),
+      };
+    });
+  }
+
+  function buildBoundsFitSkipped(node, reason) {
+    return {
+      skipped: {
+        nodeId: node && typeof node.id === "string" ? node.id : "",
+        nodeName: safeName(node),
+        reason: reason,
+      },
+    };
+  }
+
+  function buildBoundsFitEmptySelectionMessage(skipped) {
+    if (Array.isArray(skipped) && skipped.length > 0) {
+      const first = skipped[0];
+      if (first && typeof first.reason === "string" && first.reason.trim()) {
+        return first.reason.trim();
+      }
+    }
+    return "보이는 영역에 맞출 수 있는 이미지 레이어를 찾지 못했습니다.";
+  }
+
+  function hasSimpleVisibleImagePaint(node) {
+    const fills = getNodeFills(node);
+    let visibleImageCount = 0;
+    let visibleOtherCount = 0;
+
+    for (let index = 0; index < fills.length; index += 1) {
+      const fill = fills[index];
+      if (!fill || fill.visible === false) {
+        continue;
+      }
+      if (fill.type === "IMAGE") {
+        visibleImageCount += 1;
+      } else {
+        visibleOtherCount += 1;
+      }
+    }
+
+    return visibleImageCount === 1 && visibleOtherCount === 0;
+  }
+
+  function getPrimaryVisibleImageFillIndex(fills) {
+    const fillIndices = getFillIndicesInUiOrder(fills);
+    for (let index = 0; index < fillIndices.length; index += 1) {
+      const fillIndex = fillIndices[index];
+      const fill = fills[fillIndex];
+      if (isImagePaint(fill) && fill.imageHash) {
+        return fillIndex;
+      }
+    }
+    return -1;
+  }
+
+  function findVisibleImageFillIndexByHash(fills, imageHash) {
+    const fillIndices = getFillIndicesInUiOrder(fills);
+    for (let index = 0; index < fillIndices.length; index += 1) {
+      const fillIndex = fillIndices[index];
+      const fill = fills[fillIndex];
+      if (isImagePaint(fill) && fill.imageHash === imageHash) {
+        return fillIndex;
+      }
+    }
+    return -1;
+  }
+
+  function hasVisiblePaints(paints) {
+    if (!Array.isArray(paints) || !paints.length) {
+      return false;
+    }
+
+    for (let index = 0; index < paints.length; index += 1) {
+      const paint = paints[index];
+      if (paint && paint.visible !== false) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  function hasVisibleEffects(effects) {
+    if (!Array.isArray(effects) || !effects.length) {
+      return false;
+    }
+
+    for (let index = 0; index < effects.length; index += 1) {
+      const effect = effects[index];
+      if (effect && effect.visible !== false) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  function hasMatchingAspectRatio(nodeWidth, nodeHeight, sourceWidth, sourceHeight) {
+    if (!(nodeWidth > 0) || !(nodeHeight > 0) || !(sourceWidth > 0) || !(sourceHeight > 0)) {
+      return false;
+    }
+
+    const nodeAspect = nodeWidth / nodeHeight;
+    const sourceAspect = sourceWidth / sourceHeight;
+    return Math.abs(nodeAspect - sourceAspect) <= 0.02;
+  }
+
+  function buildBoundsFitSessionId() {
+    return "image-bounds-fit-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+  }
+
+  function notifyBoundsFitResult(result, operationLabel) {
+    const summary = result && result.summary ? result.summary : {};
+    const appliedCount =
+      typeof summary.appliedCount === "number" && Number.isFinite(summary.appliedCount) ? summary.appliedCount : 0;
+    const unchangedCount =
+      typeof summary.unchangedCount === "number" && Number.isFinite(summary.unchangedCount) ? summary.unchangedCount : 0;
+    const skippedCount =
+      typeof summary.skippedCount === "number" && Number.isFinite(summary.skippedCount) ? summary.skippedCount : 0;
+    const label = operationLabel || "보이는 영역에 맞추기";
+
+    if (!appliedCount && unchangedCount > 0 && skippedCount === 0) {
+      figma.notify("선택한 이미지가 이미 보이는 영역에 맞습니다.", { timeout: 2200 });
+      return;
+    }
+
+    if (!appliedCount && skippedCount > 0) {
+      figma.notify(label + " 결과를 적용할 수 있는 이미지 레이어를 찾지 못했습니다.", { timeout: 2200 });
+      return;
+    }
+
+    let message = label + " 완료 (" + appliedCount + "개 적용";
+    if (unchangedCount > 0) {
+      message += " · " + unchangedCount + "개 유지";
+    }
+    if (skippedCount > 0) {
+      message += " · " + skippedCount + "개 건너뜀";
+    }
+    message += ")";
+    figma.notify(message, { timeout: 2600 });
+  }
+
+  function sanitizeClientRequestId(value) {
+    const requestId = typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
+    return requestId || "";
+  }
+
+  function toKoreanImageErrorMessage(value, fallback) {
+    const text = typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
+    if (!text) {
+      return fallback;
+    }
+
+    const provider = /openai/i.test(text) ? "OpenAI" : /gemini/i.test(text) ? "Gemini" : "AI";
+
+    if (/(401|403|permission|forbidden|unauthori|auth|api key|credential)/i.test(text)) {
+      return provider + " 이미지 요청 권한을 확인해 주세요.";
+    }
+
+    if (/(429|resource_exhausted|rate limit|quota|too many requests)/i.test(text)) {
+      return provider + " 이미지 요청이 많이 몰리거나 사용 한도에 도달했습니다. 잠시 후 다시 시도해 주세요.";
+    }
+
+    if (/(503|unavailable|high demand|overloaded|temporar|try again later|busy)/i.test(text)) {
+      return provider + " 이미지 요청이 일시적으로 몰려 잠시 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.";
+    }
+
+    if (/(400|invalid_argument|unsupported|mime|format|image|size)/i.test(text)) {
+      return provider + " 이미지 요청 형식이나 입력 이미지를 확인해 주세요.";
+    }
+
+    if (/(500|502|504|internal|backend|server)/i.test(text)) {
+      return provider + " 서버 처리 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.";
+    }
+
+    return text;
+  }
+
+  function normalizeBytes(value) {
+    if (value instanceof Uint8Array) {
+      return value;
+    }
+
+    if (value instanceof ArrayBuffer) {
+      return new Uint8Array(value);
+    }
+
+    if (typeof ArrayBuffer !== "undefined" && typeof ArrayBuffer.isView === "function" && ArrayBuffer.isView(value)) {
+      return new Uint8Array(value.buffer);
+    }
+
+    if (Array.isArray(value)) {
+      return new Uint8Array(value);
+    }
+
+    return new Uint8Array(0);
+  }
+
+  function isImagePaint(fill) {
+    return !!fill && fill.visible !== false && fill.type === "IMAGE";
+  }
+
+  function getFillIndicesInUiOrder(fills) {
+    const indices = [];
+    if (!Array.isArray(fills) || !fills.length) {
+      return indices;
+    }
+
+    // Reverse paint order so the Fill panel's top-most visible image wins first.
+    for (let fillIndex = fills.length - 1; fillIndex >= 0; fillIndex -= 1) {
+      indices.push(fillIndex);
+    }
+
+    return indices;
+  }
+
+  function getNodeFills(node) {
+    if (!node || !("fills" in node) || !Array.isArray(node.fills)) {
+      return [];
+    }
+
+    return node.fills;
+  }
+
+  function hasChildren(node) {
+    return !!node && "children" in node && Array.isArray(node.children) && node.children.length > 0;
+  }
+
+  function detectImageExtension(bytes) {
+    if (!bytes || typeof bytes.length !== "number" || bytes.length < 4) {
+      return "bin";
+    }
+
+    if (
+      bytes.length >= 8 &&
+      bytes[0] === 137 &&
+      bytes[1] === 80 &&
+      bytes[2] === 78 &&
+      bytes[3] === 71 &&
+      bytes[4] === 13 &&
+      bytes[5] === 10 &&
+      bytes[6] === 26 &&
+      bytes[7] === 10
+    ) {
+      return "png";
+    }
+
+    if (bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255) {
+      return "jpg";
+    }
+
+    if (bytes[0] === 71 && bytes[1] === 73 && bytes[2] === 70) {
+      return "gif";
+    }
+
+    if (
+      bytes.length >= 12 &&
+      bytes[0] === 82 &&
+      bytes[1] === 73 &&
+      bytes[2] === 70 &&
+      bytes[3] === 70 &&
+      bytes[8] === 87 &&
+      bytes[9] === 69 &&
+      bytes[10] === 66 &&
+      bytes[11] === 80
+    ) {
+      return "webp";
+    }
+
+    if (bytes[0] === 66 && bytes[1] === 77) {
+      return "bmp";
+    }
+
+    return "bin";
+  }
+
+  function detectImageMimeType(bytes) {
+    const extension = detectImageExtension(bytes);
+    if (extension === "png") {
+      return "image/png";
+    }
+    if (extension === "jpg") {
+      return "image/jpeg";
+    }
+    if (extension === "webp") {
+      return "image/webp";
+    }
+    if (extension === "gif") {
+      return "image/gif";
+    }
+    if (extension === "bmp") {
+      return "image/bmp";
+    }
+    return "application/octet-stream";
+  }
+
+  function buildFileName(entry, extension) {
+    const baseName = sanitizeFileName(entry && entry.nodeName ? entry.nodeName : "figma-image");
+    const hash = entry && typeof entry.imageHash === "string" ? entry.imageHash.slice(0, 8) : "image";
+    return baseName + "-" + hash + "." + extension;
+  }
+
+  function sanitizeFileName(value) {
+    const source = typeof value === "string" && value ? value : "figma-image";
+    const trimmed = source.replace(/[<>:"/\\|?*\u0000-\u001f]/g, " ").replace(/\s+/g, " ").trim();
+    return trimmed ? trimmed.slice(0, 80) : "figma-image";
+  }
+
+  function formatSelectionLabel(selection) {
+    if (!selection.length) {
+      return "선택 없음";
+    }
+
+    if (selection.length === 1) {
+      return safeName(selection[0]);
+    }
+
+    return safeName(selection[0]) + " 외 " + (selection.length - 1) + "개";
+  }
+
+  function buildSessionId() {
+    return "ai-image-upscale-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+  }
+
+  function safeName(node) {
+    if (node && typeof node.name === "string" && node.name.trim()) {
+      return node.name.trim();
+    }
+
+    if (node && typeof node.type === "string" && node.type.trim()) {
+      return node.type.trim();
+    }
+
+    return "Unnamed";
+  }
+
+  function normalizeErrorMessage(error, fallback) {
+    if (error && typeof error === "object" && typeof error.message === "string" && error.message.trim()) {
+      return toKoreanImageErrorMessage(error.message, fallback);
+    }
+
+    if (typeof error === "string" && error.trim()) {
+      return toKoreanImageErrorMessage(error, fallback);
     }
 
     return fallback;

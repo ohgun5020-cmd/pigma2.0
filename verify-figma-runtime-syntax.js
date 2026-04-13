@@ -20,6 +20,7 @@ const defaultFiles = [
   "ai-pixel-perfect.js",
   "delete-hidden-layers.js",
   "original-image-download.js",
+  "ai-image-upscale.js",
 ];
 
 const inputFiles = process.argv.slice(2);

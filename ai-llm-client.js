@@ -13,12 +13,14 @@
     enabled: false,
     provider: "openai",
     apiKey: "",
+    openAiApiKey: "",
+    geminiApiKey: "",
     proofingLocale: "",
     userDictionary: [],
     protectedTerms: [],
   });
   const DEFAULT_MODEL_BY_PROVIDER = Object.freeze({
-    openai: "gpt-5.4",
+    openai: "gpt-5-mini",
     gemini: "gemini-2.5-flash",
   });
   const pendingUiRequests = new Map();
@@ -60,15 +62,16 @@
 
   async function hasConfiguredAiAsync() {
     const settings = await getAiSettingsAsync();
-    return settings.enabled === true && settings.apiKey.length > 0;
+    const runInfo = getResolvedRunInfo(settings);
+    return settings.enabled === true && runInfo.apiKey.length > 0;
   }
 
   async function requestJsonTask(options) {
     const settings = await getAiSettingsAsync();
-    if (settings.enabled !== true || !settings.apiKey) {
+    const runInfo = getResolvedRunInfo(settings, options);
+    if (settings.enabled !== true || !runInfo.apiKey) {
       return null;
     }
-    const runInfo = getResolvedRunInfo(settings, options);
     const provider = runInfo.provider;
     const model = runInfo.model;
     const requestMeta = buildRequestMeta(options, runInfo);
@@ -80,7 +83,7 @@
       result = await requestJsonTaskViaUiBridge({
         provider,
         model,
-        apiKey: settings.apiKey,
+        apiKey: runInfo.apiKey,
         prompt,
         meta: requestMeta,
       });
@@ -161,7 +164,8 @@
         Object.prototype.hasOwnProperty.call(settingsOrOptions, "enabled"));
     const settings = hasSettingsShape ? settingsOrOptions : normalizeAiSettings(null);
     const options = hasSettingsShape ? maybeOptions : settingsOrOptions;
-    const provider = settings && settings.provider === "gemini" ? "gemini" : "openai";
+    const provider = resolveTextTaskProvider(settings);
+    const apiKey = getApiKeyForProvider(settings, provider);
     const model =
       options && typeof options.modelByProvider === "object" && options.modelByProvider && options.modelByProvider[provider]
         ? options.modelByProvider[provider]
@@ -169,6 +173,7 @@
 
     return {
       provider,
+      apiKey,
       model,
       providerProfile: buildProviderProfile("", provider, model, "", ""),
     };
@@ -176,15 +181,53 @@
 
   function normalizeAiSettings(value) {
     const source = value && typeof value === "object" ? value : {};
+    const legacyProvider = source.provider === "gemini" ? "gemini" : DEFAULT_AI_SETTINGS.provider;
+    const legacyApiKey = typeof source.apiKey === "string" ? sanitizeApiKey(source.apiKey) : DEFAULT_AI_SETTINGS.apiKey;
+    const openAiApiKey =
+      typeof source.openAiApiKey === "string"
+        ? sanitizeApiKey(source.openAiApiKey)
+        : legacyProvider === "openai"
+          ? legacyApiKey
+          : DEFAULT_AI_SETTINGS.openAiApiKey;
+    const geminiApiKey =
+      typeof source.geminiApiKey === "string"
+        ? sanitizeApiKey(source.geminiApiKey)
+        : legacyProvider === "gemini"
+          ? legacyApiKey
+          : DEFAULT_AI_SETTINGS.geminiApiKey;
+    const provider = resolveTextTaskProvider({
+      provider: legacyProvider,
+      openAiApiKey,
+      geminiApiKey,
+    });
+    const apiKey = getApiKeyForProvider({ openAiApiKey, geminiApiKey }, provider);
 
     return {
       enabled: source.enabled === true,
-      provider: source.provider === "gemini" ? "gemini" : DEFAULT_AI_SETTINGS.provider,
-      apiKey: typeof source.apiKey === "string" ? sanitizeApiKey(source.apiKey) : DEFAULT_AI_SETTINGS.apiKey,
+      provider,
+      apiKey,
+      openAiApiKey,
+      geminiApiKey,
       proofingLocale: normalizeProofingLocale(source.proofingLocale),
       userDictionary: normalizeTermList(source.userDictionary),
       protectedTerms: normalizeTermList(source.protectedTerms),
     };
+  }
+
+  function getApiKeyForProvider(settings, provider) {
+    const source = settings && typeof settings === "object" ? settings : {};
+    return provider === "gemini" ? sanitizeApiKey(source.geminiApiKey) : sanitizeApiKey(source.openAiApiKey);
+  }
+
+  function resolveTextTaskProvider(settings) {
+    const source = settings && typeof settings === "object" ? settings : {};
+    if (getApiKeyForProvider(source, "openai")) {
+      return "openai";
+    }
+    if (getApiKeyForProvider(source, "gemini")) {
+      return "gemini";
+    }
+    return source.provider === "gemini" ? "gemini" : "openai";
   }
 
   function buildPrompt(options, requestMeta) {

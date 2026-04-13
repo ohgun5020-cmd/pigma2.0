@@ -6,10 +6,11 @@
   // PIGMA_TEXT_IMPORT_GUARD::SOURCE_ID_MATCHING
   // PIGMA_TEXT_IMPORT_GUARD::SOURCE_ID_TAGGING
   const originalOnMessage = figma.ui.onmessage;
-  const DEFAULT_BATCH_FRAME_GAP = 100;
+  const DEFAULT_BATCH_FRAME_GAP = 10;
   const IMPORT_SOURCE_ID_KEY = "__pigmaImportSourceId";
   const IMPORT_SYNTHETIC_ROOT_KEY = "__pigmaSyntheticImportRoot";
   const IMPORT_POSTPROCESS_DEBUG = true;
+  const SVG_IMPORT_BATCH_ROOT_NAME = "SVG Import";
   let availableFontsPromise = null;
 
   if (typeof originalOnMessage !== "function") {
@@ -17,6 +18,10 @@
   }
 
   figma.ui.onmessage = async message => {
+    if (isSvgImportMessage(message)) {
+      return handleSvgImportMessage(message);
+    }
+
     if (!isImportMessage(message)) {
       return originalOnMessage(message);
     }
@@ -38,6 +43,132 @@
 
   function isImportMessage(message) {
     return !!message && (message.type === "request-import" || message.type === "request-import-batch");
+  }
+
+  function isSvgImportMessage(message) {
+    return !!message && (message.type === "request-svg-import" || message.type === "request-svg-import-batch");
+  }
+
+  async function handleSvgImportMessage(message) {
+    const batch = normalizeSvgImportBatch(message);
+    if (!batch || batch.items.length === 0) {
+      figma.notify("가져올 SVG 파일이 없습니다.", { error: true });
+      return;
+    }
+
+    const targetPage = await resolveSvgImportPage(batch);
+    if (targetPage !== figma.currentPage) {
+      await figma.setCurrentPageAsync(targetPage);
+    }
+
+    try {
+      const importedNodes = [];
+      for (const item of batch.items) {
+        importedNodes.push(await importSvgPayload(item));
+      }
+
+      layoutImportedSvgNodes(importedNodes, batch.gap, figma.viewport.center);
+      figma.currentPage.selection = importedNodes;
+      figma.viewport.scrollAndZoomIntoView(importedNodes);
+      figma.notify(
+        importedNodes.length > 1
+          ? `SVG ${importedNodes.length}개를 가져왔습니다.`
+          : "SVG를 가져왔습니다."
+      );
+    } catch (error) {
+      console.warn("[pigma-svg-import]", error);
+      figma.notify(getSvgImportErrorMessage(error), { error: true });
+    }
+  }
+
+  function normalizeSvgImportBatch(message) {
+    if (message && message.type === "request-svg-import" && message.payload) {
+      return {
+        placement: normalizeSvgPlacement(message.payload.placement),
+        gap: DEFAULT_BATCH_FRAME_GAP,
+        rootName: normalizeSvgName(message.payload.rootName || SVG_IMPORT_BATCH_ROOT_NAME),
+        items: [message.payload],
+      };
+    }
+
+    if (!message || message.type !== "request-svg-import-batch" || !message.batch) {
+      return null;
+    }
+
+    return {
+      placement: normalizeSvgPlacement(message.batch.placement),
+      gap: normalizeSvgGap(message.batch.gap),
+      rootName: normalizeSvgName(message.batch.rootName || SVG_IMPORT_BATCH_ROOT_NAME),
+      items: Array.isArray(message.batch.items) ? message.batch.items.filter(Boolean) : [],
+    };
+  }
+
+  function normalizeSvgPlacement(value) {
+    return value === "new-page" ? "new-page" : "current-page";
+  }
+
+  function normalizeSvgGap(value) {
+    return Number.isFinite(value) ? Math.max(0, Math.round(value)) : DEFAULT_BATCH_FRAME_GAP;
+  }
+
+  function normalizeSvgName(value) {
+    const normalized = typeof value === "string" ? value.trim() : "";
+    return normalized.length > 0 ? normalized : SVG_IMPORT_BATCH_ROOT_NAME;
+  }
+
+  async function resolveSvgImportPage(batch) {
+    if (!batch || batch.placement !== "new-page") {
+      return figma.currentPage;
+    }
+
+    const page = figma.createPage();
+    page.name = batch.rootName;
+    return page;
+  }
+
+  async function importSvgPayload(payload) {
+    const svgText = payload && typeof payload.svgText === "string" ? payload.svgText.trim() : "";
+    if (!svgText) {
+      const fileLabel = payload && typeof payload.fileName === "string" && payload.fileName.trim().length > 0
+        ? payload.fileName.trim()
+        : "SVG";
+      throw new Error(`${fileLabel} 파일 내용이 비어 있습니다.`);
+    }
+
+    const importedNode = figma.createNodeFromSvg(svgText);
+    importedNode.name = normalizeSvgName(payload.rootName || payload.fileName || SVG_IMPORT_BATCH_ROOT_NAME);
+    return importedNode;
+  }
+
+  function layoutImportedSvgNodes(nodes, gap, center) {
+    if (!Array.isArray(nodes) || nodes.length === 0) {
+      return;
+    }
+
+    const resolvedGap = normalizeSvgGap(gap);
+    const totalHeight =
+      nodes.reduce((sum, node) => sum + Math.max(1, roundNumber(node.height)), 0) +
+      Math.max(0, nodes.length - 1) * resolvedGap;
+    const maxWidth = nodes.reduce((max, node) => Math.max(max, Math.max(1, roundNumber(node.width))), 1);
+    const centerX = center && Number.isFinite(center.x) ? center.x : 0;
+    const centerY = center && Number.isFinite(center.y) ? center.y : 0;
+    const startX = roundNumber(centerX - maxWidth / 2);
+    let cursorY = roundNumber(centerY - totalHeight / 2);
+
+    for (const node of nodes) {
+      const nodeWidth = Math.max(1, roundNumber(node.width));
+      node.x = roundNumber(startX + (maxWidth - nodeWidth) / 2);
+      node.y = cursorY;
+      cursorY += Math.max(1, roundNumber(node.height)) + resolvedGap;
+    }
+  }
+
+  function getSvgImportErrorMessage(error) {
+    if (error instanceof Error && typeof error.message === "string" && error.message.trim().length > 0) {
+      return `SVG 가져오기에 실패했습니다. ${error.message.trim()}`;
+    }
+
+    return "SVG 가져오기에 실패했습니다.";
   }
 
   async function prepareImportPayload(message) {

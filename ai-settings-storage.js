@@ -8,6 +8,8 @@
     enabled: false,
     provider: "openai",
     apiKey: "",
+    openAiApiKey: "",
+    geminiApiKey: "",
     proofingLocale: "",
     userDictionary: [],
     protectedTerms: []
@@ -67,11 +69,29 @@
 
   function normalizeAiSettings(value) {
     const source = value && typeof value === "object" ? value : {};
+    const legacyProvider = source.provider === "gemini" ? "gemini" : DEFAULT_AI_SETTINGS.provider;
+    const legacyApiKey = typeof source.apiKey === "string" ? sanitizeApiKey(source.apiKey) : DEFAULT_AI_SETTINGS.apiKey;
+    const openAiApiKey =
+      typeof source.openAiApiKey === "string"
+        ? sanitizeApiKey(source.openAiApiKey)
+        : legacyProvider === "openai"
+          ? legacyApiKey
+          : DEFAULT_AI_SETTINGS.openAiApiKey;
+    const geminiApiKey =
+      typeof source.geminiApiKey === "string"
+        ? sanitizeApiKey(source.geminiApiKey)
+        : legacyProvider === "gemini"
+          ? legacyApiKey
+          : DEFAULT_AI_SETTINGS.geminiApiKey;
+    const provider = openAiApiKey ? "openai" : geminiApiKey ? "gemini" : legacyProvider;
+    const apiKey = provider === "gemini" ? geminiApiKey : openAiApiKey;
 
     return {
       enabled: source.enabled === true,
-      provider: source.provider === "gemini" ? "gemini" : DEFAULT_AI_SETTINGS.provider,
-      apiKey: typeof source.apiKey === "string" ? sanitizeApiKey(source.apiKey) : DEFAULT_AI_SETTINGS.apiKey,
+      provider,
+      apiKey,
+      openAiApiKey,
+      geminiApiKey,
       proofingLocale: normalizeProofingLocale(source.proofingLocale),
       userDictionary: normalizeTermList(source.userDictionary),
       protectedTerms: normalizeTermList(source.protectedTerms)
