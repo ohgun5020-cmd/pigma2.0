@@ -128,16 +128,897 @@
 
   async function importSvgPayload(payload) {
     const svgText = payload && typeof payload.svgText === "string" ? payload.svgText.trim() : "";
-    if (!svgText) {
+    const svgTextFallback =
+      payload && typeof payload.svgTextFallback === "string" ? payload.svgTextFallback.trim() : "";
+    const hasBitmapBackground = getByteLength(payload && payload.backgroundPngBytes) > 0;
+    if (!svgText && !hasBitmapBackground) {
       const fileLabel = payload && typeof payload.fileName === "string" && payload.fileName.trim().length > 0
         ? payload.fileName.trim()
         : "SVG";
       throw new Error(`${fileLabel} 파일 내용이 비어 있습니다.`);
     }
 
-    const importedNode = figma.createNodeFromSvg(svgText);
+    const importedNode = hasBitmapBackground
+      ? createBitmapSvgImportNode(payload)
+      : figma.createNodeFromSvg(svgText);
     importedNode.name = normalizeSvgName(payload.rootName || payload.fileName || SVG_IMPORT_BATCH_ROOT_NAME);
+    let textImportResult = null;
+    try {
+      textImportResult = await appendEditableTextRuns(importedNode, payload);
+    } catch (error) {
+      console.warn("[pigma-svg-import] failed to append editable text runs", error);
+    }
+    if (
+      textImportResult &&
+      textImportResult.requestedCount > 0 &&
+      textImportResult.createdCount === 0 &&
+      svgTextFallback &&
+      svgTextFallback !== svgText
+    ) {
+      return replaceSvgImportWithFallback(importedNode, svgTextFallback);
+    }
     return importedNode;
+  }
+
+  function createBitmapSvgImportNode(payload) {
+    const frame = figma.createFrame();
+    const width = Math.max(1, roundNumber(payload && payload.documentWidth));
+    const height = Math.max(1, roundNumber(payload && payload.documentHeight));
+    frame.name = normalizeSvgName(payload && (payload.rootName || payload.fileName) || SVG_IMPORT_BATCH_ROOT_NAME);
+    frame.resize(width, height);
+    frame.clipsContent = true;
+    frame.strokes = [];
+    frame.fills = [];
+
+    const background = figma.createRectangle();
+    background.name = "Background PNG";
+    background.resize(width, height);
+    background.x = 0;
+    background.y = 0;
+    background.strokes = [];
+    background.fills = [createBitmapFillFromBytes(payload.backgroundPngBytes)];
+    frame.appendChild(background);
+
+    return frame;
+  }
+
+  function createBitmapFillFromBytes(bytes) {
+    const normalizedBytes = normalizeImageBytes(bytes);
+    const image = figma.createImage(normalizedBytes);
+    return {
+      type: "IMAGE",
+      imageHash: image.hash,
+      scaleMode: "FILL",
+      visible: true,
+      opacity: 1,
+    };
+  }
+
+  function normalizeImageBytes(bytes) {
+    if (bytes instanceof Uint8Array) {
+      return bytes;
+    }
+    if (bytes instanceof ArrayBuffer) {
+      return new Uint8Array(bytes);
+    }
+    if (ArrayBuffer.isView(bytes)) {
+      return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    }
+    throw new Error("The bitmap import payload did not include valid image bytes.");
+  }
+
+  async function appendEditableTextRuns(importedNode, payload) {
+    const textRuns = getEditableTextRunsFromPayload(payload);
+    if (textRuns.length === 0 || !importedNode || typeof importedNode.appendChild !== "function") {
+      return {
+        requestedCount: textRuns.length,
+        createdCount: 0,
+      };
+    }
+
+    const overlay = createEditableTextOverlay(importedNode);
+    if (!overlay) {
+      return {
+        requestedCount: textRuns.length,
+        createdCount: 0,
+      };
+    }
+
+    const availableFonts = await getAvailableFontsSafely();
+    let createdCount = 0;
+    let visibleCount = 0;
+    for (const run of textRuns) {
+      let textNode = null;
+      try {
+        textNode = await createEditableTextNode(run, availableFonts);
+      } catch (error) {
+        console.warn("[pigma-svg-import] failed to create one editable text node", error, run);
+        continue;
+      }
+      if (!textNode) {
+        continue;
+      }
+
+      overlay.appendChild(textNode);
+      textNode.x = normalizeEditableTextCoordinate(run.x);
+      textNode.y = resolveEditableTextTopCoordinate(run, textNode);
+      createdCount += 1;
+      if (isRenderableEditableTextNode(textNode)) {
+        visibleCount += 1;
+      }
+    }
+
+    if (visibleCount === 0) {
+      overlay.remove();
+      return {
+        requestedCount: textRuns.length,
+        createdCount: visibleCount,
+      };
+    }
+
+    overlay.name = `Editable Text (${visibleCount}/${textRuns.length})`;
+    setSceneNodeExpanded(overlay, true);
+    return {
+      requestedCount: textRuns.length,
+      createdCount: visibleCount,
+    };
+  }
+
+  function replaceSvgImportWithFallback(importedNode, svgTextFallback) {
+    if (!importedNode || typeof importedNode.remove !== "function") {
+      return figma.createNodeFromSvg(svgTextFallback);
+    }
+
+    const parent = importedNode.parent;
+    const index =
+      parent && Array.isArray(parent.children) ? parent.children.indexOf(importedNode) : -1;
+    const fallbackNode = figma.createNodeFromSvg(svgTextFallback);
+    fallbackNode.name = importedNode.name;
+    fallbackNode.x = importedNode.x;
+    fallbackNode.y = importedNode.y;
+
+    importedNode.remove();
+
+    if (parent && typeof parent.insertChild === "function") {
+      try {
+        parent.insertChild(index >= 0 ? index : parent.children.length, fallbackNode);
+      } catch (error) {
+        console.warn("[pigma-svg-import] failed to preserve fallback node order", error);
+      }
+    }
+
+    return fallbackNode;
+  }
+
+  function getEditableTextRunsFromPayload(payload) {
+    if (!payload || !Array.isArray(payload.editableTextRuns)) {
+      return [];
+    }
+
+    return payload.editableTextRuns.filter(run => {
+      return !!run && typeof run.characters === "string" && run.characters.trim().length > 0;
+    });
+  }
+
+  function createEditableTextOverlay(importedNode) {
+    if (!importedNode || typeof importedNode.appendChild !== "function") {
+      return null;
+    }
+
+    const overlay = figma.createFrame();
+    overlay.name = "Editable Text";
+    overlay.resize(
+      Math.max(1, roundNumber(importedNode.width)),
+      Math.max(1, roundNumber(importedNode.height))
+    );
+    overlay.x = 0;
+    overlay.y = 0;
+    overlay.clipsContent = false;
+    overlay.fills = [];
+    overlay.strokes = [];
+    importedNode.appendChild(overlay);
+    return overlay;
+  }
+
+  async function createEditableTextNode(run, availableFonts) {
+    const characters = normalizeEditableTextCharacters(run && run.characters);
+    if (!characters) {
+      return null;
+    }
+
+    const fontName = await loadEditableTextFont(run, availableFonts);
+    if (!fontName) {
+      return null;
+    }
+
+    const textNode = figma.createText();
+    textNode.fontName = fontName;
+    textNode.fontSize = normalizeEditableTextFontSize(run);
+    textNode.characters = characters;
+    applyEditableTextLineHeight(textNode, run);
+    applyEditableTextLetterSpacing(textNode, run);
+    fitEditableTextFontSizeToRun(textNode, run, characters);
+    applyEditableTextLineHeight(textNode, run);
+    applyEditableTextSizing(textNode, run, characters);
+    textNode.name = buildEditableTextLayerName(characters);
+
+    const fillPaint = createEditableTextPaint(run);
+    if (fillPaint) {
+      textNode.fills = [fillPaint];
+    } else {
+      textNode.fills = [createSolidPaintFromColor("000000", 1)];
+    }
+
+    const rotation = normalizeEditableTextRotation(run && run.rotation);
+    if (rotation !== 0) {
+      textNode.rotation = rotation;
+    }
+
+    return textNode;
+  }
+
+  function applyEditableTextLetterSpacing(textNode, run) {
+    if (!textNode || !("letterSpacing" in textNode)) {
+      return 0;
+    }
+
+    const letterSpacing = Number(run && run.letterSpacing);
+    if (!Number.isFinite(letterSpacing)) {
+      return 0;
+    }
+
+    const normalizedLetterSpacing = Math.round(letterSpacing * 1000) / 1000;
+    textNode.letterSpacing = {
+      unit: "PIXELS",
+      value: normalizedLetterSpacing,
+    };
+    return normalizedLetterSpacing;
+  }
+
+  function applyEditableTextLineHeight(textNode, run) {
+    if (!textNode || !("lineHeight" in textNode)) {
+      return;
+    }
+
+    const resolvedLineHeight = normalizeEditableTextLineHeight(run, textNode.fontSize);
+    if (!Number.isFinite(resolvedLineHeight) || resolvedLineHeight <= 0) {
+      return;
+    }
+
+    textNode.lineHeight = {
+      unit: "PIXELS",
+      value: resolvedLineHeight,
+    };
+  }
+
+  function fitEditableTextFontSizeToRun(textNode, run, characters) {
+    if (!textNode || typeof textNode.fontSize !== "number") {
+      return;
+    }
+
+    const currentFontSize = Number(textNode.fontSize);
+    const measuredWidth = Number(textNode.width) || 0;
+    const measuredHeight = Number(textNode.height) || 0;
+    const targetWidth = Number(run && run.width);
+    const targetHeight = Number(run && run.height);
+    if (!Number.isFinite(currentFontSize) || currentFontSize <= 0 || measuredWidth <= 0 || measuredHeight <= 0) {
+      return;
+    }
+
+    const ratios = [];
+    if (Number.isFinite(targetHeight) && targetHeight > 0.5) {
+      ratios.push(clampEditableTextScale(targetHeight / measuredHeight, 0.82, 1.24));
+    }
+
+    const hasLineBreak = typeof characters === "string" && /[\r\n]/.test(characters);
+    if (!hasLineBreak && Number.isFinite(targetWidth) && targetWidth > 0.5) {
+      const widthRatio = targetWidth / measuredWidth;
+      if (Math.abs(widthRatio - 1) >= 0.02) {
+        ratios.push(clampEditableTextScale(widthRatio, 0.86, 1.16));
+      }
+    }
+
+    if (ratios.length === 0) {
+      return;
+    }
+
+    let selectedRatio = ratios[0];
+    if (ratios.length > 1) {
+      const smallestRatio = Math.min(...ratios);
+      const averageRatio = ratios.reduce((sum, ratio) => sum + ratio, 0) / ratios.length;
+      selectedRatio = smallestRatio < 1 ? smallestRatio : averageRatio;
+    }
+
+    if (!Number.isFinite(selectedRatio) || Math.abs(selectedRatio - 1) < 0.02) {
+      return;
+    }
+
+    const adjustedFontSize = Math.max(1, roundNumber(currentFontSize * selectedRatio));
+    if (Math.abs(adjustedFontSize - currentFontSize) < 0.1) {
+      return;
+    }
+
+    textNode.fontSize = adjustedFontSize;
+  }
+
+  function applyEditableTextSizing(textNode, run, characters) {
+    if (!textNode) {
+      return;
+    }
+
+    const requestedFontSize = normalizeEditableTextFontSize(run);
+    const measuredWidth = Number(textNode.width) || 0;
+    const measuredHeight = Number(textNode.height) || 0;
+    const fallbackWidth = requestedFontSize * Math.max(1, String(characters || "").length * 0.55);
+    const targetWidth = Math.max(
+      1,
+      roundNumber(Number(run && run.width) || 0),
+      roundNumber(measuredWidth),
+      roundNumber(fallbackWidth)
+    );
+    const targetHeight = Math.max(
+      1,
+      roundNumber(Number(run && run.height) || 0),
+      roundNumber(measuredHeight),
+      roundNumber(requestedFontSize * 1.2)
+    );
+
+    try {
+      if ("textAutoResize" in textNode) {
+        textNode.textAutoResize = "NONE";
+      }
+      if (typeof textNode.resize === "function") {
+        textNode.resize(targetWidth, targetHeight);
+      }
+    } catch (error) {
+      console.warn("[pigma-svg-import] failed to apply explicit text sizing", error);
+      if ("textAutoResize" in textNode) {
+        textNode.textAutoResize = "WIDTH_AND_HEIGHT";
+      }
+    }
+  }
+
+  function isRenderableEditableTextNode(textNode) {
+    if (!textNode) {
+      return false;
+    }
+
+    return (
+      Number.isFinite(textNode.width) &&
+      Number.isFinite(textNode.height) &&
+      Number(textNode.width) > 0.5 &&
+      Number(textNode.height) > 0.5 &&
+      typeof textNode.characters === "string" &&
+      textNode.characters.trim().length > 0
+    );
+  }
+
+  function normalizeEditableTextCharacters(value) {
+    if (typeof value !== "string") {
+      return "";
+    }
+
+    return value.replace(/\u0000/g, "").replace(/\r\n?/g, "\n");
+  }
+
+  function buildEditableTextLayerName(characters) {
+    const normalized = String(characters).replace(/\s+/g, " ").trim();
+    if (normalized.length === 0) {
+      return "Editable Text";
+    }
+
+    return normalized.length > 48 ? normalized.slice(0, 48) : normalized;
+  }
+
+  function normalizeEditableTextCoordinate(value) {
+    return Number.isFinite(value) ? Math.round(Number(value) * 1000) / 1000 : 0;
+  }
+
+  function resolveEditableTextTopCoordinate(run, textNode) {
+    const requestedTop = normalizeEditableTextCoordinate(run && run.y);
+    if (!textNode) {
+      return requestedTop;
+    }
+
+    const requestedHeight = Number(run && run.height);
+    const measuredHeight = Number(textNode.height);
+    if (!Number.isFinite(requestedHeight) || requestedHeight <= 0 || !Number.isFinite(measuredHeight) || measuredHeight <= 0) {
+      return requestedTop;
+    }
+
+    const topShare = resolveEditableTextTopShare(run);
+    return normalizeEditableTextCoordinate(requestedTop + (requestedHeight - measuredHeight) * topShare);
+  }
+
+  function resolveEditableTextTopShare(run) {
+    const ascentRatio = Number(run && run.ascentRatio);
+    const descentRatio = Number(run && run.descentRatio);
+    if (Number.isFinite(ascentRatio) && ascentRatio > 0 && Number.isFinite(descentRatio) && descentRatio >= 0) {
+      const total = ascentRatio + descentRatio;
+      if (total > 0.01) {
+        return clampEditableTextScale(ascentRatio / total, 0.45, 0.92);
+      }
+    }
+
+    return 0.8;
+  }
+
+  function normalizeEditableTextFontSize(run) {
+    const primarySize = run && Number(run.fontSize);
+    if (Number.isFinite(primarySize) && primarySize > 0.1) {
+      return Math.max(1, Math.round(primarySize * 1000) / 1000);
+    }
+
+    const nominalSize = run && Number(run.nominalFontSize);
+    if (Number.isFinite(nominalSize) && nominalSize > 0.1) {
+      return Math.max(1, Math.round(nominalSize * 1000) / 1000);
+    }
+
+    const fallbackSize = run && Number(run.height);
+    if (Number.isFinite(fallbackSize) && fallbackSize > 0.1) {
+      return Math.max(1, Math.round(fallbackSize * 0.92 * 1000) / 1000);
+    }
+
+    return 12;
+  }
+
+  function normalizeEditableTextLineHeight(run, currentFontSize) {
+    const explicitLineHeight = run && Number(run.lineHeight);
+    if (Number.isFinite(explicitLineHeight) && explicitLineHeight > 0.1) {
+      return Math.max(1, Math.round(explicitLineHeight * 1000) / 1000);
+    }
+
+    const lineHeightRatio = run && Number(run.lineHeightRatio);
+    const fontSize = Number(currentFontSize);
+    if (Number.isFinite(lineHeightRatio) && lineHeightRatio > 0.1 && Number.isFinite(fontSize) && fontSize > 0.1) {
+      return Math.max(1, Math.round(fontSize * lineHeightRatio * 1000) / 1000);
+    }
+
+    return NaN;
+  }
+
+  function normalizeEditableTextRotation(value) {
+    return Number.isFinite(value) ? Math.round(Number(value) * 1000) / 1000 : 0;
+  }
+
+  function clampEditableTextScale(value, min, max) {
+    if (!Number.isFinite(value)) {
+      return 1;
+    }
+
+    return Math.max(min, Math.min(max, Number(value)));
+  }
+
+  function createEditableTextPaint(run) {
+    if (!run || typeof run.fillColor !== "string") {
+      return null;
+    }
+
+    return createSolidPaintFromColor(run.fillColor, run.fillOpacity);
+  }
+
+  function createSolidPaintFromColor(value, opacityValue) {
+    const normalized = typeof value === "string" ? value.trim() : "";
+    if (!normalized) {
+      return null;
+    }
+
+    const hexMatch = normalized.match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i);
+    let fullHex = "";
+    if (hexMatch) {
+      const compactHex = hexMatch[1];
+      fullHex =
+        compactHex.length === 3
+          ? compactHex[0] + compactHex[0] + compactHex[1] + compactHex[1] + compactHex[2] + compactHex[2]
+          : compactHex;
+    } else {
+      const rgbMatch = normalized.match(
+        /^rgba?\(\s*([0-9.]+)\s*,\s*([0-9.]+)\s*,\s*([0-9.]+)(?:\s*,\s*[0-9.]+\s*)?\)$/i
+      );
+      if (!rgbMatch) {
+        return null;
+      }
+
+      fullHex = rgbMatch
+        .slice(1, 4)
+        .map(channel => Math.max(0, Math.min(255, Math.round(Number(channel) || 0))).toString(16).padStart(2, "0"))
+        .join("");
+    }
+
+    const red = Number.parseInt(fullHex.slice(0, 2), 16);
+    const green = Number.parseInt(fullHex.slice(2, 4), 16);
+    const blue = Number.parseInt(fullHex.slice(4, 6), 16);
+    if (!Number.isFinite(red) || !Number.isFinite(green) || !Number.isFinite(blue)) {
+      return null;
+    }
+
+    const paint = {
+      type: "SOLID",
+      color: {
+        r: red / 255,
+        g: green / 255,
+        b: blue / 255
+      }
+    };
+    if (Number.isFinite(opacityValue) && opacityValue >= 0 && opacityValue < 1) {
+      paint.opacity = Math.max(0, Math.min(1, Number(opacityValue)));
+    }
+    return paint;
+  }
+
+  async function loadEditableTextFont(run, availableFonts) {
+    const candidates = getEditableTextFontCandidates(run, availableFonts);
+    for (const fontName of candidates) {
+      try {
+        await figma.loadFontAsync(fontName);
+        return fontName;
+      } catch (error) {
+        console.warn("[pigma-svg-import] failed to load font", fontName, error);
+      }
+    }
+
+    return null;
+  }
+
+  function getEditableTextFontCandidates(run, availableFonts) {
+    const candidates = [];
+    const requestedStyle = getRequestedEditableFontStyle(run);
+    const requestedFamilies = getRequestedEditableFontFamilies(run);
+
+    for (const requestedFamily of requestedFamilies) {
+      const splitRequest = splitRequestedEditableFontFamily(requestedFamily);
+
+      pushDirectFontNameCandidate(candidates, requestedFamily, requestedStyle);
+      pushFontNameCandidate(candidates, findExactFontMatch({
+        fontFamily: requestedFamily,
+        fontStyle: requestedStyle
+      }, availableFonts));
+
+      if (splitRequest.family && splitRequest.family !== requestedFamily) {
+        pushDirectFontNameCandidate(candidates, splitRequest.family, requestedStyle);
+        pushFontNameCandidate(candidates, findExactFontMatch({
+          fontFamily: splitRequest.family,
+          fontStyle: requestedStyle
+        }, availableFonts));
+        if (splitRequest.style) {
+          pushDirectFontNameCandidate(candidates, splitRequest.family, splitRequest.style);
+          pushFontNameCandidate(candidates, findExactFontMatch({
+            fontFamily: splitRequest.family,
+            fontStyle: splitRequest.style
+          }, availableFonts));
+        }
+      }
+
+      pushFontNameCandidate(candidates, findFamilyFontMatch(requestedFamily, run, availableFonts));
+      if (splitRequest.family && splitRequest.family !== requestedFamily) {
+        pushFontNameCandidate(candidates, findFamilyFontMatch(splitRequest.family, run, availableFonts));
+      }
+    }
+
+    pushKnownEditableFontFallbacks(candidates, run);
+    pushFontNameCandidate(candidates, findFallbackFontName(availableFonts));
+    return candidates;
+  }
+
+  function pushDirectFontNameCandidate(candidates, family, style) {
+    const normalizedFamily = cleanupEditableFontFamily(family);
+    if (!normalizedFamily) {
+      return;
+    }
+
+    pushFontNameCandidate(candidates, {
+      family: normalizedFamily,
+      style: normalizeEditableFontStyle(style) || "Regular"
+    });
+  }
+
+  function pushKnownEditableFontFallbacks(candidates, run) {
+    const styleCandidates = buildEditableFontStyleCandidates(run);
+    const families = [
+      "LGEIText",
+      "Malgun Gothic",
+      "Apple SD Gothic Neo",
+      "Noto Sans KR",
+      "Noto Sans CJK KR",
+      "Arial",
+      "Inter",
+      "Roboto"
+    ];
+
+    for (const family of families) {
+      for (const style of styleCandidates) {
+        pushDirectFontNameCandidate(candidates, family, style);
+      }
+    }
+  }
+
+  function getRequestedEditableFontFamily(run) {
+    const preferred = cleanupEditableFontFamily(run && run.fontFamily);
+    return preferred || "Arial";
+  }
+
+  function getRequestedEditableFontFamilies(run) {
+    const families = [];
+    pushRequestedEditableFontFamily(families, run && run.fontFamily);
+    pushRequestedEditableFontFamily(families, run && run.fontFamilyRaw);
+    if (families.length === 0) {
+      families.push("Arial");
+    }
+    return families;
+  }
+
+  function pushRequestedEditableFontFamily(families, value) {
+    const normalized = cleanupEditableFontFamily(value);
+    if (!normalized || families.indexOf(normalized) !== -1) {
+      return;
+    }
+
+    families.push(normalized);
+  }
+
+  function getRequestedEditableFontStyle(run) {
+    const preferred = normalizeEditableFontStyle(run && run.fontStyle);
+    return preferred || "Regular";
+  }
+
+  function cleanupEditableFontFamily(value) {
+    if (typeof value !== "string") {
+      return "";
+    }
+
+    return value
+      .trim()
+      .replace(/^["']+|["']+$/g, "")
+      .replace(/(?:PS)?MT$/i, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function normalizeEditableFontStyle(value) {
+    const normalized = typeof value === "string" ? value.replace(/[_-]+/g, " ").trim().toLowerCase() : "";
+    if (!normalized) {
+      return "";
+    }
+
+    if (
+      (normalized.indexOf("bold") !== -1 && normalized.indexOf("italic") !== -1) ||
+      (normalized.indexOf("bold") !== -1 && normalized.indexOf("oblique") !== -1)
+    ) {
+      return "Bold Italic";
+    }
+    if (
+      (normalized.indexOf("semi") !== -1 || normalized.indexOf("demi") !== -1) &&
+      normalized.indexOf("bold") !== -1
+    ) {
+      return "Semi Bold";
+    }
+    if (
+      (normalized.indexOf("extra") !== -1 || normalized.indexOf("ultra") !== -1) &&
+      normalized.indexOf("bold") !== -1
+    ) {
+      return "Extra Bold";
+    }
+    if (normalized.indexOf("bold") !== -1) {
+      return "Bold";
+    }
+    if (normalized.indexOf("medium") !== -1) {
+      return "Medium";
+    }
+    if (normalized.indexOf("light") !== -1) {
+      return "Light";
+    }
+    if (normalized.indexOf("thin") !== -1) {
+      return "Thin";
+    }
+    if (normalized.indexOf("black") !== -1 || normalized.indexOf("heavy") !== -1) {
+      return "Black";
+    }
+    if (normalized.indexOf("italic") !== -1 || normalized.indexOf("oblique") !== -1) {
+      return "Italic";
+    }
+    if (normalized.indexOf("book") !== -1) {
+      return "Book";
+    }
+    if (normalized.indexOf("roman") !== -1 || normalized.indexOf("regular") !== -1) {
+      return "Regular";
+    }
+
+    return "";
+  }
+
+  function splitRequestedEditableFontFamily(value) {
+    const normalized = cleanupEditableFontFamily(value);
+    if (!normalized) {
+      return { family: "", style: "" };
+    }
+
+    const styleMatch = normalized.match(
+      /(?:^|[-\s])(bold[\s-]*italic|italic[\s-]*bold|semi[\s-]*bold|demi[\s-]*bold|extra[\s-]*bold|ultra[\s-]*bold|bold|medium|light|thin|black|heavy|italic|oblique|regular|roman|book)$/i
+    );
+    const rawStyle = styleMatch ? styleMatch[1] : "";
+    const family = cleanupEditableFontFamily(
+      styleMatch ? normalized.slice(0, styleMatch.index).replace(/[-\s]+$/, "") : normalized
+    );
+    return {
+      family: family || normalized,
+      style: normalizeEditableFontStyle(rawStyle)
+    };
+  }
+
+  function buildEditableFontStyleCandidates(run) {
+    const candidates = [];
+    const requestedStyle = getRequestedEditableFontStyle(run);
+    const weight = Number(run && run.fontWeight);
+    const normalizedWeight = Number.isFinite(weight) ? weight : 400;
+
+    pushEditableFontStyleCandidate(candidates, requestedStyle);
+    if (requestedStyle === "Bold Italic") {
+      pushEditableFontStyleCandidate(candidates, "Italic");
+      pushEditableFontStyleCandidate(candidates, "Bold");
+    } else if (requestedStyle === "Italic") {
+      pushEditableFontStyleCandidate(candidates, "Regular");
+    }
+
+    if (normalizedWeight >= 800) {
+      pushEditableFontStyleCandidate(candidates, "Black");
+      pushEditableFontStyleCandidate(candidates, "Extra Bold");
+    }
+    if (normalizedWeight >= 700) {
+      pushEditableFontStyleCandidate(candidates, "Bold");
+    } else if (normalizedWeight >= 600) {
+      pushEditableFontStyleCandidate(candidates, "Semi Bold");
+    } else if (normalizedWeight >= 500) {
+      pushEditableFontStyleCandidate(candidates, "Medium");
+    } else if (normalizedWeight <= 300) {
+      pushEditableFontStyleCandidate(candidates, "Light");
+    }
+
+    pushEditableFontStyleCandidate(candidates, "Regular");
+    pushEditableFontStyleCandidate(candidates, "Book");
+    pushEditableFontStyleCandidate(candidates, "Roman");
+    return candidates;
+  }
+
+  function pushEditableFontStyleCandidate(candidates, value) {
+    const normalized = normalizeEditableFontStyle(value);
+    if (!normalized) {
+      return;
+    }
+
+    for (const existing of candidates) {
+      if (normalizeFontToken(existing) === normalizeFontToken(normalized)) {
+        return;
+      }
+    }
+
+    candidates.push(normalized);
+  }
+
+  function getEditableFontFamilyTokens(value) {
+    const tokens = [];
+    const cleaned = cleanupEditableFontFamily(value);
+    const split = splitRequestedEditableFontFamily(cleaned);
+    pushEditableFontFamilyToken(tokens, cleaned);
+    pushEditableFontFamilyToken(tokens, split.family);
+    return tokens;
+  }
+
+  function pushEditableFontFamilyToken(tokens, value) {
+    const normalized = normalizeFontToken(cleanupEditableFontFamily(value));
+    if (!normalized || tokens.indexOf(normalized) !== -1) {
+      return;
+    }
+
+    tokens.push(normalized);
+  }
+
+  function findFamilyFontMatch(family, run, availableFonts) {
+    if (!Array.isArray(availableFonts) || availableFonts.length === 0) {
+      return null;
+    }
+
+    const familyTokens = getEditableFontFamilyTokens(family);
+    if (familyTokens.length === 0) {
+      return null;
+    }
+
+    const exactMatches = [];
+    const partialMatches = [];
+    for (const entry of availableFonts) {
+      if (!entry || !entry.fontName) {
+        continue;
+      }
+
+      const entryFamily = normalizeFontToken(cleanupEditableFontFamily(entry.fontName.family));
+      if (!entryFamily) {
+        continue;
+      }
+
+      if (familyTokens.indexOf(entryFamily) !== -1) {
+        exactMatches.push(entry);
+        continue;
+      }
+
+      if (familyTokens.some(token => token.indexOf(entryFamily) !== -1 || entryFamily.indexOf(token) !== -1)) {
+        partialMatches.push(entry);
+      }
+    }
+
+    return selectFontEntryByStyle(exactMatches.length > 0 ? exactMatches : partialMatches, run);
+  }
+
+  function selectFontEntryByStyle(entries, run) {
+    if (!Array.isArray(entries) || entries.length === 0) {
+      return null;
+    }
+
+    const styleCandidates = buildEditableFontStyleCandidates(run);
+    for (const styleName of styleCandidates) {
+      const normalizedStyle = normalizeFontToken(styleName);
+      for (const entry of entries) {
+        if (!entry || !entry.fontName) {
+          continue;
+        }
+
+        if (normalizeFontToken(entry.fontName.style) === normalizedStyle) {
+          return entry.fontName;
+        }
+      }
+    }
+
+    for (const fallbackStyle of ["Regular", "Book", "Roman"]) {
+      const normalizedFallbackStyle = normalizeFontToken(fallbackStyle);
+      for (const entry of entries) {
+        if (!entry || !entry.fontName) {
+          continue;
+        }
+
+        if (normalizeFontToken(entry.fontName.style) === normalizedFallbackStyle) {
+          return entry.fontName;
+        }
+      }
+    }
+
+    return entries[0] && entries[0].fontName ? entries[0].fontName : null;
+  }
+
+  function findFallbackFontName(availableFonts) {
+    if (!Array.isArray(availableFonts) || availableFonts.length === 0) {
+      return null;
+    }
+
+    let fallback = findFamilyFontMatch("Arial", { fontStyle: "Regular", fontWeight: 400 }, availableFonts);
+    if (fallback) {
+      return fallback;
+    }
+
+    fallback = findFamilyFontMatch("Inter", { fontStyle: "Regular", fontWeight: 400 }, availableFonts);
+    if (fallback) {
+      return fallback;
+    }
+
+    fallback = findFamilyFontMatch("Roboto", { fontStyle: "Regular", fontWeight: 400 }, availableFonts);
+    if (fallback) {
+      return fallback;
+    }
+
+    return selectFontEntryByStyle(availableFonts, { fontStyle: "Regular", fontWeight: 400 });
+  }
+
+  function pushFontNameCandidate(candidates, fontName) {
+    if (!fontName || typeof fontName !== "object") {
+      return;
+    }
+
+    const candidateKey = normalizeFontToken(fontName.family) + ":" + normalizeFontToken(fontName.style);
+    for (const existing of candidates) {
+      const existingKey = normalizeFontToken(existing.family) + ":" + normalizeFontToken(existing.style);
+      if (existingKey === candidateKey) {
+        return;
+      }
+    }
+
+    candidates.push(fontName);
   }
 
   function layoutImportedSvgNodes(nodes, gap, center) {
@@ -602,7 +1483,7 @@
 
     const payloadNodes = getNormalizedPayloadNodes(payload);
     if (!payloadNodes || payload.mode === "flatten-image") {
-      setExpandedRecursively(importRoot, false);
+      setExpandedRecursively(importRoot, true);
       selectImportedNodes([importRoot]);
       return;
     }
@@ -610,7 +1491,7 @@
     if (shouldApplyScopedTextFixes(payloadNodes, importRoot)) {
       applyTextFixes(payloadNodes, importRoot);
     }
-    setExpandedRecursively(importRoot, false);
+    setExpandedRecursively(importRoot, true);
     selectImportedNodes([importRoot]);
   }
 
@@ -638,18 +1519,18 @@
 
       const payloadNodes = getNormalizedPayloadNodes(item);
       if (!payloadNodes || item.mode === "flatten-image") {
-        setExpandedRecursively(importSection, false);
+        setExpandedRecursively(importSection, true);
         continue;
       }
 
       if (shouldApplyScopedTextFixes(payloadNodes, importSection)) {
         applyTextFixes(payloadNodes, importSection);
       }
-      setExpandedRecursively(importSection, false);
+      setExpandedRecursively(importSection, true);
     }
 
     if (!root.removed) {
-      setExpandedRecursively(root, false);
+      setExpandedRecursively(root, true);
     }
 
     selectImportedNodes(normalizedSections);

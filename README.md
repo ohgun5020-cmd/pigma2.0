@@ -179,6 +179,7 @@ Runtime note: the active AI correction UI logic currently lives inline in `ui.ht
 - PDF-backed `AI`, `EPS`, and `PDF` import behavior currently lives in `ui.html`.
   - `pdf-compatible-ai`, `ai-pdf-wrapper`, `eps-pdf-wrapper`, and native `pdf` files try SVG conversion first.
   - `eps-postscript` and `eps-preview-tiff` now run through Ghostscript WASM to create a temporary PDF before reusing the SVG conversion path.
+  - `eps-preview-tiff` bitmap fallback now rasterizes the Ghostscript/PDF result first, and only drops to the embedded TIFF preview if that raster step fails.
   - `ai-preview-tiff` still stays on the bitmap fallback path.
   - `AI` / `EPS` inspection scans beyond the first header chunk so embedded PDF wrappers near the file tail are still discoverable.
 - `code.patched.js` is the runtime bundle that Figma actually runs from `manifest.json`.

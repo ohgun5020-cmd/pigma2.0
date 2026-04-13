@@ -87,10 +87,12 @@
 
           const bytes = await image.getBytesAsync();
           const extension = detectImageExtension(bytes);
+          const mimeType = detectImageMimeType(extension);
           const fileName = buildFileName(entry, index, extension);
           const fileRecord = {
             index: index + 1,
             fileName: fileName,
+            mimeType: mimeType,
             byteLength: bytes.length,
             imageHash: entry.imageHash,
             nodeId: entry.nodeId,
@@ -107,6 +109,7 @@
               index: index + 1,
               totalCount: totalCount,
               fileName: fileName,
+              mimeType: mimeType,
               imageHash: entry.imageHash,
               nodeId: entry.nodeId,
               nodeName: entry.nodeName,
@@ -364,6 +367,30 @@
     }
 
     return "bin";
+  }
+
+  function detectImageMimeType(extension) {
+    if (extension === "png") {
+      return "image/png";
+    }
+
+    if (extension === "jpg") {
+      return "image/jpeg";
+    }
+
+    if (extension === "gif") {
+      return "image/gif";
+    }
+
+    if (extension === "webp") {
+      return "image/webp";
+    }
+
+    if (extension === "bmp") {
+      return "image/bmp";
+    }
+
+    return "application/octet-stream";
   }
 
   function buildFileName(entry, _index, extension) {

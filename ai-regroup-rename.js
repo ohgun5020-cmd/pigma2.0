@@ -6,8 +6,8 @@
 
   const originalOnMessage = figma.ui.onmessage;
   const AI_DESIGN_READ_CACHE_KEY = "pigma:ai-design-read-cache:v1";
-  const AI_REGROUP_RENAME_CACHE_KEY = "pigma:ai-regroup-rename-cache:v1";
-  const PATCH_VERSION = 1;
+  const AI_REGROUP_RENAME_CACHE_KEY = "pigma:ai-regroup-rename-cache:v2";
+  const PATCH_VERSION = 2;
   const DEFAULT_NAMING_MODE = "web";
   const NAMING_MODE_METADATA = {
     web: {
@@ -17,7 +17,7 @@
       runningDescription: "웹 호환 구조형 이름을 정리하고 안전한 리그룹핑 후보를 확인하고 있습니다.",
       aggressiveRegroup: false,
       aiInstructions:
-        "You improve Figma layer names for web implementation. Return Korean reasons, but every suggestedName must be lowercase ASCII dot notation like section.hero, button.primary.sign-in, text.heading.hero.title. Do not use spaces, slashes, Korean, or underscores in suggestedName. If uncertain, keep the provided localName.",
+        "You improve Figma layer names for web implementation. Return Korean reasons, but every suggestedName must be lowercase ASCII dot notation like section.hero, button.primary.sign-in, text.heading.hero.title. Do not use spaces, slashes, Korean, or underscores in suggestedName. Reflect a clear topic when supported by text or metadata, for example soccer, sports, finance, food, travel, beauty, or education. For image layers, prefer semantic roles like hero, banner, thumbnail, avatar, photo, poster, cover, or illustration when supported by the hints. Only include a color token when it clearly disambiguates a badge, chip, pill, or status-like visual; do not add colors to every layer. Do not invent a topic or color that is not supported by the payload. If uncertain, keep the provided localName.",
       aiReasonFallback: "AI 구조형 네이밍 기준",
     },
     hybrid: {
@@ -27,7 +27,7 @@
       runningDescription: "하이브리드 구조형 이름을 정리하고 적극적인 리그룹핑 후보를 확인하고 있습니다.",
       aggressiveRegroup: true,
       aiInstructions:
-        "You improve Figma layer names for design handoff. Return Korean reasons, but every suggestedName must be ASCII slash notation in readable Title Case like Button/Primary/Sign In, Text/Hero/Title, Group/Navbar/Item/Profile. Use only letters, numbers, spaces, hyphens, and slashes. Do not use Korean, dots, or underscores in suggestedName. If uncertain, keep the provided localName.",
+        "You improve Figma layer names for design handoff. Return Korean reasons, but every suggestedName must be ASCII slash notation in readable Title Case like Button/Primary/Sign In, Text/Hero/Title, Group/Navbar/Item/Profile. Use only letters, numbers, spaces, hyphens, and slashes. Do not use Korean, dots, or underscores in suggestedName. Reflect a clear topic when supported by text or metadata, for example Soccer, Sports, Finance, Food, Travel, Beauty, or Education. For image layers, prefer semantic roles like Hero, Banner, Thumbnail, Avatar, Photo, Poster, Cover, or Illustration when supported by the hints. Only include a color token when it clearly disambiguates a badge, chip, pill, or status-like visual; do not add colors to every layer. Do not invent a topic or color that is not supported by the payload. If uncertain, keep the provided localName.",
       aiReasonFallback: "AI 하이브리드 네이밍 기준",
     },
   };
@@ -100,6 +100,105 @@
     ["dashboard", ["dashboard", "analytics", "report", "metric", "chart", "data", "대시보드", "분석", "리포트", "지표", "차트"]],
     ["content", ["content", "body", "copy", "section", "콘텐츠", "본문", "섹션"]],
   ];
+  const TOPIC_TOKEN_ENTRIES = [
+    [
+      "soccer",
+      [
+        "soccer",
+        "football club",
+        "football match",
+        "goalkeeper",
+        "striker",
+        "midfielder",
+        "premier league",
+        "champions league",
+        "fifa",
+        "uefa",
+        "kickoff",
+        "clean sheet",
+        "football",
+        "축구",
+        "골",
+        "득점",
+        "슈팅",
+        "선수",
+        "경기",
+        "리그",
+        "월드컵",
+        "챔피언스리그",
+      ],
+    ],
+    [
+      "sports",
+      [
+        "sports",
+        "sport",
+        "athlete",
+        "athletic",
+        "league",
+        "tournament",
+        "match",
+        "player",
+        "team",
+        "coach",
+        "score",
+        "scoreboard",
+        "stadium",
+        "mvp",
+        "스포츠",
+        "선수",
+        "팀",
+        "리그",
+        "토너먼트",
+        "점수",
+        "경기장",
+      ],
+    ],
+    ["basketball", ["basketball", "nba", "wnba", "dunk", "three pointer", "three-point", "hoop", "농구", "덩크"]],
+    ["baseball", ["baseball", "mlb", "pitcher", "homerun", "home run", "inning", "야구", "투수", "타자"]],
+    ["tennis", ["tennis", "atp", "wta", "serve", "racket", "grand slam", "테니스", "서브"]],
+    ["fitness", ["fitness", "workout", "exercise", "gym", "trainer", "yoga", "pilates", "피트니스", "운동"]],
+    ["finance", ["finance", "fintech", "bank", "banking", "loan", "payment", "wallet", "card", "stock", "crypto", "금융", "은행", "주식", "결제"]],
+    ["shopping", ["shop", "shopping", "store", "commerce", "cart", "checkout", "product", "ecommerce", "sale", "쇼핑", "장바구니", "결제", "상품"]],
+    ["food", ["food", "restaurant", "cafe", "menu", "recipe", "drink", "coffee", "dessert", "meal", "음식", "레시피", "메뉴", "카페"]],
+    ["travel", ["travel", "trip", "flight", "hotel", "tour", "booking", "destination", "vacation", "여행", "항공", "호텔", "예약"]],
+    ["beauty", ["beauty", "cosmetic", "skincare", "makeup", "hair", "perfume", "뷰티", "화장품", "스킨케어"]],
+    ["fashion", ["fashion", "style", "outfit", "clothing", "apparel", "wardrobe", "패션", "의류", "스타일"]],
+    ["music", ["music", "album", "artist", "song", "playlist", "concert", "뮤직", "음악", "아티스트", "플레이리스트"]],
+    ["gaming", ["game", "gaming", "gamer", "quest", "level", "esports", "게임", "게이밍", "e-sports", "e sports"]],
+    ["education", ["education", "course", "lesson", "class", "academy", "student", "learn", "school", "교육", "수업", "학생", "강의"]],
+    ["health", ["health", "medical", "clinic", "doctor", "care", "wellness", "hospital", "healthcare", "헬스", "의료", "병원", "건강"]],
+    ["news", ["news", "article", "headline", "editorial", "press", "magazine", "media", "뉴스", "기사", "헤드라인"]],
+  ];
+  const TOPIC_LABELS = {
+    soccer: "Soccer",
+    sports: "Sports",
+    basketball: "Basketball",
+    baseball: "Baseball",
+    tennis: "Tennis",
+    fitness: "Fitness",
+    finance: "Finance",
+    shopping: "Shopping",
+    food: "Food",
+    travel: "Travel",
+    beauty: "Beauty",
+    fashion: "Fashion",
+    music: "Music",
+    gaming: "Gaming",
+    education: "Education",
+    health: "Health",
+    news: "News",
+  };
+  const IMAGE_ROLE_TOKEN_ENTRIES = [
+    ["avatar", ["avatar", "profile", "portrait", "author", "speaker", "member", "user", "player", "coach", "프로필", "아바타", "선수"]],
+    ["hero", ["hero", "banner", "masthead", "key visual", "kv", "cover", "메인", "배너", "키비주얼"]],
+    ["thumbnail", ["thumbnail", "thumb", "preview", "teaser", "card image", "썸네일", "미리보기"]],
+    ["poster", ["poster", "flyer", "campaign", "event", "포스터", "이벤트"]],
+    ["illustration", ["illustration", "illust", "graphic", "mascot", "character", "일러스트", "캐릭터"]],
+    ["logo", ["logo", "brand", "wordmark", "symbol", "logomark", "로고", "브랜드"]],
+    ["photo", ["photo", "image", "picture", "gallery", "shot", "사진", "이미지"]],
+  ];
+  const IMAGE_NAME_PATTERN = /\b(image|photo|picture|avatar|thumbnail|thumb|cover|hero|banner|poster|illustration|illust|portrait|gallery)\b/i;
   const GENERIC_TOKEN_SET = new Set([
     "frame",
     "group",
@@ -293,6 +392,7 @@
       summary: {
         selectionLabel: context.selectionLabel,
         contextLabel: context.contextLabel,
+        topicLabel: context.topicLabel,
         namingMode: context.namingMode,
         namingModeLabel: context.namingModeLabel,
         renameCount: renameResult.applied.length,
@@ -312,6 +412,7 @@
     const namingMode = resolveNamingMode(options && options.namingMode);
     const namingModeMeta = getNamingModeMeta(namingMode);
     const preservedRoot = findLargestSelectedRoot(selection);
+    const textSamples = collectSelectionTextSamples(selection, 8);
     const roots = selection.map((node) => ({
       id: node.id,
       name: safeName(node),
@@ -319,6 +420,15 @@
     }));
     const selectionLabel = formatSelectionLabel(roots);
     const selectionSignature = getSelectionSignature(selection);
+    const contentSummary =
+      designReadResult &&
+      designReadResult.summary &&
+      typeof designReadResult.summary.contentSummary === "string"
+        ? designReadResult.summary.contentSummary
+        : "";
+    const topicSlug = inferSelectionTopic(selection, textSamples, designReadResult);
+    const topicLabel = formatTopicLabel(topicSlug);
+    const paletteHints = extractPaletteHints(designReadResult);
     if (
       designReadResult &&
       designReadResult.selectionSignature === selectionSignature &&
@@ -330,6 +440,10 @@
         selectionLabel,
         contextLabel,
         contextSlug: deriveContextSlug(contextLabel),
+        contentSummary,
+        topicSlug,
+        topicLabel,
+        paletteHints,
         preservedRootId: preservedRoot ? preservedRoot.id : "",
         preservedRootName: preservedRoot ? safeName(preservedRoot) : "",
         namingMode,
@@ -339,12 +453,15 @@
       };
     }
 
-    const textSamples = collectSelectionTextSamples(selection, 8);
     const contextLabel = inferSelectionContext(selection, textSamples);
     return {
       selectionLabel,
       contextLabel,
       contextSlug: deriveContextSlug(contextLabel),
+      contentSummary,
+      topicSlug,
+      topicLabel,
+      paletteHints,
       preservedRootId: preservedRoot ? preservedRoot.id : "",
       preservedRootName: preservedRoot ? safeName(preservedRoot) : "",
       namingMode,
@@ -410,6 +527,67 @@
     return bestLabel;
   }
 
+  function inferSelectionTopic(selection, textSamples, designReadResult) {
+    const values = [];
+    for (const node of selection || []) {
+      values.push(safeName(node));
+    }
+    values.push(...textSamples);
+
+    if (designReadResult && designReadResult.summary) {
+      if (typeof designReadResult.summary.contextLabel === "string" && designReadResult.summary.contextLabel.trim()) {
+        values.push(designReadResult.summary.contextLabel.trim());
+      }
+      if (typeof designReadResult.summary.contentSummary === "string" && designReadResult.summary.contentSummary.trim()) {
+        values.push(designReadResult.summary.contentSummary.trim());
+      }
+    }
+
+    if (designReadResult && designReadResult.typography && Array.isArray(designReadResult.typography.textSamples)) {
+      for (const value of designReadResult.typography.textSamples.slice(0, 4)) {
+        values.push(value);
+      }
+    }
+
+    return findBestToken(values, TOPIC_TOKEN_ENTRIES, "");
+  }
+
+  function formatTopicLabel(topicSlug) {
+    if (!topicSlug) {
+      return "";
+    }
+
+    return TOPIC_LABELS[topicSlug] || humanizeHybridSegment(topicSlug);
+  }
+
+  function extractPaletteHints(designReadResult) {
+    const hints = [];
+    const rows =
+      designReadResult &&
+      designReadResult.colors &&
+      Array.isArray(designReadResult.colors.topColors)
+        ? designReadResult.colors.topColors
+        : [];
+
+    for (const row of rows) {
+      if (!row || typeof row.value !== "string") {
+        continue;
+      }
+
+      const hint = describeHexColor(row.value);
+      if (!hint || hints.includes(hint)) {
+        continue;
+      }
+
+      hints.push(hint);
+      if (hints.length >= 3) {
+        break;
+      }
+    }
+
+    return hints;
+  }
+
   async function applyRenamePlan(selection, context) {
     const allNodes = collectSceneNodes(selection);
     const nodesByParent = new Map();
@@ -445,6 +623,7 @@
       for (const node of nodes) {
         const currentName = safeName(node);
         const currentKey = canonicalizeName(currentName);
+        const textHint = getPrimaryTextHint(node);
         const baseName = proposeNodeName(node, context);
         const duplicateCount = counts.get(currentKey) || 0;
         const shouldRename =
@@ -476,7 +655,12 @@
           reason: buildRenameReason(node, context),
           parentName: safeName(node.parent),
           type: String(node.type || "UNKNOWN"),
-          textHint: getPrimaryTextHint(node),
+          textHint,
+          textSamples: collectNodeTexts(node, 3, 2).slice(0, 3),
+          topicHint: formatTopicLabel(detectTopicSlug(node, context, textHint)),
+          colorHint: getNodeColorHint(node),
+          imageRole: isImageLikeNode(node) ? detectImageRole(node) : "",
+          hasImageFill: hasImageFill(node),
         });
       }
 
@@ -553,6 +737,11 @@
           nodeType: candidate.type,
           parentName: candidate.parentName,
           textHint: candidate.textHint,
+          textSamples: candidate.textSamples,
+          topicHint: candidate.topicHint,
+          colorHint: candidate.colorHint,
+          imageRole: candidate.imageRole,
+          hasImageFill: candidate.hasImageFill,
         });
       }
     }
@@ -587,6 +776,9 @@
         payload: {
           contextLabel: context.contextLabel,
           contextSlug: context.contextSlug,
+          topicLabel: context.topicLabel,
+          contentSummary: context.contentSummary,
+          paletteHints: context.paletteHints,
           candidates: candidates.slice(0, 36),
         },
       });
@@ -858,10 +1050,11 @@
     const type = String(node.type || "UNKNOWN");
     const textHint = getPrimaryTextHint(node);
     const sectionSlug = detectSectionSlug(node, context);
-    const contentSlug = resolveContentSlug(node, textHint);
+    const contentSlug = resolveContentSlug(node, textHint, context);
+    const topicSlug = detectTopicSlug(node, context, textHint);
 
     if (type === "TEXT") {
-      return buildTextNodeName(node, textHint, sectionSlug, contentSlug, context);
+      return buildTextNodeName(node, textHint, sectionSlug, contentSlug, topicSlug, context);
     }
 
     if (isButtonContainer(node)) {
@@ -872,25 +1065,30 @@
       return buildStructuredName(context.namingMode, "field", findFieldLabel(node) || contentSlug || "input", "input");
     }
 
+    if (isImageLikeNode(node)) {
+      return buildImageNodeName(node, sectionSlug, contentSlug, topicSlug, context);
+    }
+
     if (isIconLikeNode(node)) {
       return buildStructuredName(context.namingMode, "icon", findActionSlug(node) || contentSlug || sectionSlug || "glyph");
     }
 
     if (hasChildren(node)) {
-      return buildContainerName(node, context, sectionSlug, contentSlug);
+      return buildContainerName(node, context, sectionSlug, contentSlug, topicSlug);
     }
 
     if (VECTOR_TYPES.has(type)) {
-      return buildStructuredName(context.namingMode, "shape", contentSlug || "vector");
+      return buildStructuredName(context.namingMode, "shape", contentSlug || topicSlug || "vector");
     }
 
-    return buildStructuredName(context.namingMode, "layer", typePrefix(type), contentSlug || sectionSlug || "item");
+    return buildStructuredName(context.namingMode, "layer", typePrefix(type), contentSlug || topicSlug || sectionSlug || "item");
   }
 
-  function buildTextNodeName(node, textHint, sectionSlug, contentSlug, context) {
+  function buildTextNodeName(node, textHint, sectionSlug, contentSlug, topicSlug, context) {
     const text = textHint || getTextValue(node);
+    const semanticSlug = contentSlug || topicSlug || sectionSlug || context.contextSlug || "content";
     if (!text) {
-      return buildStructuredName(context.namingMode, "text", "body", sectionSlug || "content", "copy");
+      return buildStructuredName(context.namingMode, "text", "body", sectionSlug || topicSlug || "content", "copy");
     }
 
     const actionSlug = findActionSlugFromText(text);
@@ -905,18 +1103,18 @@
 
     const textRole = detectTextRole(node, text);
     if (textRole === "heading" || textRole === "title") {
-      return buildStructuredName(context.namingMode, "text", textRole, sectionSlug || "content", "title");
+      return buildStructuredName(context.namingMode, "text", textRole, sectionSlug || topicSlug || "content", topicSlug || contentSlug || "title");
     }
 
     if (textRole === "meta") {
-      return buildStructuredName(context.namingMode, "text", "meta", contentSlug || sectionSlug || "label");
+      return buildStructuredName(context.namingMode, "text", "meta", semanticSlug || "label");
     }
 
     if (textRole === "label") {
-      return buildStructuredName(context.namingMode, "text", "label", contentSlug || sectionSlug || "label");
+      return buildStructuredName(context.namingMode, "text", "label", semanticSlug || "label");
     }
 
-    return buildStructuredName(context.namingMode, "text", "body", sectionSlug || "content", contentSlug || "copy");
+    return buildStructuredName(context.namingMode, "text", "body", sectionSlug || topicSlug || "content", contentSlug || topicSlug || "copy");
   }
 
   function buildRenameReason(node, context) {
@@ -939,23 +1137,39 @@
     return "웹 호환 구조형 네이밍 기준";
   }
 
-  function buildContainerName(node, context, sectionSlug, contentSlug) {
-    const resolvedSection = sectionSlug || context.contextSlug || "content";
-    const groupRole = inferGroupRole(node, contentSlug);
+  function buildContainerName(node, context, sectionSlug, contentSlug, topicSlug) {
+    const resolvedSection = sectionSlug || context.contextSlug || topicSlug || "content";
+    const semanticSlug = contentSlug || topicSlug || "item";
+    const groupRole = inferGroupRole(node, semanticSlug);
 
     if (isCardLikeNode(node)) {
-      return buildStructuredName(context.namingMode, "card", resolvedSection, contentSlug || "item");
+      return buildStructuredName(context.namingMode, "card", resolvedSection, semanticSlug);
     }
 
     if (isSectionRootLike(node)) {
-      return buildStructuredName(context.namingMode, "section", resolvedSection);
+      return buildStructuredName(context.namingMode, "section", resolvedSection, topicSlug || "");
     }
 
     if (String(node.type || "") === "GROUP") {
-      return buildStructuredName(context.namingMode, "group", resolvedSection, groupRole);
+      return buildStructuredName(context.namingMode, "group", resolvedSection, groupRole, topicSlug || "");
     }
 
-    return buildStructuredName(context.namingMode, "container", resolvedSection, groupRole);
+    return buildStructuredName(context.namingMode, "container", resolvedSection, groupRole, topicSlug || "");
+  }
+
+  function buildImageNodeName(node, sectionSlug, contentSlug, topicSlug, context) {
+    const imageRole = detectImageRole(node);
+    const semanticSlug = topicSlug || contentSlug || sectionSlug || context.contextSlug || "content";
+
+    if (imageRole === "avatar") {
+      return buildStructuredName(context.namingMode, "image", "avatar", semanticSlug);
+    }
+
+    if (imageRole === "hero") {
+      return buildStructuredName(context.namingMode, "image", "hero", semanticSlug);
+    }
+
+    return buildStructuredName(context.namingMode, "image", imageRole, semanticSlug);
   }
 
   function typePrefix(type) {
@@ -1079,6 +1293,30 @@
 
   function deriveContextSlug(contextLabel) {
     const normalized = String(contextLabel || "");
+    const normalizedLower = normalized.toLowerCase();
+    if (/login|sign in|sign up|form|auth|password|email/.test(normalizedLower)) {
+      return "form";
+    }
+
+    if (/dashboard|analytics|report|metric|table|chart|data/.test(normalizedLower)) {
+      return "dashboard";
+    }
+
+    if (/hero|landing|promo|banner|marketing|campaign/.test(normalizedLower)) {
+      return "hero";
+    }
+
+    if (/modal|dialog|confirm|alert/.test(normalizedLower)) {
+      return "modal";
+    }
+
+    if (/nav|menu|navigation|header/.test(normalizedLower)) {
+      return "navbar";
+    }
+
+    if (/component|library|design system/.test(normalizedLower)) {
+      return "component";
+    }
     if (normalized.includes("인증") || normalized.includes("폼")) {
       return "form";
     }
@@ -1115,11 +1353,11 @@
 
     values.push(...collectNodeTexts(node, 3, 2));
     const sectionSlug = findBestToken(values, SECTION_TOKEN_ENTRIES, "");
-    return sectionSlug || context.contextSlug || "content";
+    return sectionSlug || context.contextSlug || context.topicSlug || "content";
   }
 
-  function resolveContentSlug(node, preferredText) {
-    const values = [preferredText, safeName(node), ...collectNodeTexts(node, 3, 1)];
+  function resolveContentSlug(node, preferredText, context) {
+    const values = collectNodeSemanticValues(node, preferredText, 3, 1);
     const actionSlug = findBestToken(values, ACTION_TOKEN_ENTRIES, "");
     if (actionSlug) {
       return actionSlug;
@@ -1130,6 +1368,11 @@
       return fieldSlug;
     }
 
+    const topicSlug = findBestToken(values, TOPIC_TOKEN_ENTRIES, "");
+    if (topicSlug) {
+      return topicSlug;
+    }
+
     for (const value of values) {
       const slug = slugifyAsciiToken(value);
       if (slug && !GENERIC_TOKEN_SET.has(slug)) {
@@ -1137,7 +1380,32 @@
       }
     }
 
-    return "";
+    return context && context.topicSlug ? context.topicSlug : "";
+  }
+
+  function collectNodeSemanticValues(node, preferredText, textLimit, textDepth) {
+    const values = [];
+    if (preferredText) {
+      values.push(preferredText);
+    }
+
+    values.push(safeName(node));
+    if (node && node.parent) {
+      values.push(safeName(node.parent));
+    }
+
+    values.push(...collectNodeTexts(node, textLimit, textDepth));
+    return values;
+  }
+
+  function detectTopicSlug(node, context, preferredText) {
+    const values = collectNodeSemanticValues(node, preferredText, 4, 2);
+    const localTopic = findBestToken(values, TOPIC_TOKEN_ENTRIES, "");
+    if (localTopic) {
+      return localTopic;
+    }
+
+    return context && context.topicSlug ? context.topicSlug : "";
   }
 
   function detectTextRole(node, text) {
@@ -1326,6 +1594,182 @@
     return !!node && Array.isArray(node.strokes) && node.strokes.some((paint) => paint && paint.visible !== false);
   }
 
+  function hasImageFill(node) {
+    return !!node && Array.isArray(node.fills) && node.fills.some((paint) => paint && paint.visible !== false && paint.type === "IMAGE");
+  }
+
+  function isImageLikeNode(node) {
+    if (!node || node.locked === true || node.visible === false) {
+      return false;
+    }
+
+    const bounds = getNodeBounds(node);
+    if (!bounds || bounds.width < 24 || bounds.height < 24) {
+      return false;
+    }
+
+    if (hasChildren(node) && node.children.length > 3) {
+      return false;
+    }
+
+    if (hasChildren(node) && collectNodeTexts(node, 1, 2).length > 0) {
+      return false;
+    }
+
+    if (hasImageFill(node)) {
+      return true;
+    }
+
+    return IMAGE_NAME_PATTERN.test(safeName(node));
+  }
+
+  function detectImageRole(node) {
+    const values = collectNodeSemanticValues(node, "", 2, 1);
+    const matched = findBestToken(values, IMAGE_ROLE_TOKEN_ENTRIES, "");
+    if (matched) {
+      return matched;
+    }
+
+    const bounds = getNodeBounds(node);
+    if (bounds && bounds.width <= 96 && bounds.height <= 96) {
+      return "avatar";
+    }
+
+    if (bounds && bounds.width >= 240 && bounds.height >= 120) {
+      return "hero";
+    }
+
+    return "photo";
+  }
+
+  function getNodeColorHint(node) {
+    const solidFill = getFirstVisibleSolidPaint(node && node.fills);
+    if (solidFill) {
+      return describeRgbColor(solidFill.color);
+    }
+
+    const solidStroke = getFirstVisibleSolidPaint(node && node.strokes);
+    return solidStroke ? describeRgbColor(solidStroke.color) : "";
+  }
+
+  function getFirstVisibleSolidPaint(paints) {
+    if (!Array.isArray(paints)) {
+      return null;
+    }
+
+    for (const paint of paints) {
+      if (!paint || paint.visible === false || paint.type !== "SOLID" || !paint.color) {
+        continue;
+      }
+
+      return paint;
+    }
+
+    return null;
+  }
+
+  function describeHexColor(hex) {
+    const color = parseHexColor(hex);
+    return color ? describeRgbColor(color) : "";
+  }
+
+  function parseHexColor(hex) {
+    const normalized = String(hex || "").trim().replace(/^#/, "");
+    if (!/^[0-9a-f]{6}$/i.test(normalized)) {
+      return null;
+    }
+
+    return {
+      r: parseInt(normalized.slice(0, 2), 16) / 255,
+      g: parseInt(normalized.slice(2, 4), 16) / 255,
+      b: parseInt(normalized.slice(4, 6), 16) / 255,
+    };
+  }
+
+  function describeRgbColor(color) {
+    if (!color || typeof color.r !== "number" || typeof color.g !== "number" || typeof color.b !== "number") {
+      return "";
+    }
+
+    const red = clamp01(color.r);
+    const green = clamp01(color.g);
+    const blue = clamp01(color.b);
+    const max = Math.max(red, green, blue);
+    const min = Math.min(red, green, blue);
+    const delta = max - min;
+    const lightness = (max + min) / 2;
+
+    if (lightness <= 0.08) {
+      return "black";
+    }
+
+    if (lightness >= 0.94 && delta < 0.04) {
+      return "white";
+    }
+
+    if (delta < 0.08) {
+      if (lightness < 0.3) {
+        return "charcoal";
+      }
+      if (lightness > 0.75) {
+        return "silver";
+      }
+      return "gray";
+    }
+
+    const hue = getHueDegrees(red, green, blue, max, delta);
+    if (hue < 15 || hue >= 345) {
+      return "red";
+    }
+    if (hue < 45) {
+      return "orange";
+    }
+    if (hue < 70) {
+      return "yellow";
+    }
+    if (hue < 160) {
+      return "green";
+    }
+    if (hue < 200) {
+      return "teal";
+    }
+    if (hue < 255) {
+      return "blue";
+    }
+    if (hue < 305) {
+      return "purple";
+    }
+    return "pink";
+  }
+
+  function getHueDegrees(red, green, blue, max, delta) {
+    if (delta <= 0) {
+      return 0;
+    }
+
+    let hue = 0;
+    if (max === red) {
+      hue = ((green - blue) / delta) % 6;
+    } else if (max === green) {
+      hue = (blue - red) / delta + 2;
+    } else {
+      hue = (red - green) / delta + 4;
+    }
+
+    hue *= 60;
+    return hue < 0 ? hue + 360 : hue;
+  }
+
+  function clamp01(value) {
+    if (value < 0) {
+      return 0;
+    }
+    if (value > 1) {
+      return 1;
+    }
+    return value;
+  }
+
   function isButtonContainer(node) {
     if (!node || !hasChildren(node)) {
       return false;
@@ -1467,7 +1911,7 @@
 
   function buildGroupName(labelNode, context) {
     const label = getPrimaryTextHint(labelNode);
-    const itemSlug = resolveContentSlug(labelNode, label) || "item";
+    const itemSlug = resolveContentSlug(labelNode, label, context) || context.topicSlug || "item";
     const sectionSlug = detectSectionSlug(labelNode, context);
     if (context.contextSlug === "navbar" || sectionSlug === "navbar") {
       return buildStructuredName(context.namingMode, "group", "navbar", "item", itemSlug);
@@ -1480,8 +1924,9 @@
     const titleLabel = getPrimaryTextHint(titleNode);
     const bodyLabel = getPrimaryTextHint(bodyNode);
     const itemSlug =
-      resolveContentSlug(titleNode, titleLabel) ||
-      resolveContentSlug(bodyNode, bodyLabel) ||
+      resolveContentSlug(titleNode, titleLabel, context) ||
+      resolveContentSlug(bodyNode, bodyLabel, context) ||
+      context.topicSlug ||
       "copy";
     const sectionSlug = detectSectionSlug(titleNode, context);
     return buildStructuredName(context.namingMode, "group", sectionSlug || context.contextSlug || "content", "copy", itemSlug);

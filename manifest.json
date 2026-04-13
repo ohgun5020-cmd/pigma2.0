@@ -4,6 +4,7 @@
   "api": "1.0.0",
   "main": "code.patched.js",
   "capabilities": [],
+  "enablePrivatePluginApi": true,
   "enableProposedApi": false,
   "documentAccess": "dynamic-page",
   "editorType": [
@@ -15,6 +16,6 @@
       "https://api.openai.com",
       "https://generativelanguage.googleapis.com"
     ],
-    "reasoning": "Calls user-configured OpenAI or Gemini APIs to analyze selected design content for AI correction features."
+    "reasoning": "Calls user-configured AI APIs for image and video generation workflows."
   }
 }

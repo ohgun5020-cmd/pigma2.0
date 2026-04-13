@@ -91,7 +91,6 @@ if (-not (Test-Path $deleteHiddenLayersPatch)) {
 }
 
 $hasOriginalImageDownloadPatch = Test-Path $originalImageDownloadPatch
-
 if (-not (Test-Path $aiImageUpscalePatch)) {
   throw "Missing AI image upscale patch: $aiImageUpscalePatch"
 }
