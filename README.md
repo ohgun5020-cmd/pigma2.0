@@ -81,8 +81,6 @@ Safe implementation order:
   - Source of truth for the read-only PC/MO pair analyzer that classifies two selected frames and appends draft pair, section-example, rule, and aggregate records into responsive memory.
 - `ai-llm-client.js`
   - Source of truth for provider-aware OpenAI/Gemini API requests and JSON parsing.
-- `ai-design-assist.js`
-  - Source of truth for AI-tab responsive design assist, memory retrieval, and PC -> MO draft generation experiments.
 - `ai-design-read.js`
   - Source of truth for the `디자인 읽기` plugin-side analysis and cache pipeline.
 - `ai-regroup-rename.js`

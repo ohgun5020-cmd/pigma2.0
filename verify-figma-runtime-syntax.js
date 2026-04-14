@@ -11,7 +11,6 @@ const defaultFiles = [
   "ai-responsive-memory.js",
   "ai-responsive-pair-analyzer.js",
   "ai-llm-client.js",
-  "ai-design-assist.js",
   "ai-design-read.js",
   "ai-accessibility-diagnosis.js",
   "ai-design-consistency.js",

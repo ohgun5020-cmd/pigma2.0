@@ -6,7 +6,6 @@ $aiSettingsPatch = Join-Path $root "ai-settings-storage.js"
 $aiResponsiveMemoryPatch = Join-Path $root "ai-responsive-memory.js"
 $aiResponsivePairAnalyzerPatch = Join-Path $root "ai-responsive-pair-analyzer.js"
 $aiLlmClientPatch = Join-Path $root "ai-llm-client.js"
-$aiDesignAssistPatch = Join-Path $root "ai-design-assist.js"
 $aiDesignReadPatch = Join-Path $root "ai-design-read.js"
 $aiAccessibilityDiagnosisPatch = Join-Path $root "ai-accessibility-diagnosis.js"
 $aiDesignConsistencyPatch = Join-Path $root "ai-design-consistency.js"
@@ -60,10 +59,6 @@ if (-not (Test-Path $aiResponsivePairAnalyzerPatch)) {
 
 if (-not (Test-Path $aiLlmClientPatch)) {
   throw "Missing AI LLM client patch: $aiLlmClientPatch"
-}
-
-if (-not (Test-Path $aiDesignAssistPatch)) {
-  throw "Missing AI design assist patch: $aiDesignAssistPatch"
 }
 
 if (-not (Test-Path $aiDesignReadPatch)) {
@@ -202,7 +197,6 @@ $runtimeSyntaxSourceFiles = @(
   $aiResponsiveMemoryPatch,
   $aiResponsivePairAnalyzerPatch,
   $aiLlmClientPatch,
-  $aiDesignAssistPatch,
   $aiDesignReadPatch,
   $aiAccessibilityDiagnosisPatch,
   $aiDesignConsistencyPatch,
@@ -1147,7 +1141,6 @@ $aiSettingsPatchContent = [System.IO.File]::ReadAllText($aiSettingsPatch, [Syste
 $aiResponsiveMemoryPatchContent = [System.IO.File]::ReadAllText($aiResponsiveMemoryPatch, [System.Text.Encoding]::UTF8)
 $aiResponsivePairAnalyzerPatchContent = [System.IO.File]::ReadAllText($aiResponsivePairAnalyzerPatch, [System.Text.Encoding]::UTF8)
 $aiLlmClientPatchContent = [System.IO.File]::ReadAllText($aiLlmClientPatch, [System.Text.Encoding]::UTF8)
-$aiDesignAssistPatchContent = [System.IO.File]::ReadAllText($aiDesignAssistPatch, [System.Text.Encoding]::UTF8)
 $aiAccessibilityDiagnosisPatchContent = [System.IO.File]::ReadAllText($aiAccessibilityDiagnosisPatch, [System.Text.Encoding]::UTF8)
 $aiDesignConsistencyPatchContent = [System.IO.File]::ReadAllText($aiDesignConsistencyPatch, [System.Text.Encoding]::UTF8)
 $aiRegroupRenamePatchContent = [System.IO.File]::ReadAllText($aiRegroupRenamePatch, [System.Text.Encoding]::UTF8)
@@ -1168,7 +1161,6 @@ $patchedRuntimeParts = @(
   $aiResponsiveMemoryPatchContent,
   $aiResponsivePairAnalyzerPatchContent,
   $aiLlmClientPatchContent,
-  $aiDesignAssistPatchContent,
   $aiAccessibilityDiagnosisPatchContent,
   $aiDesignConsistencyPatchContent,
   $aiRegroupRenamePatchContent,
