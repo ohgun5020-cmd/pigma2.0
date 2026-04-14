@@ -335,11 +335,13 @@
     textNode.fontName = fontName;
     textNode.fontSize = normalizeEditableTextFontSize(run);
     textNode.characters = characters;
+    applyEditableTextCase(textNode, run);
     applyEditableTextLineHeight(textNode, run);
     applyEditableTextLetterSpacing(textNode, run);
     fitEditableTextFontSizeToRun(textNode, run, characters);
     applyEditableTextLineHeight(textNode, run);
     applyEditableTextSizing(textNode, run, characters);
+    applyEditableTextDecoration(textNode, run);
     textNode.name = buildEditableTextLayerName(characters);
 
     const fillPaint = createEditableTextPaint(run);
@@ -355,6 +357,43 @@
     }
 
     return textNode;
+  }
+
+  function applyEditableTextCase(textNode, run) {
+    if (!textNode || !("textCase" in textNode)) {
+      return;
+    }
+
+    textNode.textCase = normalizeEditableTextCase(run);
+  }
+
+  function normalizeEditableTextCase(run) {
+    const normalizedCase = String((run && run.textCase) || "").trim().toLowerCase();
+    if (normalizedCase === "upper") {
+      return "UPPER";
+    }
+    if (normalizedCase === "small-caps") {
+      return "SMALL_CAPS";
+    }
+    return "ORIGINAL";
+  }
+
+  function applyEditableTextDecoration(textNode, run) {
+    if (!textNode || !("textDecoration" in textNode)) {
+      return;
+    }
+
+    textNode.textDecoration = normalizeEditableTextDecoration(run);
+  }
+
+  function normalizeEditableTextDecoration(run) {
+    if (run && run.strikeThrough === true) {
+      return "STRIKETHROUGH";
+    }
+    if (run && run.underline === true) {
+      return "UNDERLINE";
+    }
+    return "NONE";
   }
 
   function applyEditableTextLetterSpacing(textNode, run) {

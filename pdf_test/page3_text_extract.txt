@@ -1,0 +1,32 @@
+3
+핵심 Territory 근거 요약
+43개 Territory 중 OLED TV × Soundbar가 교차하는 10개를 전수 분석하여, 월드컵 시즌과 직결되는 핵심 3개를 기획 근거로 선정
+*Territory란 "어떤 소비자가, 어떤 상황에서, 어떤 문제를 느끼는가"의 데이터 기반 조합. 근거 점수는 소비자 원문 데이터에서 해당 문제가 얼마나 강하고 반복적으로 언급됐는지를 수치화한 것으로, 점수가 높을수록 소비자 공감도가 높음
+Human Problem
+Topic
+소비자긴장구조(Tension Structure)
+근거점수
+Social Belonging
+Event-Driven Joy Social Belonging
+집이 어수선하고 비용도 부담될 때
+— 친구를 부르지 못하는 소속감 결핍으로 이어짐
+101.4
+Experience 
+Quality
+Evergreen Smart Automation Experience Quality
+화질과 사운드가 이벤트 규모를 따라가지 못할 때
+— 집관 몰입감 부족으로 이어짐
+89.9
+Event-Driven Worth It Event Presence
+사운드가 받쳐주지 않고 비용도 걸릴 때
+— 경기장 현장감 부재로 이어짐
+77.6
+소비자핵심
+Desired Value
+Joy
+설렘/신남
+Dignity
+자부심/자랑스러움
+Worth It
+잘 샀다는 느낌
+Event Presence

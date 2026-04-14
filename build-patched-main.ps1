@@ -14,11 +14,15 @@ $aiRegroupRenamePatch = Join-Path $root "ai-regroup-rename.js"
 $aiTypoAuditPatch = Join-Path $root "ai-typo-audit.js"
 $aiPixelPerfectPatch = Join-Path $root "ai-pixel-perfect.js"
 $deleteHiddenLayersPatch = Join-Path $root "delete-hidden-layers.js"
+$aiColorExtractPatch = Join-Path $root "ai-color-extract.js"
 $originalImageDownloadPatch = Join-Path $root "original-image-download.js"
 $aiImageUpscalePatch = Join-Path $root "ai-image-upscale.js"
 $destination = Join-Path $root "code.patched.js"
 $uiSource = Join-Path $root "ui.html"
 $pdfJsInlineAssetSync = Join-Path $root "sync-pdfjs-inline-assets.js"
+$gifEncoderInlineAssetSync = Join-Path $root "sync-gifenc-inline-assets.js"
+$apngInlineAssetSync = Join-Path $root "sync-apng-inline-assets.js"
+$presentationInlineAssetSync = Join-Path $root "sync-presentation-inline-assets.js"
 $uiExternalizer = Join-Path $root "externalize-embedded-ui.js"
 $uiVerifier = Join-Path $root "verify-externalized-ui.js"
 $textGuardContract = Join-Path $root "text-import-guard.contract.json"
@@ -90,6 +94,10 @@ if (-not (Test-Path $deleteHiddenLayersPatch)) {
   throw "Missing hidden layer delete patch: $deleteHiddenLayersPatch"
 }
 
+if (-not (Test-Path $aiColorExtractPatch)) {
+  throw "Missing AI color extract patch: $aiColorExtractPatch"
+}
+
 $hasOriginalImageDownloadPatch = Test-Path $originalImageDownloadPatch
 if (-not (Test-Path $aiImageUpscalePatch)) {
   throw "Missing AI image upscale patch: $aiImageUpscalePatch"
@@ -107,6 +115,18 @@ if ((-not $hasOriginalImageDownloadPatch) -and $uiSourceText.Contains("run-origi
 
 if (-not (Test-Path $pdfJsInlineAssetSync)) {
   throw "Missing PDF.js inline asset sync script: $pdfJsInlineAssetSync"
+}
+
+if (-not (Test-Path $gifEncoderInlineAssetSync)) {
+  throw "Missing GIF encoder inline asset sync script: $gifEncoderInlineAssetSync"
+}
+
+if (-not (Test-Path $apngInlineAssetSync)) {
+  throw "Missing APNG inline asset sync script: $apngInlineAssetSync"
+}
+
+if (-not (Test-Path $presentationInlineAssetSync)) {
+  throw "Missing presentation inline asset sync script: $presentationInlineAssetSync"
 }
 
 if (-not (Test-Path $uiExternalizer)) {
@@ -150,6 +170,21 @@ if ($LASTEXITCODE -ne 0) {
   throw "Failed to sync inline PDF.js assets into ui.html"
 }
 
+& node $gifEncoderInlineAssetSync
+if ($LASTEXITCODE -ne 0) {
+  throw "Failed to sync inline GIF encoder assets into ui.html"
+}
+
+& node $apngInlineAssetSync
+if ($LASTEXITCODE -ne 0) {
+  throw "Failed to sync inline APNG assets into ui.html"
+}
+
+& node $presentationInlineAssetSync
+if ($LASTEXITCODE -ne 0) {
+  throw "Failed to sync inline presentation import runtime into ui.html"
+}
+
 & node $uiExternalizer $source
 if ($LASTEXITCODE -ne 0) {
   throw "Failed to externalize embedded UI in $source"
@@ -175,6 +210,7 @@ $runtimeSyntaxSourceFiles = @(
   $aiTypoAuditPatch,
   $aiPixelPerfectPatch,
   $deleteHiddenLayersPatch,
+  $aiColorExtractPatch,
   $aiImageUpscalePatch
 )
 
@@ -1118,6 +1154,7 @@ $aiRegroupRenamePatchContent = [System.IO.File]::ReadAllText($aiRegroupRenamePat
 $aiTypoAuditPatchContent = [System.IO.File]::ReadAllText($aiTypoAuditPatch, [System.Text.Encoding]::UTF8)
 $aiPixelPerfectPatchContent = [System.IO.File]::ReadAllText($aiPixelPerfectPatch, [System.Text.Encoding]::UTF8)
 $deleteHiddenLayersPatchContent = [System.IO.File]::ReadAllText($deleteHiddenLayersPatch, [System.Text.Encoding]::UTF8)
+$aiColorExtractPatchContent = [System.IO.File]::ReadAllText($aiColorExtractPatch, [System.Text.Encoding]::UTF8)
 $aiImageUpscalePatchContent = [System.IO.File]::ReadAllText($aiImageUpscalePatch, [System.Text.Encoding]::UTF8)
 $originalImageDownloadPatchContent = ""
 if ($hasOriginalImageDownloadPatch) {
@@ -1138,6 +1175,7 @@ $patchedRuntimeParts = @(
   $aiTypoAuditPatchContent,
   $aiPixelPerfectPatchContent,
   $deleteHiddenLayersPatchContent,
+  $aiColorExtractPatchContent,
   $aiImageUpscalePatchContent
 )
 
