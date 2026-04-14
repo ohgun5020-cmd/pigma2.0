@@ -10,6 +10,8 @@
   const PATCH_VERSION = 3;
   const PLANNER_VERSION = "v2";
   const RENDERER_CONTRACT_VERSION = 2;
+  const DESIGN_ASSIST_ENABLED = false;
+  const DESIGN_ASSIST_DISABLED_MESSAGE = "디자인 어시스트는 360 변환 체인 정리 중이라 현재 비활성화되어 있습니다.";
   const DEFAULT_MOBILE_WIDTH = 360;
   const DEFAULT_DESKTOP_WIDTH = 1920;
   const MOBILE_TOUCH_TARGET_MIN = 44;
@@ -53,6 +55,11 @@
   }
 
   figma.ui.onmessage = async (message) => {
+    if (!DESIGN_ASSIST_ENABLED && isDesignAssistMessage(message)) {
+      await handleDisabledDesignAssistMessage(message);
+      return;
+    }
+
     if (message && message.type === "request-ai-design-assist-cache") {
       await postCache();
       return;
@@ -92,6 +99,48 @@
   };
 
   globalScope.__PIGMA_AI_DESIGN_ASSIST_PATCH__ = true;
+
+  if (!DESIGN_ASSIST_ENABLED) {
+    return;
+  }
+
+  function isDesignAssistMessage(message) {
+    if (!message || typeof message.type !== "string") {
+      return false;
+    }
+
+    return (
+      message.type === "request-ai-design-assist-cache" ||
+      message.type === "run-ai-design-assist" ||
+      message.type === "create-ai-design-assist-draft"
+    );
+  }
+
+  async function handleDisabledDesignAssistMessage(message) {
+    const cacheMeta = {
+      status: "disabled",
+      label: "Disabled",
+      disabled: true,
+    };
+
+    if (message && message.type === "request-ai-design-assist-cache") {
+      figma.ui.postMessage({
+        type: "ai-design-assist-cache",
+        result: null,
+        cacheMeta,
+        matchesCurrentSelection: true,
+      });
+      return;
+    }
+
+    figma.ui.postMessage({
+      type: "ai-design-assist-error",
+      message: DESIGN_ASSIST_DISABLED_MESSAGE,
+      cacheMeta,
+      matchesCurrentSelection: true,
+    });
+    figma.notify(DESIGN_ASSIST_DISABLED_MESSAGE, { error: true, timeout: 2200 });
+  }
 
   async function runDesignAssist(message) {
     const action = message && message.action === "pc-design" ? "pc-design" : "mobile-design";
