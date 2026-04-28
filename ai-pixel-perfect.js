@@ -491,9 +491,21 @@
       node,
       nodeName,
       nodeType,
+      fieldKey: "rotation",
+      label: "rotation",
+      value: node.rotation,
+      kind: "direct",
+      category: "rotation",
+    });
+    maybeAddCandidate({
+      candidates,
+      excluded,
+      node,
+      nodeName,
+      nodeType,
       fieldKey: "x",
       label: "x",
-      value: node.x,
+      value: getVisualPositionValue(node, "x"),
       kind: "position",
       category: "position",
     });
@@ -505,11 +517,10 @@
       nodeType,
       fieldKey: "y",
       label: "y",
-      value: node.y,
+      value: getVisualPositionValue(node, "y"),
       kind: "position",
       category: "position",
     });
-
     if (resizable) {
       maybeAddCandidate({
         candidates,
@@ -537,6 +548,7 @@
       });
     }
 
+    collectAutoLayoutCandidates(node, nodeName, nodeType, candidates, excluded);
     maybeAddCandidate({
       candidates,
       excluded,
@@ -616,6 +628,86 @@
     collectPaintOpacityCandidates(node, nodeName, nodeType, "fills", "fill", candidates, excluded);
     collectPaintOpacityCandidates(node, nodeName, nodeType, "strokes", "stroke paint", candidates, excluded);
     collectLayerOpacityCandidate(node, nodeName, nodeType, candidates, excluded);
+  }
+
+  function collectAutoLayoutCandidates(node, nodeName, nodeType, candidates, excluded) {
+    if (!hasAutoLayout(node)) {
+      return;
+    }
+
+    maybeAddCandidate({
+      candidates,
+      excluded,
+      node,
+      nodeName,
+      nodeType,
+      fieldKey: "itemSpacing",
+      label: "auto layout gap",
+      value: typeof node.itemSpacing === "number" ? node.itemSpacing : null,
+      kind: "direct",
+      category: "auto-layout-gap",
+    });
+    maybeAddCandidate({
+      candidates,
+      excluded,
+      node,
+      nodeName,
+      nodeType,
+      fieldKey: "counterAxisSpacing",
+      label: "auto layout wrap gap",
+      value: typeof node.counterAxisSpacing === "number" ? node.counterAxisSpacing : null,
+      kind: "direct",
+      category: "auto-layout-gap",
+    });
+
+    maybeAddCandidate({
+      candidates,
+      excluded,
+      node,
+      nodeName,
+      nodeType,
+      fieldKey: "paddingTop",
+      label: "padding top",
+      value: typeof node.paddingTop === "number" ? node.paddingTop : null,
+      kind: "direct",
+      category: "auto-layout-padding",
+    });
+    maybeAddCandidate({
+      candidates,
+      excluded,
+      node,
+      nodeName,
+      nodeType,
+      fieldKey: "paddingRight",
+      label: "padding right",
+      value: typeof node.paddingRight === "number" ? node.paddingRight : null,
+      kind: "direct",
+      category: "auto-layout-padding",
+    });
+    maybeAddCandidate({
+      candidates,
+      excluded,
+      node,
+      nodeName,
+      nodeType,
+      fieldKey: "paddingBottom",
+      label: "padding bottom",
+      value: typeof node.paddingBottom === "number" ? node.paddingBottom : null,
+      kind: "direct",
+      category: "auto-layout-padding",
+    });
+    maybeAddCandidate({
+      candidates,
+      excluded,
+      node,
+      nodeName,
+      nodeType,
+      fieldKey: "paddingLeft",
+      label: "padding left",
+      value: typeof node.paddingLeft === "number" ? node.paddingLeft : null,
+      kind: "direct",
+      category: "auto-layout-padding",
+    });
   }
 
   function collectEffectCandidates(node, nodeName, nodeType, candidates, excluded) {
@@ -933,8 +1025,14 @@
     switch (candidate.category) {
       case "position":
         return "가장 가까운 정수 좌표로 스냅했습니다.";
+      case "rotation":
+        return "Snap rotation to the nearest whole degree.";
       case "size":
         return "가장 가까운 정수 크기로 스냅했습니다.";
+      case "auto-layout-gap":
+        return "가장 가까운 정수 오토레이아웃 간격으로 스냅했습니다.";
+      case "auto-layout-padding":
+        return "가장 가까운 정수 오토레이아웃 패딩으로 스냅했습니다.";
       case "radius":
         return "가장 가까운 정수 반경 값으로 스냅했습니다.";
       case "effect-blur":
@@ -994,29 +1092,34 @@
   }
 
   function applyPositionChange(node, fieldKey, targetValue) {
-    const currentX = typeof node.x === "number" ? node.x : null;
-    const currentY = typeof node.y === "number" ? node.y : null;
+    const position = getVisualPosition(node);
+    const currentX = position && typeof position.x === "number" ? position.x : null;
+    const currentY = position && typeof position.y === "number" ? position.y : null;
     if (!Number.isFinite(currentX) || !Number.isFinite(currentY)) {
       throw new Error("position 속성을 읽을 수 없습니다.");
     }
 
     const desiredX = fieldKey === "x" ? targetValue : currentX;
     const desiredY = fieldKey === "y" ? targetValue : currentY;
+    const deltaX = desiredX - currentX;
+    const deltaY = desiredY - currentY;
+
+    if (Math.abs(deltaX) <= VALUE_EPSILON && Math.abs(deltaY) <= VALUE_EPSILON) {
+      return;
+    }
 
     if ("x" in node && "y" in node) {
       try {
-        node.x = desiredX;
-        node.y = desiredY;
+        node.x += deltaX;
+        node.y += deltaY;
       } catch (error) {}
     }
 
-    if (isCloseEnough(node.x, desiredX) && isCloseEnough(node.y, desiredY)) {
+    if (isVisualPositionCloseEnough(node, desiredX, desiredY)) {
       return;
     }
 
     if (Array.isArray(node.relativeTransform) && node.relativeTransform.length === 2) {
-      const deltaX = desiredX - currentX;
-      const deltaY = desiredY - currentY;
       const transform = node.relativeTransform;
       node.relativeTransform = [
         [transform[0][0], transform[0][1], roundValue(transform[0][2] + deltaX)],
@@ -1024,9 +1127,61 @@
       ];
     }
 
-    if (!isCloseEnough(node.x, desiredX) || !isCloseEnough(node.y, desiredY)) {
+    if (!isVisualPositionCloseEnough(node, desiredX, desiredY)) {
       throw new Error("position 적용에 실패했습니다.");
     }
+  }
+
+  function getVisualPositionValue(node, axis) {
+    const position = getVisualPosition(node);
+    return position && typeof position[axis] === "number" ? position[axis] : null;
+  }
+
+  function getVisualPosition(node) {
+    if (!node) {
+      return null;
+    }
+
+    const nodeBounds = getAbsoluteBounds(node);
+    if (nodeBounds) {
+      const parentBounds = getAbsoluteBounds(node.parent);
+      return {
+        x: parentBounds ? nodeBounds.x - parentBounds.x : nodeBounds.x,
+        y: parentBounds ? nodeBounds.y - parentBounds.y : nodeBounds.y,
+      };
+    }
+
+    if (typeof node.x === "number" && typeof node.y === "number") {
+      return {
+        x: node.x,
+        y: node.y,
+      };
+    }
+
+    return null;
+  }
+
+  function getAbsoluteBounds(node) {
+    if (!node || !node.absoluteBoundingBox) {
+      return null;
+    }
+
+    const bounds = node.absoluteBoundingBox;
+    if (
+      typeof bounds.x !== "number" ||
+      typeof bounds.y !== "number" ||
+      !Number.isFinite(bounds.x) ||
+      !Number.isFinite(bounds.y)
+    ) {
+      return null;
+    }
+
+    return bounds;
+  }
+
+  function isVisualPositionCloseEnough(node, expectedX, expectedY) {
+    const position = getVisualPosition(node);
+    return !!position && isCloseEnough(position.x, expectedX) && isCloseEnough(position.y, expectedY);
   }
 
   function applySizeChange(node, fieldKey, targetValue) {
@@ -1422,6 +1577,10 @@
     }
 
     return typeof node.resizeWithoutConstraints === "function" || typeof node.resize === "function";
+  }
+
+  function hasAutoLayout(node) {
+    return !!node && typeof node.layoutMode === "string" && node.layoutMode !== "NONE";
   }
 
   function cloneEffects(effects) {

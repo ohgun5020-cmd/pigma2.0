@@ -10,6 +10,7 @@
     apiKey: "",
     openAiApiKey: "",
     geminiApiKey: "",
+    dubApiKey: "",
     proofingLocale: "",
     userDictionary: [],
     protectedTerms: []
@@ -83,7 +84,16 @@
         : legacyProvider === "gemini"
           ? legacyApiKey
           : DEFAULT_AI_SETTINGS.geminiApiKey;
-    const provider = openAiApiKey ? "openai" : geminiApiKey ? "gemini" : legacyProvider;
+    const dubApiKey =
+      typeof source.dubApiKey === "string" ? sanitizeApiKey(source.dubApiKey) : DEFAULT_AI_SETTINGS.dubApiKey;
+    const preferredProvider = legacyProvider === "gemini" ? "gemini" : "openai";
+    const fallbackProvider = preferredProvider === "gemini" ? "openai" : "gemini";
+    const provider =
+      (preferredProvider === "gemini" ? geminiApiKey : openAiApiKey)
+        ? preferredProvider
+        : (fallbackProvider === "gemini" ? geminiApiKey : openAiApiKey)
+          ? fallbackProvider
+          : preferredProvider;
     const apiKey = provider === "gemini" ? geminiApiKey : openAiApiKey;
 
     return {
@@ -92,6 +102,7 @@
       apiKey,
       openAiApiKey,
       geminiApiKey,
+      dubApiKey,
       proofingLocale: normalizeProofingLocale(source.proofingLocale),
       userDictionary: normalizeTermList(source.userDictionary),
       protectedTerms: normalizeTermList(source.protectedTerms)

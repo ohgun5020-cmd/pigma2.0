@@ -18,6 +18,7 @@
   let isBoundsFitApplying = false;
   let pendingBoundsFitSession = null;
   let isReferencePreparing = false;
+  let isPromptDraftPreparing = false;
   let isTextOverlayPreparing = false;
   let isTextOverlayApplying = false;
   let pendingTextOverlaySession = null;
@@ -29,7 +30,7 @@
   const UPSCALE_RESULT_BYTES_MISSING_MESSAGE = "No generated image bytes were provided.";
   const UPSCALE_IMAGE_CREATE_ERROR_MESSAGE = "Failed to create an image hash from the generated result.";
   const UPSCALE_APPLY_ERROR_MESSAGE = "Failed to apply the generated AI image result.";
-  const BOUNDS_FIT_SOURCE_PREPARE_ERROR_MESSAGE = "Failed to prepare the bounds-fit image source.";
+  const BOUNDS_FIT_SOURCE_PREPARE_ERROR_MESSAGE = "Failed to prepare the bounds-fit source.";
   const REFERENCE_SEARCH_SOURCE_PREPARE_ERROR_MESSAGE = "Failed to prepare the reference search source.";
   const REFERENCE_SEARCH_QUERY_REQUIRED_MESSAGE = "Enter a search query before opening reference pages.";
   const REFERENCE_SEARCH_OPENED_MESSAGE_PREFIX = "Opened reference search: ";
@@ -53,6 +54,15 @@
   const SHAPE_TARGET_UNAVAILABLE_REASON = "Could not find an editable shape layer to apply the generated image.";
   const SHAPE_FILL_APPLY_ERROR_MESSAGE = "Failed to apply the generated image to the shape fill.";
   const REFERENCE_SOURCE_NOT_FOUND_MESSAGE = "Could not find usable text or image content in the selection.";
+  const PROMPT_DRAFT_SOURCE_PREPARE_ERROR_MESSAGE = "Failed to prepare the prompt draft source.";
+  const PROMPT_DRAFT_SOURCE_NOT_FOUND_MESSAGE = "Select one image, frame, shape, or text layer to generate a prompt.";
+  const PROMPT_SMART_SELECTION_MESSAGE = "Select at most one visual layer plus optional text layers for prompt edit/generation.";
+  const PROMPT_MULTI_IMAGE_CONTAINER_MESSAGE =
+    "Prompt edit/generation supports a frame only when it contains one main image plus optional text. Select a single image layer instead.";
+  const PROMPT_TARGET_EXPORT_ERROR_MESSAGE = "Failed to export the selected layer for prompt edit/generation.";
+  const PROMPT_TARGET_EXPORT_EMPTY_MESSAGE = "The selected layer export for prompt edit/generation was empty.";
+  const PROMPT_PLACEMENT_APPLY_ERROR_MESSAGE = "Failed to place the generated prompt image.";
+  const PROMPT_TEXT_ANCHOR_GAP = 24;
 
   if (typeof originalOnMessage !== "function") {
     return;
@@ -62,6 +72,11 @@
     if (isAiImageUpscaleMessage(message)) {
       if (message.type === "request-ai-image-upscale-source") {
         await prepareUpscaleSource(message);
+        return;
+      }
+
+      if (message.type === "request-ai-image-prompt-draft-source") {
+        await preparePromptDraftSource(message);
         return;
       }
 
@@ -105,6 +120,11 @@
       if (message.type === "image-composite-report-error") {
         pendingCompositeSession = null;
         notifyUiReportedError(message);
+        return;
+      }
+
+      if (message.type === "run-image-merge") {
+        await runImageMerge(message);
         return;
       }
 
@@ -164,6 +184,7 @@
     return (
       !!message &&
       (message.type === "request-ai-image-upscale-source" ||
+        message.type === "request-ai-image-prompt-draft-source" ||
         message.type === "apply-ai-image-upscaled-image" ||
         message.type === "ai-image-upscale-report-error" ||
         message.type === "request-image-extend-source" ||
@@ -172,6 +193,7 @@
         message.type === "request-image-composite-source" ||
         message.type === "apply-image-composite-image" ||
         message.type === "image-composite-report-error" ||
+        message.type === "run-image-merge" ||
         message.type === "request-image-bounds-fit-source" ||
         message.type === "apply-image-bounds-fit-image" ||
         message.type === "image-bounds-fit-report-error" ||
@@ -194,6 +216,7 @@
       isCompositeApplying ||
       isBoundsFitPreparing ||
       isBoundsFitApplying ||
+      isPromptDraftPreparing ||
       isTextOverlayPreparing ||
       isTextOverlayApplying
     ) {
@@ -205,19 +228,31 @@
     pendingSession = null;
 
     try {
-      const target = collectAiImageSourceTargetFromSelection(sanitizeSourceMode(message && message.sourceMode));
-      const source = await buildAiImageSource(target);
+      const target = collectAiImageSourceTargetFromSelection(
+        sanitizeSourceMode(message && message.sourceMode),
+        message
+      );
+      const source = await buildAiImageSource(target, {
+        preferOriginalImageBytes: shouldPreferOriginalUpscaleSource(message),
+      });
       const sessionId = buildSessionId();
 
       pendingSession = {
         id: sessionId,
         clientRequestId: sanitizeClientRequestId(message && message.clientRequestId),
         targetKind: target.kind,
-        targetNodeId: target.entry.nodeId,
+        captureMode: source && source.summary && typeof source.summary.captureMode === "string" ? source.summary.captureMode : "",
+        targetNodeId: target.entry && target.entry.nodeId ? target.entry.nodeId : "",
         originalHash: target.kind === "image-fill" ? target.entry.imageHash : "",
         usages: target.kind === "image-fill" ? target.usages : [],
         selectionLabel: formatSelectionLabel(target.selection),
-        targetNodeName: target.entry.nodeName,
+        targetNodeName: target.entry && target.entry.nodeName ? target.entry.nodeName : "",
+        targetWidth: target.targetWidth || 0,
+        targetHeight: target.targetHeight || 0,
+        targetParentId: target.targetParentId || "",
+        targetX: target.targetX || 0,
+        targetY: target.targetY || 0,
+        placementMode: target.placementMode || "",
         operationLabel: sanitizeOperationLabel(message && message.operationLabel),
         preparedAt: new Date().toISOString(),
       };
@@ -228,11 +263,14 @@
         clientRequestId: pendingSession.clientRequestId,
         image: source.image,
         summary: source.summary,
+        composite: source.composite || null,
       });
     } catch (error) {
       pendingSession = null;
       postPrepareError(
-        normalizeErrorMessage(error, UPSCALE_SOURCE_PREPARE_ERROR_MESSAGE),
+        normalizeErrorMessage(error, UPSCALE_SOURCE_PREPARE_ERROR_MESSAGE, {
+          operationLabel: sanitizeOperationLabel(message && message.operationLabel),
+        }),
         sanitizeClientRequestId(message && message.clientRequestId)
       );
     } finally {
@@ -249,6 +287,7 @@
       isCompositeApplying ||
       isBoundsFitPreparing ||
       isBoundsFitApplying ||
+      isPromptDraftPreparing ||
       isTextOverlayPreparing ||
       isTextOverlayApplying
     ) {
@@ -273,10 +312,14 @@
         throw new Error(UPSCALE_IMAGE_CREATE_ERROR_MESSAGE);
       }
 
-      const result =
-        pendingSession.targetKind === "shape-export"
-          ? await applyGeneratedImageToShapeNode(pendingSession, createdImage.hash, bytes.length)
-          : await replaceSelectionImageFills(pendingSession, createdImage.hash, bytes.length);
+      let result = null;
+      if (pendingSession.targetKind === "shape-export") {
+        result = await applyGeneratedImageToShapeNode(pendingSession, createdImage.hash, bytes.length);
+      } else if (pendingSession.targetKind === "container-placement" || pendingSession.targetKind === "new-image-placement") {
+        result = await applyGeneratedPromptImagePlacement(pendingSession, createdImage.hash, bytes.length);
+      } else {
+        result = await replaceSelectionImageFills(pendingSession, createdImage.hash, bytes.length);
+      }
       figma.ui.postMessage({
         type: "ai-image-upscale-apply-result",
         clientRequestId: pendingSession.clientRequestId,
@@ -285,7 +328,12 @@
       notifyApplyResult(result, sanitizeOperationLabel(message && message.operationLabel) || pendingSession.operationLabel);
       pendingSession = null;
     } catch (error) {
-      const messageText = normalizeErrorMessage(error, UPSCALE_APPLY_ERROR_MESSAGE);
+      const messageText = normalizeErrorMessage(error, UPSCALE_APPLY_ERROR_MESSAGE, {
+        operationLabel:
+          sanitizeOperationLabel(message && message.operationLabel) ||
+          (pendingSession && pendingSession.operationLabel) ||
+          "",
+      });
       figma.ui.postMessage({
         type: "ai-image-upscale-apply-error",
         clientRequestId: pendingSession && pendingSession.clientRequestId ? pendingSession.clientRequestId : sanitizeClientRequestId(message && message.clientRequestId),
@@ -307,6 +355,7 @@
       isCompositeApplying ||
       isBoundsFitPreparing ||
       isBoundsFitApplying ||
+      isPromptDraftPreparing ||
       isReferencePreparing ||
       isTextOverlayPreparing ||
       isTextOverlayApplying
@@ -323,7 +372,8 @@
 
     try {
       const target = await collectImageExtendTargetFromSelection();
-      const expand = sanitizeImageExtendPadding(message && message.expand);
+      const requestedExpand = sanitizeImageExtendPadding(message && message.expand);
+      const expand = resolveImageExtendEffectivePadding(requestedExpand, target.boundsPadding);
       const sessionId = buildImageExtendSessionId();
 
       pendingImageExtendSession = {
@@ -335,6 +385,7 @@
         targetNodeName: target.entry.nodeName,
         originalHash: target.entry.imageHash,
         expand: expand,
+        imageBounds: target.imageBounds,
         preparedAt: new Date().toISOString(),
       };
 
@@ -346,7 +397,7 @@
         summary: {
           selectionLabel: pendingImageExtendSession.selectionLabel,
           targetNodeName: target.entry.nodeName,
-          captureMode: "rendered-node",
+          captureMode: "image-bounds",
           currentWidth: target.currentWidth,
           currentHeight: target.currentHeight,
           targetWidth: target.currentWidth + expand.left + expand.right,
@@ -355,6 +406,7 @@
           expandRight: expand.right,
           expandBottom: expand.bottom,
           expandLeft: expand.left,
+          expansionSource: expand.source || "prompt",
           byteLength: target.image.bytes.length,
         },
       });
@@ -379,6 +431,7 @@
       isCompositeApplying ||
       isBoundsFitPreparing ||
       isBoundsFitApplying ||
+      isPromptDraftPreparing ||
       isTextOverlayPreparing ||
       isTextOverlayApplying
     ) {
@@ -442,6 +495,7 @@
       isCompositeApplying ||
       isBoundsFitPreparing ||
       isBoundsFitApplying ||
+      isPromptDraftPreparing ||
       isReferencePreparing ||
       isTextOverlayPreparing ||
       isTextOverlayApplying
@@ -469,6 +523,8 @@
         operationLabel: sanitizeOperationLabel(message && message.operationLabel),
         selectionLabel: formatSelectionLabel(collection.selection),
         unionRect: collection.unionRect,
+        selectedRootNodeId: collection.selectedRoot && collection.selectedRoot.id ? collection.selectedRoot.id : "",
+        selectedRootNodeName: collection.selectedRoot ? safeName(collection.selectedRoot) : "",
         layerCount: collection.layers.length,
         preparedAt: new Date().toISOString(),
       };
@@ -486,6 +542,9 @@
             fileName: layer.fileName,
             mimeType: layer.mimeType,
             bytes: layer.bytes,
+            layerKind: layer.layerKind || "image",
+            nodeType: layer.nodeType || "",
+            textContent: layer.textContent || "",
             offsetX: layer.offsetX,
             offsetY: layer.offsetY,
             width: layer.visibleRect.width,
@@ -496,7 +555,8 @@
           selectionLabel: pendingCompositeSession.selectionLabel,
           layerCount: collection.layers.length,
           skippedCount: collection.skipped.length,
-          backgroundNodeName: collection.layers[0].nodeName,
+          backgroundNodeName:
+            pendingCompositeSession.selectedRootNodeName || (collection.layers[0] ? collection.layers[0].nodeName : ""),
           foregroundCount: Math.max(0, collection.layers.length - 1),
           canvasWidth: collection.unionRect.width,
           canvasHeight: collection.unionRect.height,
@@ -523,6 +583,7 @@
       isCompositeApplying ||
       isBoundsFitPreparing ||
       isBoundsFitApplying ||
+      isPromptDraftPreparing ||
       isTextOverlayPreparing ||
       isTextOverlayApplying
     ) {
@@ -586,6 +647,7 @@
       isCompositeApplying ||
       isBoundsFitPreparing ||
       isBoundsFitApplying ||
+      isPromptDraftPreparing ||
       isTextOverlayPreparing ||
       isTextOverlayApplying
     ) {
@@ -612,6 +674,7 @@
         operationLabel: sanitizeOperationLabel(message && message.operationLabel),
         selectionLabel: formatSelectionLabel(collection.selection),
         targets: collection.targets,
+        containers: collection.containers,
         skipped: collection.skipped,
         requestedCount: collection.selection.length,
         preparedAt: new Date().toISOString(),
@@ -621,21 +684,38 @@
         type: "image-bounds-fit-source-ready",
         sessionId: sessionId,
         clientRequestId: pendingBoundsFitSession.clientRequestId,
-        items: collection.targets.map(function (target) {
-          return {
-            nodeId: target.nodeId,
-            nodeName: target.nodeName,
-            imageHash: target.originalHash,
-            fileName: target.fileName,
-            mimeType: target.mimeType,
-            bytes: target.bytes,
-            sourceWidth: target.sourceWidth,
-            sourceHeight: target.sourceHeight,
-          };
-        }),
+        items: collection.targets
+          .filter(function (target) {
+            return !target || target.skipRasterAnalysis !== true;
+          })
+          .map(function (target) {
+            return {
+              nodeId: target.nodeId,
+              nodeName: target.nodeName,
+              imageHash: target.originalHash,
+              fileName: target.fileName,
+              mimeType: target.mimeType,
+              bytes: target.bytes,
+              sourceWidth: target.sourceWidth,
+              sourceHeight: target.sourceHeight,
+              analysisOffsetX: target.analysisOffsetX,
+              analysisOffsetY: target.analysisOffsetY,
+              analysisWidth: target.analysisWidth,
+              analysisHeight: target.analysisHeight,
+              rasterAnalysisOffsetX: Number.isFinite(Number(target.rasterAnalysisOffsetX))
+                ? Number(target.rasterAnalysisOffsetX)
+                : Number(target.analysisOffsetX) || 0,
+              rasterAnalysisOffsetY: Number.isFinite(Number(target.rasterAnalysisOffsetY))
+                ? Number(target.rasterAnalysisOffsetY)
+                : Number(target.analysisOffsetY) || 0,
+              rasterAnalysisWidth: Number(target.rasterAnalysisWidth) > 0 ? Number(target.rasterAnalysisWidth) : Number(target.analysisWidth) || 0,
+              rasterAnalysisHeight:
+                Number(target.rasterAnalysisHeight) > 0 ? Number(target.rasterAnalysisHeight) : Number(target.analysisHeight) || 0,
+            };
+          }),
         summary: {
           selectionLabel: pendingBoundsFitSession.selectionLabel,
-          eligibleCount: collection.targets.length,
+          eligibleCount: collection.targets.length + collection.containers.length,
           skippedCount: collection.skipped.length,
         },
       });
@@ -660,6 +740,7 @@
       isCompositeApplying ||
       isBoundsFitPreparing ||
       isBoundsFitApplying ||
+      isPromptDraftPreparing ||
       isReferencePreparing ||
       isTextOverlayPreparing ||
       isTextOverlayApplying
@@ -693,6 +774,50 @@
     }
   }
 
+  async function preparePromptDraftSource(message) {
+    if (
+      isPreparing ||
+      isApplying ||
+      isImageExtendPreparing ||
+      isImageExtendApplying ||
+      isCompositePreparing ||
+      isCompositeApplying ||
+      isBoundsFitPreparing ||
+      isBoundsFitApplying ||
+      isReferencePreparing ||
+      isPromptDraftPreparing ||
+      isTextOverlayPreparing ||
+      isTextOverlayApplying
+    ) {
+      postPromptDraftSourceError(
+        IMAGE_TASK_ALREADY_RUNNING_MESSAGE,
+        sanitizeClientRequestId(message && message.clientRequestId)
+      );
+      return;
+    }
+
+    isPromptDraftPreparing = true;
+
+    try {
+      const source = await collectPromptDraftSourceFromSelection();
+      figma.ui.postMessage({
+        type: "ai-image-prompt-draft-source-ready",
+        clientRequestId: sanitizeClientRequestId(message && message.clientRequestId),
+        sourceType: source.sourceType,
+        text: source.text || "",
+        image: source.image || null,
+        summary: source.summary || {},
+      });
+    } catch (error) {
+      postPromptDraftSourceError(
+        normalizeErrorMessage(error, PROMPT_DRAFT_SOURCE_PREPARE_ERROR_MESSAGE),
+        sanitizeClientRequestId(message && message.clientRequestId)
+      );
+    } finally {
+      isPromptDraftPreparing = false;
+    }
+  }
+
   async function prepareImageTextOverlaySource(message) {
     if (
       isPreparing ||
@@ -704,6 +829,7 @@
       isBoundsFitPreparing ||
       isBoundsFitApplying ||
       isReferencePreparing ||
+      isPromptDraftPreparing ||
       isTextOverlayPreparing ||
       isTextOverlayApplying
     ) {
@@ -751,6 +877,7 @@
       isBoundsFitPreparing ||
       isBoundsFitApplying ||
       isReferencePreparing ||
+      isPromptDraftPreparing ||
       isTextOverlayPreparing ||
       isTextOverlayApplying
     ) {
@@ -879,7 +1006,11 @@
       message && typeof message.message === "string" && message.message.trim()
         ? message.message.trim()
         : UI_REPORTED_IMAGE_ERROR_FALLBACK,
-      UI_REPORTED_IMAGE_ERROR_FALLBACK
+      UI_REPORTED_IMAGE_ERROR_FALLBACK,
+      {
+        operationLabel: sanitizeOperationLabel(message && message.operationLabel),
+        operationKind: message && typeof message.operationKind === "string" ? message.operationKind : "",
+      }
     );
     figma.notify(text, { error: true, timeout: 2600 });
   }
@@ -887,6 +1018,15 @@
   function postPrepareError(message, clientRequestId) {
     figma.ui.postMessage({
       type: "ai-image-upscale-source-error",
+      clientRequestId: sanitizeClientRequestId(clientRequestId),
+      message: message,
+    });
+    figma.notify(message, { error: true, timeout: 2600 });
+  }
+
+  function postPromptDraftSourceError(message, clientRequestId) {
+    figma.ui.postMessage({
+      type: "ai-image-prompt-draft-source-error",
       clientRequestId: sanitizeClientRequestId(clientRequestId),
       message: message,
     });
@@ -992,7 +1132,11 @@
     figma.notify(message, { error: true, timeout: 2600 });
   }
 
-  function collectAiImageSourceTargetFromSelection(sourceMode) {
+  function collectAiImageSourceTargetFromSelection(sourceMode, message) {
+    if (sanitizeSourceMode(sourceMode) === "prompt-smart") {
+      return collectPromptSmartTargetFromSelection(message);
+    }
+
     try {
       const imageTarget = collectSingleUpscaleTargetFromSelection();
       imageTarget.kind = "image-fill";
@@ -1005,27 +1149,327 @@
     }
   }
 
-  async function buildAiImageSource(target) {
+  function collectPromptSmartTargetFromSelection(message) {
+    const selection = Array.from(figma.currentPage.selection || []).filter(Boolean);
+    const outputSize = sanitizePromptOutputSize(message && message.requestedOutputSize);
+    const visualNodes = selection.filter(function (node) {
+      return !!node && !node.removed && node.type !== "TEXT";
+    });
+
+    if (!visualNodes.length) {
+      return buildPromptPlacementTarget(selection, outputSize);
+    }
+
+    if (visualNodes.length > 1) {
+      throw new Error(PROMPT_SMART_SELECTION_MESSAGE);
+    }
+
+    const node = visualNodes[0];
+    if ("locked" in node && node.locked) {
+      throw new Error("Locked layers are not supported for prompt edit/generation.");
+    }
+
+    const directImageTarget = collectDirectImageFillTarget(node, selection);
+    if (directImageTarget) {
+      return directImageTarget;
+    }
+
+    if (isPromptEditableShapeNode(node)) {
+      const localBounds = getImageExtendLocalBounds(node);
+      return {
+        kind: "shape-export",
+        selection: selection,
+        entry: {
+          nodeId: node.id,
+          nodeName: safeName(node),
+          path: safeName(node),
+        },
+        targetWidth: localBounds ? localBounds.width : roundBoundsFitMetric(node.width),
+        targetHeight: localBounds ? localBounds.height : roundBoundsFitMetric(node.height),
+      };
+    }
+
+    if (!isPromptSmartContainerTarget(node)) {
+      throw new Error(PROMPT_SMART_SELECTION_MESSAGE);
+    }
+
+    return {
+      kind: "container-placement",
+      selection: selection,
+      entry: {
+        nodeId: node.id,
+        nodeName: safeName(node),
+        path: safeName(node),
+      },
+      targetWidth: roundBoundsFitMetric(node.width),
+      targetHeight: roundBoundsFitMetric(node.height),
+    };
+  }
+
+  function buildPromptPlacementTarget(selection, outputSize) {
+    const dimensions = buildPromptPlacementDimensions(outputSize);
+    const target = {
+      kind: "new-image-placement",
+      selection: Array.isArray(selection) ? selection.slice() : [],
+      entry: {
+        nodeId: "",
+        nodeName: Array.isArray(selection) && selection.length ? safeName(selection[0]) : "Viewport center",
+        path: "",
+      },
+      targetWidth: dimensions.width,
+      targetHeight: dimensions.height,
+    };
+
+    if (Array.isArray(selection) && selection.length === 1 && selection[0] && selection[0].type === "TEXT") {
+      const textNode = selection[0];
+      const textRect = getBoundsFitNodeRect(textNode);
+      target.entry.nodeId = textNode.id;
+      target.entry.nodeName = safeName(textNode);
+      target.entry.path = safeName(textNode);
+      target.targetParentId = textNode.parent && typeof textNode.parent.id === "string" ? textNode.parent.id : "";
+      target.targetX = textRect ? textRect.x : 0;
+      target.targetY = textRect ? textRect.y : 0;
+      target.placementMode = "below-selected-text";
+    }
+
+    return target;
+  }
+
+  function collectDirectImageFillTarget(node, selection) {
+    if (!node || node.removed || !hasSimpleVisibleImagePaint(node)) {
+      return null;
+    }
+
+    const fills = getNodeFills(node);
+    const fillIndex = getPrimaryVisibleImageFillIndex(fills);
+    if (fillIndex < 0) {
+      return null;
+    }
+
+    const fill = fills[fillIndex];
+    if (!fill || !fill.imageHash) {
+      return null;
+    }
+
+    return {
+      kind: "image-fill",
+      selection: Array.isArray(selection) ? selection.slice() : [node],
+      entry: {
+        imageHash: fill.imageHash,
+        nodeId: node.id,
+        nodeName: safeName(node),
+        path: safeName(node),
+      },
+      usages: [
+        {
+          nodeId: node.id,
+          nodeName: safeName(node),
+          fillIndex: fillIndex,
+          imageHash: fill.imageHash,
+          path: safeName(node),
+        },
+      ],
+      targetWidth: roundBoundsFitMetric(node.width),
+      targetHeight: roundBoundsFitMetric(node.height),
+    };
+  }
+
+  function isPromptSmartContainerTarget(node) {
+    return (
+      !!node &&
+      !node.removed &&
+      node.type !== "TEXT" &&
+      (!("locked" in node) || !node.locked) &&
+      typeof node.exportAsync === "function" &&
+      typeof node.width === "number" &&
+      typeof node.height === "number" &&
+      node.width > 0 &&
+      node.height > 0
+    );
+  }
+
+  async function buildAiImageSource(target, options) {
     if (target && target.kind === "shape-export") {
       return await buildShapeEditSource(target);
     }
-    return await buildUpscaleImageSource(target);
+    if (target && target.kind === "container-placement") {
+      return await buildContainerPromptSource(target);
+    }
+    if (target && target.kind === "new-image-placement") {
+      return buildPromptPlacementSource(target);
+    }
+    return await buildUpscaleImageSource(target, options);
   }
 
-  async function buildUpscaleImageSource(target) {
-    const image = figma.getImageByHash(target.entry.imageHash);
-    if (!image) {
-      throw new Error(IMAGE_FILL_NOT_FOUND_MESSAGE);
+  function buildPromptPlacementSource(target) {
+    return {
+      image: null,
+      summary: {
+        selectionLabel: formatSelectionLabel(target.selection),
+        targetNodeName: target.entry && target.entry.nodeName ? target.entry.nodeName : "Viewport center",
+        targetWidth: target.targetWidth || 0,
+        targetHeight: target.targetHeight || 0,
+        placementMode: "viewport-center",
+        requestMode: "prompt-only",
+        byteLength: 0,
+      },
+    };
+  }
+
+  async function buildContainerPromptSource(target) {
+    const node = await figma.getNodeByIdAsync(target.entry.nodeId);
+    if (!isPromptSmartContainerTarget(node)) {
+      throw new Error(PROMPT_TARGET_EXPORT_ERROR_MESSAGE);
     }
 
-    const bytes = await image.getBytesAsync();
+    let composite = null;
+    let collection = null;
+    if (hasChildren(node)) {
+      try {
+        collection = await collectImageCompositeTargetsFromSelection([node]);
+      } catch (error) {
+        collection = null;
+      }
+      if (collection && Array.isArray(collection.layers)) {
+        const imageLayerCount = collection.layers.filter(function (layer) {
+          return !!layer && layer.layerKind === "image";
+        }).length;
+        if (imageLayerCount >= 2) {
+          throw new Error(PROMPT_MULTI_IMAGE_CONTAINER_MESSAGE);
+        }
+        if (collection.layers.length >= 2 && collection.unionRect) {
+          composite = {
+            layers: collection.layers.map(function (layer) {
+              return {
+                nodeId: layer.nodeId,
+                nodeName: layer.nodeName,
+                role: layer.role,
+                orderIndex: layer.orderIndex,
+                fileName: layer.fileName,
+                mimeType: layer.mimeType,
+                bytes: layer.bytes,
+                layerKind: layer.layerKind || "image",
+                nodeType: layer.nodeType || "",
+                textContent: layer.textContent || "",
+                offsetX: layer.offsetX,
+                offsetY: layer.offsetY,
+                width: layer.visibleRect.width,
+                height: layer.visibleRect.height,
+              };
+            }),
+            summary: {
+              selectionLabel: formatSelectionLabel(target.selection),
+              layerCount: collection.layers.length,
+              skippedCount: Array.isArray(collection.skipped) ? collection.skipped.length : 0,
+              backgroundNodeName: safeName(node),
+              foregroundCount: Math.max(0, collection.layers.length - 1),
+              canvasWidth: collection.unionRect.width,
+              canvasHeight: collection.unionRect.height,
+            },
+          };
+        }
+      }
+    }
+
+    const bytes = await node.exportAsync({
+      format: "PNG",
+      useAbsoluteBounds: false,
+    });
     if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
-      throw new Error(IMAGE_FILL_BYTES_MISSING_MESSAGE);
+      throw new Error(PROMPT_TARGET_EXPORT_EMPTY_MESSAGE);
     }
 
-    const extension = detectImageExtension(bytes);
-    const mimeType = detectImageMimeType(bytes);
-    const fileName = buildFileName(target.entry, extension === "bin" ? "png" : extension);
+    return {
+      image: {
+        bytes: bytes,
+        mimeType: "image/png",
+        fileName: buildFileName(
+          {
+            nodeName: safeName(node),
+            imageHash: node.id,
+          },
+          "png"
+        ),
+      },
+      summary: {
+        selectionLabel: formatSelectionLabel(target.selection),
+        targetNodeName: safeName(node),
+        captureMode: "rendered-node",
+        targetWidth: roundBoundsFitMetric(node.width),
+        targetHeight: roundBoundsFitMetric(node.height),
+        requestMode: "image-edit",
+        byteLength: bytes.length,
+        pipelineMode: composite ? "composite" : "upscale",
+      },
+      composite: composite,
+    };
+  }
+
+  async function buildUpscaleImageSource(target, options) {
+    const targetNode = await figma.getNodeByIdAsync(target.entry.nodeId);
+    const preferOriginalImageBytes = !!(options && options.preferOriginalImageBytes);
+    const sourceFill = resolveUpscaleSourceFill(targetNode, target);
+    const requiresRenderedSource = sourceFill ? await isRenderedUpscaleSourceRequired(targetNode, sourceFill) : false;
+    const localBounds = getImageExtendLocalBounds(targetNode);
+    let sourceWidth = 0;
+    let sourceHeight = 0;
+    if (target && target.entry && target.entry.imageHash) {
+      const sourceImage = figma.getImageByHash(target.entry.imageHash);
+      if (sourceImage && typeof sourceImage.getSizeAsync === "function") {
+        try {
+          const size = await sourceImage.getSizeAsync();
+          sourceWidth = size && typeof size.width === "number" && Number.isFinite(size.width) ? Math.max(0, Math.round(size.width)) : 0;
+          sourceHeight =
+            size && typeof size.height === "number" && Number.isFinite(size.height) ? Math.max(0, Math.round(size.height)) : 0;
+        } catch (error) {}
+      }
+    }
+    const summary = {
+      selectionLabel: formatSelectionLabel(target.selection),
+      targetNodeName: target.entry.nodeName,
+      targetFillCount: target.usages.length,
+      imageHash: target.entry.imageHash,
+      captureMode: "rendered-node",
+      targetWidth: localBounds ? localBounds.width : 0,
+      targetHeight: localBounds ? localBounds.height : 0,
+      sourceWidth: sourceWidth,
+      sourceHeight: sourceHeight,
+      byteLength: 0,
+    };
+    let bytes = new Uint8Array(0);
+    let mimeType = "image/png";
+    let fileName = buildFileName(target.entry, "png");
+
+    if (!preferOriginalImageBytes && targetNode && !targetNode.removed && typeof targetNode.exportAsync === "function") {
+      try {
+        bytes = await targetNode.exportAsync({
+          format: "PNG",
+          useAbsoluteBounds: false,
+        });
+      } catch (error) {
+        bytes = new Uint8Array(0);
+      }
+    }
+
+    if (!bytes.length) {
+      if (requiresRenderedSource && !preferOriginalImageBytes) {
+        throw new Error("Could not export the currently visible image bytes for upscale.");
+      }
+      const image = figma.getImageByHash(target.entry.imageHash);
+      if (!image) {
+        throw new Error(IMAGE_FILL_NOT_FOUND_MESSAGE);
+      }
+      bytes = await image.getBytesAsync();
+      if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
+        throw new Error(IMAGE_FILL_BYTES_MISSING_MESSAGE);
+      }
+      const extension = detectImageExtension(bytes);
+      mimeType = detectImageMimeType(bytes);
+      fileName = buildFileName(target.entry, extension === "bin" ? "png" : extension);
+      summary.captureMode = "source-image";
+    }
+
+    summary.byteLength = bytes.length;
 
     return {
       image: {
@@ -1033,14 +1477,64 @@
         mimeType: mimeType,
         fileName: fileName,
       },
-      summary: {
-        selectionLabel: formatSelectionLabel(target.selection),
-        targetNodeName: target.entry.nodeName,
-        targetFillCount: target.usages.length,
-        imageHash: target.entry.imageHash,
-        byteLength: bytes.length,
-      },
+      summary: summary,
     };
+  }
+
+  function resolveUpscaleSourceFill(node, target) {
+    if (!node || node.removed) {
+      return null;
+    }
+    const fills = getNodeFills(node);
+    if (!fills.length) {
+      return null;
+    }
+    const preferredUsage = target && Array.isArray(target.usages) && target.usages.length ? target.usages[0] : null;
+    if (
+      preferredUsage &&
+      Number.isInteger(preferredUsage.fillIndex) &&
+      preferredUsage.fillIndex >= 0 &&
+      preferredUsage.fillIndex < fills.length
+    ) {
+      const directFill = fills[preferredUsage.fillIndex];
+      if (isImagePaint(directFill) && directFill.imageHash === target.entry.imageHash) {
+        return directFill;
+      }
+    }
+    for (let index = 0; index < fills.length; index += 1) {
+      const fill = fills[index];
+      if (isImagePaint(fill) && fill.imageHash === target.entry.imageHash) {
+        return fill;
+      }
+    }
+    return null;
+  }
+
+  async function isRenderedUpscaleSourceRequired(node, fill) {
+    if (!node || !fill || !fill.imageHash) {
+      return false;
+    }
+    const nodeWidth = typeof node.width === "number" && Number.isFinite(node.width) ? node.width : 0;
+    const nodeHeight = typeof node.height === "number" && Number.isFinite(node.height) ? node.height : 0;
+    const image = figma.getImageByHash(fill.imageHash);
+    if (!image) {
+      return false;
+    }
+    const size = await image.getSizeAsync();
+    const sourceWidth = size && typeof size.width === "number" ? size.width : 0;
+    const sourceHeight = size && typeof size.height === "number" ? size.height : 0;
+    if (!(nodeWidth > 0) || !(nodeHeight > 0) || !(sourceWidth > 0) || !(sourceHeight > 0)) {
+      return false;
+    }
+    const scaleMode = typeof fill.scaleMode === "string" ? fill.scaleMode : "FILL";
+    const fillRotation = typeof fill.rotation === "number" && Number.isFinite(fill.rotation) ? fill.rotation : 0;
+    return (
+      scaleMode === "CROP" ||
+      scaleMode === "TILE" ||
+      !!fill.imageTransform ||
+      Math.abs(fillRotation) > 0.01 ||
+      !hasMatchingAspectRatio(nodeWidth, nodeHeight, sourceWidth, sourceHeight)
+    );
   }
 
   function collectSingleUpscaleTargetFromSelection(selectionInput) {
@@ -1161,11 +1655,17 @@
     if (!isPromptEditableShapeNode(node) || typeof node.exportAsync !== "function") {
       throw new Error(SHAPE_EXPORT_SOURCE_ERROR_MESSAGE);
     }
+    const localBounds = getImageExtendLocalBounds(node);
 
-    const bytes = await node.exportAsync({
-      format: "PNG",
-      useAbsoluteBounds: false,
-    });
+    let bytes = new Uint8Array(0);
+    if (shapeEditNeedsPlaceholderSource(node)) {
+      bytes = await exportShapeEditPlaceholderPng(node);
+    } else {
+      bytes = await node.exportAsync({
+        format: "PNG",
+        useAbsoluteBounds: false,
+      });
+    }
     if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
       throw new Error(SHAPE_EXPORT_EMPTY_MESSAGE);
     }
@@ -1188,6 +1688,8 @@
         targetFillCount: 1,
         imageHash: "",
         captureMode: "rendered-node",
+        targetWidth: localBounds ? localBounds.width : 0,
+        targetHeight: localBounds ? localBounds.height : 0,
         byteLength: bytes.length,
       },
     };
@@ -1249,14 +1751,9 @@
       throw new Error("Could not determine the current layer size.");
     }
 
-    if (typeof node.exportAsync !== "function") {
-      throw new Error("Could not export the selected image layer for image extend.");
-    }
-
-    const bytes = await node.exportAsync({
-      format: "PNG",
-      useAbsoluteBounds: false,
-    });
+    const imageBounds = await resolveImageExtendImageLocalBounds(node, fill, width, height);
+    const boundsPadding = buildImageExtendBoundsPadding(imageBounds, width, height);
+    const bytes = await exportImageExtendSourcePng(node, imageBounds);
     if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
       throw new Error("Could not export the selected image layer as PNG.");
     }
@@ -1268,8 +1765,10 @@
         nodeName: safeName(node),
         imageHash: fill.imageHash || "",
       },
-      currentWidth: width,
-      currentHeight: height,
+      currentWidth: imageBounds.width,
+      currentHeight: imageBounds.height,
+      imageBounds: imageBounds,
+      boundsPadding: boundsPadding,
       image: {
         bytes: bytes,
         mimeType: "image/png",
@@ -1282,6 +1781,158 @@
         ),
       },
     };
+  }
+
+  async function resolveImageExtendImageLocalBounds(node, fill, fallbackWidth, fallbackHeight) {
+    const nodeWidth = Math.max(1, Number(fallbackWidth) || 1);
+    const nodeHeight = Math.max(1, Number(fallbackHeight) || 1);
+    const fullBounds = buildImageExtendFullLocalBounds(nodeWidth, nodeHeight);
+    if (!fill || !isImagePaint(fill)) {
+      return fullBounds;
+    }
+
+    const fillRotation = typeof fill.rotation === "number" && Number.isFinite(fill.rotation) ? fill.rotation : 0;
+    if (Math.abs(fillRotation) > 0.01 || !!fill.imageTransform) {
+      return fullBounds;
+    }
+
+    const scaleMode = typeof fill.scaleMode === "string" ? fill.scaleMode : "FILL";
+    if (scaleMode !== "FIT") {
+      return fullBounds;
+    }
+
+    const sourceSize = await getImageExtendSourceSize(fill);
+    if (!sourceSize) {
+      return fullBounds;
+    }
+
+    const scale = Math.min(nodeWidth / sourceSize.width, nodeHeight / sourceSize.height);
+    if (!(scale > 0)) {
+      return fullBounds;
+    }
+
+    const imageWidth = Math.max(1, roundBoundsFitMetric(sourceSize.width * scale));
+    const imageHeight = Math.max(1, roundBoundsFitMetric(sourceSize.height * scale));
+    return normalizeImageExtendLocalBounds(
+      {
+        x: roundBoundsFitMetric((nodeWidth - imageWidth) / 2),
+        y: roundBoundsFitMetric((nodeHeight - imageHeight) / 2),
+        width: imageWidth,
+        height: imageHeight,
+      },
+      nodeWidth,
+      nodeHeight
+    );
+  }
+
+  async function getImageExtendSourceSize(fill) {
+    if (!fill || !fill.imageHash) {
+      return null;
+    }
+
+    const image = figma.getImageByHash(fill.imageHash);
+    if (!image || typeof image.getSizeAsync !== "function") {
+      return null;
+    }
+
+    try {
+      const size = await image.getSizeAsync();
+      const width = size && typeof size.width === "number" && Number.isFinite(size.width) ? size.width : 0;
+      const height = size && typeof size.height === "number" && Number.isFinite(size.height) ? size.height : 0;
+      if (!(width > 0) || !(height > 0)) {
+        return null;
+      }
+      return {
+        width: width,
+        height: height,
+      };
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function buildImageExtendFullLocalBounds(width, height) {
+    return {
+      x: 0,
+      y: 0,
+      width: Math.max(1, roundBoundsFitMetric(width)),
+      height: Math.max(1, roundBoundsFitMetric(height)),
+    };
+  }
+
+  function normalizeImageExtendLocalBounds(value, fallbackWidth, fallbackHeight) {
+    const fallback = buildImageExtendFullLocalBounds(fallbackWidth, fallbackHeight);
+    if (!value || typeof value !== "object") {
+      return fallback;
+    }
+
+    const x = Number(value.x);
+    const y = Number(value.y);
+    const width = Number(value.width);
+    const height = Number(value.height);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !(width > 0) || !(height > 0)) {
+      return fallback;
+    }
+
+    return {
+      x: roundBoundsFitMetric(x),
+      y: roundBoundsFitMetric(y),
+      width: Math.max(1, roundBoundsFitMetric(width)),
+      height: Math.max(1, roundBoundsFitMetric(height)),
+    };
+  }
+
+  function areImageExtendLocalBoundsFullNode(bounds, width, height) {
+    const normalized = normalizeImageExtendLocalBounds(bounds, width, height);
+    return (
+      Math.abs(normalized.x) <= 0.01 &&
+      Math.abs(normalized.y) <= 0.01 &&
+      Math.abs(normalized.width - Math.max(1, Number(width) || 1)) <= 0.01 &&
+      Math.abs(normalized.height - Math.max(1, Number(height) || 1)) <= 0.01
+    );
+  }
+
+  async function exportImageExtendSourcePng(node, imageBounds) {
+    if (!node || typeof node.exportAsync !== "function") {
+      throw new Error("Could not export the selected image layer for image extend.");
+    }
+
+    const nodeWidth = typeof node.width === "number" && Number.isFinite(node.width) ? node.width : 0;
+    const nodeHeight = typeof node.height === "number" && Number.isFinite(node.height) ? node.height : 0;
+    const bounds = normalizeImageExtendLocalBounds(imageBounds, nodeWidth, nodeHeight);
+    if (areImageExtendLocalBoundsFullNode(bounds, nodeWidth, nodeHeight)) {
+      return await node.exportAsync({
+        format: "PNG",
+        useAbsoluteBounds: false,
+      });
+    }
+
+    const preview = figma.createFrame();
+    let clone = null;
+    try {
+      preview.name = "__pigma-image-extend-source-bounds__";
+      preview.resize(bounds.width, bounds.height);
+      preview.clipsContent = true;
+      preview.fills = [];
+      preview.strokes = [];
+      figma.currentPage.appendChild(preview);
+
+      clone = node.clone();
+      preview.appendChild(clone);
+      setImageExtendNodePosition(clone, -bounds.x, -bounds.y);
+
+      return await preview.exportAsync({
+        format: "PNG",
+        useAbsoluteBounds: false,
+      });
+    } finally {
+      if (clone && !clone.removed) {
+        clone.remove();
+      }
+      if (preview && !preview.removed) {
+        preview.remove();
+      }
+    }
   }
 
   function sanitizeImageExtendPadding(value) {
@@ -1298,6 +1949,43 @@
     }
 
     return next;
+  }
+
+  function buildImageExtendBoundsPadding(imageBounds, nodeWidth, nodeHeight) {
+    const bounds = normalizeImageExtendLocalBounds(imageBounds, nodeWidth, nodeHeight);
+    const width = Math.max(1, Number(nodeWidth) || 1);
+    const height = Math.max(1, Number(nodeHeight) || 1);
+    return {
+      top: sanitizeImageExtendPaddingValue(bounds.y),
+      right: sanitizeImageExtendPaddingValue(width - (bounds.x + bounds.width)),
+      bottom: sanitizeImageExtendPaddingValue(height - (bounds.y + bounds.height)),
+      left: sanitizeImageExtendPaddingValue(bounds.x),
+    };
+  }
+
+  function hasPositiveImageExtendPadding(padding) {
+    return !!padding && (padding.top > 0 || padding.right > 0 || padding.bottom > 0 || padding.left > 0);
+  }
+
+  function resolveImageExtendEffectivePadding(requestedPadding, boundsPadding) {
+    const requested = requestedPadding || { top: 0, right: 0, bottom: 0, left: 0 };
+    const bounds = boundsPadding || { top: 0, right: 0, bottom: 0, left: 0 };
+    if (hasPositiveImageExtendPadding(bounds)) {
+      return {
+        top: sanitizeImageExtendPaddingValue(bounds.top),
+        right: sanitizeImageExtendPaddingValue(bounds.right),
+        bottom: sanitizeImageExtendPaddingValue(bounds.bottom),
+        left: sanitizeImageExtendPaddingValue(bounds.left),
+        source: "image-bounds",
+      };
+    }
+    return {
+      top: sanitizeImageExtendPaddingValue(requested.top),
+      right: sanitizeImageExtendPaddingValue(requested.right),
+      bottom: sanitizeImageExtendPaddingValue(requested.bottom),
+      left: sanitizeImageExtendPaddingValue(requested.left),
+      source: "prompt",
+    };
   }
 
   function sanitizeImageExtendPaddingValue(value) {
@@ -1322,6 +2010,35 @@
     }
 
     return true;
+  }
+
+  async function resolveImageExtendCurrentImageBounds(node, session, localBounds) {
+    const width = localBounds && localBounds.width > 0 ? localBounds.width : typeof node.width === "number" ? node.width : 0;
+    const height = localBounds && localBounds.height > 0 ? localBounds.height : typeof node.height === "number" ? node.height : 0;
+    const fallback = normalizeImageExtendLocalBounds(session && session.imageBounds, width, height);
+    const fills = getNodeFills(node);
+    let fill = null;
+    const originalHash = session && typeof session.originalHash === "string" ? session.originalHash : "";
+
+    if (originalHash) {
+      const fillIndex = findVisibleImageFillIndexByHash(fills, originalHash);
+      if (fillIndex >= 0) {
+        fill = fills[fillIndex];
+      }
+    }
+
+    if (!fill) {
+      const primaryFillIndex = getPrimaryVisibleImageFillIndex(fills);
+      if (primaryFillIndex >= 0) {
+        fill = fills[primaryFillIndex];
+      }
+    }
+
+    if (!fill) {
+      return fallback;
+    }
+
+    return await resolveImageExtendImageLocalBounds(node, fill, width, height);
   }
 
   async function applyImageExtendUnderlayToSelection(session, newImageHash, byteLength) {
@@ -1379,10 +2096,11 @@
 
     const parent = node.parent;
     const expand = session.expand || { top: 0, right: 0, bottom: 0, left: 0 };
-    const nextX = localBounds.x - expand.left;
-    const nextY = localBounds.y - expand.top;
-    const nextWidth = Math.max(1, roundBoundsFitMetric(localBounds.width + expand.left + expand.right));
-    const nextHeight = Math.max(1, roundBoundsFitMetric(localBounds.height + expand.top + expand.bottom));
+    const imageBounds = await resolveImageExtendCurrentImageBounds(node, session, localBounds);
+    const nextX = localBounds.x + imageBounds.x - expand.left;
+    const nextY = localBounds.y + imageBounds.y - expand.top;
+    const nextWidth = Math.max(1, roundBoundsFitMetric(imageBounds.width + expand.left + expand.right));
+    const nextHeight = Math.max(1, roundBoundsFitMetric(imageBounds.height + expand.top + expand.bottom));
     let background = null;
 
     try {
@@ -1444,7 +2162,7 @@
     };
   }
 
-  function buildImageCompositeApplyResult(session, resultNode, byteLength, skipped) {
+  function buildImageCompositeApplyResult(session, resultNode, byteLength, skipped, placementMode) {
     const appliedCount = resultNode ? 1 : 0;
     const nodeName = resultNode && typeof resultNode.name === "string" ? resultNode.name : "";
     const nodeId = resultNode && typeof resultNode.id === "string" ? resultNode.id : "";
@@ -1456,10 +2174,155 @@
         skippedCount: Array.isArray(skipped) ? skipped.length : 0,
         resultNodeId: nodeId,
         resultNodeName: nodeName,
+        placementMode: typeof placementMode === "string" ? placementMode : "",
         resultByteLength: byteLength,
       },
       skipped: Array.isArray(skipped) ? skipped.slice(0, 24) : [],
     };
+  }
+
+  async function runImageMerge(message) {
+    const clientRequestId = message && typeof message.clientRequestId === "string" ? message.clientRequestId : "";
+    try {
+      const source = await exportImageMergeSelection();
+      const createdImage = figma.createImage(source.bytes);
+      if (!createdImage || !createdImage.hash) {
+        throw new Error("이미지 병합 결과를 Figma 이미지로 만들지 못했습니다.");
+      }
+
+      const result = await applyImageCompositeToSelection(
+        {
+          selectionLabel: source.selectionLabel,
+          selectedRootNodeId: source.selectedRootNodeId,
+          selectedRootNodeName: source.selectedRootNodeName,
+          unionRect: source.unionRect,
+          preserveSelectedRootTransform: source.preserveSelectedRootTransform,
+          selectedRootWidth: source.selectedRootWidth,
+          selectedRootHeight: source.selectedRootHeight,
+        },
+        createdImage.hash,
+        source.bytes.length
+      );
+
+      figma.ui.postMessage({
+        type: "image-merge-result",
+        clientRequestId: clientRequestId,
+        result: result,
+      });
+
+      const appliedCount = result && result.summary && Number(result.summary.appliedCount) > 0 ? 1 : 0;
+      figma.notify(appliedCount ? "이미지 병합 레이어를 만들었습니다." : "이미지 병합 레이어를 만들지 못했습니다.", {
+        timeout: 2200,
+      });
+    } catch (error) {
+      const messageText = normalizeErrorMessage(error, "이미지 병합에 실패했습니다.");
+      figma.ui.postMessage({
+        type: "image-merge-error",
+        clientRequestId: clientRequestId,
+        message: messageText,
+      });
+      figma.notify(messageText, { error: true, timeout: 2600 });
+    }
+  }
+
+  async function exportImageMergeSelection() {
+    const selection = Array.from(figma.currentPage.selection || []).filter(function (node) {
+      return !!node && !node.removed && typeof node.exportAsync === "function";
+    });
+    if (!selection.length) {
+      throw new Error("이미지로 병합할 프레임, 그룹, 레이어를 먼저 선택해주세요.");
+    }
+
+    const rects = selection
+      .map(function (node) {
+        return getBoundsFitNodeRect(node);
+      })
+      .filter(Boolean);
+    const unionRect = unionAbsoluteRects(rects);
+    if (!unionRect || !(unionRect.width > 0) || !(unionRect.height > 0)) {
+      throw new Error("선택한 항목의 병합 영역을 계산하지 못했습니다.");
+    }
+
+    const exportSettings = {
+      format: "PNG",
+      useAbsoluteBounds: true,
+    };
+
+    let bytes = null;
+    if (selection.length === 1) {
+      bytes = await selection[0].exportAsync(exportSettings);
+    } else {
+      bytes = await exportImageMergeMultipleSelection(selection, unionRect, exportSettings);
+    }
+
+    if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
+      throw new Error("이미지 병합 PNG가 비어 있습니다.");
+    }
+
+    return {
+      selectionLabel: formatSelectionLabel(selection),
+      selectedRootNodeId: selection.length === 1 && selection[0] && typeof selection[0].id === "string" ? selection[0].id : "",
+      selectedRootNodeName: selection.length === 1 ? safeName(selection[0]) : "",
+      preserveSelectedRootTransform: selection.length === 1,
+      selectedRootWidth:
+        selection.length === 1 && typeof selection[0].width === "number" && Number.isFinite(selection[0].width)
+          ? selection[0].width
+          : 0,
+      selectedRootHeight:
+        selection.length === 1 && typeof selection[0].height === "number" && Number.isFinite(selection[0].height)
+          ? selection[0].height
+          : 0,
+      unionRect: unionRect,
+      bytes: bytes,
+    };
+  }
+
+  async function exportImageMergeMultipleSelection(selection, unionRect, exportSettings) {
+    const preview = figma.createFrame();
+    const clones = [];
+    try {
+      preview.name = "__pigma-image-merge-preview__";
+      preview.resize(unionRect.width, unionRect.height);
+      preview.clipsContent = true;
+      preview.fills = [];
+      preview.strokes = [];
+      preview.x = unionRect.x;
+      preview.y = unionRect.y;
+      figma.currentPage.appendChild(preview);
+
+      const orderedSelection = selection.slice().sort(compareSceneNodeCanvasOrder);
+      for (let index = 0; index < orderedSelection.length; index += 1) {
+        const node = orderedSelection[index];
+        const rect = getBoundsFitNodeRect(node);
+        if (!rect) {
+          continue;
+        }
+        const clone = node.clone();
+        preview.appendChild(clone);
+        clones.push(clone);
+        if ("x" in clone && typeof clone.x === "number") {
+          clone.x = roundBoundsFitMetric(rect.x - unionRect.x);
+        }
+        if ("y" in clone && typeof clone.y === "number") {
+          clone.y = roundBoundsFitMetric(rect.y - unionRect.y);
+        }
+      }
+
+      if (!clones.length) {
+        throw new Error("병합 가능한 선택 레이어를 찾지 못했습니다.");
+      }
+
+      return await preview.exportAsync(exportSettings);
+    } finally {
+      for (let index = 0; index < clones.length; index += 1) {
+        if (clones[index] && !clones[index].removed) {
+          clones[index].remove();
+        }
+      }
+      if (preview && !preview.removed) {
+        preview.remove();
+      }
+    }
   }
 
   async function applyImageCompositeToSelection(session, newImageHash, byteLength) {
@@ -1471,23 +2334,91 @@
         nodeName: "",
         reason: "Could not calculate the composite placement bounds.",
       });
-      return buildImageCompositeApplyResult(session, null, byteLength, skipped);
+      return buildImageCompositeApplyResult(session, null, byteLength, skipped, "");
     }
+    let resultNode = null;
+    let placementMode = "";
 
-    const resultNode = figma.createRectangle();
-    resultNode.name = buildImageCompositeResultName(session && session.selectionLabel ? session.selectionLabel : "");
-    resultNode.resize(unionRect.width, unionRect.height);
-    resultNode.fills = [buildVisibleImageFill(newImageHash)];
-    resultNode.strokes = [];
-    if ("cornerRadius" in resultNode) {
-      resultNode.cornerRadius = 0;
+    try {
+      resultNode = figma.createRectangle();
+      resultNode.name = buildImageCompositeResultName(session && session.selectionLabel ? session.selectionLabel : "");
+      const resultWidth =
+        session && session.preserveSelectedRootTransform && Number(session.selectedRootWidth) > 0
+          ? Number(session.selectedRootWidth)
+          : unionRect.width;
+      const resultHeight =
+        session && session.preserveSelectedRootTransform && Number(session.selectedRootHeight) > 0
+          ? Number(session.selectedRootHeight)
+          : unionRect.height;
+      resultNode.resize(resultWidth, resultHeight);
+      resultNode.fills = [buildVisibleImageFill(newImageHash)];
+      resultNode.strokes = [];
+      if ("cornerRadius" in resultNode) {
+        resultNode.cornerRadius = 0;
+      }
+
+      let placed = false;
+      if (session && session.selectedRootNodeId) {
+        const selectedRootNode = await figma.getNodeByIdAsync(session.selectedRootNodeId);
+        if (
+          selectedRootNode &&
+          !selectedRootNode.removed &&
+          (!("locked" in selectedRootNode) || !selectedRootNode.locked)
+        ) {
+          if (canUsePromptPlacementContainer(selectedRootNode)) {
+            selectedRootNode.insertChild(selectedRootNode.children.length, resultNode);
+            setImageExtendNodePosition(resultNode, 0, 0);
+            placementMode = "inside-selected-root";
+            placed = true;
+          } else if (
+            selectedRootNode.parent &&
+            canUsePromptPlacementContainer(selectedRootNode.parent) &&
+            !isAutoLayoutNode(selectedRootNode.parent)
+          ) {
+            const localBounds = getImageExtendLocalBounds(selectedRootNode);
+            if (localBounds) {
+              const parent = selectedRootNode.parent;
+              const insertIndex = findNodeChildIndex(parent, selectedRootNode.id);
+              parent.insertChild(insertIndex >= 0 ? insertIndex + 1 : parent.children.length, resultNode);
+              if (
+                session &&
+                session.preserveSelectedRootTransform &&
+                copyNodeRelativeTransform(resultNode, selectedRootNode)
+              ) {
+                placementMode = "selected-root-sibling-transform";
+              } else {
+                setImageExtendNodePosition(resultNode, localBounds.x, localBounds.y);
+                placementMode = "selected-root-sibling";
+              }
+              placed = true;
+            }
+          }
+        }
+      }
+
+      if (!placed) {
+        figma.currentPage.appendChild(resultNode);
+        resultNode.x = unionRect.x;
+        resultNode.y = unionRect.y;
+        placementMode = "page-overlay";
+      }
+
+      figma.currentPage.selection = [resultNode];
+      if (typeof figma.viewport.scrollAndZoomIntoView === "function") {
+        figma.viewport.scrollAndZoomIntoView([resultNode]);
+      }
+      return buildImageCompositeApplyResult(session, resultNode, byteLength, skipped, placementMode);
+    } catch (error) {
+      if (resultNode && !resultNode.removed && resultNode.parent) {
+        resultNode.remove();
+      }
+      skipped.push({
+        nodeId: session && session.selectedRootNodeId ? session.selectedRootNodeId : "",
+        nodeName: session && session.selectedRootNodeName ? session.selectedRootNodeName : "",
+        reason: normalizeErrorMessage(error, "Failed to place the generated composite image."),
+      });
+      return buildImageCompositeApplyResult(session, null, byteLength, skipped, placementMode);
     }
-    resultNode.x = unionRect.x;
-    resultNode.y = unionRect.y;
-    figma.currentPage.appendChild(resultNode);
-    figma.currentPage.selection = [resultNode];
-
-    return buildImageCompositeApplyResult(session, resultNode, byteLength, skipped);
   }
 
   function getImageExtendLocalBounds(node) {
@@ -1545,6 +2476,31 @@
     }
 
     throw new Error("Could not update the layer position.");
+  }
+
+  function copyNodeRelativeTransform(targetNode, sourceNode) {
+    if (
+      !targetNode ||
+      !sourceNode ||
+      !("relativeTransform" in targetNode) ||
+      !("relativeTransform" in sourceNode) ||
+      !Array.isArray(sourceNode.relativeTransform) ||
+      sourceNode.relativeTransform.length < 2
+    ) {
+      return false;
+    }
+
+    const row0 = Array.isArray(sourceNode.relativeTransform[0]) ? sourceNode.relativeTransform[0] : null;
+    const row1 = Array.isArray(sourceNode.relativeTransform[1]) ? sourceNode.relativeTransform[1] : null;
+    if (!row0 || !row1 || row0.length < 3 || row1.length < 3) {
+      return false;
+    }
+
+    targetNode.relativeTransform = [
+      [Number(row0[0]) || 0, Number(row0[1]) || 0, roundBoundsFitMetric(Number(row0[2]) || 0)],
+      [Number(row1[0]) || 0, Number(row1[1]) || 0, roundBoundsFitMetric(Number(row1[2]) || 0)],
+    ];
+    return true;
   }
 
   function findNodeChildIndex(parent, nodeId) {
@@ -2551,7 +3507,10 @@
       const nextFills = fills.slice();
       const originalFill = nextFills[targetIndex];
       const hiddenOriginalFill = cloneImagePaintWithHashAndVisibility(originalFill, session.originalHash, false);
-      const newVisibleFill = cloneImagePaintWithHashAndVisibility(originalFill, newImageHash, true);
+      const newVisibleFill =
+        session && session.captureMode === "source-image"
+          ? cloneImagePaintWithHash(originalFill, newImageHash)
+          : cloneRenderedUpscaleImagePaint(originalFill, newImageHash);
       nextFills.splice(targetIndex, 1, hiddenOriginalFill, newVisibleFill);
 
       try {
@@ -2627,6 +3586,180 @@
     };
   }
 
+  async function applyGeneratedPromptImagePlacement(session, newImageHash, byteLength) {
+    const skipped = [];
+    let resultNode = null;
+    let placementMode = "";
+
+    try {
+      if (session.targetKind === "new-image-placement") {
+        resultNode = createPromptPlacementResultNode(session, newImageHash);
+        placementMode = await placePromptGeneratedNodeFromAnchor(session, resultNode);
+      } else {
+        const targetNode = await figma.getNodeByIdAsync(session.targetNodeId);
+        if (!targetNode || targetNode.removed) {
+          throw new Error("Could not find the selected target layer again.");
+        }
+        if ("locked" in targetNode && targetNode.locked) {
+          throw new Error("Locked layers are not supported for prompt edit/generation.");
+        }
+        if ("rotation" in targetNode && typeof targetNode.rotation === "number" && Math.abs(targetNode.rotation) > 0.01) {
+          throw new Error("Rotated layers are not supported for prompt edit/generation yet.");
+        }
+
+        resultNode = createPromptPlacementResultNode(session, newImageHash);
+        if (canUsePromptPlacementContainer(targetNode)) {
+          targetNode.insertChild(targetNode.children.length, resultNode);
+          setImageExtendNodePosition(resultNode, 0, 0);
+          placementMode = "inside-target";
+        } else if (
+          targetNode.parent &&
+          canUsePromptPlacementContainer(targetNode.parent) &&
+          !isAutoLayoutNode(targetNode.parent)
+        ) {
+          const localBounds = getImageExtendLocalBounds(targetNode);
+          if (!localBounds) {
+            throw new Error("Could not determine the selected layer position.");
+          }
+          const parent = targetNode.parent;
+          const insertIndex = findNodeChildIndex(parent, targetNode.id);
+          if (insertIndex >= 0) {
+            parent.insertChild(insertIndex + 1, resultNode);
+          } else {
+            parent.insertChild(parent.children.length, resultNode);
+          }
+          setImageExtendNodePosition(resultNode, localBounds.x, localBounds.y);
+          placementMode = "sibling-overlay";
+        } else {
+          const absoluteRect = getBoundsFitNodeRect(targetNode);
+          if (!absoluteRect) {
+            throw new Error("Could not determine the selected layer bounds.");
+          }
+          figma.currentPage.appendChild(resultNode);
+          resultNode.x = absoluteRect.x;
+          resultNode.y = absoluteRect.y;
+          placementMode = "page-overlay";
+        }
+      }
+
+      if (resultNode) {
+        figma.currentPage.selection = [resultNode];
+        if (typeof figma.viewport.scrollAndZoomIntoView === "function") {
+          figma.viewport.scrollAndZoomIntoView([resultNode]);
+        }
+      }
+    } catch (error) {
+      if (resultNode && !resultNode.removed && resultNode.parent) {
+        resultNode.remove();
+      }
+      skipped.push({
+        nodeId: session.targetNodeId,
+        nodeName: session.targetNodeName,
+        reason: normalizeErrorMessage(error, PROMPT_PLACEMENT_APPLY_ERROR_MESSAGE),
+      });
+      resultNode = null;
+    }
+
+    return buildPromptPlacementApplyResult(session, resultNode, byteLength, skipped, placementMode);
+  }
+
+  async function placePromptGeneratedNodeFromAnchor(session, resultNode) {
+    if (
+      session &&
+      session.targetNodeId &&
+      typeof session.targetNodeId === "string" &&
+      session.targetNodeId &&
+      session.placementMode === "below-selected-text"
+    ) {
+      const anchorNode = await figma.getNodeByIdAsync(session.targetNodeId);
+      if (
+        anchorNode &&
+        !anchorNode.removed &&
+        (!("locked" in anchorNode) || !anchorNode.locked) &&
+        (!("rotation" in anchorNode) || typeof anchorNode.rotation !== "number" || Math.abs(anchorNode.rotation) <= 0.01)
+      ) {
+        const localBounds = getImageExtendLocalBounds(anchorNode);
+        if (
+          localBounds &&
+          anchorNode.parent &&
+          canUsePromptPlacementContainer(anchorNode.parent) &&
+          !isAutoLayoutNode(anchorNode.parent)
+        ) {
+          const parent = anchorNode.parent;
+          const insertIndex = findNodeChildIndex(parent, anchorNode.id);
+          if (insertIndex >= 0) {
+            parent.insertChild(insertIndex + 1, resultNode);
+          } else {
+            parent.insertChild(parent.children.length, resultNode);
+          }
+          setImageExtendNodePosition(resultNode, localBounds.x, localBounds.y + localBounds.height + PROMPT_TEXT_ANCHOR_GAP);
+          return "below-selected-text";
+        }
+
+        const absoluteRect = getBoundsFitNodeRect(anchorNode);
+        if (absoluteRect) {
+          figma.currentPage.appendChild(resultNode);
+          resultNode.x = absoluteRect.x;
+          resultNode.y = absoluteRect.y + absoluteRect.height + PROMPT_TEXT_ANCHOR_GAP;
+          return "below-selected-text-page";
+        }
+      }
+    }
+
+    const viewportCenter = figma.viewport && figma.viewport.center ? figma.viewport.center : { x: 0, y: 0 };
+    figma.currentPage.appendChild(resultNode);
+    resultNode.x = roundBoundsFitMetric(viewportCenter.x - resultNode.width / 2);
+    resultNode.y = roundBoundsFitMetric(viewportCenter.y - resultNode.height / 2);
+    return "viewport-center";
+  }
+
+  function createPromptPlacementResultNode(session, newImageHash) {
+    const width = Math.max(1, roundBoundsFitPixel(session && session.targetWidth ? session.targetWidth : 1024));
+    const height = Math.max(1, roundBoundsFitPixel(session && session.targetHeight ? session.targetHeight : 1024));
+    const node = figma.createRectangle();
+    node.name = buildPromptPlacementResultName(session);
+    node.resize(width, height);
+    node.fills = [buildVisibleImageFill(newImageHash)];
+    node.strokes = [];
+    if ("cornerRadius" in node) {
+      node.cornerRadius = 0;
+    }
+    return node;
+  }
+
+  function buildPromptPlacementResultName(session) {
+    const baseName =
+      session && typeof session.targetNodeName === "string" && session.targetNodeName.trim()
+        ? session.targetNodeName.trim()
+        : "AI generated image";
+    return baseName + " / generated";
+  }
+
+  function buildPromptPlacementApplyResult(session, resultNode, byteLength, skipped, placementMode) {
+    return {
+      processedAt: new Date().toISOString(),
+      summary: {
+        selectionLabel: session && session.selectionLabel ? session.selectionLabel : "",
+        targetNodeName: session && session.targetNodeName ? session.targetNodeName : "",
+        appliedNodeCount: resultNode ? 1 : 0,
+        skippedCount: Array.isArray(skipped) ? skipped.length : 0,
+        resultNodeId: resultNode && resultNode.id ? resultNode.id : "",
+        resultNodeName: resultNode && resultNode.name ? resultNode.name : "",
+        placementMode: placementMode || "",
+        resultByteLength: byteLength,
+      },
+      skipped: Array.isArray(skipped) ? skipped.slice(0, 24) : [],
+    };
+  }
+
+  function isAutoLayoutNode(node) {
+    return !!node && "layoutMode" in node && typeof node.layoutMode === "string" && node.layoutMode !== "NONE";
+  }
+
+  function canUsePromptPlacementContainer(node) {
+    return canUseImageExtendParent(node) && !isAutoLayoutNode(node);
+  }
+
   function notifyApplyResult(result) {
     const summary = result && result.summary ? result.summary : {};
     const appliedFillCount =
@@ -2673,6 +3806,30 @@
     };
   }
 
+  function resolveRenderedUpscaleScaleMode(fill) {
+    const scaleMode = typeof (fill && fill.scaleMode) === "string" ? fill.scaleMode : "FILL";
+    if (scaleMode === "FIT" || scaleMode === "STRETCH" || scaleMode === "FILL") {
+      return scaleMode;
+    }
+    return "FIT";
+  }
+
+  function cloneRenderedUpscaleImagePaint(fill, imageHash) {
+    const cloned = cloneImagePaintWithHash(fill, imageHash);
+    const resolvedScaleMode = resolveRenderedUpscaleScaleMode(fill);
+    cloned.scaleMode = resolvedScaleMode;
+    if ("imageTransform" in cloned) {
+      delete cloned.imageTransform;
+    }
+    if ("scalingFactor" in cloned) {
+      delete cloned.scalingFactor;
+    }
+    if ("rotation" in cloned) {
+      delete cloned.rotation;
+    }
+    return cloned;
+  }
+
   function cloneBoundsFitImagePaint(fill, imageHash) {
     const cloned = cloneImagePaintWithHash(fill, imageHash);
     cloned.scaleMode = "FILL";
@@ -2688,21 +3845,86 @@
     return cloned;
   }
 
+  function cloneBoundsFitPreservedImagePaint(fill, target, processed) {
+    if (!fill || !isImagePaint(fill) || !fill.imageHash || !target || !processed) {
+      return null;
+    }
+
+    const useRenderedAnalysis = target.analysisMode === "rendered-node";
+    const sourceWidth =
+      useRenderedAnalysis && Number(processed.sourceWidth) > 0
+        ? Number(processed.sourceWidth)
+        : Number(target.sourceWidth) > 0
+          ? Number(target.sourceWidth)
+          : 0;
+    const sourceHeight =
+      useRenderedAnalysis && Number(processed.sourceHeight) > 0
+        ? Number(processed.sourceHeight)
+        : Number(target.sourceHeight) > 0
+          ? Number(target.sourceHeight)
+          : 0;
+    const rasterOffsetX =
+      useRenderedAnalysis || !Number.isFinite(Number(target.rasterAnalysisOffsetX))
+        ? 0
+        : Number(target.rasterAnalysisOffsetX);
+    const rasterOffsetY =
+      useRenderedAnalysis || !Number.isFinite(Number(target.rasterAnalysisOffsetY))
+        ? 0
+        : Number(target.rasterAnalysisOffsetY);
+    const cropX = rasterOffsetX + (Number(processed.cropX) || 0);
+    const cropY = rasterOffsetY + (Number(processed.cropY) || 0);
+    const cropWidth = Number(processed.cropWidth) > 0 ? Number(processed.cropWidth) : 0;
+    const cropHeight = Number(processed.cropHeight) > 0 ? Number(processed.cropHeight) : 0;
+
+    if (!(sourceWidth > 0) || !(sourceHeight > 0) || !(cropWidth > 0) || !(cropHeight > 0)) {
+      return null;
+    }
+
+    const cloned = cloneImagePaintWithHash(fill, fill.imageHash);
+    cloned.scaleMode = "CROP";
+    cloned.imageTransform = [
+      [cropWidth / sourceWidth, 0, cropX / sourceWidth],
+      [0, cropHeight / sourceHeight, cropY / sourceHeight],
+    ];
+    if ("scalingFactor" in cloned) {
+      delete cloned.scalingFactor;
+    }
+    if ("rotation" in cloned) {
+      delete cloned.rotation;
+    }
+    return cloned;
+  }
+
   function notifyApplyResult(result, operationLabel) {
     const summary = result && result.summary ? result.summary : {};
     const appliedFillCount =
       typeof summary.appliedFillCount === "number" && Number.isFinite(summary.appliedFillCount)
         ? summary.appliedFillCount
         : 0;
+    const appliedNodeCount =
+      typeof summary.appliedNodeCount === "number" && Number.isFinite(summary.appliedNodeCount)
+        ? summary.appliedNodeCount
+        : 0;
     const skippedCount =
       typeof summary.skippedCount === "number" && Number.isFinite(summary.skippedCount) ? summary.skippedCount : 0;
+    const skipped = result && Array.isArray(result.skipped) ? result.skipped : [];
+    const firstSkippedReason =
+      skipped.length && skipped[0] && typeof skipped[0].reason === "string" ? skipped[0].reason.trim() : "";
 
-    if (!appliedFillCount) {
-      figma.notify("AI image result could not find an IMAGE fill to apply.", { timeout: 2200 });
+    if (!appliedFillCount && !appliedNodeCount) {
+      const message = firstSkippedReason
+        ? "AI image result could not be applied: " + firstSkippedReason
+        : "AI image result could not be applied.";
+      figma.notify(message, { timeout: 3200, error: true });
       return;
     }
 
-    let message = (operationLabel || "AI Image") + " complete (" + appliedFillCount + " fill applied";
+    let message = operationLabel || "AI Image";
+    if (appliedFillCount > 0) {
+      message += " complete (" + appliedFillCount + " fill applied";
+    } else {
+      message += " complete (" + appliedNodeCount + " layer created";
+    }
     if (skippedCount > 0) {
       message += ", " + skippedCount + " skipped";
     }
@@ -2714,9 +3936,69 @@
     return label || "AI Image";
   }
 
+  function isBoundsFitOperation(options) {
+    const operationKind =
+      options && typeof options.operationKind === "string" ? options.operationKind.replace(/\s+/g, " ").trim().toLowerCase() : "";
+    if (operationKind === "bounds-fit") {
+      return true;
+    }
+    const operationLabel = sanitizeOperationLabel(options && options.operationLabel);
+    return /bounds\s*fit/i.test(operationLabel);
+  }
+
+  function isImageExtendOperation(options) {
+    const operationKind =
+      options && typeof options.operationKind === "string" ? options.operationKind.replace(/\s+/g, " ").trim().toLowerCase() : "";
+    if (operationKind === "image-extend") {
+      return true;
+    }
+    const operationLabel = sanitizeOperationLabel(options && options.operationLabel);
+    return /extend|확장/i.test(operationLabel);
+  }
+
   function sanitizeSourceMode(value) {
     const mode = typeof value === "string" ? value.replace(/\s+/g, " ").trim().toLowerCase() : "";
-    return mode === "shape-or-image" ? mode : "image-fill-only";
+    return mode === "shape-or-image" || mode === "prompt-smart" ? mode : "image-fill-only";
+  }
+
+  function shouldPreferOriginalUpscaleSource(message) {
+    if (message && message.preferOriginalImageBytes === true) {
+      return true;
+    }
+    return isSharpenOperationLabel(message && message.operationLabel) || isUpscaleOperationLabel(message && message.operationLabel);
+  }
+
+  function sanitizePromptOutputSize(value) {
+    const normalized = typeof value === "string" ? value.replace(/\s+/g, "").trim().toUpperCase() : "";
+    return normalized === "2K" || normalized === "4K" ? normalized : "1K";
+  }
+
+  function isSharpenOperationLabel(value) {
+    const label = sanitizeOperationLabel(value);
+    return label === "샤프닝" || /sharpen/i.test(label);
+  }
+
+  function isUpscaleOperationLabel(value) {
+    const label = sanitizeOperationLabel(value);
+    return /업스케일|upscale/i.test(label);
+  }
+
+  function shouldPreferOriginalUpscaleSource(message) {
+    if (message && message.preferOriginalImageBytes === true) {
+      return true;
+    }
+    return isSharpenOperationLabel(message && message.operationLabel) || isUpscaleOperationLabel(message && message.operationLabel);
+  }
+
+  function buildPromptPlacementDimensions(outputSize) {
+    const normalizedSize = sanitizePromptOutputSize(outputSize);
+    if (normalizedSize === "4K") {
+      return { width: 4096, height: 4096 };
+    }
+    if (normalizedSize === "2K") {
+      return { width: 2048, height: 2048 };
+    }
+    return { width: 1024, height: 1024 };
   }
 
   async function collectReferenceSearchSourceFromSelection() {
@@ -2923,6 +4205,145 @@
     };
   }
 
+  async function collectPromptDraftSourceFromSelection() {
+    const selection = Array.from(figma.currentPage.selection || []).filter(Boolean);
+    if (!selection.length) {
+      throw new Error(PROMPT_DRAFT_SOURCE_NOT_FOUND_MESSAGE);
+    }
+
+    const selectedRangeText = getSelectedTextRangeSnapshot();
+    const textPayload = collectPromptDraftTextPayload(selection, selectedRangeText);
+    const visualNodes = selection.filter(function (node) {
+      return !!node && !node.removed && node.type !== "TEXT";
+    });
+
+    if (visualNodes.length > 1) {
+      throw new Error(PROMPT_SMART_SELECTION_MESSAGE);
+    }
+
+    if (visualNodes.length === 1) {
+      const source = await buildPromptDraftVisualSource(visualNodes[0], selection);
+      if (textPayload && textPayload.text) {
+        source.sourceType = "mixed";
+        source.text = textPayload.text;
+        source.summary = source.summary || {};
+        source.summary.textLength = textPayload.text.length;
+        source.summary.textMode = textPayload.textMode;
+      }
+      return source;
+    }
+
+    if (textPayload && textPayload.text) {
+      return {
+        sourceType: "text",
+        text: textPayload.text,
+        summary: {
+          selectionLabel: formatSelectionLabel(selection),
+          targetNodeName: textPayload.nodeName || safeName(selection[0]),
+          textMode: textPayload.textMode,
+          textLength: textPayload.text.length,
+        },
+      };
+    }
+
+    throw new Error(PROMPT_DRAFT_SOURCE_NOT_FOUND_MESSAGE);
+  }
+
+  function collectPromptDraftTextPayload(selection, selectedRangeText) {
+    if (selectedRangeText && selectedRangeText.text) {
+      return {
+        text: selectedRangeText.text,
+        textMode: "selected-range",
+        nodeName: selectedRangeText.nodeName,
+      };
+    }
+
+    if (selection.every(function (node) { return node && node.type === "TEXT"; })) {
+      const directText = collectReferenceTextFromNodes(selection, {
+        maxNodes: 8,
+        maxLength: 600,
+        includeDescendants: false,
+      });
+      if (directText) {
+        return {
+          text: directText,
+          textMode: "text-selection",
+          nodeName: safeName(selection[0]),
+        };
+      }
+    }
+
+    const fallbackText = collectReferenceTextFromNodes(selection, {
+      maxNodes: 10,
+      maxLength: 720,
+      includeDescendants: true,
+    });
+    if (fallbackText) {
+      return {
+        text: fallbackText,
+        textMode: "selection-descendants",
+        nodeName: safeName(selection[0]),
+      };
+    }
+
+    return null;
+  }
+
+  async function buildPromptDraftVisualSource(node, selection) {
+    if (!node || node.removed || typeof node.exportAsync !== "function") {
+      throw new Error(PROMPT_TARGET_EXPORT_ERROR_MESSAGE);
+    }
+
+    if (hasChildren(node)) {
+      let collection = null;
+      try {
+        collection = await collectImageCompositeTargetsFromSelection([node]);
+      } catch (error) {
+        collection = null;
+      }
+      if (collection && Array.isArray(collection.layers)) {
+        const imageLayerCount = collection.layers.filter(function (layer) {
+          return !!layer && layer.layerKind === "image";
+        }).length;
+        if (imageLayerCount >= 2) {
+          throw new Error(PROMPT_MULTI_IMAGE_CONTAINER_MESSAGE);
+        }
+      }
+    }
+
+    const bytes = await node.exportAsync({
+      format: "PNG",
+      useAbsoluteBounds: false,
+    });
+    if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
+      throw new Error(PROMPT_TARGET_EXPORT_EMPTY_MESSAGE);
+    }
+
+    const bounds = getBoundsFitNodeRect(node);
+    return {
+      sourceType: "image",
+      image: {
+        bytes: bytes,
+        mimeType: "image/png",
+        fileName: buildFileName(
+          {
+            nodeName: safeName(node),
+            imageHash: node.id,
+          },
+          "png"
+        ),
+      },
+      summary: {
+        selectionLabel: formatSelectionLabel(selection),
+        targetNodeName: safeName(node),
+        captureMode: "rendered-node",
+        targetWidth: bounds ? bounds.width : roundBoundsFitMetric(node.width),
+        targetHeight: bounds ? bounds.height : roundBoundsFitMetric(node.height),
+        byteLength: bytes.length,
+      },
+    };
+  }
+
   async function collectImageTextOverlaySourceFromSelection(message) {
     let overlayReason = "";
 
@@ -3056,6 +4477,64 @@
     };
   }
 
+  function shapeEditNeedsPlaceholderSource(node) {
+    return !hasRenderablePaints(node && node.fills) && !hasRenderablePaints(node && node.strokes);
+  }
+
+  function hasRenderablePaints(paints) {
+    return Array.isArray(paints) && paints.some(isRenderablePaint);
+  }
+
+  function isRenderablePaint(paint) {
+    if (!paint || paint.visible === false) {
+      return false;
+    }
+
+    if (paint.type === "IMAGE") {
+      return typeof paint.imageHash === "string" && paint.imageHash.length > 0;
+    }
+
+    const opacity = typeof paint.opacity === "number" && Number.isFinite(paint.opacity) ? Number(paint.opacity) : 1;
+    if (!(opacity > 0.001)) {
+      return false;
+    }
+
+    return (
+      paint.type === "SOLID" ||
+      paint.type === "GRADIENT_LINEAR" ||
+      paint.type === "GRADIENT_RADIAL" ||
+      paint.type === "GRADIENT_ANGULAR" ||
+      paint.type === "GRADIENT_DIAMOND"
+    );
+  }
+
+  async function exportShapeEditPlaceholderPng(node) {
+    const width = typeof node.width === "number" && Number.isFinite(node.width) ? Math.max(1, Math.round(node.width)) : 0;
+    const height = typeof node.height === "number" && Number.isFinite(node.height) ? Math.max(1, Math.round(node.height)) : 0;
+    if (!(width > 0) || !(height > 0)) {
+      throw new Error(SHAPE_EXPORT_SOURCE_ERROR_MESSAGE);
+    }
+
+    const placeholder = figma.createRectangle();
+    try {
+      placeholder.name = "__pigma-shape-source-placeholder__";
+      placeholder.resize(width, height);
+      placeholder.fills = [createSolidPaintFromColor("#f4f4f5", 1)];
+      placeholder.strokes = [];
+      placeholder.x = -100000;
+      placeholder.y = -100000;
+      figma.currentPage.appendChild(placeholder);
+      return await placeholder.exportAsync({
+        format: "PNG",
+        useAbsoluteBounds: false,
+      });
+    } finally {
+      if (placeholder && !placeholder.removed) {
+        placeholder.remove();
+      }
+    }
+  }
+
   function sanitizeReferenceSearchQuery(value) {
     const normalized = typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
     return normalized ? normalized.slice(0, 120) : "";
@@ -3070,42 +4549,316 @@
   }
 
   async function collectBoundsFitTargetsFromSelection() {
-    const selection = Array.from(figma.currentPage.selection || []);
+    const selection = Array.from(figma.currentPage.selection || []).filter(Boolean);
     if (!selection.length) {
-      throw new Error("Select a frame, group, or layer first.");
+      throw new Error("Select a frame, group, text, or image layer first.");
     }
 
-    const targets = [];
-    const skipped = [];
+    const state = {
+      targets: [],
+      containers: [],
+      skipped: [],
+      targetNodeIds: {},
+      containerNodeIds: {},
+      skippedNodeIds: {},
+    };
 
     for (let index = 0; index < selection.length; index += 1) {
-      const analysis = await analyzeBoundsFitSelectionNode(selection[index]);
-      if (analysis && analysis.target) {
-        targets.push(analysis.target);
-      } else if (analysis && analysis.skipped) {
-        skipped.push(analysis.skipped);
-      }
+      await collectBoundsFitPlansFromNode(selection[index], state, true);
     }
 
     return {
       selection: selection,
-      targets: targets,
-      skipped: skipped,
+      targets: state.targets,
+      containers: state.containers,
+      skipped: state.skipped,
     };
   }
 
-  async function collectImageCompositeTargetsFromSelection() {
-    const selection = Array.from(figma.currentPage.selection || []).filter(Boolean);
-    if (!selection.length) {
-      throw new Error("Select 2 to 5 image layers first.");
+  async function collectBoundsFitPlansFromNode(node, state, isRootSelection) {
+    if (!node || node.removed) {
+      if (isRootSelection) {
+        appendBoundsFitSkipped(buildBoundsFitSkipped(node, "The selected layer could not be read."), state);
+      }
+      return false;
     }
+
+    if (!isBoundsFitNodeVisible(node)) {
+      if (isRootSelection) {
+        appendBoundsFitSkipped(buildBoundsFitSkipped(node, "Hidden layers are not supported for bounds-fit."), state);
+      }
+      return false;
+    }
+
+    if ("locked" in node && node.locked) {
+      if (isRootSelection) {
+        appendBoundsFitSkipped(buildBoundsFitSkipped(node, "Locked layers are not supported for bounds-fit."), state);
+      }
+      return false;
+    }
+
+    if (hasChildren(node)) {
+      let hasEligibleDescendant = false;
+      for (let index = 0; index < node.children.length; index += 1) {
+        if (await collectBoundsFitPlansFromNode(node.children[index], state, false)) {
+          hasEligibleDescendant = true;
+        }
+      }
+
+      if (hasEligibleDescendant && canApplyBoundsFitContainer(node)) {
+        appendBoundsFitContainerPlan(node, state, {
+          selectedRoot: isRootSelection,
+        });
+      } else if (isRootSelection && !hasEligibleDescendant) {
+        appendBoundsFitSkipped(
+          buildBoundsFitSkipped(
+            node,
+            isBoundsFitContainerTreeNode(node)
+              ? "Could not find visible text or image layers inside the selected container."
+              : buildBoundsFitUnsupportedRootReason(node)
+          ),
+          state
+        );
+      }
+
+      return hasEligibleDescendant;
+    }
+
+    let analysis = null;
+    if (isBoundsFitTextSelectionNodeCandidate(node)) {
+      analysis = await analyzeBoundsFitTextSelectionNode(node);
+    } else if (isBoundsFitImageSelectionNodeCandidate(node)) {
+      analysis = await analyzeBoundsFitImageSelectionNode(node);
+    } else {
+      if (isRootSelection) {
+        appendBoundsFitSkipped(buildBoundsFitSkipped(node, buildBoundsFitUnsupportedRootReason(node)), state);
+      }
+      return false;
+    }
+
+    if (analysis && analysis.target) {
+      appendBoundsFitTarget(analysis.target, state);
+      return true;
+    }
+
+    if (analysis && analysis.skipped && isRootSelection) {
+      appendBoundsFitSkipped(analysis, state);
+    }
+
+    return false;
+  }
+
+  function appendBoundsFitTarget(target, state) {
+    if (!target || !target.nodeId || !state || !state.targetNodeIds) {
+      return;
+    }
+
+    if (state.targetNodeIds[target.nodeId]) {
+      return;
+    }
+
+    state.targetNodeIds[target.nodeId] = true;
+    state.targets.push(target);
+  }
+
+  function appendBoundsFitContainerPlan(node, state, options) {
+    if (!node || !node.id || !state || !state.containerNodeIds) {
+      return;
+    }
+
+    const existingIndex =
+      typeof state.containerNodeIds[node.id] === "number" && state.containerNodeIds[node.id] >= 0
+        ? state.containerNodeIds[node.id]
+        : -1;
+    if (existingIndex >= 0) {
+      if (options && options.selectedRoot === true && state.containers[existingIndex]) {
+        state.containers[existingIndex].selectedRoot = true;
+      }
+      return;
+    }
+
+    state.containerNodeIds[node.id] = state.containers.length;
+    state.containers.push({
+      nodeId: node.id,
+      nodeName: safeName(node),
+      nodeType: typeof node.type === "string" ? node.type : "",
+      depth: getBoundsFitNodeDepth(node),
+      selectedRoot: !!(options && options.selectedRoot === true),
+    });
+  }
+
+  function appendBoundsFitSkipped(analysis, state) {
+    const skipped = analysis && analysis.skipped ? analysis.skipped : analysis;
+    if (!skipped || !state || !Array.isArray(state.skipped)) {
+      return;
+    }
+
+    const key = skipped.nodeId || skipped.nodeName || skipped.reason;
+    if (key && state.skippedNodeIds && state.skippedNodeIds[key]) {
+      return;
+    }
+
+    if (key && state.skippedNodeIds) {
+      state.skippedNodeIds[key] = true;
+    }
+
+    state.skipped.push(skipped);
+  }
+
+  function isBoundsFitNodeVisible(node) {
+    return !!node && (!("visible" in node) || node.visible !== false);
+  }
+
+  function isBoundsFitContainerTreeNode(node) {
+    if (!node || !hasChildren(node)) {
+      return false;
+    }
+
+    return node.type === "FRAME" || node.type === "GROUP" || node.type === "SECTION" || node.type === "INSTANCE";
+  }
+
+  function isBoundsFitAutoLayoutNode(node) {
+    return !!node && "layoutMode" in node && typeof node.layoutMode === "string" && node.layoutMode !== "NONE";
+  }
+
+  function isBoundsFitAutoLayoutChildNode(node) {
+    return !!node && !!node.parent && isBoundsFitAutoLayoutNode(node.parent);
+  }
+
+  function canMoveBoundsFitNode(node) {
+    if (!node) {
+      return false;
+    }
+
+    if (!isBoundsFitAutoLayoutChildNode(node)) {
+      return true;
+    }
+
+    return "layoutPositioning" in node && node.layoutPositioning === "ABSOLUTE";
+  }
+
+  function shouldPreserveBoundsFitTextWidth(node) {
+    if (!node || node.type !== "TEXT") {
+      return false;
+    }
+
+    if (isBoundsFitAutoLayoutChildNode(node)) {
+      return true;
+    }
+
+    if ("textAutoResize" in node && typeof node.textAutoResize === "string" && node.textAutoResize === "NONE") {
+      return true;
+    }
+
+    return false;
+  }
+
+  function shouldResizeBoundsFitContainer(node) {
+    if (!node || node.type === "GROUP") {
+      return false;
+    }
+
+    if (isBoundsFitAutoLayoutChildNode(node) && (!("layoutPositioning" in node) || node.layoutPositioning !== "ABSOLUTE")) {
+      return false;
+    }
+
+    return true;
+  }
+
+  function canApplyBoundsFitContainer(node) {
+    if (!isBoundsFitContainerTreeNode(node)) {
+      return false;
+    }
+
+    if ("rotation" in node && typeof node.rotation === "number" && Math.abs(node.rotation) > 0.01) {
+      return false;
+    }
+
+    if (node.type !== "GROUP" && !canResizeBoundsFitNode(node)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  function buildBoundsFitUnsupportedRootReason(node) {
+    if (!node) {
+      return "Could not find an eligible layer for bounds-fit.";
+    }
+
+    if (hasChildren(node)) {
+      return buildBoundsFitContainerUnsupportedReason(node);
+    }
+
+    return "Bounds-fit currently supports text layers, image layers, and groups/frames that contain them.";
+  }
+
+  function buildBoundsFitContainerUnsupportedReason(node) {
+    if (!node) {
+      return "Could not find an eligible container for bounds-fit.";
+    }
+
+    if (!isBoundsFitContainerTreeNode(node)) {
+      return "Bounds-fit container mode currently supports groups, frames, sections, and instances that contain text or image layers.";
+    }
+
+    if ("rotation" in node && typeof node.rotation === "number" && Math.abs(node.rotation) > 0.01) {
+      return "Rotated containers are not supported yet.";
+    }
+
+    if (node.type !== "GROUP" && !canResizeBoundsFitNode(node)) {
+      return "Bounds-fit could not resize the selected container.";
+    }
+
+    return "Bounds-fit could not find visible text or image layers inside the selected container.";
+  }
+
+  function isBoundsFitTextSelectionNodeCandidate(node) {
+    return !!node && node.type === "TEXT";
+  }
+
+  function isBoundsFitImageSelectionNodeCandidate(node) {
+    return !!node && !hasChildren(node) && hasSimpleVisibleImagePaint(node);
+  }
+
+  function isBoundsFitPreferredContentNode(node) {
+    return isBoundsFitTextSelectionNodeCandidate(node) || isBoundsFitImageSelectionNodeCandidate(node);
+  }
+
+  function canResizeBoundsFitNode(node) {
+    return !!node && (typeof node.resizeWithoutConstraints === "function" || typeof node.resize === "function");
+  }
+
+  function getBoundsFitNodeDepth(node) {
+    let depth = 0;
+    let current = node && node.parent ? node.parent : null;
+    while (current) {
+      depth += 1;
+      current = current.parent;
+    }
+    return depth;
+  }
+
+  const IMAGE_COMPOSITE_MAX_LAYER_COUNT = 8;
+
+  async function collectImageCompositeTargetsFromSelection(selectionInput) {
+    const selection = Array.isArray(selectionInput)
+      ? selectionInput.filter(Boolean)
+      : Array.from(figma.currentPage.selection || []).filter(Boolean);
+    if (!selection.length) {
+      throw new Error("Select a frame or 2 to 8 visible visual layers first.");
+    }
+    const rootSelection = resolveImageCompositeSelectionRoot(selection);
+    const rootRect = rootSelection ? getBoundsFitNodeRect(rootSelection) : null;
     const candidateNodes = collectImageCompositeCandidateNodes(selection);
 
     const layers = [];
     const skipped = [];
 
     for (let index = 0; index < candidateNodes.length; index += 1) {
-      const analysis = await analyzeImageCompositeSelectionNode(candidateNodes[index]);
+      const analysis = await analyzeImageCompositeSelectionNode(candidateNodes[index], {
+        rootRect: rootRect,
+      });
       if (analysis && analysis.target) {
         layers.push(analysis.target);
       } else if (analysis && analysis.skipped) {
@@ -3113,25 +4866,29 @@
       }
     }
 
-    if (layers.length > 5) {
-      throw new Error("Image composite currently supports up to 5 eligible image layers.");
+    if (!layers.length) {
+      throw new Error(buildImageCompositeEmptySelectionMessage(layers, skipped));
     }
 
     layers.sort(function (left, right) {
       return compareSceneNodeCanvasOrder(left.node, right.node);
     });
 
-    const unionRect = unionAbsoluteRects(
-      layers.map(function (layer) {
-        return layer.visibleRect;
-      })
-    );
+    const trimmedLayers = trimImageCompositeLayersForPayload(layers, skipped, IMAGE_COMPOSITE_MAX_LAYER_COUNT);
+
+    const unionRect =
+      rootRect ||
+      unionAbsoluteRects(
+        trimmedLayers.map(function (layer) {
+          return layer.visibleRect;
+        })
+      );
     if (!unionRect) {
-      throw new Error(buildImageCompositeEmptySelectionMessage(layers, skipped));
+      throw new Error(buildImageCompositeEmptySelectionMessage(trimmedLayers, skipped));
     }
 
-    for (let index = 0; index < layers.length; index += 1) {
-      const layer = layers[index];
+    for (let index = 0; index < trimmedLayers.length; index += 1) {
+      const layer = trimmedLayers[index];
       layer.role = index === 0 ? "background" : "foreground";
       layer.orderIndex = index;
       layer.offsetX = roundBoundsFitMetric(layer.visibleRect.x - unionRect.x);
@@ -3140,10 +4897,80 @@
 
     return {
       selection: selection,
-      layers: layers,
+      selectedRoot: rootSelection,
+      layers: trimmedLayers,
       skipped: skipped,
       unionRect: unionRect,
     };
+  }
+
+  function resolveImageCompositeSelectionRoot(selection) {
+    if (!Array.isArray(selection) || selection.length !== 1) {
+      return null;
+    }
+
+    const node = selection[0];
+    if (!node || node.removed || !hasChildren(node)) {
+      return null;
+    }
+
+    return getBoundsFitNodeRect(node) ? node : null;
+  }
+
+  function getImageCompositeLayerArea(layer) {
+    const rect = layer && layer.visibleRect ? layer.visibleRect : null;
+    const width = rect && Number(rect.width) > 0 ? Number(rect.width) : 0;
+    const height = rect && Number(rect.height) > 0 ? Number(rect.height) : 0;
+    return width * height;
+  }
+
+  function getImageCompositeLayerWeight(layer) {
+    if (!layer || layer.layerKind === "image") {
+      return 3;
+    }
+    if (layer.layerKind === "text") {
+      return 2.4;
+    }
+    return 1.8;
+  }
+
+  function trimImageCompositeLayersForPayload(layers, skipped, maxCount) {
+    if (!Array.isArray(layers) || layers.length <= maxCount) {
+      return Array.isArray(layers) ? layers.slice() : [];
+    }
+
+    const ranked = layers
+      .slice()
+      .sort(function (left, right) {
+        const scoreDelta =
+          getImageCompositeLayerArea(right) * getImageCompositeLayerWeight(right) -
+          getImageCompositeLayerArea(left) * getImageCompositeLayerWeight(left);
+        if (Math.abs(scoreDelta) > 0.01) {
+          return scoreDelta > 0 ? 1 : -1;
+        }
+        return compareSceneNodeCanvasOrder(left.node, right.node);
+      })
+      .slice(0, maxCount);
+    const kept = {};
+    for (let index = 0; index < ranked.length; index += 1) {
+      kept[ranked[index].nodeId] = true;
+    }
+
+    const result = [];
+    for (let index = 0; index < layers.length; index += 1) {
+      const layer = layers[index];
+      if (layer && kept[layer.nodeId]) {
+        result.push(layer);
+        continue;
+      }
+      skipped.push({
+        nodeId: layer && typeof layer.nodeId === "string" ? layer.nodeId : "",
+        nodeName: layer && typeof layer.nodeName === "string" ? layer.nodeName : "",
+        reason: "Skipped because image composite currently keeps up to 8 of the most prominent visible layers.",
+      });
+    }
+
+    return result;
   }
 
   function collectImageCompositeCandidateNodes(selection) {
@@ -3177,6 +5004,10 @@
 
   function roundBoundsFitMetric(value) {
     return Math.round((Number(value) || 0) * 1000) / 1000;
+  }
+
+  function roundBoundsFitPixel(value) {
+    return Math.round(Number(value) || 0);
   }
 
   function unionAbsoluteRects(rects) {
@@ -3214,29 +5045,102 @@
     };
   }
 
+  function readBoundsFitRectCandidate(getter) {
+    if (typeof getter !== "function") {
+      return null;
+    }
+    try {
+      const rect = getter();
+      if (!rect) {
+        return null;
+      }
+      const width = Number(rect.width) || 0;
+      const height = Number(rect.height) || 0;
+      if (!(width > 0) || !(height > 0)) {
+        return null;
+      }
+      return {
+        x: roundBoundsFitMetric(rect.x),
+        y: roundBoundsFitMetric(rect.y),
+        width: roundBoundsFitMetric(width),
+        height: roundBoundsFitMetric(height),
+      };
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function getBoundsFitTransformRect(node) {
+    if (!node) {
+      return null;
+    }
+
+    try {
+      const width = Number(node.width) || 0;
+      const height = Number(node.height) || 0;
+      if (!(width > 0) || !(height > 0)) {
+        return null;
+      }
+
+      const transform = Array.isArray(node.absoluteTransform) ? node.absoluteTransform : null;
+      if (!transform || transform.length < 2) {
+        return null;
+      }
+
+      const axisAligned =
+        Math.abs(Number(transform[0][1]) || 0) <= 0.0001 && Math.abs(Number(transform[1][0]) || 0) <= 0.0001;
+      if (!axisAligned) {
+        return null;
+      }
+
+      return {
+        x: roundBoundsFitMetric(Number(transform[0][2]) || 0),
+        y: roundBoundsFitMetric(Number(transform[1][2]) || 0),
+        width: roundBoundsFitMetric(width),
+        height: roundBoundsFitMetric(height),
+      };
+    } catch (error) {
+      return null;
+    }
+  }
+
   function getBoundsFitNodeRect(node) {
-    const rect =
-      node && node.absoluteBoundingBox
-        ? node.absoluteBoundingBox
-        : node && node.absoluteRenderBounds
-          ? node.absoluteRenderBounds
-          : null;
-    if (!rect) {
-      return null;
-    }
+    const isTextNode = !!node && node.type === "TEXT";
+    const transformRect = getBoundsFitTransformRect(node);
 
-    const width = Number(rect.width) || 0;
-    const height = Number(rect.height) || 0;
-    if (!(width > 0) || !(height > 0)) {
-      return null;
-    }
+    const preferredRect = isTextNode
+      ? readBoundsFitRectCandidate(function () {
+          return node.absoluteRenderBounds;
+        }) ||
+        readBoundsFitRectCandidate(function () {
+          return node.absoluteBoundingBox;
+        }) ||
+        transformRect
+      : transformRect ||
+        readBoundsFitRectCandidate(function () {
+          return node.absoluteBoundingBox;
+        }) ||
+        readBoundsFitRectCandidate(function () {
+          return node.absoluteRenderBounds;
+        });
 
-    return {
-      x: roundBoundsFitMetric(rect.x),
-      y: roundBoundsFitMetric(rect.y),
-      width: roundBoundsFitMetric(width),
-      height: roundBoundsFitMetric(height),
-    };
+    return preferredRect || null;
+  }
+
+  function getBoundsFitNodeLayoutRect(node) {
+    return (
+      readBoundsFitRectCandidate(function () {
+        return node.absoluteBoundingBox;
+      }) ||
+      getBoundsFitTransformRect(node) ||
+      getBoundsFitNodeRect(node)
+    );
+  }
+
+  function getBoundsFitNodeRenderRect(node) {
+    return readBoundsFitRectCandidate(function () {
+      return node.absoluteRenderBounds;
+    });
   }
 
   function intersectBoundsFitRects(baseRect, clipRect) {
@@ -3348,17 +5252,98 @@
     throw new Error("Could not position the preview clone for bounds-fit analysis.");
   }
 
-  async function exportBoundsFitRenderedAnalysisBytes(node, analysisContext) {
+  function resolveBoundsFitRenderedExportScale(nodeWidth, nodeHeight, sourceWidth, sourceHeight) {
+    // Bounds-fit only needs the currently visible pixels to shrink the layer.
+    // Exporting at the on-canvas size is the most stable path for edited Figma images.
+    return 1;
+  }
+
+  function resolveBoundsFitSourceImageAnalysis(fill, nodeWidth, nodeHeight, sourceWidth, sourceHeight, analysisContext) {
+    if (!fill || !(nodeWidth > 0) || !(nodeHeight > 0) || !(sourceWidth > 0) || !(sourceHeight > 0) || !analysisContext) {
+      return null;
+    }
+
+    const scaleMode = typeof fill.scaleMode === "string" ? fill.scaleMode : "FILL";
+    const fillRotation = typeof fill.rotation === "number" && Number.isFinite(fill.rotation) ? fill.rotation : 0;
+    if (!!fill.imageTransform || Math.abs(fillRotation) > 0.01 || scaleMode === "CROP" || scaleMode === "TILE") {
+      return null;
+    }
+
+    const localVisibleRect = {
+      x: roundBoundsFitMetric(analysisContext.offsetX),
+      y: roundBoundsFitMetric(analysisContext.offsetY),
+      width: roundBoundsFitMetric(analysisContext.visibleRect.width),
+      height: roundBoundsFitMetric(analysisContext.visibleRect.height),
+    };
+
+    if (scaleMode === "STRETCH") {
+      const scaleX = sourceWidth / nodeWidth;
+      const scaleY = sourceHeight / nodeHeight;
+      return {
+        analysisOffsetX: localVisibleRect.x,
+        analysisOffsetY: localVisibleRect.y,
+        analysisWidth: localVisibleRect.width,
+        analysisHeight: localVisibleRect.height,
+        rasterAnalysisOffsetX: roundBoundsFitMetric(localVisibleRect.x * scaleX),
+        rasterAnalysisOffsetY: roundBoundsFitMetric(localVisibleRect.y * scaleY),
+        rasterAnalysisWidth: roundBoundsFitMetric(localVisibleRect.width * scaleX),
+        rasterAnalysisHeight: roundBoundsFitMetric(localVisibleRect.height * scaleY),
+      };
+    }
+
+    const uniformScale =
+      scaleMode === "FIT" ? Math.min(nodeWidth / sourceWidth, nodeHeight / sourceHeight) : Math.max(nodeWidth / sourceWidth, nodeHeight / sourceHeight);
+    if (!(uniformScale > 0)) {
+      return null;
+    }
+
+    const displayRect = {
+      x: roundBoundsFitMetric((nodeWidth - sourceWidth * uniformScale) / 2),
+      y: roundBoundsFitMetric((nodeHeight - sourceHeight * uniformScale) / 2),
+      width: roundBoundsFitMetric(sourceWidth * uniformScale),
+      height: roundBoundsFitMetric(sourceHeight * uniformScale),
+    };
+    const visibleImageRect = intersectBoundsFitRects(localVisibleRect, displayRect);
+    if (!visibleImageRect) {
+      return null;
+    }
+
+    return {
+      analysisOffsetX: visibleImageRect.x,
+      analysisOffsetY: visibleImageRect.y,
+      analysisWidth: visibleImageRect.width,
+      analysisHeight: visibleImageRect.height,
+      rasterAnalysisOffsetX: roundBoundsFitMetric((visibleImageRect.x - displayRect.x) / uniformScale),
+      rasterAnalysisOffsetY: roundBoundsFitMetric((visibleImageRect.y - displayRect.y) / uniformScale),
+      rasterAnalysisWidth: roundBoundsFitMetric(visibleImageRect.width / uniformScale),
+      rasterAnalysisHeight: roundBoundsFitMetric(visibleImageRect.height / uniformScale),
+    };
+  }
+
+  async function exportBoundsFitRenderedAnalysisBytes(node, analysisContext, exportScale) {
     const visibleRect = analysisContext && analysisContext.visibleRect ? analysisContext.visibleRect : null;
     if (!visibleRect) {
       return new Uint8Array(0);
     }
 
+    const resolvedExportScale =
+      Number.isFinite(Number(exportScale)) && Number(exportScale) > 0 ? Number(exportScale) : 1;
+    const exportSettings = {
+      format: "PNG",
+      // Bounds-fit needs the full node/frame area so the UI can crop visible pixels itself.
+      // Using absolute bounds also avoids Figma's internal render-bounds crop path, which
+      // has been unstable for some edited images such as background-removed assets.
+      useAbsoluteBounds: true,
+    };
+    if (Math.abs(resolvedExportScale - 1) > 0.01) {
+      exportSettings.constraint = {
+        type: "SCALE",
+        value: resolvedExportScale,
+      };
+    }
+
     if (!analysisContext.clipped) {
-      return await node.exportAsync({
-        format: "PNG",
-        useAbsoluteBounds: false,
-      });
+      return await node.exportAsync(exportSettings);
     }
 
     const preview = figma.createFrame();
@@ -3378,21 +5363,18 @@
       preview.appendChild(clonedNode);
       positionBoundsFitPreviewClone(node, clonedNode, visibleRect);
 
-      return await preview.exportAsync({
-        format: "PNG",
-        useAbsoluteBounds: false,
-      });
+      return await preview.exportAsync(exportSettings);
     } finally {
-      if (preview && !preview.removed) {
-        preview.remove();
-      }
       if (clonedNode && !clonedNode.removed) {
         clonedNode.remove();
+      }
+      if (preview && !preview.removed) {
+        preview.remove();
       }
     }
   }
 
-  async function analyzeBoundsFitSelectionNode(node) {
+  async function analyzeBoundsFitImageSelectionNode(node) {
     if (!node || node.removed) {
       return buildBoundsFitSkipped(node, "The selected image layer could not be read.");
     }
@@ -3411,15 +5393,6 @@
 
     if ("rotation" in node && typeof node.rotation === "number" && Math.abs(node.rotation) > 0.01) {
       return buildBoundsFitSkipped(node, "Rotated image layers are not supported yet.");
-    }
-
-    if (
-      node.parent &&
-      "layoutMode" in node.parent &&
-      typeof node.parent.layoutMode === "string" &&
-      node.parent.layoutMode !== "NONE"
-    ) {
-      return buildBoundsFitSkipped(node, "Bounds-fit does not support image layers inside auto-layout parents yet.");
     }
 
     if (!hasSimpleVisibleImagePaint(node)) {
@@ -3460,42 +5433,162 @@
       return buildBoundsFitSkipped(node, "Could not read the source image size.");
     }
 
-    const scaleMode = typeof fill.scaleMode === "string" ? fill.scaleMode : "FILL";
-    const fillRotation = typeof fill.rotation === "number" && Number.isFinite(fill.rotation) ? fill.rotation : 0;
-    const needsRenderedAnalysis =
-      scaleMode === "CROP" ||
-      scaleMode === "TILE" ||
-      !!fill.imageTransform ||
-      Math.abs(fillRotation) > 0.01 ||
-      !hasMatchingAspectRatio(nodeWidth, nodeHeight, sourceWidth, sourceHeight);
-    const analysisContext = needsRenderedAnalysis ? getBoundsFitAnalysisContext(node) : null;
-    if (needsRenderedAnalysis && !analysisContext) {
+    const renderedExportScale = resolveBoundsFitRenderedExportScale(nodeWidth, nodeHeight, sourceWidth, sourceHeight);
+    // Bounds-fit must follow the pixels currently visible on canvas. Raw getImageByHash() bytes can lag
+    // behind in-editor image edits such as background removal, so we always analyze the rendered node.
+    const analysisContext = getBoundsFitAnalysisContext(node);
+    if (!analysisContext) {
       return buildBoundsFitSkipped(node, "Could not calculate the visible bounds for analysis.");
     }
 
-    const bytes = needsRenderedAnalysis
-      ? await exportBoundsFitRenderedAnalysisBytes(node, analysisContext)
-      : await image.getBytesAsync();
+    const directSourceAnalysis = resolveBoundsFitSourceImageAnalysis(
+      fill,
+      nodeWidth,
+      nodeHeight,
+      sourceWidth,
+      sourceHeight,
+      analysisContext
+    );
+    if (directSourceAnalysis) {
+      const directBytes = await image.getBytesAsync();
+      if (!directBytes || typeof directBytes.length !== "number" || directBytes.length <= 0) {
+        return buildBoundsFitSkipped(node, "Could not read the source image bytes.");
+      }
+
+      return {
+        target: {
+          nodeId: node.id,
+          nodeName: safeName(node),
+          targetKind: "image-fill",
+          analysisMode: "source-image",
+          fillIndex: fillIndex,
+          originalHash: fill.imageHash,
+          sourceWidth: sourceWidth,
+          sourceHeight: sourceHeight,
+          analysisOffsetX: directSourceAnalysis.analysisOffsetX,
+          analysisOffsetY: directSourceAnalysis.analysisOffsetY,
+          analysisWidth: directSourceAnalysis.analysisWidth,
+          analysisHeight: directSourceAnalysis.analysisHeight,
+          rasterAnalysisOffsetX: directSourceAnalysis.rasterAnalysisOffsetX,
+          rasterAnalysisOffsetY: directSourceAnalysis.rasterAnalysisOffsetY,
+          rasterAnalysisWidth: directSourceAnalysis.rasterAnalysisWidth,
+          rasterAnalysisHeight: directSourceAnalysis.rasterAnalysisHeight,
+          fileName: buildFileName(
+            {
+              nodeName: safeName(node),
+              imageHash: fill.imageHash,
+            },
+            detectImageExtension(directBytes) === "bin" ? "png" : detectImageExtension(directBytes)
+          ),
+          mimeType: detectImageMimeType(directBytes),
+          bytes: directBytes,
+        },
+      };
+    }
+
+    const exportSettings = {
+      format: "PNG",
+      useAbsoluteBounds: true,
+    };
+    if (Math.abs(renderedExportScale - 1) > 0.01) {
+      exportSettings.constraint = {
+        type: "SCALE",
+        value: renderedExportScale,
+      };
+    }
+
+    let bytes = new Uint8Array(0);
+    let analysisMode = "rendered-node";
+    let mimeType = "image/png";
+    let rasterAnalysisOffsetX = analysisContext.offsetX;
+    let rasterAnalysisOffsetY = analysisContext.offsetY;
+    let rasterAnalysisWidth = analysisContext.visibleRect.width;
+    let rasterAnalysisHeight = analysisContext.visibleRect.height;
+
+    try {
+      bytes = await node.exportAsync(exportSettings);
+    } catch (error) {
+      let previewExportError = null;
+      try {
+        // Some edited fills (notably background-removed assets in crop mode) can fail
+        // direct exportAsync(). Exporting a temporary preview clone still captures the
+        // currently visible pixels and keeps bounds-fit usable for those layers.
+        bytes = await exportBoundsFitRenderedAnalysisBytes(
+          node,
+          {
+            visibleRect: analysisContext.visibleRect,
+            clipped: true,
+          },
+          renderedExportScale
+        );
+        if (bytes && typeof bytes.length === "number" && bytes.length > 0) {
+          rasterAnalysisOffsetX = 0;
+          rasterAnalysisOffsetY = 0;
+          rasterAnalysisWidth = analysisContext.visibleRect.width;
+          rasterAnalysisHeight = analysisContext.visibleRect.height;
+        }
+      } catch (previewError) {
+        previewExportError = previewError;
+      }
+
+      if (bytes && typeof bytes.length === "number" && bytes.length > 0) {
+        // Recovered with the preview export path.
+      } else {
+        const scaleMode = typeof fill.scaleMode === "string" ? fill.scaleMode : "FILL";
+        const fillRotation = typeof fill.rotation === "number" && Number.isFinite(fill.rotation) ? fill.rotation : 0;
+        const canFallbackToSourceImage =
+          scaleMode !== "CROP" &&
+          scaleMode !== "TILE" &&
+          !fill.imageTransform &&
+          Math.abs(fillRotation) <= 0.01 &&
+          hasMatchingAspectRatio(nodeWidth, nodeHeight, sourceWidth, sourceHeight);
+        if (!canFallbackToSourceImage) {
+          return buildBoundsFitSkipped(
+            node,
+            normalizeErrorMessage(
+              previewExportError,
+              normalizeErrorMessage(error, "Could not export the currently visible image bytes.")
+            )
+          );
+        }
+
+        bytes = await image.getBytesAsync();
+        if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
+          return buildBoundsFitSkipped(node, "Could not read the source image bytes.");
+        }
+
+        analysisMode = "source-image";
+        mimeType = detectImageMimeType(bytes);
+        const scaleX = sourceWidth / nodeWidth;
+        const scaleY = sourceHeight / nodeHeight;
+        rasterAnalysisOffsetX = roundBoundsFitMetric(analysisContext.offsetX * scaleX);
+        rasterAnalysisOffsetY = roundBoundsFitMetric(analysisContext.offsetY * scaleY);
+        rasterAnalysisWidth = roundBoundsFitMetric(analysisContext.visibleRect.width * scaleX);
+        rasterAnalysisHeight = roundBoundsFitMetric(analysisContext.visibleRect.height * scaleY);
+      }
+    }
     if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
-      return buildBoundsFitSkipped(
-        node,
-        needsRenderedAnalysis ? "Could not export the currently visible image bytes." : "Could not read the source image bytes."
-      );
+      return buildBoundsFitSkipped(node, "Could not export the currently visible image bytes.");
     }
 
     return {
       target: {
         nodeId: node.id,
         nodeName: safeName(node),
-        analysisMode: needsRenderedAnalysis ? "rendered-node" : "source-image",
+        targetKind: "image-fill",
+        analysisMode: analysisMode,
         fillIndex: fillIndex,
         originalHash: fill.imageHash,
         sourceWidth: sourceWidth,
         sourceHeight: sourceHeight,
-        analysisOffsetX: needsRenderedAnalysis ? analysisContext.offsetX : 0,
-        analysisOffsetY: needsRenderedAnalysis ? analysisContext.offsetY : 0,
-        analysisWidth: needsRenderedAnalysis ? analysisContext.visibleRect.width : nodeWidth,
-        analysisHeight: needsRenderedAnalysis ? analysisContext.visibleRect.height : nodeHeight,
+        analysisOffsetX: analysisContext.offsetX,
+        analysisOffsetY: analysisContext.offsetY,
+        analysisWidth: analysisContext.visibleRect.width,
+        analysisHeight: analysisContext.visibleRect.height,
+        rasterAnalysisOffsetX: rasterAnalysisOffsetX,
+        rasterAnalysisOffsetY: rasterAnalysisOffsetY,
+        rasterAnalysisWidth: rasterAnalysisWidth,
+        rasterAnalysisHeight: rasterAnalysisHeight,
         fileName: buildFileName(
           {
             nodeName: safeName(node),
@@ -3503,7 +5596,7 @@
           },
           "png"
         ),
-        mimeType: needsRenderedAnalysis ? "image/png" : detectImageMimeType(bytes),
+        mimeType: mimeType,
         bytes: bytes,
       },
     };
@@ -3526,7 +5619,7 @@
     for (let index = 0; index < session.targets.length; index += 1) {
       const target = session.targets[index];
       const processed = resultByNodeId[target.nodeId];
-      if (!processed) {
+      if (!processed && !(target && target.skipRasterAnalysis === true)) {
         skipped.push({
           nodeId: target.nodeId,
           nodeName: target.nodeName,
@@ -3535,12 +5628,22 @@
         continue;
       }
 
+      if (!processed && target && target.skipRasterAnalysis === true) {
+        const directStatus = await applyBoundsFitTargetResult(target, null, skipped);
+        if (directStatus === "applied") {
+          appliedCount += 1;
+        } else if (directStatus === "unchanged") {
+          unchangedCount += 1;
+        }
+        continue;
+      }
+
       if (processed.status === "unchanged") {
         unchangedCount += 1;
         continue;
       }
 
-      if (processed.status !== "trimmed") {
+      if (processed.status === "skipped" || processed.status !== "trimmed") {
         skipped.push({
           nodeId: target.nodeId,
           nodeName: target.nodeName,
@@ -3549,137 +5652,21 @@
         continue;
       }
 
-      const node = await figma.getNodeByIdAsync(target.nodeId);
-      if (!node || node.removed) {
-        skipped.push({
-          nodeId: target.nodeId,
-          nodeName: target.nodeName,
-          reason: "Could not find the layer again.",
-        });
-        continue;
-      }
-
-      if (!("resize" in node) || typeof node.resize !== "function") {
-        skipped.push({
-          nodeId: target.nodeId,
-          nodeName: safeName(node),
-          reason: "This layer cannot be resized.",
-        });
-        continue;
-      }
-
-      const fills = getNodeFills(node);
-      if (!fills.length) {
-        skipped.push({
-          nodeId: target.nodeId,
-          nodeName: safeName(node),
-          reason: "The IMAGE fill is no longer available.",
-        });
-        continue;
-      }
-
-      let targetIndex = -1;
-      if (target.fillIndex >= 0 && target.fillIndex < fills.length) {
-        const directFill = fills[target.fillIndex];
-        if (isImagePaint(directFill) && directFill.imageHash === target.originalHash) {
-          targetIndex = target.fillIndex;
-        }
-      }
-
-      if (targetIndex < 0) {
-        targetIndex = findVisibleImageFillIndexByHash(fills, target.originalHash);
-      }
-
-      if (targetIndex < 0) {
-        skipped.push({
-          nodeId: target.nodeId,
-          nodeName: safeName(node),
-          reason: "Could not find the IMAGE fill with the original image hash.",
-        });
-        continue;
-      }
-
-      const currentWidth = typeof node.width === "number" && Number.isFinite(node.width) ? node.width : 0;
-      const currentHeight = typeof node.height === "number" && Number.isFinite(node.height) ? node.height : 0;
-      if (!(currentWidth > 0) || !(currentHeight > 0)) {
-        skipped.push({
-          nodeId: target.nodeId,
-          nodeName: safeName(node),
-          reason: "Could not calculate the current layer size.",
-        });
-        continue;
-      }
-
-      const analysisWidth =
-        Number(target.analysisWidth) > 0 ? Number(target.analysisWidth) : Number(currentWidth) > 0 ? Number(currentWidth) : 0;
-      const analysisHeight =
-        Number(target.analysisHeight) > 0 ? Number(target.analysisHeight) : Number(currentHeight) > 0 ? Number(currentHeight) : 0;
-      const analysisOffsetX = Number.isFinite(Number(target.analysisOffsetX)) ? Number(target.analysisOffsetX) : 0;
-      const analysisOffsetY = Number.isFinite(Number(target.analysisOffsetY)) ? Number(target.analysisOffsetY) : 0;
-      if (!(analysisWidth > 0) || !(analysisHeight > 0)) {
-        skipped.push({
-          nodeId: target.nodeId,
-          nodeName: safeName(node),
-          reason: "Could not calculate the visible bounds size.",
-        });
-        continue;
-      }
-
-      if (!hasMatchingAspectRatio(analysisWidth, analysisHeight, processed.sourceWidth, processed.sourceHeight)) {
-        skipped.push({
-          nodeId: target.nodeId,
-          nodeName: safeName(node),
-          reason: "The analyzed crop aspect ratio no longer matches the source image.",
-        });
-        continue;
-      }
-
-      const bytes = normalizeBytes(processed.bytes);
-      if (!bytes.length) {
-        skipped.push({
-          nodeId: target.nodeId,
-          nodeName: safeName(node),
-          reason: "The trimmed image bytes are empty.",
-        });
-        continue;
-      }
-
-      const cropWidth = Number(processed.cropWidth) || 0;
-      const cropHeight = Number(processed.cropHeight) || 0;
-      const cropX = Number(processed.cropX) || 0;
-      const cropY = Number(processed.cropY) || 0;
-      if (!(cropWidth > 0) || !(cropHeight > 0)) {
-        skipped.push({
-          nodeId: target.nodeId,
-          nodeName: safeName(node),
-          reason: "The trimmed image size is invalid.",
-        });
-        continue;
-      }
-
-      const scaleX = analysisWidth / processed.sourceWidth;
-      const scaleY = analysisHeight / processed.sourceHeight;
-      const nextWidth = Math.max(1, roundBoundsFitMetric(cropWidth * scaleX));
-      const nextHeight = Math.max(1, roundBoundsFitMetric(cropHeight * scaleY));
-      const shiftX = roundBoundsFitMetric(analysisOffsetX + cropX * scaleX);
-      const shiftY = roundBoundsFitMetric(analysisOffsetY + cropY * scaleY);
-
-      try {
-        const createdImage = figma.createImage(bytes);
-        const nextFills = fills.slice();
-        nextFills[targetIndex] =
-          target.analysisMode === "rendered-node"
-            ? cloneBoundsFitImagePaint(nextFills[targetIndex], createdImage.hash)
-            : cloneImagePaintWithHash(nextFills[targetIndex], createdImage.hash);
-        node.fills = nextFills;
-        applyBoundsFitGeometry(node, nextWidth, nextHeight, shiftX, shiftY);
+      const applyStatus = await applyBoundsFitTargetResult(target, processed, skipped);
+      if (applyStatus === "applied") {
         appliedCount += 1;
-      } catch (error) {
-        skipped.push({
-          nodeId: target.nodeId,
-          nodeName: safeName(node),
-          reason: normalizeErrorMessage(error, "Failed to apply bounds-fit."),
-        });
+      } else if (applyStatus === "unchanged") {
+        unchangedCount += 1;
+      }
+    }
+
+    const containerPlans = sortBoundsFitContainerPlans(session && Array.isArray(session.containers) ? session.containers : []);
+    for (let index = 0; index < containerPlans.length; index += 1) {
+      const containerStatus = await applyBoundsFitContainerPlan(containerPlans[index], skipped);
+      if (containerStatus === "applied") {
+        appliedCount += 1;
+      } else if (containerStatus === "unchanged") {
+        unchangedCount += 1;
       }
     }
 
@@ -3688,7 +5675,7 @@
       summary: {
         selectionLabel: session.selectionLabel,
         requestedCount: session.requestedCount,
-        eligibleCount: session.targets.length,
+        eligibleCount: session.targets.length + (session && Array.isArray(session.containers) ? session.containers.length : 0),
         appliedCount: appliedCount,
         unchangedCount: unchangedCount,
         skippedCount: skipped.length,
@@ -3697,20 +5684,638 @@
     };
   }
 
-  function applyBoundsFitGeometry(node, width, height, shiftX, shiftY) {
-    if ("x" in node && typeof node.x === "number" && "y" in node && typeof node.y === "number") {
-      node.x = node.x + shiftX;
-      node.y = node.y + shiftY;
-    } else if ("relativeTransform" in node && Array.isArray(node.relativeTransform)) {
-      node.relativeTransform = [
-        [node.relativeTransform[0][0], node.relativeTransform[0][1], node.relativeTransform[0][2] + shiftX],
-        [node.relativeTransform[1][0], node.relativeTransform[1][1], node.relativeTransform[1][2] + shiftY],
-      ];
-    } else if (shiftX !== 0 || shiftY !== 0) {
-      throw new Error("Could not move the layer to the analyzed position.");
+  async function applyBoundsFitTargetResult(target, processed, skipped) {
+    if (!target) {
+      return "skipped";
     }
 
-    node.resize(width, height);
+    if (!processed && !(target.targetKind === "text" && target.skipRasterAnalysis === true)) {
+      return "skipped";
+    }
+
+    if (target.targetKind === "text") {
+      return await applyBoundsFitTextTargetResult(target, processed, skipped);
+    }
+
+    return await applyBoundsFitImageTargetResult(target, processed, skipped);
+  }
+
+  async function applyBoundsFitImageTargetResult(target, processed, skipped) {
+    const node = await figma.getNodeByIdAsync(target.nodeId);
+    if (!node || node.removed) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: target.nodeName,
+        reason: "Could not find the layer again.",
+      });
+      return "skipped";
+    }
+
+    if (!canResizeBoundsFitNode(node)) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: "This layer cannot be resized.",
+      });
+      return "skipped";
+    }
+
+    const fills = getNodeFills(node);
+    if (!fills.length) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: "The IMAGE fill is no longer available.",
+      });
+      return "skipped";
+    }
+
+    let targetIndex = -1;
+    if (target.fillIndex >= 0 && target.fillIndex < fills.length) {
+      const directFill = fills[target.fillIndex];
+      if (isImagePaint(directFill) && directFill.imageHash === target.originalHash) {
+        targetIndex = target.fillIndex;
+      }
+    }
+
+    if (targetIndex < 0) {
+      targetIndex = findVisibleImageFillIndexByHash(fills, target.originalHash);
+    }
+
+    if (targetIndex < 0) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: "Could not find the IMAGE fill with the original image hash.",
+      });
+      return "skipped";
+    }
+
+    const currentWidth = typeof node.width === "number" && Number.isFinite(node.width) ? node.width : 0;
+    const currentHeight = typeof node.height === "number" && Number.isFinite(node.height) ? node.height : 0;
+    if (!(currentWidth > 0) || !(currentHeight > 0)) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: "Could not calculate the current layer size.",
+      });
+      return "skipped";
+    }
+
+    const geometry = resolveBoundsFitProcessedGeometry(target, processed, currentWidth, currentHeight);
+    if (!geometry) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: "Could not calculate the visible bounds size.",
+      });
+      return "skipped";
+    }
+
+    if (!hasMatchingAspectRatio(geometry.analysisWidth, geometry.analysisHeight, processed.sourceWidth, processed.sourceHeight)) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: "The analyzed crop aspect ratio no longer matches the source image.",
+      });
+      return "skipped";
+    }
+
+    try {
+      const nextFills = fills.slice();
+      const cropPaint = cloneBoundsFitPreservedImagePaint(nextFills[targetIndex], target, processed);
+      if (!cropPaint) {
+        skipped.push({
+          nodeId: target.nodeId,
+          nodeName: safeName(node),
+          reason: "Could not preserve the original IMAGE fill while fitting visible bounds.",
+        });
+        return "skipped";
+      }
+      nextFills[targetIndex] = cropPaint;
+      node.fills = nextFills;
+      applyBoundsFitGeometry(node, geometry.nextWidth, geometry.nextHeight, geometry.shiftX, geometry.shiftY, null);
+      return "applied";
+    } catch (error) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: normalizeErrorMessage(error, "Failed to apply bounds-fit."),
+      });
+      return "skipped";
+    }
+  }
+
+  async function loadBoundsFitTextFonts(node) {
+    if (!node || node.type !== "TEXT") {
+      return;
+    }
+
+    const fontNames = collectBoundsFitTextFontNames(node);
+    for (let index = 0; index < fontNames.length; index += 1) {
+      await figma.loadFontAsync(fontNames[index]);
+    }
+  }
+
+  function collectBoundsFitTextFontNames(node) {
+    const fontNames = [];
+    const seen = {};
+
+    function pushFont(fontName) {
+      if (!fontName || typeof fontName !== "object") {
+        return;
+      }
+
+      if (typeof fontName.family !== "string" || typeof fontName.style !== "string") {
+        return;
+      }
+
+      const key = fontName.family + "::" + fontName.style;
+      if (seen[key]) {
+        return;
+      }
+
+      seen[key] = true;
+      fontNames.push({
+        family: fontName.family,
+        style: fontName.style,
+      });
+    }
+
+    if (typeof node.getRangeAllFontNames === "function" && typeof node.characters === "string" && node.characters.length > 0) {
+      try {
+        const rangeFonts = node.getRangeAllFontNames(0, node.characters.length);
+        for (let index = 0; index < rangeFonts.length; index += 1) {
+          pushFont(rangeFonts[index]);
+        }
+      } catch (error) {}
+    }
+
+    if (!fontNames.length && node.fontName && node.fontName !== figma.mixed && typeof node.fontName === "object") {
+      pushFont(node.fontName);
+    }
+
+    return fontNames;
+  }
+
+  async function resolveBoundsFitTextMeasuredRect(node) {
+    const layoutRect = getBoundsFitNodeLayoutRect(node);
+    if (!layoutRect) {
+      return null;
+    }
+
+    const renderRect = getBoundsFitNodeRenderRect(node);
+    if (renderRect) {
+      if (!areBoundsFitRectsEqual(renderRect, layoutRect)) {
+        return renderRect;
+      }
+    }
+
+    await loadBoundsFitTextFonts(node);
+
+    const probe = figma.createFrame();
+    let clonedNode = null;
+    let flattenedNode = null;
+
+    try {
+      probe.name = "__pigma-bounds-fit-text-probe__";
+      probe.resize(layoutRect.width, layoutRect.height);
+      probe.clipsContent = false;
+      probe.fills = [];
+      probe.strokes = [];
+      probe.x = layoutRect.x;
+      probe.y = layoutRect.y;
+      figma.currentPage.appendChild(probe);
+
+      clonedNode = node.clone();
+      probe.appendChild(clonedNode);
+      positionBoundsFitPreviewClone(node, clonedNode, layoutRect);
+
+      flattenedNode = figma.flatten([clonedNode], probe);
+      const flattenedRect = getBoundsFitNodeRect(flattenedNode);
+      if (!flattenedRect) {
+        return renderRect || layoutRect;
+      }
+
+      return flattenedRect;
+    } catch (error) {
+      return renderRect || layoutRect;
+    } finally {
+      if (clonedNode && !clonedNode.removed) {
+        clonedNode.remove();
+      }
+      if (flattenedNode && !flattenedNode.removed) {
+        flattenedNode.remove();
+      }
+      if (probe && !probe.removed) {
+        probe.remove();
+      }
+    }
+  }
+
+  async function applyBoundsFitTextTargetResult(target, processed, skipped) {
+    const node = await figma.getNodeByIdAsync(target.nodeId);
+    if (!node || node.removed) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: target.nodeName,
+        reason: "Could not find the layer again.",
+      });
+      return "skipped";
+    }
+
+    if (!canResizeBoundsFitNode(node)) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: "This text layer cannot be resized.",
+      });
+      return "skipped";
+    }
+
+    const currentWidth = typeof node.width === "number" && Number.isFinite(node.width) ? node.width : 0;
+    const currentHeight = typeof node.height === "number" && Number.isFinite(node.height) ? node.height : 0;
+    if (!(currentWidth > 0) || !(currentHeight > 0)) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: "Could not calculate the current text layer size.",
+      });
+      return "skipped";
+    }
+
+    const geometry =
+      target.skipRasterAnalysis === true
+        ? resolveBoundsFitDirectGeometry(target, currentWidth, currentHeight)
+        : resolveBoundsFitProcessedGeometry(target, processed, currentWidth, currentHeight);
+    if (!geometry) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: "The visible text bounds are invalid.",
+      });
+      return "skipped";
+    }
+
+    if (shouldPreserveBoundsFitTextWidth(node)) {
+      geometry.nextWidth = currentWidth;
+      geometry.shiftX = 0;
+      geometry.nextHeight = Math.max(currentHeight, geometry.nextHeight);
+    }
+
+    if (isBoundsFitAutoLayoutChildNode(node)) {
+      geometry.shiftX = 0;
+      geometry.shiftY = 0;
+      geometry.nextHeight = Math.max(currentHeight, geometry.nextHeight);
+    }
+
+    if (
+      Math.abs(geometry.shiftX) <= 0.01 &&
+      Math.abs(geometry.shiftY) <= 0.01 &&
+      Math.abs(geometry.nextWidth - currentWidth) <= 0.01 &&
+      Math.abs(geometry.nextHeight - currentHeight) <= 0.01
+    ) {
+      return "unchanged";
+    }
+
+    try {
+      applyBoundsFitGeometry(node, geometry.nextWidth, geometry.nextHeight, geometry.shiftX, geometry.shiftY, {
+        textAutoResizeNone: true,
+        preferWithoutConstraints: true,
+      });
+      return "applied";
+    } catch (error) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: normalizeErrorMessage(error, "Failed to apply bounds-fit to the selected text layer."),
+      });
+      return "skipped";
+    }
+  }
+
+  function resolveBoundsFitProcessedGeometry(target, processed, fallbackWidth, fallbackHeight) {
+    const analysisWidth =
+      Number(target.analysisWidth) > 0 ? Number(target.analysisWidth) : Number(fallbackWidth) > 0 ? Number(fallbackWidth) : 0;
+    const analysisHeight =
+      Number(target.analysisHeight) > 0 ? Number(target.analysisHeight) : Number(fallbackHeight) > 0 ? Number(fallbackHeight) : 0;
+    const analysisOffsetX = Number.isFinite(Number(target.analysisOffsetX)) ? Number(target.analysisOffsetX) : 0;
+    const analysisOffsetY = Number.isFinite(Number(target.analysisOffsetY)) ? Number(target.analysisOffsetY) : 0;
+    const cropWidth = Number(processed.cropWidth) || 0;
+    const cropHeight = Number(processed.cropHeight) || 0;
+    const cropX = Number(processed.cropX) || 0;
+    const cropY = Number(processed.cropY) || 0;
+
+    if (!(analysisWidth > 0) || !(analysisHeight > 0)) {
+      return null;
+    }
+
+    if (!(processed.sourceWidth > 0) || !(processed.sourceHeight > 0)) {
+      return null;
+    }
+
+    if (!(cropWidth > 0) || !(cropHeight > 0)) {
+      return null;
+    }
+
+    const scaleX = analysisWidth / processed.sourceWidth;
+    const scaleY = analysisHeight / processed.sourceHeight;
+    return {
+      analysisWidth: analysisWidth,
+      analysisHeight: analysisHeight,
+      nextWidth: Math.max(1, roundBoundsFitMetric(cropWidth * scaleX)),
+      nextHeight: Math.max(1, roundBoundsFitMetric(cropHeight * scaleY)),
+      shiftX: roundBoundsFitMetric(analysisOffsetX + cropX * scaleX),
+      shiftY: roundBoundsFitMetric(analysisOffsetY + cropY * scaleY),
+    };
+  }
+
+  function resolveBoundsFitDirectGeometry(target, fallbackWidth, fallbackHeight) {
+    const analysisWidth = Number(fallbackWidth) > 0 ? Number(fallbackWidth) : 0;
+    const analysisHeight = Number(fallbackHeight) > 0 ? Number(fallbackHeight) : 0;
+    const cropWidth = Number(target.directCropWidth) || 0;
+    const cropHeight = Number(target.directCropHeight) || 0;
+    const cropX = Number(target.directCropX) || 0;
+    const cropY = Number(target.directCropY) || 0;
+
+    if (!(analysisWidth > 0) || !(analysisHeight > 0)) {
+      return null;
+    }
+
+    if (!(cropWidth > 0) || !(cropHeight > 0)) {
+      return null;
+    }
+
+    return {
+      analysisWidth: analysisWidth,
+      analysisHeight: analysisHeight,
+      nextWidth: Math.max(1, roundBoundsFitMetric(cropWidth)),
+      nextHeight: Math.max(1, roundBoundsFitMetric(cropHeight)),
+      shiftX: roundBoundsFitMetric(cropX),
+      shiftY: roundBoundsFitMetric(cropY),
+    };
+  }
+
+  function sortBoundsFitContainerPlans(plans) {
+    if (!Array.isArray(plans) || !plans.length) {
+      return [];
+    }
+
+    return plans.slice().sort(function (left, right) {
+      const leftDepth = left && typeof left.depth === "number" ? left.depth : 0;
+      const rightDepth = right && typeof right.depth === "number" ? right.depth : 0;
+      return rightDepth - leftDepth;
+    });
+  }
+
+  async function applyBoundsFitContainerPlan(plan, skipped) {
+    if (!plan || !plan.nodeId) {
+      return "skipped";
+    }
+
+    const node = await figma.getNodeByIdAsync(plan.nodeId);
+    if (!node || node.removed) {
+      skipped.push({
+        nodeId: plan.nodeId,
+        nodeName: plan.nodeName || "Unnamed",
+        reason: "Could not find the selected container again.",
+      });
+      return "skipped";
+    }
+
+    if (!canApplyBoundsFitContainer(node)) {
+      skipped.push({
+        nodeId: plan.nodeId,
+        nodeName: safeName(node),
+        reason: buildBoundsFitContainerUnsupportedReason(node),
+      });
+      return "skipped";
+    }
+
+    const containerRect = getBoundsFitNodeRect(node);
+    if (!containerRect) {
+      skipped.push({
+        nodeId: plan.nodeId,
+        nodeName: safeName(node),
+        reason: "Could not calculate the current container bounds.",
+      });
+      return "skipped";
+    }
+
+    const childUnion = getBoundsFitContainerChildrenUnionRect(node, containerRect);
+    if (!childUnion) {
+      skipped.push({
+        nodeId: plan.nodeId,
+        nodeName: safeName(node),
+        reason: "Could not calculate the visible child bounds inside the selected container.",
+      });
+      return "skipped";
+    }
+
+    const shiftX = roundBoundsFitMetric(childUnion.x - containerRect.x);
+    const shiftY = roundBoundsFitMetric(childUnion.y - containerRect.y);
+    const needsMove = Math.abs(shiftX) > 0.01 || Math.abs(shiftY) > 0.01;
+    const needsResize =
+      shouldResizeBoundsFitContainer(node) &&
+      (Math.abs(childUnion.width - containerRect.width) > 0.01 || Math.abs(childUnion.height - containerRect.height) > 0.01);
+
+    if (!needsMove && !needsResize) {
+      return "unchanged";
+    }
+
+    try {
+      if (isBoundsFitAutoLayoutNode(node)) {
+        applyBoundsFitAutoLayoutContainerGeometry(node, containerRect, childUnion, {
+          preserveLeadingInsets: !!(plan && plan.selectedRoot === true),
+        });
+      } else {
+        if (plan && plan.selectedRoot === true) {
+          applyBoundsFitSelectedRootContainerGeometry(node, containerRect, childUnion);
+        } else {
+          if (canMoveBoundsFitNode(node)) {
+            moveBoundsFitNode(node, shiftX, shiftY);
+          }
+          moveBoundsFitContainerChildren(node, -shiftX, -shiftY);
+          if (shouldResizeBoundsFitContainer(node)) {
+            resizeBoundsFitNode(node, childUnion.width, childUnion.height, false);
+          }
+        }
+      }
+      return "applied";
+    } catch (error) {
+      skipped.push({
+        nodeId: plan.nodeId,
+        nodeName: safeName(node),
+        reason: normalizeErrorMessage(error, "Failed to apply bounds-fit to the selected container."),
+      });
+      return "skipped";
+    }
+  }
+
+  function getBoundsFitContainerChildrenUnionRect(node, containerRect) {
+    if (!node || !hasChildren(node)) {
+      return null;
+    }
+
+    const preferredRects = [];
+    const fallbackRects = [];
+    const clipRect = containerRect || getBoundsFitNodeRect(node);
+    const nextClipRect =
+      "clipsContent" in node && node.clipsContent === true && clipRect ? clipRect : null;
+    collectBoundsFitDescendantRects(node, nextClipRect, preferredRects, fallbackRects);
+
+    return unionAbsoluteRects(preferredRects.length ? preferredRects : fallbackRects);
+  }
+
+  function collectBoundsFitDescendantRects(node, clipRect, preferredRects, fallbackRects) {
+    if (!node || !hasChildren(node) || !Array.isArray(preferredRects) || !Array.isArray(fallbackRects)) {
+      return;
+    }
+
+    for (let index = 0; index < node.children.length; index += 1) {
+      const child = node.children[index];
+      if (!child || child.removed || !isBoundsFitNodeVisible(child)) {
+        continue;
+      }
+
+      let childRect = getBoundsFitNodeRect(child);
+      if (!childRect) {
+        continue;
+      }
+
+      if (clipRect) {
+        childRect = intersectBoundsFitRects(childRect, clipRect);
+        if (!childRect) {
+          continue;
+        }
+      }
+
+      if (hasChildren(child)) {
+        const descendantClipRect =
+          "clipsContent" in child && child.clipsContent === true ? childRect : clipRect;
+        collectBoundsFitDescendantRects(child, descendantClipRect, preferredRects, fallbackRects);
+        continue;
+      }
+
+      fallbackRects.push(childRect);
+      if (isBoundsFitPreferredContentNode(child)) {
+        preferredRects.push(childRect);
+      }
+    }
+  }
+
+  function moveBoundsFitContainerChildren(node, shiftX, shiftY) {
+    if (!node || !hasChildren(node)) {
+      return;
+    }
+
+    for (let index = 0; index < node.children.length; index += 1) {
+      moveBoundsFitNode(node.children[index], shiftX, shiftY);
+    }
+  }
+
+  function applyBoundsFitSelectedRootContainerGeometry(node, containerRect, childUnion) {
+    const nextLeft = Math.min(containerRect.x, childUnion.x);
+    const nextTop = Math.min(containerRect.y, childUnion.y);
+    const nextRight = Math.max(containerRect.x, childUnion.x + childUnion.width);
+    const nextBottom = Math.max(containerRect.y, childUnion.y + childUnion.height);
+    const shiftX = roundBoundsFitMetric(nextLeft - containerRect.x);
+    const shiftY = roundBoundsFitMetric(nextTop - containerRect.y);
+    const nextWidth = Math.max(1, roundBoundsFitMetric(nextRight - nextLeft));
+    const nextHeight = Math.max(1, roundBoundsFitMetric(nextBottom - nextTop));
+
+    if (canMoveBoundsFitNode(node) && (Math.abs(shiftX) > 0.01 || Math.abs(shiftY) > 0.01)) {
+      moveBoundsFitNode(node, shiftX, shiftY);
+    }
+
+    if (shouldResizeBoundsFitContainer(node)) {
+      resizeBoundsFitNode(node, nextWidth, nextHeight, false);
+    }
+  }
+
+  function applyBoundsFitAutoLayoutContainerGeometry(node, containerRect, childUnion, options) {
+    const preserveLeadingInsets = !!(options && options.preserveLeadingInsets === true);
+    const leftInset = roundBoundsFitMetric(childUnion.x - containerRect.x);
+    const topInset = roundBoundsFitMetric(childUnion.y - containerRect.y);
+    const rightInset = roundBoundsFitMetric(containerRect.x + containerRect.width - (childUnion.x + childUnion.width));
+    const bottomInset = roundBoundsFitMetric(containerRect.y + containerRect.height - (childUnion.y + childUnion.height));
+
+    if (!preserveLeadingInsets && canMoveBoundsFitNode(node)) {
+      moveBoundsFitNode(node, leftInset, topInset);
+    }
+
+    if ("paddingLeft" in node && typeof node.paddingLeft === "number") {
+      node.paddingLeft = preserveLeadingInsets && leftInset >= 0 ? roundBoundsFitPixel(node.paddingLeft) : Math.max(0, roundBoundsFitPixel(node.paddingLeft - leftInset));
+    }
+    if ("paddingTop" in node && typeof node.paddingTop === "number") {
+      node.paddingTop = preserveLeadingInsets && topInset >= 0 ? roundBoundsFitPixel(node.paddingTop) : Math.max(0, roundBoundsFitPixel(node.paddingTop - topInset));
+    }
+    if ("paddingRight" in node && typeof node.paddingRight === "number") {
+      node.paddingRight = Math.max(0, roundBoundsFitPixel(node.paddingRight - rightInset));
+    }
+    if ("paddingBottom" in node && typeof node.paddingBottom === "number") {
+      node.paddingBottom = Math.max(0, roundBoundsFitPixel(node.paddingBottom - bottomInset));
+    }
+
+    if (shouldResizeBoundsFitContainer(node)) {
+      const nextWidth = preserveLeadingInsets && leftInset >= 0 ? childUnion.width + leftInset : childUnion.width;
+      const nextHeight = preserveLeadingInsets && topInset >= 0 ? childUnion.height + topInset : childUnion.height;
+      resizeBoundsFitNode(node, nextWidth, nextHeight, false);
+    }
+  }
+
+  function applyBoundsFitGeometry(node, width, height, shiftX, shiftY, options) {
+    if (canMoveBoundsFitNode(node)) {
+      moveBoundsFitNode(node, shiftX, shiftY);
+    }
+
+    if (options && options.textAutoResizeNone === true && node && node.type === "TEXT" && "textAutoResize" in node) {
+      try {
+        node.textAutoResize = "NONE";
+      } catch (error) {
+        // Ignore text nodes that do not allow changing auto-resize in the current runtime.
+      }
+    }
+
+    resizeBoundsFitNode(node, width, height, !!(options && options.preferWithoutConstraints === true));
+  }
+
+  function moveBoundsFitNode(node, shiftX, shiftY) {
+    const nextShiftX = roundBoundsFitPixel(shiftX);
+    const nextShiftY = roundBoundsFitPixel(shiftY);
+    if ("x" in node && typeof node.x === "number" && "y" in node && typeof node.y === "number") {
+      node.x = roundBoundsFitPixel(node.x + nextShiftX);
+      node.y = roundBoundsFitPixel(node.y + nextShiftY);
+    } else if ("relativeTransform" in node && Array.isArray(node.relativeTransform)) {
+      node.relativeTransform = [
+        [node.relativeTransform[0][0], node.relativeTransform[0][1], roundBoundsFitPixel(node.relativeTransform[0][2] + nextShiftX)],
+        [node.relativeTransform[1][0], node.relativeTransform[1][1], roundBoundsFitPixel(node.relativeTransform[1][2] + nextShiftY)],
+      ];
+    } else if (nextShiftX !== 0 || nextShiftY !== 0) {
+      throw new Error("Could not move the layer to the analyzed position.");
+    }
+  }
+
+  function resizeBoundsFitNode(node, width, height, preferWithoutConstraints) {
+    const nextWidth = Math.max(1, roundBoundsFitPixel(width));
+    const nextHeight = Math.max(1, roundBoundsFitPixel(height));
+
+    if (preferWithoutConstraints && typeof node.resizeWithoutConstraints === "function") {
+      node.resizeWithoutConstraints(nextWidth, nextHeight);
+      return;
+    }
+
+    if (typeof node.resize === "function") {
+      node.resize(nextWidth, nextHeight);
+      return;
+    }
+
+    if (typeof node.resizeWithoutConstraints === "function") {
+      node.resizeWithoutConstraints(nextWidth, nextHeight);
+      return;
+    }
+
+    throw new Error("Could not resize the selected layer.");
   }
 
   function normalizeBoundsFitResults(value) {
@@ -3748,6 +6353,69 @@
     };
   }
 
+  async function analyzeBoundsFitTextSelectionNode(node) {
+    if (!node || node.removed) {
+      return buildBoundsFitSkipped(node, "The selected text layer could not be read.");
+    }
+
+    if (node.type !== "TEXT") {
+      return buildBoundsFitSkipped(node, "Bounds-fit text mode requires a text layer.");
+    }
+
+    if ("locked" in node && node.locked) {
+      return buildBoundsFitSkipped(node, "Locked text layers are not supported for bounds-fit.");
+    }
+
+    if (!canResizeBoundsFitNode(node)) {
+      return buildBoundsFitSkipped(node, "Bounds-fit could not resize the selected text layer.");
+    }
+
+    if ("rotation" in node && typeof node.rotation === "number" && Math.abs(node.rotation) > 0.01) {
+      return buildBoundsFitSkipped(node, "Rotated text layers are not supported yet.");
+    }
+
+    const layoutRect = getBoundsFitNodeLayoutRect(node);
+    if (!layoutRect) {
+      return buildBoundsFitSkipped(node, "Could not calculate the selected text layer bounds.");
+    }
+
+    const measuredRect = await resolveBoundsFitTextMeasuredRect(node);
+    if (!measuredRect) {
+      return buildBoundsFitSkipped(node, "Could not calculate the visible bounds for the selected text layer.");
+    }
+
+    const measuredWidth = Number(measuredRect.width) || 0;
+    const measuredHeight = Number(measuredRect.height) || 0;
+    if (!(measuredWidth > 0) || !(measuredHeight > 0)) {
+      return buildBoundsFitSkipped(node, "Could not calculate the visible text bounds inside the selected layer.");
+    }
+
+    return {
+      target: {
+        nodeId: node.id,
+        nodeName: safeName(node),
+        targetKind: "text",
+        analysisMode: "direct-text-bounds",
+        skipRasterAnalysis: true,
+        fillIndex: -1,
+        originalHash: "",
+        sourceWidth: layoutRect.width,
+        sourceHeight: layoutRect.height,
+        analysisOffsetX: 0,
+        analysisOffsetY: 0,
+        analysisWidth: layoutRect.width,
+        analysisHeight: layoutRect.height,
+        directCropX: roundBoundsFitMetric(measuredRect.x - layoutRect.x),
+        directCropY: roundBoundsFitMetric(measuredRect.y - layoutRect.y),
+        directCropWidth: measuredRect.width,
+        directCropHeight: measuredRect.height,
+        fileName: "",
+        mimeType: "",
+        bytes: new Uint8Array(0),
+      },
+    };
+  }
+
   function buildImageCompositeSkipped(node, reason) {
     return {
       skipped: {
@@ -3765,12 +6433,12 @@
         return first.reason.trim();
       }
     }
-    return "Could not find an eligible image layer for bounds-fit.";
+    return "Could not find an eligible text, image, or supported container for bounds-fit.";
   }
 
   function buildImageCompositeEmptySelectionMessage(layers, skipped) {
     if (Array.isArray(layers) && layers.length === 1) {
-      return "Image composite requires at least 2 eligible image layers.";
+      return "Image composite requires at least 2 eligible visible layers.";
     }
 
     if (Array.isArray(skipped) && skipped.length > 0 && (!Array.isArray(layers) || !layers.length)) {
@@ -3780,46 +6448,66 @@
       }
     }
 
-    return "Could not find 2 to 5 eligible image layers for image composite.";
+    return "Could not find 2 to 8 eligible visible layers for image composite.";
   }
 
-  async function analyzeImageCompositeSelectionNode(node) {
+  function resolveImageCompositeLayerKind(node) {
+    if (node && node.type === "TEXT") {
+      return "text";
+    }
+    if (hasSimpleVisibleImagePaint(node)) {
+      return "image";
+    }
+    return "shape";
+  }
+
+  function getImageCompositeTextContent(node) {
+    if (!node || node.type !== "TEXT" || typeof node.characters !== "string") {
+      return "";
+    }
+
+    return node.characters.replace(/\s+/g, " ").trim().slice(0, 240);
+  }
+
+  function hasRenderableImageCompositeAppearance(node) {
+    if (!node) {
+      return false;
+    }
+
+    if (node.type === "TEXT") {
+      return hasVisiblePaints(node.fills) || hasVisibleEffects(node.effects);
+    }
+
+    if (hasSimpleVisibleImagePaint(node)) {
+      return true;
+    }
+
+    return hasVisiblePaints(getNodeFills(node)) || hasVisiblePaints(node.strokes) || hasVisibleEffects(node.effects);
+  }
+
+  async function analyzeImageCompositeSelectionNode(node, options) {
     if (!node || node.removed) {
-      return buildImageCompositeSkipped(node, "The selected image layer could not be read.");
+      return buildImageCompositeSkipped(node, "The selected layer could not be read.");
+    }
+
+    if (!isBoundsFitNodeVisible(node)) {
+      return buildImageCompositeSkipped(node, "The selected layer is hidden.");
     }
 
     if (hasChildren(node)) {
-      return buildImageCompositeSkipped(node, "Image composite does not support frames, groups, or layers with children yet.");
+      return buildImageCompositeSkipped(node, "Image composite supports visible leaf layers only inside the selected frame.");
     }
 
     if ("locked" in node && node.locked) {
-      return buildImageCompositeSkipped(node, "Locked image layers are not supported for image composite.");
+      return buildImageCompositeSkipped(node, "Locked layers are not supported for image composite.");
     }
 
     if (typeof node.exportAsync !== "function") {
       return buildImageCompositeSkipped(node, "The selected layer cannot be exported for image composite.");
     }
 
-    if ("rotation" in node && typeof node.rotation === "number" && Math.abs(node.rotation) > 0.01) {
-      return buildImageCompositeSkipped(node, "Rotated image layers are not supported yet.");
-    }
-
-    if (!hasSimpleVisibleImagePaint(node)) {
-      return buildImageCompositeSkipped(node, "Image composite requires layers with exactly one visible IMAGE fill.");
-    }
-
-    if (hasVisiblePaints(node.strokes)) {
-      return buildImageCompositeSkipped(node, "Image layers with visible strokes are not supported yet.");
-    }
-
-    if (hasVisibleEffects(node.effects)) {
-      return buildImageCompositeSkipped(node, "Image layers with visible effects are not supported yet.");
-    }
-
-    const fills = getNodeFills(node);
-    const fillIndex = getPrimaryVisibleImageFillIndex(fills);
-    if (fillIndex < 0) {
-      return buildImageCompositeSkipped(node, "Could not find an IMAGE fill.");
+    if (!hasRenderableImageCompositeAppearance(node)) {
+      return buildImageCompositeSkipped(node, "The selected layer does not have visible pixels to composite.");
     }
 
     const analysisContext = getBoundsFitAnalysisContext(node);
@@ -3827,20 +6515,45 @@
       return buildImageCompositeSkipped(node, "Could not calculate the visible bounds for the selected layer.");
     }
 
-    const bytes = await exportBoundsFitRenderedAnalysisBytes(node, analysisContext);
+    let visibleRect = analysisContext.visibleRect;
+    const rootRect = options && options.rootRect ? options.rootRect : null;
+    if (rootRect) {
+      visibleRect = intersectBoundsFitRects(visibleRect, rootRect);
+      if (!visibleRect) {
+        return buildImageCompositeSkipped(node, "The selected layer is outside the chosen frame bounds.");
+      }
+    }
+
+    const exportContext =
+      rootRect && !areBoundsFitRectsEqual(visibleRect, analysisContext.visibleRect)
+        ? {
+            nodeRect: analysisContext.nodeRect,
+            visibleRect: visibleRect,
+            clipped: true,
+            offsetX: roundBoundsFitMetric(visibleRect.x - analysisContext.nodeRect.x),
+            offsetY: roundBoundsFitMetric(visibleRect.y - analysisContext.nodeRect.y),
+          }
+        : analysisContext;
+
+    const bytes = await exportBoundsFitRenderedAnalysisBytes(node, exportContext);
     if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
       return buildImageCompositeSkipped(node, "Could not export the current layer as PNG.");
     }
 
-    const fill = fills[fillIndex];
+    const fills = getNodeFills(node);
+    const fillIndex = hasSimpleVisibleImagePaint(node) ? getPrimaryVisibleImageFillIndex(fills) : -1;
+    const fill = fillIndex >= 0 ? fills[fillIndex] : null;
     return {
       target: {
         node: node,
         nodeId: node.id,
         nodeName: safeName(node),
+        layerKind: resolveImageCompositeLayerKind(node),
+        nodeType: node.type,
+        textContent: getImageCompositeTextContent(node),
         fillIndex: fillIndex,
         originalHash: fill && typeof fill.imageHash === "string" ? fill.imageHash : "",
-        visibleRect: analysisContext.visibleRect,
+        visibleRect: visibleRect,
         fileName: buildFileName(
           {
             nodeName: safeName(node),
@@ -3978,12 +6691,12 @@
     const label = operationLabel || "Bounds Fit";
 
     if (!appliedCount && unchangedCount > 0 && skippedCount === 0) {
-      figma.notify("The selected image is already tightly fit to its visible bounds.", { timeout: 2200 });
+      figma.notify("The selected layer is already tightly fit to its visible bounds.", { timeout: 2200 });
       return;
     }
 
     if (!appliedCount && skippedCount > 0) {
-      figma.notify(label + " could not find an eligible image layer to apply.", { timeout: 2200 });
+      figma.notify(label + " could not find an eligible layer or container to apply.", { timeout: 2200 });
       return;
     }
 
@@ -4065,7 +6778,45 @@
     return questionCount >= 2 && nonAsciiCount >= 4;
   }
 
-  function toKoreanImageErrorMessage(value, fallback) {
+  function buildSharpenSpecificImageError(text, provider) {
+    const providerLabel = provider && provider !== "AI" ? provider + " " : "";
+
+    if (
+      /(select at least one node|could not find the selected image fill|could not find an image fill in the current selection|select one editable shape layer|shape layer or a layer that uses an image fill|select exactly one editable shape layer)/i.test(
+        text
+      )
+    ) {
+      return "샤프닝할 이미지를 찾지 못했습니다. 이미지 레이어를 다시 선택해주세요.";
+    }
+
+    if (
+      /(could not read bytes|bytes from the selected image fill|image fill bytes missing|input image bytes|source image .*empty|exported shape image was empty|empty image bytes|no generated image bytes)/i.test(
+        text
+      )
+    ) {
+      return "샤프닝 원본 이미지 바이트를 읽지 못했습니다. 원본 이미지가 비었거나 손상되었을 수 있습니다.";
+    }
+
+    if (/(application\/octet-stream|unsupported|mime|format|image\/gif|image\/bmp|image\/tiff|image\/heic|image\/heif)/i.test(text)) {
+      return "샤프닝 입력 이미지 형식을 지원하지 않습니다. PNG, JPG, WEBP처럼 일반적인 이미지로 다시 시도해주세요.";
+    }
+
+    if (/(payload|request size|20 ?mb|inline[_ ]data|too large|exceeds?.*limit|max(?:imum)? size)/i.test(text)) {
+      return "샤프닝 입력 이미지가 너무 큽니다. 더 작은 이미지로 다시 시도해주세요.";
+    }
+
+    if (/(aspect[_ -]?ratio|unsupported image setting|image dimensions|width|height)/i.test(text)) {
+      return "샤프닝 입력 이미지 비율이나 크기가 현재 처리 범위를 벗어났습니다. 일반적인 비율이나 크기로 다시 시도해주세요.";
+    }
+
+    if (/(400|invalid_argument|invalid image|unsupported image|image|size)/i.test(text)) {
+      return providerLabel + "샤프닝 입력 이미지를 현재 요청 형식으로 처리하지 못했습니다. 이미지 소스나 설정을 다시 확인해주세요.";
+    }
+
+    return "";
+  }
+
+  function toKoreanImageErrorMessage(value, fallback, options) {
     const text = typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
     if (!text) {
       return fallback;
@@ -4075,7 +6826,24 @@
       return fallback;
     }
 
+    if (isBoundsFitOperation(options)) {
+      return text;
+    }
+
+    if (isImageExtendOperation(options)) {
+      return text;
+    }
+
+    if (
+      /(bounds-fit|auto-layout|text overlay|selected text layer|selected container|visible bounds|cannot be resized|could not resize)/i.test(
+        text
+      )
+    ) {
+      return text;
+    }
+
     const provider = /openai/i.test(text) ? "OpenAI" : /gemini/i.test(text) ? "Gemini" : "AI";
+    const operationLabel = sanitizeOperationLabel(options && options.operationLabel);
 
     if (/(401|403|permission|forbidden|unauthori|auth|api key|credential)/i.test(text)) {
       return provider + " image request permission was denied. Check your API key or credentials.";
@@ -4087,6 +6855,13 @@
 
     if (/(503|unavailable|high demand|overloaded|temporar|try again later|busy)/i.test(text)) {
       return provider + " image request is temporarily unavailable. Please try again later.";
+    }
+
+    if (isSharpenOperationLabel(operationLabel)) {
+      const sharpenSpecificMessage = buildSharpenSpecificImageError(text, provider);
+      if (sharpenSpecificMessage) {
+        return sharpenSpecificMessage;
+      }
     }
 
     if (/(payload|request size|20 ?mb|inline[_ ]data|aspect[_ -]?ratio|too large)/i.test(text)) {
@@ -4262,13 +7037,13 @@
     return "Unnamed";
   }
 
-  function normalizeErrorMessage(error, fallback) {
+  function normalizeErrorMessage(error, fallback, options) {
     if (error && typeof error === "object" && typeof error.message === "string" && error.message.trim()) {
-      return toKoreanImageErrorMessage(error.message, fallback);
+      return toKoreanImageErrorMessage(error.message, fallback, options);
     }
 
     if (typeof error === "string" && error.trim()) {
-      return toKoreanImageErrorMessage(error, fallback);
+      return toKoreanImageErrorMessage(error, fallback, options);
     }
 
     return fallback;

@@ -146,7 +146,9 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     const svgText = payload && typeof payload.svgText === "string" ? payload.svgText.trim() : "";
     const svgTextFallback =
       payload && typeof payload.svgTextFallback === "string" ? payload.svgTextFallback.trim() : "";
-    const hasBitmapBackground = getByteLength(payload && payload.backgroundPngBytes) > 0;
+    const bitmapBackgroundTiles = getBitmapBackgroundTiles(payload);
+    const hasBitmapBackground =
+      getByteLength(payload && payload.backgroundPngBytes) > 0 || bitmapBackgroundTiles.length > 0;
     if (!svgText && !hasBitmapBackground) {
       const fileLabel = payload && typeof payload.fileName === "string" && payload.fileName.trim().length > 0
         ? payload.fileName.trim()
@@ -155,7 +157,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
 
     const importedNode = hasBitmapBackground
-      ? createBitmapSvgImportNode(payload)
+      ? createBitmapSvgImportNode(payload, bitmapBackgroundTiles)
       : figma.createNodeFromSvg(svgText);
     importedNode.name = normalizeSvgName(payload.rootName || payload.fileName || SVG_IMPORT_BATCH_ROOT_NAME);
     let textImportResult = null;
@@ -176,7 +178,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return importedNode;
   }
 
-  function createBitmapSvgImportNode(payload) {
+  function createBitmapSvgImportNode(payload, bitmapBackgroundTiles) {
     const frame = figma.createFrame();
     const width = Math.max(1, roundNumber(payload && payload.documentWidth));
     const height = Math.max(1, roundNumber(payload && payload.documentHeight));
@@ -185,6 +187,22 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     frame.clipsContent = true;
     frame.strokes = [];
     frame.fills = [];
+
+    if (Array.isArray(bitmapBackgroundTiles) && bitmapBackgroundTiles.length > 0) {
+      for (let index = 0; index < bitmapBackgroundTiles.length; index += 1) {
+        const tile = bitmapBackgroundTiles[index];
+        const background = figma.createRectangle();
+        background.name = normalizeSvgName(tile.name || `Background Tile ${index + 1}`);
+        background.resize(Math.max(1, roundNumber(tile.width)), Math.max(1, roundNumber(tile.height)));
+        background.x = roundNumber(tile.x);
+        background.y = roundNumber(tile.y);
+        background.strokes = [];
+        background.fills = [createBitmapFillFromBytes(tile.pngBytes)];
+        frame.appendChild(background);
+      }
+
+      return frame;
+    }
 
     const background = figma.createRectangle();
     background.name = "Background PNG";
@@ -221,6 +239,29 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     }
     throw new Error("The bitmap import payload did not include valid image bytes.");
+  }
+
+  function getBitmapBackgroundTiles(payload) {
+    if (!payload || !Array.isArray(payload.backgroundTiles)) {
+      return [];
+    }
+
+    return payload.backgroundTiles
+      .map(tile => {
+        if (!tile || getByteLength(tile.pngBytes) <= 0) {
+          return null;
+        }
+
+        return {
+          name: typeof tile.name === "string" && tile.name.trim().length > 0 ? tile.name.trim() : "",
+          x: roundNumber(tile.x),
+          y: roundNumber(tile.y),
+          width: Math.max(1, roundNumber(tile.width)),
+          height: Math.max(1, roundNumber(tile.height)),
+          pngBytes: tile.pngBytes,
+        };
+      })
+      .filter(Boolean);
   }
 
   async function appendEditableTextRuns(importedNode, payload) {
@@ -2545,6 +2586,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     apiKey: "",
     openAiApiKey: "",
     geminiApiKey: "",
+    dubApiKey: "",
     proofingLocale: "",
     userDictionary: [],
     protectedTerms: []
@@ -2618,7 +2660,16 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         : legacyProvider === "gemini"
           ? legacyApiKey
           : DEFAULT_AI_SETTINGS.geminiApiKey;
-    const provider = openAiApiKey ? "openai" : geminiApiKey ? "gemini" : legacyProvider;
+    const dubApiKey =
+      typeof source.dubApiKey === "string" ? sanitizeApiKey(source.dubApiKey) : DEFAULT_AI_SETTINGS.dubApiKey;
+    const preferredProvider = legacyProvider === "gemini" ? "gemini" : "openai";
+    const fallbackProvider = preferredProvider === "gemini" ? "openai" : "gemini";
+    const provider =
+      (preferredProvider === "gemini" ? geminiApiKey : openAiApiKey)
+        ? preferredProvider
+        : (fallbackProvider === "gemini" ? geminiApiKey : openAiApiKey)
+          ? fallbackProvider
+          : preferredProvider;
     const apiKey = provider === "gemini" ? geminiApiKey : openAiApiKey;
 
     return {
@@ -2627,6 +2678,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       apiKey,
       openAiApiKey,
       geminiApiKey,
+      dubApiKey,
       proofingLocale: normalizeProofingLocale(source.proofingLocale),
       userDictionary: normalizeTermList(source.userDictionary),
       protectedTerms: normalizeTermList(source.protectedTerms)
@@ -8986,6 +9038,11 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     openai: "gpt-5-mini",
     gemini: "gemini-2.5-flash",
   });
+  const FALLBACK_MODELS_BY_PROVIDER = Object.freeze({
+    openai: ["gpt-5-mini", "gpt-4.1-mini"],
+    gemini: ["gemini-2.5-flash"],
+  });
+  const TEXT_AI_PROVIDERS = Object.freeze(["openai", "gemini"]);
   const pendingUiRequests = new Map();
 
   globalScope.__PIGMA_AI_LLM__ = {
@@ -9031,74 +9088,111 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
   async function requestJsonTask(options) {
     const settings = await getAiSettingsAsync();
-    const runInfo = getResolvedRunInfo(settings, options);
-    if (settings.enabled !== true || !runInfo.apiKey) {
+    if (settings.enabled !== true) {
       return null;
     }
-    const provider = runInfo.provider;
-    const model = runInfo.model;
-    const requestMeta = buildRequestMeta(options, runInfo);
-    const prompt = buildPrompt(options, requestMeta);
-    const startedAt = Date.now();
-
-    try {
-      let result = null;
-      result = await requestJsonTaskViaUiBridge({
-        provider,
-        model,
-        apiKey: runInfo.apiKey,
-        prompt,
-        meta: requestMeta,
-      });
-      const durationMs = Math.max(0, Date.now() - startedAt);
-      const quality = summarizeJsonResponseQuality(result, options && options.schema);
-
-      if (result && typeof result === "object") {
-        result._provider = provider;
-        result._model = model;
-        result._taskType = requestMeta.taskType;
-        result._taskContext = requestMeta.taskContext;
-        result._plannerVersion = requestMeta.plannerVersion;
-        result._providerProfile = requestMeta.providerProfile;
-        result._durationMs = durationMs;
-        result._responseQualityScore = quality.score;
-        result._responseQualityLabel = quality.label;
-        result._responseQualityNotes = quality.notes.slice(0, 4);
-      }
-
-      await appendAiRunLogAsync({
-        ok: true,
-        provider: provider,
-        model: model,
-        taskType: requestMeta.taskType,
-        taskContext: requestMeta.taskContext,
-        plannerVersion: requestMeta.plannerVersion,
-        providerProfile: requestMeta.providerProfile,
-        durationMs: durationMs,
-        qualityScore: quality.score,
-        qualityLabel: quality.label,
-        notes: quality.notes.slice(0, 4),
-      });
-
-      return result;
-    } catch (error) {
-      const durationMs = Math.max(0, Date.now() - startedAt);
-      const failureType = classifyAiFailureType(error);
-      const message = normalizeErrorMessage(error, "AI 응답을 받지 못했습니다.");
-      await appendAiRunLogAsync({
-        ok: false,
-        provider: provider,
-        model: model,
-        taskType: requestMeta.taskType,
-        taskContext: requestMeta.taskContext,
-        plannerVersion: requestMeta.plannerVersion,
-        providerProfile: requestMeta.providerProfile,
-        durationMs: durationMs,
-        failureType: failureType,
-        message: message,
-      });
-      throw createAiClientError(error, message, requestMeta, runInfo, durationMs, failureType);
+    const attemptRunInfos = buildTextTaskRunInfos(settings, options);
+    if (!attemptRunInfos.length) {
+      return null;
     }
+
+    let lastFailure = null;
+
+    for (let index = 0; index < attemptRunInfos.length; index += 1) {
+      const runInfo = attemptRunInfos[index];
+      const provider = runInfo.provider;
+      const model = runInfo.model;
+      const requestMeta = buildRequestMeta(options, runInfo);
+      const prompt = buildPrompt(options, requestMeta);
+      const startedAt = Date.now();
+
+      try {
+        let result = null;
+        result = await requestJsonTaskViaUiBridge({
+          provider,
+          model,
+          apiKey: runInfo.apiKey,
+          prompt,
+          meta: requestMeta,
+        });
+        const durationMs = Math.max(0, Date.now() - startedAt);
+        const quality = summarizeJsonResponseQuality(result, options && options.schema);
+
+        if (result && typeof result === "object") {
+          result._provider = provider;
+          result._model = model;
+          result._taskType = requestMeta.taskType;
+          result._taskContext = requestMeta.taskContext;
+          result._plannerVersion = requestMeta.plannerVersion;
+          result._providerProfile = requestMeta.providerProfile;
+          result._durationMs = durationMs;
+          result._responseQualityScore = quality.score;
+          result._responseQualityLabel = quality.label;
+          result._responseQualityNotes = quality.notes.slice(0, 4);
+        }
+
+        const notes = quality.notes.slice(0, 4);
+        if (index > 0) {
+          notes.push(`fallback after ${attemptRunInfos[index - 1].provider}`);
+        }
+
+        await appendAiRunLogAsync({
+          ok: true,
+          provider: provider,
+          model: model,
+          taskType: requestMeta.taskType,
+          taskContext: requestMeta.taskContext,
+          plannerVersion: requestMeta.plannerVersion,
+          providerProfile: requestMeta.providerProfile,
+          durationMs: durationMs,
+          qualityScore: quality.score,
+          qualityLabel: quality.label,
+          notes,
+        });
+
+        return result;
+      } catch (error) {
+        const durationMs = Math.max(0, Date.now() - startedAt);
+        const failureType = classifyAiFailureType(error);
+        const message = normalizeErrorMessage(error, "AI 응답을 받지 못했습니다.");
+        const notes = index + 1 < attemptRunInfos.length ? [`retrying with ${attemptRunInfos[index + 1].provider}`] : [];
+        await appendAiRunLogAsync({
+          ok: false,
+          provider: provider,
+          model: model,
+          taskType: requestMeta.taskType,
+          taskContext: requestMeta.taskContext,
+          plannerVersion: requestMeta.plannerVersion,
+          providerProfile: requestMeta.providerProfile,
+          durationMs: durationMs,
+          failureType: failureType,
+          message: message,
+          notes,
+        });
+
+        lastFailure = {
+          error,
+          message,
+          requestMeta,
+          runInfo,
+          durationMs,
+          failureType,
+        };
+      }
+    }
+
+    if (lastFailure) {
+      throw createAiClientError(
+        lastFailure.error,
+        lastFailure.message,
+        lastFailure.requestMeta,
+        lastFailure.runInfo,
+        lastFailure.durationMs,
+        lastFailure.failureType
+      );
+    }
+
+    return null;
   }
 
   async function getAiRunLogAsync() {
@@ -9140,6 +9234,55 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       model,
       providerProfile: buildProviderProfile("", provider, model, "", ""),
     };
+  }
+
+  function buildTextTaskRunInfos(settings, options) {
+    const source = settings && typeof settings === "object" ? settings : {};
+    const preferredProvider = resolveTextTaskProvider(source);
+    const providers = [];
+
+    if (preferredProvider) {
+      providers.push(preferredProvider);
+    }
+
+    for (const provider of TEXT_AI_PROVIDERS) {
+      if (providers.indexOf(provider) >= 0) {
+        continue;
+      }
+      if (!getApiKeyForProvider(source, provider)) {
+        continue;
+      }
+      providers.push(provider);
+    }
+
+    const runInfos = [];
+
+    for (const provider of providers) {
+      const apiKey = getApiKeyForProvider(source, provider);
+      if (!apiKey) {
+        continue;
+      }
+
+      const preferredModel =
+        options && typeof options.modelByProvider === "object" && options.modelByProvider && options.modelByProvider[provider]
+          ? options.modelByProvider[provider]
+          : DEFAULT_MODEL_BY_PROVIDER[provider];
+      const modelCandidates = uniqueStrings(
+        [preferredModel].concat(Array.isArray(FALLBACK_MODELS_BY_PROVIDER[provider]) ? FALLBACK_MODELS_BY_PROVIDER[provider] : []),
+        4
+      );
+
+      for (const model of modelCandidates) {
+        runInfos.push({
+          provider,
+          apiKey,
+          model,
+          providerProfile: buildProviderProfile("", provider, model, "", ""),
+        });
+      }
+    }
+
+    return runInfos;
   }
 
   function normalizeAiSettings(value) {
@@ -9184,13 +9327,15 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
   function resolveTextTaskProvider(settings) {
     const source = settings && typeof settings === "object" ? settings : {};
-    if (getApiKeyForProvider(source, "openai")) {
-      return "openai";
+    const preferred = source.provider === "gemini" ? "gemini" : "openai";
+    if (getApiKeyForProvider(source, preferred)) {
+      return preferred;
     }
-    if (getApiKeyForProvider(source, "gemini")) {
-      return "gemini";
+    const fallback = preferred === "gemini" ? "openai" : "gemini";
+    if (getApiKeyForProvider(source, fallback)) {
+      return fallback;
     }
-    return source.provider === "gemini" ? "gemini" : "openai";
+    return preferred;
   }
 
   function buildPrompt(options, requestMeta) {
@@ -15182,7 +15327,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       runningDescription: "하이브리드 구조형 이름을 정리하고 적극적인 리그룹핑 후보를 확인하고 있습니다.",
       aggressiveRegroup: true,
       aiInstructions:
-        "You improve Figma layer names for design handoff. Return Korean reasons, but every suggestedName must be ASCII slash notation in readable Title Case like Button/Primary/Sign In, Text/Hero/Title, Group/Navbar/Item/Profile. Use only letters, numbers, spaces, hyphens, and slashes. Do not use Korean, dots, or underscores in suggestedName. Reflect a clear topic when supported by text or metadata, for example Soccer, Sports, Finance, Food, Travel, Beauty, or Education. For image layers, prefer semantic roles like Hero, Banner, Thumbnail, Avatar, Photo, Poster, Cover, or Illustration when supported by the hints. Only include a color token when it clearly disambiguates a badge, chip, pill, or status-like visual; do not add colors to every layer. Do not invent a topic or color that is not supported by the payload. If uncertain, keep the provided localName.",
+        "You improve Figma layer names for design handoff. Return Korean reasons. When candidate.nameMode is 'structured', suggestedName should be short readable ASCII labels in Title Case, using slashes only for meaningful block hierarchy such as Hero/Copy, Hero/Media, Feature/List, Navbar/Item, CTA Primary, Title, Body, Thumbnail, Price, or Badge. Do not prefix every structured name with generic words like Group, Text, Frame, Container, or Layer. Use only letters, numbers, spaces, hyphens, and slashes. Do not use Korean or dots. When candidate.nameMode is 'display', suggestedName must be a human-readable section or repeat-card label like 01_Key Visual, 02_Introduction, 03_Features, 04_Product 01, 05_Product 02, 06_FAQ, 07_Outro, Product Card 01, Product Card 02, Coupon + Product Card, Awards, FAQ, or Archiving Page. For display names, first infer the section role from narrative context, visual hierarchy, section order, surrounding sections, and what the block is trying to communicate. Only after that decide the final label. Use heading/body/action text, sibling order, visual composition, nearby section context, and repeated card patterns together. Do not rely on file names, document titles, or shallow keywords alone. A word like monthly by itself does not mean Pricing. Avoid labels like Sports, Finance, Food, or other broad topic words as top-level section names unless the block is literally a named category section. Prefix 01_, 02_ only when candidate.needsIndex is true. For repeated cards, prefer 2-digit numbering like 01 and 02. Avoid repeating the same broad label for parent and child. If localName looks heuristic or weak, replace it with a better role-based label instead of preserving it. When candidate.aiOnlySectionName is true and candidate.currentNameLooksWeak or candidate.localNameLooksWeak is true, ignore those weak names and infer a new section label from the content. Prefer candidate.sectionRoleHint and candidate.sectionNarrative when they are supported by the rest of the payload.",
       aiReasonFallback: "AI 하이브리드 네이밍 기준",
     },
   };
@@ -15254,6 +15399,12 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     ["modal", ["modal", "dialog", "confirm", "cancel", "닫기", "취소", "확인"]],
     ["dashboard", ["dashboard", "analytics", "report", "metric", "chart", "data", "대시보드", "분석", "리포트", "지표", "차트"]],
     ["content", ["content", "body", "copy", "section", "콘텐츠", "본문", "섹션"]],
+  ];
+  const CONTENT_ROLE_TOKEN_ENTRIES = [
+    ["introduction", ["introduction", "intro", "opening", "overview", "about", "hi i am", "hi i'm", "reviewer", "reviewed", "real use", "story"]],
+    ["summary", ["summary", "conclusion", "closing", "wrap up", "takeaway"]],
+    ["faq", ["faq", "frequently asked", "questions"]],
+    ["archive", ["archive", "archiving", "history", "behind the scenes"]],
   ];
   const TOPIC_TOKEN_ENTRIES = [
     [
@@ -15444,7 +15595,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
     try {
       const designReadResult = await readDesignReadCache();
-      const result = await applyRegroupRename(designReadResult, { namingMode });
+      const result = sanitizeRegroupRenameResult(await applyRegroupRename(designReadResult, { namingMode }));
       await writeRegroupRenameCache(result);
 
       figma.ui.postMessage({
@@ -15453,7 +15604,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         matchesCurrentSelection: matchesSelectionSignature(result.selectionSignature || runSelectionSignature),
       });
 
-      figma.notify(`리그룹핑/리네이밍 완료 (${result.summary.renameCount}개 이름 정리)`, { timeout: 1800 });
+      figma.notify(buildRegroupRenameToast(result), { timeout: 2200 });
     } catch (error) {
       const message = normalizeErrorMessage(error, "리그룹핑/리네이밍에 실패했습니다.");
 
@@ -15468,7 +15619,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   }
 
   async function postCachedRegroupRenameResult() {
-    const result = await readRegroupRenameCache();
+    const result = sanitizeRegroupRenameResult(await readRegroupRenameCache());
 
     figma.ui.postMessage({
       type: "ai-regroup-rename-cache",
@@ -15516,6 +15667,117 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return result;
   }
 
+  function sanitizeRegroupRenameResult(result) {
+    if (!result || typeof result !== "object") {
+      return null;
+    }
+
+    const summary = result.summary && typeof result.summary === "object" ? result.summary : {};
+    return {
+      version: typeof result.version === "number" ? result.version : PATCH_VERSION,
+      source: typeof result.source === "string" ? result.source : "local-heuristic",
+      namingMode: typeof result.namingMode === "string" ? result.namingMode : resolveNamingMode(activeNamingMode),
+      namingModeLabel: typeof result.namingModeLabel === "string" ? result.namingModeLabel : "",
+      selectionSignature: typeof result.selectionSignature === "string" ? result.selectionSignature : "",
+      processedAt: typeof result.processedAt === "string" ? result.processedAt : new Date().toISOString(),
+      summary: {
+        selectionLabel: typeof summary.selectionLabel === "string" ? summary.selectionLabel : "",
+        contextLabel: typeof summary.contextLabel === "string" ? summary.contextLabel : "",
+        topicLabel: typeof summary.topicLabel === "string" ? summary.topicLabel : "",
+        namingMode: typeof summary.namingMode === "string" ? summary.namingMode : "",
+        namingModeLabel: typeof summary.namingModeLabel === "string" ? summary.namingModeLabel : "",
+        renameCount: Math.max(0, Number(summary.renameCount) || 0),
+        aiRenameCount: Math.max(0, Number(summary.aiRenameCount) || 0),
+        localRenameCount: Math.max(0, Number(summary.localRenameCount) || 0),
+        aiConfigured: summary.aiConfigured === true,
+        aiHelperAvailable: summary.aiHelperAvailable === true,
+        aiCandidateCount: Math.max(0, Number(summary.aiCandidateCount) || 0),
+        aiSuggestionCount: Math.max(0, Number(summary.aiSuggestionCount) || 0),
+        aiFailed: summary.aiFailed === true,
+        aiErrorMessage: typeof summary.aiErrorMessage === "string" ? summary.aiErrorMessage : "",
+        aiFailureType: typeof summary.aiFailureType === "string" ? summary.aiFailureType : "",
+        aiStatusLabel: typeof summary.aiStatusLabel === "string" ? summary.aiStatusLabel : "",
+        regroupCount: Math.max(0, Number(summary.regroupCount) || 0),
+        suggestionCount: Math.max(0, Number(summary.suggestionCount) || 0),
+        skippedCount: Math.max(0, Number(summary.skippedCount) || 0),
+        aiOnlySkippedCount: Math.max(0, Number(summary.aiOnlySkippedCount) || 0),
+      },
+      renamed: sanitizeRegroupRenameEntryList(result.renamed, ["id", "from", "to", "reason", "nameSource"], 24),
+      regrouped: sanitizeRegroupRenameEntryList(result.regrouped, ["id", "name", "parentName", "nodes", "reason"], 12),
+      suggestions: sanitizeRegroupRenameEntryList(result.suggestions, ["name", "parentName", "nodes", "reason"], 12),
+      skipped: sanitizeRegroupRenameEntryList(result.skipped, ["label", "reason", "nameSource"], 12),
+      insights: sanitizeStringList(result.insights, 6),
+    };
+  }
+
+  function sanitizeRegroupRenameEntryList(rows, allowedKeys, limit) {
+    const values = Array.isArray(rows) ? rows : [];
+    const max = typeof limit === "number" && limit > 0 ? limit : values.length;
+    const entries = [];
+    for (const row of values) {
+      if (!row || typeof row !== "object") {
+        continue;
+      }
+
+      const next = {};
+      for (const key of allowedKeys) {
+        if (key === "nodes") {
+          if (Array.isArray(row.nodes)) {
+            next.nodes = row.nodes
+              .map((entry) => {
+                if (entry && typeof entry === "object") {
+                  return {
+                    id: typeof entry.id === "string" ? entry.id : "",
+                    name: typeof entry.name === "string" ? entry.name : "",
+                  };
+                }
+
+                return typeof entry === "string" ? entry : "";
+              })
+              .filter((entry) => {
+                if (typeof entry === "string") {
+                  return !!entry;
+                }
+
+                return !!(entry && (entry.id || entry.name));
+              })
+              .slice(0, 6);
+          }
+          continue;
+        }
+
+        if (typeof row[key] === "string") {
+          next[key] = row[key];
+        }
+      }
+
+      entries.push(next);
+      if (entries.length >= max) {
+        break;
+      }
+    }
+
+    return entries;
+  }
+
+  function sanitizeStringList(values, limit) {
+    const rows = Array.isArray(values) ? values : [];
+    const max = typeof limit === "number" && limit > 0 ? limit : rows.length;
+    const items = [];
+    for (const value of rows) {
+      if (typeof value !== "string" || !value) {
+        continue;
+      }
+
+      items.push(value);
+      if (items.length >= max) {
+        break;
+      }
+    }
+
+    return items;
+  }
+
   function matchesCurrentSelection(result) {
     return !!result && result.selectionSignature === getSelectionSignature(figma.currentPage.selection);
   }
@@ -15530,16 +15792,21 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       throw new Error("프레임, 그룹, 레이어를 먼저 선택하세요.");
     }
 
+    const selectionIds = selection.map((node) => node.id);
     const context = buildSelectionContext(selection, designReadResult, options);
     const renameResult = await applyRenamePlan(selection, context);
-    const regroupResult = applyRegroupPlan(selection, context);
-    const suggestionResult = buildRegroupSuggestions(selection, regroupResult.usedNodeIds, context);
+    const refreshedSelection = resolveNodeListByIds(selectionIds);
+    const regroupResult = applyRegroupPlan(refreshedSelection, context);
+    const suggestionResult = buildRegroupSuggestions(refreshedSelection, regroupResult.usedNodeIds, context);
     const skippedCount = renameResult.skipped.length + regroupResult.skipped.length;
     const insights = buildInsights(context, renameResult, regroupResult, suggestionResult);
+    const aiRenameCount = renameResult.aiAppliedCount || 0;
+    const localRenameCount = renameResult.localAppliedCount || 0;
+    const aiStatusLabel = buildAiRenameStatusLabel(renameResult);
 
     return {
       version: PATCH_VERSION,
-      source: "local-heuristic",
+      source: aiRenameCount > 0 ? (localRenameCount > 0 ? "mixed" : "ai") : "local-heuristic",
       namingMode: context.namingMode,
       namingModeLabel: context.namingModeLabel,
       selectionSignature: getSelectionSignature(selection),
@@ -15551,9 +15818,20 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         namingMode: context.namingMode,
         namingModeLabel: context.namingModeLabel,
         renameCount: renameResult.applied.length,
+        aiRenameCount,
+        localRenameCount,
+        aiConfigured: renameResult.aiConfigured === true,
+        aiHelperAvailable: renameResult.aiHelperAvailable === true,
+        aiCandidateCount: renameResult.aiCandidateCount || 0,
+        aiSuggestionCount: renameResult.aiSuggestionCount || 0,
+        aiFailed: renameResult.aiFailed === true,
+        aiErrorMessage: renameResult.aiErrorMessage || "",
+        aiFailureType: renameResult.aiFailureType || "",
+        aiStatusLabel,
         regroupCount: regroupResult.applied.length,
         suggestionCount: suggestionResult.length,
         skippedCount,
+        aiOnlySkippedCount: renameResult.aiOnlySkippedCount || 0,
       },
       renamed: renameResult.applied.slice(0, 24),
       regrouped: regroupResult.applied.slice(0, 12),
@@ -15596,9 +15874,12 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         contextLabel,
         contextSlug: deriveContextSlug(contextLabel),
         contentSummary,
+        selectionTextSamples: textSamples.slice(0, 16),
         topicSlug,
         topicLabel,
         paletteHints,
+        selectedRootIds: selection.map((node) => node.id),
+        selectedRootCount: selection.length,
         preservedRootId: preservedRoot ? preservedRoot.id : "",
         preservedRootName: preservedRoot ? safeName(preservedRoot) : "",
         namingMode,
@@ -15614,9 +15895,12 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       contextLabel,
       contextSlug: deriveContextSlug(contextLabel),
       contentSummary,
+      selectionTextSamples: textSamples.slice(0, 16),
       topicSlug,
       topicLabel,
       paletteHints,
+      selectedRootIds: selection.map((node) => node.id),
+      selectedRootCount: selection.length,
       preservedRootId: preservedRoot ? preservedRoot.id : "",
       preservedRootName: preservedRoot ? safeName(preservedRoot) : "",
       namingMode,
@@ -15749,6 +16033,16 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     const parentNameCounts = new Map();
     const applied = [];
     const skipped = [];
+    let aiAppliedCount = 0;
+    let localAppliedCount = 0;
+    let aiOnlySkippedCount = 0;
+    let aiHelperAvailable = false;
+    let aiConfigured = false;
+    let aiCandidateCount = 0;
+    let aiSuggestionCount = 0;
+    let aiFailed = false;
+    let aiErrorMessage = "";
+    let aiFailureType = "";
     const parentGroups = [];
 
     for (const node of allNodes) {
@@ -15778,14 +16072,50 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       for (const node of nodes) {
         const currentName = safeName(node);
         const currentKey = canonicalizeName(currentName);
+        const useHybridDisplayName = shouldUseHybridDisplayName(node, context);
+        const majorSection = isMajorHybridSection(node, context);
         const textHint = getPrimaryTextHint(node);
-        const baseName = proposeNodeName(node, context);
+        const sectionSlug = detectSectionSlug(node, context);
+        const contentSlug = resolveContentSlug(node, textHint, context);
+        const topicSlug = detectTopicSlug(node, context, textHint);
+        const semanticSlug = contentSlug || topicSlug || sectionSlug || context.contextSlug || "content";
+        const groupRole = hasChildren(node) ? inferGroupRole(node, semanticSlug) : "";
+        const repeatRole = describeRepeatableRole(node, context, {
+          textHint: textHint,
+          sectionSlug: sectionSlug,
+          contentSlug: contentSlug,
+          topicSlug: topicSlug,
+          groupRole: groupRole,
+          majorSection: majorSection,
+        });
+        const candidateNameMode = resolveCandidateNameMode(context, useHybridDisplayName, majorSection, repeatRole);
+        const baseName = proposeNodeName(node, context, {
+          textHint: textHint,
+          sectionSlug: sectionSlug,
+          contentSlug: contentSlug,
+          topicSlug: topicSlug,
+          groupRole: groupRole,
+          repeatRole: repeatRole,
+          majorSection: majorSection,
+        });
         const duplicateCount = counts.get(currentKey) || 0;
+        const currentNameSafeDisplay = candidateNameMode === "display" ? isSafeLocalDisplayFallback(currentName, node, context) : false;
+        const baseNameSafeDisplay = candidateNameMode === "display" ? isSafeLocalDisplayFallback(baseName, node, context) : false;
+        const baseNameSemanticallyWeak = baseName ? isSemanticallyWeakCurrentName(baseName, node, context) : true;
+        const forceAiRename = shouldAlwaysEvaluateHybridDisplayName(node, context, useHybridDisplayName, majorSection);
+        const weakHybridDisplayName =
+          resolveNamingMode(context.namingMode) === "hybrid" &&
+          candidateNameMode === "display" &&
+          (!currentNameSafeDisplay || hasRedundantHybridParentLabel(currentName, safeName(node.parent)));
+        const semanticWeakCurrentName = isSemanticallyWeakCurrentName(currentName, node, context);
         const shouldRename =
+          forceAiRename ||
           isSuspiciousName(currentName, node.type) ||
           duplicateCount > 1 ||
-          !isStructuredNameForMode(currentName, context.namingMode);
-        const preserveRootName = context.preservedRootId && node.id === context.preservedRootId;
+          semanticWeakCurrentName ||
+          !isStructuredNameForMode(currentName, context.namingMode) ||
+          weakHybridDisplayName;
+        const preserveRootName = shouldPreserveRootName(node, context, currentName);
 
         if (preserveRootName) {
           usedNames.add(currentKey);
@@ -15803,21 +16133,62 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
           continue;
         }
 
+        const majorSectionSiblings = majorSection ? getMajorHybridSectionSiblings(node, context) : [];
+        const majorSectionOrder = majorSection ? majorSectionSiblings.findIndex((entry) => entry && entry.id === node.id) + 1 : 0;
+        const deepTextSamples = collectNodeTexts(node, 8, 4).slice(0, 8);
+        const aiOnlySectionName = useHybridDisplayName && majorSection;
+        const sectionRoleAnalysis =
+          useHybridDisplayName && hasChildren(node)
+            ? analyzeSectionRole(node, context, {
+                textHint,
+              })
+            : null;
         candidates.push({
-          node,
+          nodeId: node.id,
           currentName,
           baseName,
           reason: buildRenameReason(node, context),
           parentName: safeName(node.parent),
           type: String(node.type || "UNKNOWN"),
+          namingMode: context.namingMode,
           textHint,
-          textSamples: collectNodeTexts(node, 3, 2).slice(0, 3),
+          textSamples: deepTextSamples.slice(0, 3),
+          deepTextSamples,
+          headingTexts: collectProminentTexts(node, 3),
+          actionTexts: collectActionTexts(node, 3),
+          contentDigest: buildNodeContentDigest(node, context),
+          sectionNarrative: sectionRoleAnalysis ? sectionRoleAnalysis.summary : "",
+          sectionRoleHint: sectionRoleAnalysis ? sectionRoleAnalysis.role : "",
+          sectionRoleReason: sectionRoleAnalysis ? sectionRoleAnalysis.reason : "",
           topicHint: formatTopicLabel(detectTopicSlug(node, context, textHint)),
           colorHint: getNodeColorHint(node),
           imageRole: isImageLikeNode(node) ? detectImageRole(node) : "",
           hasImageFill: hasImageFill(node),
+          allowAiOverride: true,
+          nameMode: candidateNameMode,
+          aiOnlySectionName,
+          localFallbackAllowed: !aiOnlySectionName || isSafeLocalDisplayFallback(baseName, node, context),
+          majorSection: majorSection,
+          majorSectionOrder: majorSectionOrder,
+          majorSectionCount: majorSectionSiblings.length,
+          needsIndex: shouldPrefixHybridDisplayOrdinal(node, context),
+          positionHint: describeNodeSectionPosition(node, context),
+          siblingContext: buildSiblingContentContext(node, context),
+          currentNameSafeDisplay: currentNameSafeDisplay,
+          baseNameSafeDisplay: baseNameSafeDisplay,
+          currentNameSemanticallyWeak: semanticWeakCurrentName,
+          baseNameSemanticallyWeak: baseNameSemanticallyWeak,
+          looksLikePricing: looksLikePricingSection(node),
+          bounds: snapshotNodeBounds(node),
+          sectionSlug: sectionSlug,
+          contentSlug: contentSlug,
+          topicSlug: topicSlug,
+          groupRole: groupRole,
+          repeatRole: repeatRole,
         });
       }
+
+      applySiblingClusterNaming(candidates);
 
       parentGroups.push({
         usedNames,
@@ -15825,28 +16196,65 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       });
     }
 
-    const aiRenameMap = await requestAiRenameSuggestions(parentGroups, context);
+    const aiRenameResult = await requestAiRenameSuggestions(parentGroups, context);
+    const aiRenameMap = aiRenameResult && aiRenameResult.map instanceof Map ? aiRenameResult.map : new Map();
+    aiHelperAvailable = !!(aiRenameResult && aiRenameResult.helperAvailable);
+    aiConfigured = !!(aiRenameResult && aiRenameResult.configured);
+    aiCandidateCount = Math.max(0, Number(aiRenameResult && aiRenameResult.candidateCount) || 0);
+    aiSuggestionCount = Math.max(0, Number(aiRenameResult && aiRenameResult.suggestionCount) || 0);
+    aiFailed = !!(aiRenameResult && aiRenameResult.failed);
+    aiErrorMessage = typeof (aiRenameResult && aiRenameResult.errorMessage) === "string" ? aiRenameResult.errorMessage.trim() : "";
+    aiFailureType = typeof (aiRenameResult && aiRenameResult.failureType) === "string" ? aiRenameResult.failureType.trim() : "";
 
     for (const group of parentGroups) {
       const usedNames = group.usedNames;
       const candidates = group.candidates;
       for (const candidate of candidates) {
-        const aiSuggestion = aiRenameMap.get(candidate.node.id);
-        const nextBaseName = aiSuggestion && aiSuggestion.name ? aiSuggestion.name : candidate.baseName;
-        const nextReason = aiSuggestion && aiSuggestion.reason ? aiSuggestion.reason : candidate.reason;
+        const aiSuggestion = candidate.allowAiOverride ? aiRenameMap.get(candidate.nodeId) : null;
+        const renameDecision = resolveRenameDecision(candidate, aiSuggestion, aiRenameResult);
+        if (!renameDecision) {
+          usedNames.add(canonicalizeName(candidate.currentName));
+          if (candidate.aiOnlySectionName) {
+            aiOnlySkippedCount += 1;
+            skipped.push({
+              label: candidate.currentName,
+              reason: "AI 대분류 네이밍 결과가 없어 기존 이름을 유지했습니다.",
+              nameSource: "kept",
+            });
+          }
+          continue;
+        }
+        const nextBaseName = renameDecision.name;
+        const nextReason = renameDecision.reason;
         const uniqueName = ensureUniqueName(nextBaseName, usedNames);
         if (!uniqueName || canonicalizeName(uniqueName) === canonicalizeName(candidate.currentName)) {
           continue;
         }
 
         try {
-          candidate.node.name = uniqueName;
+          const liveNode = getNodeByIdSafe(candidate.nodeId);
+          if (!liveNode || !canRenameNode(liveNode)) {
+            skipped.push({
+              label: candidate.currentName,
+              reason: "변경 대상 레이어를 다시 찾지 못해 이름 변경을 건너뛰었습니다.",
+            });
+            usedNames.add(canonicalizeName(candidate.currentName));
+            continue;
+          }
+
+          liveNode.name = uniqueName;
           applied.push({
-            id: candidate.node.id,
+            id: candidate.nodeId,
             from: candidate.currentName,
             to: uniqueName,
             reason: nextReason,
+            nameSource: renameDecision.source,
           });
+          if (renameDecision.source === "ai") {
+            aiAppliedCount += 1;
+          } else {
+            localAppliedCount += 1;
+          }
           usedNames.add(canonicalizeName(uniqueName));
         } catch (error) {
           skipped.push({
@@ -15861,13 +16269,32 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return {
       applied,
       skipped,
+      aiAppliedCount,
+      localAppliedCount,
+      aiOnlySkippedCount,
+      aiHelperAvailable,
+      aiConfigured,
+      aiCandidateCount,
+      aiSuggestionCount,
+      aiFailed,
+      aiErrorMessage,
+      aiFailureType,
     };
   }
 
   async function requestAiRenameSuggestions(parentGroups, context) {
     const ai = getAiHelper();
     if (!ai) {
-      return new Map();
+      return {
+        map: new Map(),
+        helperAvailable: false,
+        configured: false,
+        candidateCount: 0,
+        suggestionCount: 0,
+        failed: false,
+        errorMessage: "",
+        failureType: "",
+      };
     }
 
     let configured = false;
@@ -15878,31 +16305,70 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
 
     if (!configured) {
-      return new Map();
+      return {
+        map: new Map(),
+        helperAvailable: true,
+        configured: false,
+        candidateCount: 0,
+        suggestionCount: 0,
+        failed: false,
+        errorMessage: "",
+        failureType: "",
+      };
     }
 
     const candidates = [];
     for (const group of parentGroups) {
       const items = group && Array.isArray(group.candidates) ? group.candidates : [];
       for (const candidate of items) {
+        if (candidate.allowAiOverride === false) {
+          continue;
+        }
+
         candidates.push({
-          id: candidate.node.id,
-          currentName: candidate.currentName,
-          localName: candidate.baseName,
+          id: candidate.nodeId,
+          currentName: candidate.aiOnlySectionName && candidate.currentNameSafeDisplay !== true ? "" : candidate.currentName,
+          localName: candidate.aiOnlySectionName && candidate.baseNameSafeDisplay !== true ? "" : candidate.baseName,
           nodeType: candidate.type,
           parentName: candidate.parentName,
+          currentNameLooksWeak: candidate.aiOnlySectionName ? candidate.currentNameSafeDisplay !== true || candidate.currentNameSemanticallyWeak === true : false,
+          localNameLooksWeak: candidate.aiOnlySectionName ? candidate.baseNameSafeDisplay !== true || candidate.baseNameSemanticallyWeak === true : false,
           textHint: candidate.textHint,
           textSamples: candidate.textSamples,
+          deepTextSamples: Array.isArray(candidate.deepTextSamples) ? candidate.deepTextSamples.slice(0, 4) : [],
+          headingTexts: Array.isArray(candidate.headingTexts) ? candidate.headingTexts.slice(0, 2) : [],
+          actionTexts: Array.isArray(candidate.actionTexts) ? candidate.actionTexts.slice(0, 2) : [],
+          contentDigest: candidate.contentDigest,
+          sectionNarrative: candidate.sectionNarrative,
+          sectionRoleHint: candidate.sectionRoleHint,
+          sectionRoleReason: candidate.sectionRoleReason,
           topicHint: candidate.topicHint,
           colorHint: candidate.colorHint,
           imageRole: candidate.imageRole,
           hasImageFill: candidate.hasImageFill,
+          nameMode: candidate.nameMode,
+          aiOnlySectionName: candidate.aiOnlySectionName,
+          majorSection: candidate.majorSection,
+          majorSectionOrder: candidate.majorSectionOrder,
+          majorSectionCount: candidate.majorSectionCount,
+          needsIndex: candidate.needsIndex,
+          positionHint: candidate.positionHint,
+          siblingContext: candidate.siblingContext,
         });
       }
     }
 
     if (!candidates.length) {
-      return new Map();
+      return {
+        map: new Map(),
+        helperAvailable: true,
+        configured: true,
+        candidateCount: 0,
+        suggestionCount: 0,
+        failed: false,
+        errorMessage: "",
+        failureType: "",
+      };
     }
 
     const schema = {
@@ -15933,8 +16399,9 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
           contextSlug: context.contextSlug,
           topicLabel: context.topicLabel,
           contentSummary: context.contentSummary,
+          selectionTextSamples: context.selectionTextSamples,
           paletteHints: context.paletteHints,
-          candidates: candidates.slice(0, 36),
+          candidates: candidates.slice(0, 24),
         },
       });
       const map = new Map();
@@ -15955,10 +16422,101 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         });
       }
 
-      return map;
+      return {
+        map,
+        helperAvailable: true,
+        configured: true,
+        candidateCount: candidates.length,
+        suggestionCount: map.size,
+        failed: false,
+        errorMessage: "",
+        failureType: "",
+      };
     } catch (error) {
-      return new Map();
+      const errorMessage = normalizeAiRequestError(ai, error, "AI 대분류 네이밍 호출에 실패했습니다.");
+      const failureType =
+        error && typeof error === "object" && typeof error.pigmaAiFailureType === "string"
+          ? String(error.pigmaAiFailureType).trim()
+          : "";
+      return {
+        map: new Map(),
+        helperAvailable: true,
+        configured: true,
+        candidateCount: candidates.length,
+        suggestionCount: 0,
+        failed: true,
+        errorMessage,
+        failureType,
+      };
     }
+  }
+
+  function buildAiRenameStatusLabel(renameResult) {
+    if (!renameResult || typeof renameResult !== "object") {
+      return "AI 상태 알 수 없음";
+    }
+
+    if (renameResult.aiFailed === true) {
+      return "AI 오류";
+    }
+
+    if (renameResult.aiHelperAvailable !== true) {
+      return "AI helper 없음";
+    }
+
+    if (renameResult.aiConfigured !== true) {
+      return "AI 비활성";
+    }
+
+    if ((renameResult.aiCandidateCount || 0) <= 0) {
+      return "AI 후보 없음";
+    }
+
+    if ((renameResult.aiSuggestionCount || 0) <= 0) {
+      return "AI 응답 없음";
+    }
+
+    if ((renameResult.aiAppliedCount || 0) <= 0) {
+      return "AI 미적용";
+    }
+
+    return "AI 적용";
+  }
+
+  function normalizeAiRequestError(ai, error, fallback) {
+    if (ai && typeof ai.normalizeErrorMessage === "function") {
+      const normalized = ai.normalizeErrorMessage(error, fallback);
+      if (typeof normalized === "string" && normalized.trim()) {
+        return normalized.trim();
+      }
+    }
+
+    return normalizeErrorMessage(error, fallback);
+  }
+
+  function compactAiErrorMessage(message, limit) {
+    const normalized = String(message || "").replace(/\s+/g, " ").trim();
+    if (!normalized) {
+      return "";
+    }
+
+    const max = typeof limit === "number" && limit > 0 ? limit : 48;
+    return normalized.length > max ? `${normalized.slice(0, max - 3)}...` : normalized;
+  }
+
+  function buildRegroupRenameToast(result) {
+    const summary = (result && result.summary) || {};
+    const parts = [`${summary.renameCount || 0}개 이름 정리`, `AI ${summary.aiRenameCount || 0}`, `Local ${summary.localRenameCount || 0}`];
+    if (summary.aiStatusLabel) {
+      parts.push(summary.aiStatusLabel);
+    }
+    if (summary.aiFailed === true) {
+      const errorLabel = compactAiErrorMessage(summary.aiErrorMessage || summary.aiFailureType || "", 34);
+      if (errorLabel) {
+        parts.push(errorLabel);
+      }
+    }
+    return `리그룹핑/리네이밍 완료 (${parts.join(" · ")})`;
   }
 
   function applySafeRegroup(selection, context) {
@@ -15973,7 +16531,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         try {
           const group = figma.group([pair.icon, pair.label], parent);
           const groupName = ensureUniqueName(
-            buildGroupName(pair.label, context),
+            buildGroupName(group, pair.label, context),
             collectSiblingNameSet(parent, group)
           );
           group.name = groupName;
@@ -16035,7 +16593,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
         try {
           const group = figma.group(nodes, parent);
-          const groupName = ensureUniqueName(suggestion.name, collectSiblingNameSet(parent, group));
+          const groupName = ensureUniqueName(buildSuggestedTextBlockName(group, nodes[0], nodes[1], context), collectSiblingNameSet(parent, group));
           group.name = groupName;
           applied.push({
             id: group.id,
@@ -16201,22 +16759,294 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return typeof node.name === "string";
   }
 
-  function proposeNodeName(node, context) {
+  function shouldPreserveRootName(node, context, currentName) {
+    if (!context || !context.preservedRootId || !node || node.id !== context.preservedRootId) {
+      return false;
+    }
+
+    if (shouldAlwaysEvaluateHybridDisplayName(node, context)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  function shouldAlwaysEvaluateHybridDisplayName(node, context, knownUseHybridDisplayName, knownMajorSection) {
+    if (resolveNamingMode(context && context.namingMode) !== "hybrid") {
+      return false;
+    }
+
+    if (!node || !context) {
+      return false;
+    }
+
+    const useHybridDisplayName =
+      typeof knownUseHybridDisplayName === "boolean"
+        ? knownUseHybridDisplayName
+        : shouldUseHybridDisplayName(node, context);
+    if (!useHybridDisplayName) {
+      return false;
+    }
+
+    const majorSection =
+      typeof knownMajorSection === "boolean" ? knownMajorSection : isMajorHybridSection(node, context);
+    return !!majorSection;
+  }
+
+  function resolveRenameDecision(candidate, aiSuggestion, aiResult) {
+    const hasAiSuggestion =
+      !!(aiSuggestion && aiSuggestion.name) && !isInvalidAiDisplaySuggestion(aiSuggestion.name, candidate);
+    if (hasAiSuggestion) {
+      return {
+        name: aiSuggestion.name,
+        reason: aiSuggestion.reason || candidate.reason,
+        source: "ai",
+      };
+    }
+
+    if (candidate && candidate.aiOnlySectionName) {
+      const safeCurrentName = candidate.currentName && candidate.currentNameSafeDisplay === true && candidate.currentNameSemanticallyWeak !== true;
+      const safeLocalBaseName = candidate.baseName && candidate.baseNameSafeDisplay === true && candidate.baseNameSemanticallyWeak !== true;
+
+      if (
+        safeLocalBaseName &&
+        canonicalizeName(candidate.baseName) !== canonicalizeName(candidate.currentName)
+      ) {
+        return {
+          name: candidate.baseName,
+          reason: buildAiSectionFallbackReason(aiResult),
+          source: "local",
+        };
+      }
+
+      if (safeCurrentName) {
+        return null;
+      }
+
+      const safeSectionName = buildSafeAiSectionFallbackName(candidate);
+      if (!safeSectionName) {
+        return null;
+      }
+
+      return {
+        name: safeSectionName,
+        reason: buildAiSectionFallbackReason(aiResult),
+        source: "local",
+      };
+    }
+
+    if (!candidate || !candidate.baseName) {
+      return null;
+    }
+
+    return {
+      name: candidate.baseName,
+      reason: candidate.reason,
+      source: "local",
+    };
+  }
+
+  function buildSafeAiSectionFallbackName(candidate) {
+    if (!candidate || !candidate.aiOnlySectionName) {
+      return candidate && candidate.baseName ? candidate.baseName : "";
+    }
+
+    if (candidate.baseName && candidate.baseNameSafeDisplay === true && candidate.baseNameSemanticallyWeak !== true) {
+      return candidate.baseName;
+    }
+
+    const ordinal =
+      candidate.needsIndex && Number(candidate.majorSectionOrder) > 0
+        ? String(candidate.majorSectionOrder).padStart(2, "0") + "_"
+        : "";
+    return `${ordinal}Content`;
+  }
+
+  function buildAiSectionFallbackReason(aiResult) {
+    if (aiResult && aiResult.failed) {
+      return "AI 오류로 안전한 번호형 대분류 기본값을 사용했습니다.";
+    }
+
+    if (aiResult && aiResult.configured !== true) {
+      return "AI 비활성 상태라 안전한 번호형 대분류 기본값을 사용했습니다.";
+    }
+
+    return "AI 대분류 네이밍 응답이 없어 안전한 번호형 기본값을 사용했습니다.";
+  }
+
+  function isInvalidAiDisplaySuggestion(name, candidate) {
+    if (!candidate || !candidate.aiOnlySectionName) {
+      return false;
+    }
+
+    const normalized = String(name || "").trim().replace(/^\d{2}_/, "");
+    const slug = slugifyAsciiToken(normalized);
+    if (!slug) {
+      return true;
+    }
+
+    if (isWeakHybridDisplayName(normalized)) {
+      return true;
+    }
+
+    if (slug === "pricing" && candidate.looksLikePricing !== true) {
+      return true;
+    }
+
+    return false;
+  }
+
+  function isSafeLocalDisplayFallback(name, node, context) {
+    const normalized = String(name || "").trim();
+    if (!normalized) {
+      return false;
+    }
+
+    if (normalized.includes("/")) {
+      return false;
+    }
+
+    if (isWeakHybridDisplayName(normalized)) {
+      return false;
+    }
+
+    const slug = slugifyAsciiToken(normalized.replace(/^\d{2}_/, "").trim());
+    if (!slug) {
+      return false;
+    }
+
+    if (slug === "pricing" && node && !looksLikePricingSection(node)) {
+      return false;
+    }
+
+    if (slug === "navigation" && node && !looksLikeNavigationBar(node)) {
+      return false;
+    }
+
+    if ((slug === "outro" || looksLikeClosingDisplaySlug(slug)) && node && !looksLikeOutroSection(node)) {
+      return false;
+    }
+
+    if (slug === "key-visual" && node && !looksLikeKeyVisualSection(node, context)) {
+      return false;
+    }
+
+    if (slug === "introduction" && node && looksLikeCompositeContentWrapper(node)) {
+      return false;
+    }
+
+    if (
+      slug === "introduction" &&
+      node &&
+      isMajorHybridSection(node, context) &&
+      getHybridDisplayOrdinal(node, context) === "01" &&
+      looksLikeKeyVisualSection(node, context)
+    ) {
+      return false;
+    }
+
+    return true;
+  }
+
+  function looksLikeClosingDisplaySlug(slug) {
+    return /(?:^|-)closing(?:-|$)|(?:^|-)summary(?:-|$)|(?:^|-)conclusion(?:-|$)|(?:^|-)takeaway(?:-|$)/.test(
+      String(slug || "")
+    );
+  }
+
+  function isSemanticallyWeakCurrentName(name, node, context) {
+    const normalized = String(name || "").trim();
+    if (!normalized) {
+      return true;
+    }
+
+    const slug = slugifyAsciiToken(normalized.replace(/^\d{2}_/, "").replace(/[/.]+/g, " "));
+    const segments = normalized
+      .replace(/^\d{2}_/, "")
+      .split(/[/.]+/)
+      .map((segment) => slugifyAsciiToken(segment))
+      .filter(Boolean);
+
+    if (segments.some((segment) => segment === "field" || segment === "input" || segment === "field-label")) {
+      return !isFieldSemanticNode(node);
+    }
+
+    if (segments.some((segment) => segment === "button" || segment === "cta" || segment === "button-label")) {
+      return !isButtonSemanticNode(node);
+    }
+
+    if (segments.some((segment) => segment === "navbar" || segment === "navigation" || segment === "menu")) {
+      return !looksLikeNavigationBar(node);
+    }
+
+    if (
+      segments.some((segment) => segment === "outro" || segment === "footer" || segment === "closing" || segment === "summary") ||
+      looksLikeClosingDisplaySlug(slug)
+    ) {
+      return !looksLikeOutroSection(node);
+    }
+
+    if (segments.some((segment) => segment === "hero" || segment === "key-visual" || segment === "kv") || slug === "key-visual") {
+      return !looksLikeKeyVisualSection(node, context);
+    }
+
+    if (
+      slug === "introduction" &&
+      isMajorHybridSection(node, context) &&
+      getHybridDisplayOrdinal(node, context) === "01" &&
+      looksLikeKeyVisualSection(node, context)
+    ) {
+      return true;
+    }
+
+    return false;
+  }
+
+  function proposeNodeName(node, context, hints) {
     const type = String(node.type || "UNKNOWN");
-    const textHint = getPrimaryTextHint(node);
-    const sectionSlug = detectSectionSlug(node, context);
-    const contentSlug = resolveContentSlug(node, textHint, context);
-    const topicSlug = detectTopicSlug(node, context, textHint);
+    const textHint = hints && typeof hints.textHint === "string" ? hints.textHint : getPrimaryTextHint(node);
+    const sectionSlug = hints && hints.sectionSlug ? hints.sectionSlug : detectSectionSlug(node, context);
+    const contentSlug = hints && hints.contentSlug ? hints.contentSlug : resolveContentSlug(node, textHint, context);
+    const topicSlug = hints && hints.topicSlug ? hints.topicSlug : detectTopicSlug(node, context, textHint);
+    const semanticSlug = contentSlug || topicSlug || sectionSlug || (context && context.contextSlug) || "content";
+    const groupRole = hints && hints.groupRole ? hints.groupRole : (hasChildren(node) ? inferGroupRole(node, semanticSlug) : "");
+    const repeatRole =
+      hints && hints.repeatRole
+        ? hints.repeatRole
+        : describeRepeatableRole(node, context, {
+            textHint: textHint,
+            sectionSlug: sectionSlug,
+            contentSlug: contentSlug,
+            topicSlug: topicSlug,
+            groupRole: groupRole,
+          });
+
+    if (resolveNamingMode(context.namingMode) === "hybrid" && hints && hints.majorSection === true) {
+      return buildHybridDisplayName(node, context, {
+        textHint,
+        sectionSlug,
+        contentSlug,
+        topicSlug,
+        groupRole,
+        repeatRole,
+      });
+    }
 
     if (type === "TEXT") {
       return buildTextNodeName(node, textHint, sectionSlug, contentSlug, topicSlug, context);
     }
 
     if (isButtonContainer(node)) {
+      if (resolveNamingMode(context.namingMode) === "hybrid") {
+        return `CTA ${humanizeHybridSegment(detectButtonVariant(node) || "primary")}`;
+      }
       return buildStructuredName(context.namingMode, "button", detectButtonVariant(node), findActionSlug(node) || contentSlug || "action");
     }
 
     if (isFieldContainer(node)) {
+      if (resolveNamingMode(context.namingMode) === "hybrid") {
+        return "Input";
+      }
       return buildStructuredName(context.namingMode, "field", findFieldLabel(node) || contentSlug || "input", "input");
     }
 
@@ -16225,15 +17055,28 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
 
     if (isIconLikeNode(node)) {
+      if (resolveNamingMode(context.namingMode) === "hybrid") {
+        return "Icon";
+      }
       return buildStructuredName(context.namingMode, "icon", findActionSlug(node) || contentSlug || sectionSlug || "glyph");
     }
 
     if (hasChildren(node)) {
-      return buildContainerName(node, context, sectionSlug, contentSlug, topicSlug);
+      return buildContainerName(node, context, sectionSlug, contentSlug, topicSlug, {
+        groupRole: groupRole,
+        repeatRole: repeatRole,
+      });
     }
 
     if (VECTOR_TYPES.has(type)) {
+      if (resolveNamingMode(context.namingMode) === "hybrid") {
+        return "Shape";
+      }
       return buildStructuredName(context.namingMode, "shape", contentSlug || topicSlug || "vector");
+    }
+
+    if (resolveNamingMode(context.namingMode) === "hybrid") {
+      return "Layer";
     }
 
     return buildStructuredName(context.namingMode, "layer", typePrefix(type), contentSlug || topicSlug || sectionSlug || "item");
@@ -16242,6 +17085,10 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   function buildTextNodeName(node, textHint, sectionSlug, contentSlug, topicSlug, context) {
     const text = textHint || getTextValue(node);
     const semanticSlug = contentSlug || topicSlug || sectionSlug || context.contextSlug || "content";
+    if (resolveNamingMode(context.namingMode) === "hybrid") {
+      return buildHybridTextAtomName(node, text, sectionSlug, contentSlug, topicSlug, context);
+    }
+
     if (!text) {
       return buildStructuredName(context.namingMode, "text", "body", sectionSlug || topicSlug || "content", "copy");
     }
@@ -16273,6 +17120,10 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   }
 
   function buildRenameReason(node, context) {
+    if (shouldUseHybridDisplayName(node, context)) {
+      return "디자인 영역 역할 기준";
+    }
+
     if (String(node.type || "") === "TEXT") {
       return "웹 구조형 텍스트 역할 기준";
     }
@@ -16292,10 +17143,30 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return "웹 호환 구조형 네이밍 기준";
   }
 
-  function buildContainerName(node, context, sectionSlug, contentSlug, topicSlug) {
+  function buildContainerName(node, context, sectionSlug, contentSlug, topicSlug, hints) {
     const resolvedSection = sectionSlug || context.contextSlug || topicSlug || "content";
     const semanticSlug = contentSlug || topicSlug || "item";
-    const groupRole = inferGroupRole(node, semanticSlug);
+    const groupRole = hints && hints.groupRole ? hints.groupRole : inferGroupRole(node, semanticSlug);
+    const repeatRole =
+      hints && hints.repeatRole
+        ? hints.repeatRole
+        : describeRepeatableRole(node, context, {
+            sectionSlug: sectionSlug,
+            contentSlug: contentSlug,
+            topicSlug: topicSlug,
+            groupRole: groupRole,
+          });
+
+    if (repeatRole && Array.isArray(repeatRole.webSegments) && repeatRole.webSegments.length > 0) {
+      return resolveNamingMode(context.namingMode) === "hybrid" ? repeatRole.hybridLabel : buildStructuredNameFromSegments(context.namingMode, repeatRole.webSegments);
+    }
+
+    if (resolveNamingMode(context.namingMode) === "hybrid") {
+      const hybridScopeName = buildHybridScopeContainerName(sectionSlug, contentSlug, topicSlug, groupRole);
+      if (hybridScopeName) {
+        return hybridScopeName;
+      }
+    }
 
     if (isCardLikeNode(node)) {
       return buildStructuredName(context.namingMode, "card", resolvedSection, semanticSlug);
@@ -16312,9 +17183,1216 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return buildStructuredName(context.namingMode, "container", resolvedSection, groupRole, topicSlug || "");
   }
 
+  function buildHybridScopeContainerName(sectionSlug, contentSlug, topicSlug, groupRole) {
+    const scopeSlug = slugifyAsciiToken(sectionSlug || contentSlug || topicSlug);
+    const roleSlug = slugifyAsciiToken(groupRole);
+    if (!scopeSlug || !roleSlug) {
+      return "";
+    }
+
+    if (GENERIC_TOKEN_SET.has(scopeSlug) && GENERIC_TOKEN_SET.has(roleSlug)) {
+      return "";
+    }
+
+    if (roleSlug === "copy" || roleSlug === "media" || roleSlug === "list" || roleSlug === "actions" || roleSlug === "item") {
+      return buildStructuredName("hybrid", scopeSlug, roleSlug === "actions" ? "actions" : roleSlug);
+    }
+
+    if (scopeSlug === "hero" && roleSlug === "content") {
+      return "Hero/Copy";
+    }
+
+    return "";
+  }
+
+  function buildHybridTextAtomName(node, text, sectionSlug, contentSlug, topicSlug, context) {
+    const normalizedText = compactText(text);
+    if (!normalizedText) {
+      return "Body";
+    }
+
+    if (looksLikePriceText(normalizedText)) {
+      return "Price";
+    }
+
+    if (looksLikeBadgeTextNode(node, normalizedText)) {
+      return "Badge";
+    }
+
+    const actionSlug = findActionSlugFromText(normalizedText);
+    if (actionSlug) {
+      return "Label";
+    }
+
+    const fieldLabel = matchFieldLabel(normalizedText);
+    if (fieldLabel) {
+      return "Label";
+    }
+
+    const textRole = detectTextRole(node, normalizedText);
+    if (textRole === "heading" || textRole === "title") {
+      return "Title";
+    }
+
+    if (textRole === "meta") {
+      return "Meta";
+    }
+
+    if (textRole === "label") {
+      if (sectionSlug === "pricing" || contentSlug === "pricing" || topicSlug === "shopping") {
+        return "Price";
+      }
+      return "Label";
+    }
+
+    if (context && context.contextSlug === "hero" && normalizedText.length <= 60) {
+      return "Body";
+    }
+
+    return "Body";
+  }
+
+  function describeRepeatableRole(node, context, hints) {
+    if (!node || !context) {
+      return null;
+    }
+
+    if (hints && hints.majorSection) {
+      return null;
+    }
+
+    if (String(node.type || "") === "TEXT" || isButtonContainer(node) || isFieldContainer(node) || isIconLikeNode(node)) {
+      return null;
+    }
+
+    const textHint = hints && typeof hints.textHint === "string" ? hints.textHint : getPrimaryTextHint(node);
+    const sectionSlug = hints && hints.sectionSlug ? hints.sectionSlug : detectSectionSlug(node, context);
+    const contentSlug = hints && hints.contentSlug ? hints.contentSlug : resolveContentSlug(node, textHint, context);
+    const topicSlug = hints && hints.topicSlug ? hints.topicSlug : detectTopicSlug(node, context, textHint);
+    const semanticSlug = contentSlug || topicSlug || sectionSlug || context.contextSlug || "content";
+    const groupRole = hints && hints.groupRole ? hints.groupRole : (hasChildren(node) ? inferGroupRole(node, semanticSlug) : "");
+    const parent = node.parent;
+
+    if (parent && looksLikeNavigationBar(parent)) {
+      return buildRepeatRole("menu-item", "Menu Item", "Menu", ["group", "navbar", "item"]);
+    }
+
+    if (looksLikeFaqItemNode(node, context, sectionSlug, contentSlug) || (parent && looksLikeFaqSectionNode(parent, context))) {
+      return buildRepeatRole("faq-item", "FAQ Item", "FAQ", ["group", "faq", "item"]);
+    }
+
+    if ((sectionSlug === "pricing" || looksLikePricingCardNode(node, context, sectionSlug, contentSlug)) && (isCardLikeNode(node) || groupRole === "item" || groupRole === "list")) {
+      return buildRepeatRole("pricing-card", "Pricing Card", "Plan", ["card", "pricing"], "display");
+    }
+
+    if (looksLikeProductCardNode(node, context, sectionSlug, contentSlug, topicSlug) && (isCardLikeNode(node) || groupRole === "item" || groupRole === "list")) {
+      return buildRepeatRole("product-card", "Product Card", "Product", ["card", "product"], "display", true);
+    }
+
+    if (sectionSlug === "feature" && (isCardLikeNode(node) || groupRole === "item" || groupRole === "list")) {
+      return buildRepeatRole("feature-card", "Feature Card", "Feature", ["card", "feature"], "display", true);
+    }
+
+    if (sectionSlug === "dashboard" && (isCardLikeNode(node) || groupRole === "item" || groupRole === "list")) {
+      return buildRepeatRole("metric-card", "Metric Card", "Metric", ["card", "metric"], "display", true);
+    }
+
+    if ((contentSlug === "archive" || sectionSlug === "archive") && (isCardLikeNode(node) || groupRole === "item")) {
+      return buildRepeatRole("archive-card", "Archive Card", "Archive", ["card", "archive"], "display", true);
+    }
+
+    if (sectionSlug === "hero" && isCardLikeNode(node)) {
+      return buildRepeatRole("highlight-card", "Highlight Card", "Card", ["card", "highlight"], "display", true);
+    }
+
+    if (isCardLikeNode(node)) {
+      const contextualCardSlug = selectRepeatableContextSlug(sectionSlug, contentSlug, topicSlug, context);
+      if (contextualCardSlug) {
+        return buildRepeatRole(
+          "card:" + contextualCardSlug,
+          joinHybridDisplayParts(buildHybridRoleLabel(contextualCardSlug), "Card"),
+          "Card",
+          ["card", contextualCardSlug],
+          "display"
+        );
+      }
+    }
+
+    if (groupRole === "item" || groupRole === "list") {
+      const contextualItemSlug = selectRepeatableContextSlug(sectionSlug, contentSlug, topicSlug, context);
+      if (contextualItemSlug) {
+        return buildRepeatRole(
+          "item:" + contextualItemSlug,
+          joinHybridDisplayParts(buildHybridRoleLabel(contextualItemSlug), "Item"),
+          contextualItemSlug === "navbar" ? "Menu" : "Item",
+          ["group", contextualItemSlug, "item"]
+        );
+      }
+    }
+
+    return null;
+  }
+
+  function resolveCandidateNameMode(context, useHybridDisplayName, majorSection, repeatRole) {
+    if (resolveNamingMode(context && context.namingMode) !== "hybrid") {
+      return "structured";
+    }
+
+    if (!useHybridDisplayName) {
+      return "structured";
+    }
+
+    if (majorSection) {
+      return "display";
+    }
+
+    if (repeatRole && repeatRole.preferredMode === "display") {
+      return "display";
+    }
+
+    return "structured";
+  }
+
+  function buildRepeatRole(familyKey, hybridLabel, hybridSuffix, webSegments, preferredMode, preferIndex) {
+    return {
+      familyKey: familyKey,
+      hybridLabel: hybridLabel,
+      hybridSuffix: hybridSuffix || "",
+      webSegments: Array.isArray(webSegments) ? webSegments.slice(0, 6) : [],
+      preferredMode: preferredMode === "display" ? "display" : "structured",
+      preferIndex: preferIndex === true,
+    };
+  }
+
+  function selectRepeatableContextSlug(sectionSlug, contentSlug, topicSlug, context) {
+    const values = [contentSlug, sectionSlug, topicSlug, context && context.contextSlug ? context.contextSlug : "", context && context.topicSlug ? context.topicSlug : ""];
+    for (const value of values) {
+      const slug = slugifyAsciiToken(value);
+      if (slug && !GENERIC_TOKEN_SET.has(slug)) {
+        return slug;
+      }
+    }
+
+    return "";
+  }
+
+  function looksLikeFaqSectionNode(node, context) {
+    if (!node || !hasChildren(node)) {
+      return false;
+    }
+
+    const values = collectNodeSemanticValues(node, "", 6, 2);
+    const corpus = values.join(" ").toLowerCase();
+    if (/faq|q&a|questions|question|answer/.test(corpus)) {
+      return true;
+    }
+
+    return !!(context && context.contextSlug === "faq");
+  }
+
+  function looksLikeFaqItemNode(node, context, knownSectionSlug, knownContentSlug) {
+    if (!node || !hasChildren(node)) {
+      return false;
+    }
+
+    if (knownSectionSlug === "faq" || knownContentSlug === "faq") {
+      return true;
+    }
+
+    if (node.parent && looksLikeFaqSectionNode(node.parent, context)) {
+      return true;
+    }
+
+    const texts = collectNodeTexts(node, 4, 2).map((text) => compactText(text)).filter(Boolean);
+    if (texts.length < 2) {
+      return false;
+    }
+
+    const first = texts[0].toLowerCase();
+    if (/^(q|faq|qna)\b/.test(first)) {
+      return true;
+    }
+
+    if (/\?$/.test(texts[0])) {
+      return true;
+    }
+
+    return /question|answer/.test(texts.join(" ").toLowerCase());
+  }
+
+  function looksLikePricingCardNode(node, context, knownSectionSlug, knownContentSlug) {
+    if (!node || !hasChildren(node)) {
+      return false;
+    }
+
+    if (knownSectionSlug === "pricing" || knownContentSlug === "pricing") {
+      return true;
+    }
+
+    if (context && context.contextSlug === "pricing") {
+      return true;
+    }
+
+    return looksLikePricingValueSet(collectNodeTexts(node, 8, 3));
+  }
+
+  function looksLikeProductCardNode(node, context, knownSectionSlug, knownContentSlug, knownTopicSlug) {
+    if (!node || !hasChildren(node)) {
+      return false;
+    }
+
+    if (knownSectionSlug === "shopping" || knownContentSlug === "shopping" || knownTopicSlug === "shopping") {
+      return true;
+    }
+
+    const values = collectNodeSemanticValues(node, "", 6, 2);
+    const corpus = values.join(" ").toLowerCase();
+    if (/product|sku|sale|buy|cart|checkout|shop|shopping|price/.test(corpus)) {
+      return true;
+    }
+
+    const imageCount = countDirectChildrenByPredicate(node, isImageLikeNode);
+    const textCount = countDirectChildrenByType(node, "TEXT");
+    return isCardLikeNode(node) && imageCount >= 1 && textCount >= 1 && !!(context && context.topicSlug === "shopping");
+  }
+
+  function shouldUseHybridDisplayName(node, context) {
+    if (resolveNamingMode(context && context.namingMode) !== "hybrid") {
+      return false;
+    }
+
+    if (!node || node.locked === true || node.visible === false || isInsideInstance(node)) {
+      return false;
+    }
+
+    const type = String(node.type || "");
+    if (type === "TEXT" || isIconLikeNode(node)) {
+      return false;
+    }
+
+    if (isButtonContainer(node) || isFieldContainer(node)) {
+      return true;
+    }
+
+    if (isImageLikeNode(node)) {
+      const bounds = getNodeBounds(node);
+      return !!bounds && (bounds.width >= 120 || bounds.height >= 120);
+    }
+
+    if (isSectionRootLike(node)) {
+      return true;
+    }
+
+    return hasChildren(node) && node.children.length >= 2;
+  }
+
+  function buildHybridDisplayName(node, context, hints) {
+    const label = buildHybridDisplayLabel(node, context, hints);
+    const ordinal = getHybridDisplayOrdinal(node, context);
+    return ordinal ? `${ordinal}_${label}` : label;
+  }
+
+  function buildHybridDisplayLabel(node, context, hints) {
+    const textHint = hints && typeof hints.textHint === "string" ? hints.textHint : getPrimaryTextHint(node);
+    const sectionSlug = hints && hints.sectionSlug ? hints.sectionSlug : detectSectionSlug(node, context);
+    const contentSlug = hints && hints.contentSlug ? hints.contentSlug : resolveContentSlug(node, textHint, context);
+    const topicSlug = hints && hints.topicSlug ? hints.topicSlug : detectTopicSlug(node, context, textHint);
+    const semanticSlug = contentSlug || topicSlug || sectionSlug || (context && context.contextSlug) || "content";
+    const groupRole = hints && hints.groupRole ? hints.groupRole : (hasChildren(node) ? inferGroupRole(node, semanticSlug) : "");
+    const actionSlug = isButtonContainer(node) ? findActionSlug(node) || contentSlug || "action" : "";
+    const fieldSlug = isFieldContainer(node) ? findFieldLabel(node) || contentSlug || "input" : "";
+    const imageRole = isImageLikeNode(node) ? detectImageRole(node) : "";
+    const repeatRole =
+      hints && hints.repeatRole
+        ? hints.repeatRole
+        : describeRepeatableRole(node, context, {
+            textHint: textHint,
+            sectionSlug: sectionSlug,
+            contentSlug: contentSlug,
+            topicSlug: topicSlug,
+            groupRole: groupRole,
+          });
+    const childNodes = hasChildren(node) ? node.children.filter(Boolean) : [];
+    const textCount = childNodes.filter((child) => child.type === "TEXT").length;
+    const imageCount = childNodes.filter((child) => isImageLikeNode(child)).length;
+
+    if (isButtonContainer(node)) {
+      return joinHybridDisplayParts(buildHybridRoleLabel(actionSlug || "action"), "CTA");
+    }
+
+    if (isFieldContainer(node)) {
+      return joinHybridDisplayParts(buildHybridRoleLabel(fieldSlug || "input"), "Input");
+    }
+
+    const explicitLabel = detectExplicitHybridDisplayLabel(node, textHint, sectionSlug, contentSlug, topicSlug, context);
+    if (explicitLabel) {
+      return explicitLabel;
+    }
+
+    if (isMajorHybridSection(node, context)) {
+      return buildMajorHybridSectionLabel(node, context, {
+        sectionSlug,
+        contentSlug,
+        topicSlug,
+        groupRole,
+        imageRole,
+        textCount,
+        imageCount,
+      });
+    }
+
+    if (repeatRole && repeatRole.hybridLabel) {
+      return repeatRole.hybridLabel;
+    }
+
+    if (imageRole === "hero" || sectionSlug === "hero") {
+      if (isImageLikeNode(node) || imageCount > textCount) {
+        return "Key Visual";
+      }
+
+      if (groupRole === "copy" || textCount >= 2) {
+        return "Introduction";
+      }
+    }
+
+    if (looksLikeCompositeContentWrapper(node)) {
+      return "Content";
+    }
+
+    if (sectionSlug === "navbar") {
+      if (!looksLikeNavigationBar(node)) {
+        return "Content";
+      }
+      if (groupRole === "item" && semanticSlug && semanticSlug !== "navbar") {
+        return joinHybridDisplayParts(buildHybridRoleLabel(semanticSlug), "Menu");
+      }
+      return "Navigation";
+    }
+
+    if (sectionSlug === "footer") {
+      return looksLikeOutroSection(node, sectionSlug) ? "Outro" : "Content";
+    }
+
+    if (sectionSlug === "sidebar") {
+      return "Sidebar";
+    }
+
+    if (sectionSlug === "feature") {
+      return groupRole === "list" ? "Feature List" : "Features";
+    }
+
+    if (sectionSlug === "pricing" && looksLikePricingSection(node)) {
+      return "Pricing";
+    }
+
+    if (sectionSlug === "modal") {
+      return "Dialog";
+    }
+
+    if (sectionSlug === "dashboard") {
+      return groupRole === "list" ? "Metric List" : "Metrics";
+    }
+
+    if (imageRole === "avatar") {
+      return "Profile Image";
+    }
+
+    if (imageRole === "thumbnail") {
+      return "Thumbnail";
+    }
+
+    if (imageRole === "poster") {
+      return "Poster";
+    }
+
+    if (imageRole === "illustration") {
+      return "Illustration";
+    }
+
+    if (imageRole === "logo") {
+      return "Logo";
+    }
+
+    if (imageRole === "photo") {
+      return "Photo";
+    }
+
+    if (groupRole === "copy") {
+      return sectionSlug === "hero" ? "Introduction" : joinHybridDisplayParts(buildHybridRoleLabel(semanticSlug), "Copy");
+    }
+
+    if (groupRole === "actions") {
+      return actionSlug ? joinHybridDisplayParts(buildHybridRoleLabel(actionSlug), "Actions") : "Actions";
+    }
+
+    if (groupRole === "list") {
+      return joinHybridDisplayParts(buildHybridRoleLabel(sectionSlug || semanticSlug), "List");
+    }
+
+    if (groupRole === "media") {
+      return "Media";
+    }
+
+    if (topicSlug) {
+      return buildHybridRoleLabel(topicSlug);
+    }
+
+    if (contentSlug && !GENERIC_TOKEN_SET.has(contentSlug)) {
+      return buildHybridRoleLabel(contentSlug);
+    }
+
+    if (sectionSlug && !GENERIC_TOKEN_SET.has(sectionSlug)) {
+      return buildHybridRoleLabel(sectionSlug);
+    }
+
+    return "Content";
+  }
+
+  function buildMajorHybridSectionLabel(node, context, hints) {
+    return mapSectionRoleToDisplayLabel(node, context, analyzeSectionRole(node, context, hints));
+  }
+
+  function analyzeSectionRole(node, context, hints) {
+    const majorSections = getMajorHybridSectionSiblings(node, context);
+    const orderIndex = majorSections.findIndex((entry) => entry && entry.id === node.id);
+    const sectionSlug = hints && hints.sectionSlug ? hints.sectionSlug : detectSectionSlug(node, context);
+    const textHint = hints && typeof hints.textHint === "string" ? hints.textHint : getPrimaryTextHint(node);
+    const contentSlug = hints && hints.contentSlug ? hints.contentSlug : resolveContentSlug(node, textHint, context);
+    const topicSlug = hints && hints.topicSlug ? hints.topicSlug : detectTopicSlug(node, context, textHint);
+    const groupRole = hints && hints.groupRole ? hints.groupRole : inferGroupRole(node, contentSlug || sectionSlug || "content");
+    const imageRole = hints && hints.imageRole ? hints.imageRole : (isImageLikeNode(node) ? detectImageRole(node) : "");
+    const textCount = hints && typeof hints.textCount === "number" ? hints.textCount : countDirectChildrenByType(node, "TEXT");
+    const imageCount =
+      hints && typeof hints.imageCount === "number" ? hints.imageCount : countDirectChildrenByPredicate(node, isImageLikeNode);
+    const headingTexts = hints && Array.isArray(hints.headingTexts) ? hints.headingTexts : collectProminentTexts(node, 3);
+    const actionTexts = hints && Array.isArray(hints.actionTexts) ? hints.actionTexts : collectActionTexts(node, 3);
+    const bodyTexts = collectNodeTexts(node, 6, 3).map((text) => compactText(text)).filter(Boolean);
+    const semanticValues = collectNodeSemanticValues(node, textHint, 8, 3);
+    const corpus = semanticValues.join(" ").toLowerCase();
+    const isFirst = orderIndex === 0;
+    const isLast = orderIndex >= 0 && orderIndex === majorSections.length - 1;
+    const hasKvStructure = looksLikeKeyVisualSection(node, context, sectionSlug);
+    const hasIntroNarrative =
+      contentSlug === "introduction" ||
+      sectionSlug === "hero" ||
+      /intro|introduction|opening|overview|about|story|reviewer|real use|experience/.test(corpus);
+    const hasClosingNarrative =
+      /outro|closing|final|wrap up|thank you|summary|conclusion|takeaway/.test(corpus);
+    const hasFaqNarrative = /faq|q&a|frequently asked|question/.test(corpus);
+    const hasAwardsNarrative = /award|awards|trophy|prize|certified|certification/.test(corpus);
+    const hasArchiveNarrative = /archive|archiving|collection|library|history/.test(corpus);
+
+    let role = "content-section";
+    let reason = "general section";
+
+    if (looksLikeCompositeContentWrapper(node)) {
+      role = "content-wrapper";
+      reason = "multiple large blocks in one wrapper";
+    } else if (looksLikeCouponProductSection(node)) {
+      role = "coupon-product";
+      reason = "coupon and product card appear together";
+    } else if (hasFaqNarrative) {
+      role = "faq";
+      reason = "question and answer narrative";
+    } else if (hasAwardsNarrative) {
+      role = "awards";
+      reason = "award or certification narrative";
+    } else if (hasArchiveNarrative) {
+      role = "archive";
+      reason = "archive or history narrative";
+    } else if (looksLikePricingSection(node)) {
+      role = "pricing";
+      reason = "explicit price or plan structure";
+    } else if (looksLikeProductSection(node)) {
+      role = "product";
+      reason = "product-like content card structure";
+    } else if (sectionSlug === "feature") {
+      role = "features";
+      reason = "feature-oriented section structure";
+    } else if (looksLikeOutroSection(node, sectionSlug, majorSections, orderIndex) || (isLast && hasClosingNarrative)) {
+      role = "outro";
+      reason = "last section or closing narrative";
+    } else if (hasKvStructure || (isFirst && hasProminentHeadingText(node))) {
+      role = "key-visual";
+      reason = "top section with hero hierarchy";
+    } else if (
+      hasIntroNarrative ||
+      groupRole === "copy" ||
+      ((isFirst || orderIndex === 1) && headingTexts.length > 0 && imageCount <= textCount + 1)
+    ) {
+      role = "introduction";
+      reason = "narrative copy-led introduction";
+    } else if (sectionSlug === "navbar" && looksLikeNavigationBar(node)) {
+      role = "navigation";
+      reason = "navigation bar structure";
+    } else if (isFirst) {
+      role = "key-visual";
+      reason = "first major section fallback";
+    } else if (orderIndex === 1) {
+      role = "introduction";
+      reason = "second major section fallback";
+    }
+
+    return {
+      role,
+      reason,
+      summary: buildSectionNarrativeSummary({
+        role,
+        reason,
+        orderIndex,
+        majorCount: majorSections.length,
+        sectionSlug,
+        contentSlug,
+        topicSlug,
+        groupRole,
+        imageRole,
+        headingTexts,
+        actionTexts,
+        bodyTexts,
+        hasKvStructure,
+      }),
+    };
+  }
+
+  function buildSectionNarrativeSummary(analysis) {
+    const orderText =
+      analysis.majorCount > 0 && analysis.orderIndex >= 0
+        ? `${analysis.orderIndex + 1}/${analysis.majorCount}`
+        : "single";
+    const headings = Array.isArray(analysis.headingTexts) ? analysis.headingTexts.slice(0, 2).join(" / ") : "";
+    const actions = Array.isArray(analysis.actionTexts) ? analysis.actionTexts.slice(0, 2).join(" / ") : "";
+    const bodies = Array.isArray(analysis.bodyTexts) ? analysis.bodyTexts.slice(0, 2).join(" / ") : "";
+    return [
+      `Role: ${analysis.role}`,
+      `Reason: ${analysis.reason}`,
+      `Order: ${orderText}`,
+      analysis.sectionSlug ? `Section: ${analysis.sectionSlug}` : "",
+      analysis.contentSlug ? `Content: ${analysis.contentSlug}` : "",
+      analysis.groupRole ? `Group: ${analysis.groupRole}` : "",
+      analysis.hasKvStructure ? "Visual: hero-like" : "",
+      headings ? `Headings: ${headings}` : "",
+      bodies ? `Bodies: ${bodies}` : "",
+      actions ? `Actions: ${actions}` : "",
+    ]
+      .filter(Boolean)
+      .join(" | ");
+  }
+
+  function mapSectionRoleToDisplayLabel(node, context, analysis) {
+    const role = analysis && analysis.role ? analysis.role : "content-section";
+    switch (role) {
+      case "coupon-product":
+        return "Coupon + Product Card";
+      case "faq":
+        return "FAQ";
+      case "awards":
+        return "Awards";
+      case "archive":
+        return "Archiving Page";
+      case "pricing":
+        return "Pricing";
+      case "product":
+        return buildProductSectionLabel(node, context);
+      case "features":
+        return "Features";
+      case "outro":
+        return "Outro";
+      case "key-visual":
+        return "Key Visual";
+      case "introduction":
+        return "Introduction";
+      case "navigation":
+        return "Navigation";
+      case "content-wrapper":
+        return "Content";
+      default:
+        return "Content Section";
+    }
+  }
+
+  function looksLikeCouponProductSection(node) {
+    const values = collectNodeSemanticValues(node, "", 6, 2);
+    const corpus = values.join(" ").toLowerCase();
+    return /coupon|promo|discount/.test(corpus) && /(product|card|item)/.test(corpus);
+  }
+
+  function looksLikePricingSection(node) {
+    return looksLikePricingValueSet(collectNodeTexts(node, 10, 4));
+  }
+
+  function looksLikeProductSection(node) {
+    if (!node || !hasChildren(node)) {
+      return false;
+    }
+
+    const cardCount = countDirectChildrenByPredicate(node, isCardLikeNode);
+    const imageCount = countDirectChildrenByPredicate(node, isImageLikeNode);
+    const textCount = countDirectChildrenByType(node, "TEXT");
+    return cardCount >= 1 && (imageCount >= 1 || textCount >= 2);
+  }
+
+  function buildProductSectionLabel(node, context) {
+    const siblings = getMajorHybridSectionSiblings(node, context).filter((entry) => looksLikeProductSection(entry));
+    if (siblings.length <= 1) {
+      return "Product";
+    }
+
+    const productIndex = siblings.findIndex((entry) => entry && entry.id === node.id) + 1;
+    return productIndex > 0 ? `Product ${formatRepeatIndex(productIndex)}` : "Product";
+  }
+
+  function hasProminentHeadingText(node) {
+    if (!node) {
+      return false;
+    }
+
+    const stack = [{ node, depth: 0 }];
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (!current) {
+        continue;
+      }
+
+      if (current.node.type === "TEXT") {
+        const text = compactText(getTextValue(current.node));
+        const fontSize = typeof current.node.fontSize === "number" ? current.node.fontSize : 0;
+        if (text && ((fontSize >= 24 && text.length >= 8) || fontSize >= 32)) {
+          return true;
+        }
+      }
+
+      if (current.depth >= 3 || !hasChildren(current.node)) {
+        continue;
+      }
+
+      for (let index = current.node.children.length - 1; index >= 0; index -= 1) {
+        stack.push({ node: current.node.children[index], depth: current.depth + 1 });
+      }
+    }
+
+    return false;
+  }
+
+  function looksLikeKeyVisualSection(node, context, knownSectionSlug) {
+    if (!node || looksLikeNavigationBar(node) || isFieldContainer(node) || isButtonContainer(node)) {
+      return false;
+    }
+
+    const sectionSlug = knownSectionSlug || detectSectionSlug(node, context || {});
+    if (sectionSlug === "hero") {
+      return true;
+    }
+
+    if (hasDominantVisualSection(node)) {
+      return true;
+    }
+
+    const bounds = getNodeBounds(node);
+    const parentBounds = node.parent ? getNodeBounds(node.parent) : null;
+    if (!bounds || !parentBounds || parentBounds.width <= 0 || parentBounds.height <= 0) {
+      return false;
+    }
+
+    const widthRatio = bounds.width / parentBounds.width;
+    const heightRatio = bounds.height / parentBounds.height;
+    const topOffset = bounds.y - parentBounds.y;
+    const majorSections = getMajorHybridSectionSiblings(node, context || {});
+    const orderIndex = majorSections.findIndex((entry) => entry && entry.id === node.id);
+
+    return (
+      orderIndex === 0 &&
+      widthRatio >= 0.72 &&
+      topOffset <= Math.max(140, parentBounds.height * 0.18) &&
+      (heightRatio >= 0.16 || bounds.height >= 280) &&
+      hasProminentHeadingText(node)
+    );
+  }
+
+  function hasDominantVisualSection(node) {
+    if (!node || !hasChildren(node)) {
+      return false;
+    }
+
+    const bounds = getNodeBounds(node);
+    if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
+      return false;
+    }
+
+    for (const child of node.children) {
+      if (!child || !isImageLikeNode(child)) {
+        continue;
+      }
+
+      const childBounds = getNodeBounds(child);
+      if (!childBounds) {
+        continue;
+      }
+
+      const widthRatio = childBounds.width / bounds.width;
+      const heightRatio = childBounds.height / bounds.height;
+      if (widthRatio >= 0.45 || heightRatio >= 0.35) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  function countLargeDirectChildBlocks(node) {
+    if (!node || !hasChildren(node)) {
+      return 0;
+    }
+
+    const bounds = getNodeBounds(node);
+    if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
+      return 0;
+    }
+
+    let count = 0;
+    for (const child of node.children) {
+      if (!child || child.locked === true || child.visible === false || child.type === "TEXT") {
+        continue;
+      }
+
+      const childBounds = getNodeBounds(child);
+      if (!childBounds) {
+        continue;
+      }
+
+      const widthRatio = childBounds.width / bounds.width;
+      const heightRatio = childBounds.height / bounds.height;
+      if (widthRatio >= 0.45 || heightRatio >= 0.14 || childBounds.height >= 160) {
+        count += 1;
+      }
+    }
+
+    return count;
+  }
+
+  function looksLikeCompositeContentWrapper(node) {
+    if (!node || !hasChildren(node)) {
+      return false;
+    }
+
+    const largeBlockCount = countLargeDirectChildBlocks(node);
+    if (largeBlockCount >= 2) {
+      return true;
+    }
+
+    return largeBlockCount >= 1 && countDirectChildrenByType(node, "TEXT") >= 3;
+  }
+
+  function looksLikeNavigationBar(node) {
+    if (!node || !hasChildren(node)) {
+      return false;
+    }
+
+    const bounds = getNodeBounds(node);
+    const parentBounds = node.parent ? getNodeBounds(node.parent) : null;
+    if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
+      return false;
+    }
+
+    const heightRatio = parentBounds && parentBounds.height > 0 ? bounds.height / parentBounds.height : 0;
+    const widthRatio = parentBounds && parentBounds.width > 0 ? bounds.width / parentBounds.width : 0;
+    const topOffset = parentBounds ? bounds.y - parentBounds.y : 0;
+    const directTextCount = countDirectChildrenByType(node, "TEXT");
+    const iconCount = countDirectChildrenByPredicate(node, isIconLikeNode);
+    const imageCount = countDirectChildrenByPredicate(node, isImageLikeNode);
+
+    return (
+      (bounds.height <= 220 || heightRatio <= 0.18) &&
+      (widthRatio === 0 || widthRatio >= 0.55) &&
+      topOffset <= Math.max(80, (parentBounds && parentBounds.height ? parentBounds.height * 0.12 : 80)) &&
+      imageCount === 0 &&
+      countLargeDirectChildBlocks(node) <= 1 &&
+      (directTextCount >= 1 || iconCount >= 1)
+    );
+  }
+
+  function looksLikeOutroSection(node, sectionSlug, majorSections, orderIndex) {
+    const values = collectNodeSemanticValues(node, "", 6, 2);
+    const corpus = values.join(" ").toLowerCase();
+    if (/outro|closing|final|wrap up|thank you/.test(corpus) || sectionSlug === "footer") {
+      return true;
+    }
+
+    if (!node || !node.parent) {
+      return false;
+    }
+
+    const bounds = getNodeBounds(node);
+    const parentBounds = getNodeBounds(node.parent);
+    if (!bounds || !parentBounds || parentBounds.height <= 0) {
+      return false;
+    }
+
+    const isLastSection =
+      Array.isArray(majorSections) && majorSections.length > 1 ? orderIndex === majorSections.length - 1 : false;
+    return isLastSection && bounds.height / parentBounds.height <= 0.24 && !looksLikeCompositeContentWrapper(node);
+  }
+
+  function countDirectChildrenByPredicate(node, predicate) {
+    if (!node || !hasChildren(node)) {
+      return 0;
+    }
+
+    let count = 0;
+    for (const child of node.children) {
+      if (child && typeof predicate === "function" && predicate(child)) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
+  function countDirectChildrenByType(node, type) {
+    if (!node || !hasChildren(node)) {
+      return 0;
+    }
+
+    let count = 0;
+    for (const child of node.children) {
+      if (child && String(child.type || "") === String(type || "")) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
+  function isMajorHybridSection(node, context) {
+    return getMajorHybridSectionSiblings(node, context).some((entry) => entry && entry.id === (node && node.id));
+  }
+
+  function getMajorHybridSectionContainer(context) {
+    if (!context) {
+      return null;
+    }
+
+    const selectedRoots = getContextSelectedRoots(context);
+    if (selectedRoots.length !== 1) {
+      return null;
+    }
+
+    const root = selectedRoots[0];
+    if (!root || root.id !== context.preservedRootId || !hasChildren(root)) {
+      return root || null;
+    }
+
+    const directMajorChildren = getPotentialMajorHybridChildren(root, context);
+    if (directMajorChildren.length >= 2) {
+      return root;
+    }
+
+    const rootBounds = getNodeBounds(root);
+    let bestWrapper = null;
+    let bestWrapperCount = 0;
+
+    for (const child of root.children) {
+      if (!child || !hasChildren(child) || child.locked === true || child.visible === false) {
+        continue;
+      }
+
+      if (isButtonContainer(child) || isFieldContainer(child) || isImageLikeNode(child) || looksLikeNavigationBar(child)) {
+        continue;
+      }
+
+      const childBounds = getNodeBounds(child);
+      if (!childBounds || !rootBounds || rootBounds.width <= 0 || rootBounds.height <= 0) {
+        continue;
+      }
+
+      const widthRatio = childBounds.width / rootBounds.width;
+      const heightRatio = childBounds.height / rootBounds.height;
+      if (widthRatio < 0.55 && heightRatio < 0.35) {
+        continue;
+      }
+
+      const nestedMajorChildren = getPotentialMajorHybridChildren(child, context);
+      if (nestedMajorChildren.length >= 2 && nestedMajorChildren.length > bestWrapperCount) {
+        bestWrapper = child;
+        bestWrapperCount = nestedMajorChildren.length;
+      }
+    }
+
+    return bestWrapper || root;
+  }
+
+  function getPotentialMajorHybridChildren(container, context) {
+    if (!container || !hasChildren(container)) {
+      return [];
+    }
+
+    return container.children.filter((child) => isPotentialMajorHybridSectionCandidate(child, context, container)).sort(compareBounds);
+  }
+
+  function getMajorHybridSectionSiblings(node, context) {
+    if (!node || !context) {
+      return [];
+    }
+
+    const selectedRoots = getContextSelectedRoots(context);
+    if (selectedRoots.length > 1 && selectedRoots.some((entry) => entry.id === node.id)) {
+      return selectedRoots.filter((entry) => isPotentialMajorHybridSection(entry, context)).sort(compareBounds);
+    }
+
+    const container = getMajorHybridSectionContainer(context);
+    if (container && node.parent && node.parent.id === container.id) {
+      return getPotentialMajorHybridChildren(container, context);
+    }
+
+    return [];
+  }
+
+  function isPotentialMajorHybridSection(node, context) {
+    const container = getMajorHybridSectionContainer(context);
+    if (container && node && node.parent && node.parent.id === container.id) {
+      return isPotentialMajorHybridSectionCandidate(node, context, container);
+    }
+
+    const selectedRoots = getContextSelectedRoots(context);
+    if (selectedRoots.length > 1) {
+      return selectedRoots.some((entry) => entry && entry.id === node.id) && isPotentialMajorHybridSectionCandidate(node, context, node.parent);
+    }
+
+    return false;
+  }
+
+  function isPotentialMajorHybridSectionCandidate(node, context, container) {
+    if (!shouldUseHybridDisplayName(node, context)) {
+      return false;
+    }
+
+    if (!node || !hasChildren(node) || isButtonContainer(node) || isFieldContainer(node) || isImageLikeNode(node)) {
+      return false;
+    }
+
+    const type = String(node.type || "");
+    if (type !== "FRAME" && type !== "SECTION" && type !== "GROUP") {
+      return false;
+    }
+
+    const bounds = getNodeBounds(node);
+    if (!bounds || bounds.width < 160 || bounds.height < 80) {
+      return false;
+    }
+
+    const childCount = Array.isArray(node.children) ? node.children.length : 0;
+    if (childCount < 2) {
+      return false;
+    }
+
+    if (container) {
+      const parentBounds = getNodeBounds(container);
+      const widthRatio = parentBounds && parentBounds.width > 0 ? bounds.width / parentBounds.width : 0;
+      return type !== "GROUP" || widthRatio >= 0.35 || bounds.height >= 180;
+    }
+
+    return true;
+  }
+
+  function detectExplicitHybridDisplayLabel(node, textHint, sectionSlug, contentSlug, topicSlug, context) {
+    const values = collectNodeSemanticValues(node, textHint, 4, 2);
+    const corpus = values.join(" ").toLowerCase();
+
+    const explicitProduct = findExplicitProductDisplayLabel(values);
+    if (explicitProduct) {
+      return explicitProduct;
+    }
+
+    if (/coupon|promo|discount/.test(corpus) && /(product|card|item)/.test(corpus)) {
+      return "Coupon + Product Card";
+    }
+
+    if (/faq|q&a|questions|frequently asked/.test(corpus)) {
+      return "FAQ";
+    }
+
+    if (/award|awards|trophy|prize|certified|certification/.test(corpus)) {
+      return "Awards";
+    }
+
+    if (/archive|archiving|collection|library|history/.test(corpus)) {
+      return "Archiving Page";
+    }
+
+    if ((/outro|closing|final|wrap up|thank you/.test(corpus) || sectionSlug === "footer") && looksLikeOutroSection(node, sectionSlug)) {
+      return "Outro";
+    }
+
+    if (/intro|introduction|opening|overview|about/.test(corpus) && !looksLikeCompositeContentWrapper(node)) {
+      return "Introduction";
+    }
+
+    if ((/hero|key visual|kv/.test(corpus) || sectionSlug === "hero") && (isImageLikeNode(node) || hasDominantVisualSection(node))) {
+      return "Key Visual";
+    }
+
+    if (contentSlug === "message") {
+      return "Inquiry";
+    }
+
+    if (context && context.contextSlug === "hero" && hasChildren(node) && inferGroupRole(node, contentSlug || topicSlug || "content") === "copy") {
+      return "Introduction";
+    }
+
+    return "";
+  }
+
+  function findExplicitProductDisplayLabel(values) {
+    const samples = Array.isArray(values) ? values : [];
+    for (const sample of samples) {
+      const normalized = compactText(sample);
+      if (!normalized) {
+        continue;
+      }
+
+      const match = normalized.match(/product\s*(\d+(?:-\d+)?)/i);
+      if (match) {
+        return `Product ${match[1]}`;
+      }
+
+      if (/^product$/i.test(normalized)) {
+        return "Product";
+      }
+    }
+
+    return "";
+  }
+
+  function buildHybridRoleLabel(value) {
+    const slug = slugifyAsciiToken(value);
+    if (!slug) {
+      return "";
+    }
+
+    switch (slug) {
+      case "hero":
+        return "Key Visual";
+      case "footer":
+        return "Outro";
+      case "navbar":
+        return "Navigation";
+      case "sidebar":
+        return "Sidebar";
+      case "feature":
+        return "Feature";
+      case "pricing":
+        return "Pricing";
+      case "modal":
+        return "Dialog";
+      case "dashboard":
+        return "Metrics";
+      case "message":
+        return "Inquiry";
+      case "email":
+        return "Email";
+      case "password":
+        return "Password";
+      case "search":
+        return "Search";
+      case "phone":
+        return "Phone";
+      case "name":
+        return "Name";
+      case "company":
+        return "Company";
+      case "address":
+        return "Address";
+      case "sign-in":
+        return "Sign In";
+      case "sign-up":
+        return "Sign Up";
+      case "contact":
+        return "Contact";
+      case "faq":
+        return "FAQ";
+      case "archive":
+      case "archiving":
+        return "Archiving";
+      default:
+        return humanizeHybridSegment(slug);
+    }
+  }
+
+  function joinHybridDisplayParts() {
+    const joined = [];
+    for (let index = 0; index < arguments.length; index += 1) {
+      const part = compactHybridDisplayText(arguments[index]);
+      if (!part) {
+        continue;
+      }
+
+      if (joined.length > 0 && canonicalizeName(joined[joined.length - 1]) === canonicalizeName(part)) {
+        continue;
+      }
+
+      joined.push(part);
+    }
+
+    return joined.length ? joined.join(" ") : "Content";
+  }
+
+  function compactHybridDisplayText(value) {
+    return String(value || "")
+      .replace(/\s+/g, " ")
+      .replace(/\s*\+\s*/g, " + ")
+      .trim();
+  }
+
+  function getHybridDisplayOrdinal(node, context) {
+    if (!shouldPrefixHybridDisplayOrdinal(node, context)) {
+      return "";
+    }
+
+    const candidates = getMajorHybridSectionSiblings(node, context);
+    if (candidates.length < 2) {
+      return "";
+    }
+
+    const ordinalIndex = candidates.findIndex((candidate) => candidate && candidate.id === node.id);
+    return formatRepeatIndex((ordinalIndex >= 0 ? ordinalIndex : candidates.length) + 1);
+  }
+
+  function shouldPrefixHybridDisplayOrdinal(node, context) {
+    return isMajorHybridSection(node, context);
+  }
+
+  function isHybridOrdinalSibling(node, context) {
+    return shouldUseHybridDisplayName(node, context) && shouldPrefixHybridDisplayOrdinal(node, context);
+  }
+
   function buildImageNodeName(node, sectionSlug, contentSlug, topicSlug, context) {
     const imageRole = detectImageRole(node);
     const semanticSlug = topicSlug || contentSlug || sectionSlug || context.contextSlug || "content";
+
+    if (resolveNamingMode(context.namingMode) === "hybrid") {
+      if (imageRole === "avatar") {
+        return "Avatar";
+      }
+
+      if (imageRole === "hero") {
+        return "Hero Image";
+      }
+
+      if (imageRole === "thumbnail") {
+        return "Thumbnail";
+      }
+
+      if (imageRole === "poster") {
+        return "Poster";
+      }
+
+      if (imageRole === "illustration") {
+        return "Illustration";
+      }
+
+      if (imageRole === "logo") {
+        return "Logo";
+      }
+
+      return "Image";
+    }
 
     if (imageRole === "avatar") {
       return buildStructuredName(context.namingMode, "image", "avatar", semanticSlug);
@@ -16367,7 +18445,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       }
     }
 
-    return texts.length > 0 ? compactText(texts[0]) : "";
+    return "";
   }
 
   function collectNodeTexts(node, limit, maxDepth) {
@@ -16399,6 +18477,111 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return texts;
   }
 
+  function collectProminentTexts(node, limit) {
+    if (!node) {
+      return [];
+    }
+
+    const entries = [];
+    const stack = [{ node, depth: 0 }];
+    while (stack.length > 0 && entries.length < Math.max(limit * 3, 6)) {
+      const current = stack.pop();
+      if (!current) {
+        continue;
+      }
+
+      if (current.node.type === "TEXT") {
+        const value = compactText(getTextValue(current.node));
+        if (value) {
+          entries.push({
+            text: value,
+            fontSize: typeof current.node.fontSize === "number" ? current.node.fontSize : 0,
+          });
+        }
+      }
+
+      if (current.depth >= 3 || !hasChildren(current.node)) {
+        continue;
+      }
+
+      for (let index = current.node.children.length - 1; index >= 0; index -= 1) {
+        stack.push({ node: current.node.children[index], depth: current.depth + 1 });
+      }
+    }
+
+    return entries
+      .sort((left, right) => right.fontSize - left.fontSize)
+      .map((entry) => entry.text)
+      .filter((value, index, array) => array.indexOf(value) === index)
+      .slice(0, limit);
+  }
+
+  function collectActionTexts(node, limit) {
+    return collectNodeTexts(node, 10, 3)
+      .filter((text) => findActionSlugFromText(text) || looksLikeButtonText(text))
+      .map((text) => compactText(text))
+      .filter((value, index, array) => value && array.indexOf(value) === index)
+      .slice(0, limit);
+  }
+
+  function buildNodeContentDigest(node, context) {
+    const headings = collectProminentTexts(node, 2);
+    const texts = collectNodeTexts(node, 6, 3)
+      .map((text) => compactText(text))
+      .filter(Boolean);
+    const actions = collectActionTexts(node, 2);
+    const sectionPosition = describeNodeSectionPosition(node, context);
+    const summary = [];
+    if (sectionPosition) {
+      summary.push(sectionPosition);
+    }
+    if (headings.length) {
+      summary.push(`Headings: ${headings.join(" / ")}`);
+    }
+    if (texts.length) {
+      summary.push(`Texts: ${texts.slice(0, 3).join(" / ")}`);
+    }
+    if (actions.length) {
+      summary.push(`Actions: ${actions.join(" / ")}`);
+    }
+    return summary.join(" | ");
+  }
+
+  function describeNodeSectionPosition(node, context) {
+    const majorSections = getMajorHybridSectionSiblings(node, context);
+    const index = majorSections.findIndex((entry) => entry && entry.id === (node && node.id));
+    if (index < 0 || majorSections.length <= 1) {
+      return "";
+    }
+
+    if (index === 0) {
+      return `first of ${majorSections.length}`;
+    }
+    if (index === majorSections.length - 1) {
+      return `last of ${majorSections.length}`;
+    }
+    return `${index + 1} of ${majorSections.length}`;
+  }
+
+  function buildSiblingContentContext(node, context) {
+    const majorSections = getMajorHybridSectionSiblings(node, context);
+    const index = majorSections.findIndex((entry) => entry && entry.id === (node && node.id));
+    if (index < 0) {
+      return "";
+    }
+
+    const prev = index > 0 ? majorSections[index - 1] : null;
+    const next = index < majorSections.length - 1 ? majorSections[index + 1] : null;
+    const parts = [];
+    if (prev) {
+      parts.push(`Prev: ${safeName(prev)} | ${collectNodeTexts(prev, 2, 2).join(" / ")}`);
+    }
+    if (next) {
+      parts.push(`Next: ${safeName(next)} | ${collectNodeTexts(next, 2, 2).join(" / ")}`);
+    }
+    return parts.join(" || ");
+  }
+
   function getPrimaryTextHint(node) {
     if (!node) {
       return "";
@@ -16428,13 +18611,97 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return normalized.length > 28 ? `${normalized.slice(0, 25)}...` : normalized;
   }
 
+  function looksLikePriceText(text) {
+    const normalized = compactText(text);
+    if (!normalized) {
+      return false;
+    }
+
+    return /\$\s*\d|\d[\d,.\s]*(?:원|krw|usd|eur)|(?:price|pricing|monthly|yearly|month|year)/i.test(normalized);
+  }
+
+  function looksLikeBadgeTextNode(node, text) {
+    const normalized = compactText(text);
+    if (!normalized || normalized.length > 18) {
+      return false;
+    }
+
+    if (/(new|hot|sale|best|event|live|pro|beta|%\s*off)/i.test(normalized)) {
+      return true;
+    }
+
+    const bounds = getNodeBounds(node);
+    if (bounds && bounds.width <= 160 && bounds.height <= 48) {
+      const colorHint = getNodeColorHint(node) || getNodeColorHint(node && node.parent);
+      if (colorHint && colorHint !== "black" && colorHint !== "white" && colorHint !== "gray" && colorHint !== "silver") {
+        return true;
+      }
+    }
+
+    return /^[A-Z0-9\s+-]{2,18}$/.test(normalized);
+  }
+
   function looksLikeButtonText(text) {
     const normalized = compactText(text).toLowerCase();
     return normalized.length > 0 && normalized.length <= 24 && BUTTON_TEXT_PATTERN.test(normalized);
   }
 
   function matchFieldLabel(text) {
-    return findBestToken([text], FIELD_KEYWORD_ENTRIES, "");
+    const normalized = compactFieldCandidateText(text);
+    if (!normalized || !looksLikeFieldLabelText(normalized)) {
+      return "";
+    }
+
+    return findBestToken([normalized], FIELD_KEYWORD_ENTRIES, "");
+  }
+
+  function compactFieldCandidateText(text) {
+    return String(text || "")
+      .replace(/\s+/g, " ")
+      .replace(/[“”"']/g, "")
+      .trim();
+  }
+
+  function looksLikeFieldLabelText(text) {
+    const normalized = compactFieldCandidateText(text);
+    if (!normalized) {
+      return false;
+    }
+
+    if (normalized.length > 40) {
+      return false;
+    }
+
+    if (/[.!?]|:\s|\n/.test(normalized)) {
+      return false;
+    }
+
+    const words = normalized.split(/\s+/).filter(Boolean);
+    if (words.length > 4) {
+      return false;
+    }
+
+    const lower = normalized.toLowerCase();
+    if (/(smartphone|smartphones|laptops|reviewed everything|does it really feel different)/.test(lower)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  function findFieldSlugFromValues(values) {
+    const items = Array.isArray(values) ? values : [];
+    const candidates = [];
+
+    for (const value of items) {
+      const normalized = compactFieldCandidateText(value);
+      if (!looksLikeFieldLabelText(normalized)) {
+        continue;
+      }
+      candidates.push(normalized);
+    }
+
+    return findBestToken(candidates, FIELD_KEYWORD_ENTRIES, "");
   }
 
   function findActionSlug(node) {
@@ -16500,14 +18767,18 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   }
 
   function detectSectionSlug(node, context) {
-    const values = [safeName(node)];
+    const values = [];
+    appendSemanticNameValue(values, node);
     const parent = node && node.parent;
     if (parent) {
-      values.push(safeName(parent));
+      appendSemanticNameValue(values, parent);
     }
 
     values.push(...collectNodeTexts(node, 3, 2));
     const sectionSlug = findBestToken(values, SECTION_TOKEN_ENTRIES, "");
+    if (sectionSlug === "pricing" && !looksLikePricingValueSet(values)) {
+      return context.contextSlug || context.topicSlug || "content";
+    }
     return sectionSlug || context.contextSlug || context.topicSlug || "content";
   }
 
@@ -16518,7 +18789,12 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       return actionSlug;
     }
 
-    const fieldSlug = findBestToken(values, FIELD_KEYWORD_ENTRIES, "");
+    const contentRoleSlug = findBestToken(values, CONTENT_ROLE_TOKEN_ENTRIES, "");
+    if (contentRoleSlug) {
+      return contentRoleSlug;
+    }
+
+    const fieldSlug = findFieldSlugFromValues(values);
     if (fieldSlug) {
       return fieldSlug;
     }
@@ -16544,13 +18820,75 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       values.push(preferredText);
     }
 
-    values.push(safeName(node));
+    appendSemanticNameValue(values, node);
     if (node && node.parent) {
-      values.push(safeName(node.parent));
+      appendSemanticNameValue(values, node.parent);
     }
 
     values.push(...collectNodeTexts(node, textLimit, textDepth));
     return values;
+  }
+
+  function appendSemanticNameValue(values, node) {
+    const name = safeName(node);
+    if (!name || isDocumentStyleName(name)) {
+      return;
+    }
+
+    values.push(name);
+  }
+
+  function isDocumentStyleName(name) {
+    const normalized = String(name || "").trim();
+    if (!normalized) {
+      return true;
+    }
+
+    if (normalized.length >= 24 && /[_]/.test(normalized)) {
+      return true;
+    }
+
+    if (/[A-Z]{3,}/.test(normalized) && /\d/.test(normalized)) {
+      return true;
+    }
+
+    if (/ver\s*\d|v\d|\d{6,}/i.test(normalized)) {
+      return true;
+    }
+
+    return /^[A-Za-z0-9_.-]+$/.test(normalized) && normalized.split(/[_-]/).length >= 4;
+  }
+
+  function looksLikePricingValueSet(values) {
+    const corpus = (Array.isArray(values) ? values : [])
+      .filter((value) => typeof value === "string" && value.trim())
+      .join(" ")
+      .toLowerCase();
+    if (!corpus) {
+      return false;
+    }
+
+    const explicitCount = [
+      "pricing",
+      "price",
+      "prices",
+      "plan",
+      "plans",
+      "billing",
+      "subscription",
+      "subscribe",
+      "cost",
+      "fee",
+      "$",
+      "usd",
+      "krw",
+      "￦",
+      "원",
+      "요금",
+      "가격",
+      "플랜",
+    ].filter((token) => corpus.includes(token)).length;
+    return explicitCount >= 2 || /\$\s*\d|￦\s*\d|\d+\s*(usd|krw|원)/i.test(corpus);
   }
 
   function detectTopicSlug(node, context, preferredText) {
@@ -16633,6 +18971,11 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return resolveNamingMode(mode) === "hybrid" ? buildHybridName(...segments) : buildWebName(...segments);
   }
 
+  function buildStructuredNameFromSegments(mode, segments) {
+    const values = Array.isArray(segments) ? segments : [];
+    return buildStructuredName(mode, values[0], values[1], values[2], values[3], values[4], values[5]);
+  }
+
   function buildWebName(...segments) {
     const normalized = [];
     for (const segment of segments) {
@@ -16675,6 +19018,53 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
 
     return normalized.join("/");
+  }
+
+  function formatRepeatIndex(index) {
+    const numeric = Number(index);
+    if (!(numeric > 0)) {
+      return "01";
+    }
+
+    return String(Math.round(numeric)).padStart(2, "0");
+  }
+
+  function appendHumanIndexSuffix(label, index) {
+    const trimmed = String(label || "").trim();
+    if (!trimmed) {
+      return "";
+    }
+
+    const suffix = formatRepeatIndex(index);
+    if (new RegExp("(?:^|\\s)" + suffix + "$").test(trimmed)) {
+      return trimmed;
+    }
+
+    return `${trimmed} ${suffix}`;
+  }
+
+  function appendStructuredOrdinal(name, index) {
+    const trimmed = String(name || "").trim();
+    if (!trimmed) {
+      return "";
+    }
+
+    const suffix = formatRepeatIndex(index);
+    if (isWebCompatibleStructuredName(trimmed)) {
+      return `${trimmed}.${suffix}`;
+    }
+
+    return `${trimmed} ${suffix}`;
+  }
+
+  function endsWithDisplaySuffix(label, suffix) {
+    const left = slugifyAsciiToken(label);
+    const right = slugifyAsciiToken(suffix);
+    if (!left || !right) {
+      return false;
+    }
+
+    return left === right || left.endsWith("-" + right);
   }
 
   function humanizeHybridSegment(value) {
@@ -16734,7 +19124,49 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
   function isHybridStructuredName(name) {
     const normalized = String(name || "").trim();
-    return /^[A-Z][A-Za-z0-9]*(?:[ -][A-Za-z0-9]+)*(?:\/[A-Z][A-Za-z0-9]*(?:[ -][A-Za-z0-9]+)*)+$/.test(normalized);
+    return (
+      /^[A-Z][A-Za-z0-9]*(?:[ -][A-Za-z0-9]+)*(?:\/[A-Z][A-Za-z0-9]*(?:[ -][A-Za-z0-9]+)*)+$/.test(normalized) ||
+      /^(?:\d{2}_)?[A-Z][A-Za-z0-9]*(?: (?:\+ )?[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)*$/.test(normalized)
+    );
+  }
+
+  function isWeakHybridDisplayName(name) {
+    const normalized = String(name || "").trim();
+    if (!normalized) {
+      return true;
+    }
+
+    const label = normalized.replace(/^\d{2}_/, "").trim();
+    const slug = slugifyAsciiToken(label);
+    if (!slug) {
+      return true;
+    }
+
+    if (GENERIC_TOKEN_SET.has(slug)) {
+      return true;
+    }
+
+    if (TOPIC_TOKEN_ENTRIES.some((entry) => entry && entry[0] === slug)) {
+      return true;
+    }
+
+    return (
+      slug === "section" ||
+      slug === "content-section" ||
+      slug === "visual-section" ||
+      slug === "content" ||
+      slug === "group" ||
+      slug === "container" ||
+      slug === "item" ||
+      slug === "list" ||
+      slug === "media"
+    );
+  }
+
+  function hasRedundantHybridParentLabel(name, parentName) {
+    const childSlug = slugifyAsciiToken(String(name || "").replace(/^\d{2}_/, "").trim());
+    const parentSlug = slugifyAsciiToken(String(parentName || "").replace(/^\d{2}_/, "").trim());
+    return !!childSlug && !!parentSlug && childSlug === parentSlug;
   }
 
   function isStructuredNameForMode(name, mode) {
@@ -16925,6 +19357,38 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return value;
   }
 
+  function isButtonSemanticNode(node) {
+    if (!node) {
+      return false;
+    }
+
+    if (isButtonContainer(node)) {
+      return true;
+    }
+
+    if (node.type === "TEXT") {
+      return looksLikeButtonText(getTextValue(node));
+    }
+
+    return false;
+  }
+
+  function isFieldSemanticNode(node) {
+    if (!node) {
+      return false;
+    }
+
+    if (isFieldContainer(node)) {
+      return true;
+    }
+
+    if (node.type === "TEXT") {
+      return !!matchFieldLabel(getTextValue(node));
+    }
+
+    return false;
+  }
+
   function isButtonContainer(node) {
     if (!node || !hasChildren(node)) {
       return false;
@@ -16950,11 +19414,17 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
 
     const bounds = getNodeBounds(node);
-    if (!bounds || bounds.width < 120 || bounds.height < 32) {
+    if (!bounds || bounds.width < 120 || bounds.height < 32 || bounds.height > 160) {
       return false;
     }
 
-    return !!findFieldLabel(node);
+    const texts = collectNodeTexts(node, 4, 2);
+    const shortFieldTexts = texts.filter((text) => !!matchFieldLabel(text));
+    if (!shortFieldTexts.length) {
+      return false;
+    }
+
+    return texts.length <= 3;
   }
 
   function isCardLikeNode(node) {
@@ -17051,7 +19521,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       }
 
       suggestions.push({
-        name: buildSuggestedTextBlockName(title, body, context),
+        name: buildSuggestedTextBlockName(null, title, body, context),
         parentName: safeName(title.parent),
         nodes: [
           { id: title.id, name: safeName(title) },
@@ -17064,10 +19534,11 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return suggestions;
   }
 
-  function buildGroupName(labelNode, context) {
-    const label = getPrimaryTextHint(labelNode);
-    const itemSlug = resolveContentSlug(labelNode, label, context) || context.topicSlug || "item";
-    const sectionSlug = detectSectionSlug(labelNode, context);
+  function buildGroupName(groupNode, labelNode, context) {
+    const label = getPrimaryTextHint(labelNode || groupNode);
+    const sourceNode = labelNode || groupNode;
+    const itemSlug = resolveContentSlug(sourceNode, label, context) || context.topicSlug || "item";
+    const sectionSlug = detectSectionSlug(sourceNode, context);
     if (context.contextSlug === "navbar" || sectionSlug === "navbar") {
       return buildStructuredName(context.namingMode, "group", "navbar", "item", itemSlug);
     }
@@ -17075,16 +19546,230 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return buildStructuredName(context.namingMode, "group", sectionSlug || context.contextSlug || "content", "item", itemSlug);
   }
 
-  function buildSuggestedTextBlockName(titleNode, bodyNode, context) {
-    const titleLabel = getPrimaryTextHint(titleNode);
-    const bodyLabel = getPrimaryTextHint(bodyNode);
+  function buildSuggestedTextBlockName(groupNode, titleNode, bodyNode, context) {
+    const primaryNode = titleNode || groupNode;
+    const secondaryNode = bodyNode || groupNode;
+    const titleLabel = getPrimaryTextHint(primaryNode);
+    const bodyLabel = getPrimaryTextHint(secondaryNode);
     const itemSlug =
-      resolveContentSlug(titleNode, titleLabel, context) ||
-      resolveContentSlug(bodyNode, bodyLabel, context) ||
+      resolveContentSlug(primaryNode, titleLabel, context) ||
+      resolveContentSlug(secondaryNode, bodyLabel, context) ||
       context.topicSlug ||
       "copy";
-    const sectionSlug = detectSectionSlug(titleNode, context);
+    const sectionSlug = detectSectionSlug(primaryNode, context);
     return buildStructuredName(context.namingMode, "group", sectionSlug || context.contextSlug || "content", "copy", itemSlug);
+  }
+
+  function applySiblingClusterNaming(candidates) {
+    if (!Array.isArray(candidates) || candidates.length < 2) {
+      return;
+    }
+
+    const clusters = new Map();
+    for (const candidate of candidates) {
+      if (!candidate || !candidate.repeatRole || !candidate.repeatRole.familyKey) {
+        continue;
+      }
+
+      const key = candidate.repeatRole.familyKey;
+      const bucket = clusters.get(key) || [];
+      bucket.push(candidate);
+      clusters.set(key, bucket);
+    }
+
+    for (const bucket of clusters.values()) {
+      if (!bucket || bucket.length < 2) {
+        continue;
+      }
+
+      bucket.sort((left, right) => compareStoredBounds(left.bounds, right.bounds));
+      const titleMap = collectClusterTitleMap(bucket);
+      const useDistinctTitles =
+        titleMap && titleMap.useDistinctTitles === true && !(bucket[0] && bucket[0].repeatRole && bucket[0].repeatRole.preferIndex === true);
+      for (let index = 0; index < bucket.length; index += 1) {
+        const candidate = bucket[index];
+        if (!candidate) {
+          continue;
+        }
+
+        const titleInfo = useDistinctTitles ? titleMap.byNodeId.get(candidate.nodeId) : null;
+        const nextBaseName = titleInfo ? buildClusterTitleDrivenName(candidate, titleInfo) : buildClusterIndexedName(candidate, index + 1);
+        if (!nextBaseName) {
+          continue;
+        }
+
+        candidate.baseName = nextBaseName;
+        candidate.repeatIndex = index + 1;
+        candidate.repeatCount = bucket.length;
+      }
+    }
+  }
+
+  function collectClusterTitleMap(bucket) {
+    const byNodeId = new Map();
+    const usedSlugs = new Set();
+    for (const candidate of bucket) {
+      const titleInfo = extractClusterTitleInfo(candidate);
+      if (!titleInfo || usedSlugs.has(titleInfo.slug)) {
+        return {
+          useDistinctTitles: false,
+          byNodeId: new Map(),
+        };
+      }
+
+      usedSlugs.add(titleInfo.slug);
+      byNodeId.set(candidate.nodeId, titleInfo);
+    }
+
+    return {
+      useDistinctTitles: byNodeId.size >= 2 && byNodeId.size === bucket.length,
+      byNodeId: byNodeId,
+    };
+  }
+
+  function extractClusterTitleInfo(candidate) {
+    if (!candidate) {
+      return null;
+    }
+
+    const samples = [];
+    appendCandidateTitleSamples(samples, candidate.headingTexts, 2);
+    appendCandidateTitleSamples(samples, [candidate.textHint], 1);
+    appendCandidateTitleSamples(samples, candidate.textSamples, 2);
+    appendCandidateTitleSamples(samples, candidate.deepTextSamples, 4);
+    for (const sample of samples) {
+      const titleInfo = normalizeClusterTitleInfo(sample, candidate.repeatRole);
+      if (titleInfo) {
+        return titleInfo;
+      }
+    }
+
+    return null;
+  }
+
+  function appendCandidateTitleSamples(target, values, limit) {
+    if (!Array.isArray(target) || !Array.isArray(values)) {
+      return;
+    }
+
+    let count = 0;
+    for (const value of values) {
+      if (!(count < limit)) {
+        break;
+      }
+
+      const normalized = compactText(value);
+      if (!normalized || target.includes(normalized)) {
+        continue;
+      }
+
+      target.push(normalized);
+      count += 1;
+    }
+  }
+
+  function normalizeClusterTitleInfo(value, repeatRole) {
+    const normalized = compactText(value);
+    if (!normalized || normalized.length < 2 || normalized.length > 32) {
+      return null;
+    }
+
+    if (looksLikeButtonText(normalized) || matchFieldLabel(normalized)) {
+      return null;
+    }
+
+    const slug = slugifyAsciiToken(normalized);
+    if (!slug) {
+      return null;
+    }
+
+    const tokenCount = slug.split("-").filter(Boolean).length;
+    if (tokenCount <= 0 || tokenCount > 4) {
+      return null;
+    }
+
+    if (isGenericClusterTitleSlug(slug, repeatRole)) {
+      return null;
+    }
+
+    return {
+      slug: slug,
+      label: humanizeHybridSegment(slug),
+    };
+  }
+
+  function isGenericClusterTitleSlug(slug, repeatRole) {
+    if (!slug || GENERIC_TOKEN_SET.has(slug)) {
+      return true;
+    }
+
+    if (
+      slug === "faq" ||
+      slug === "menu" ||
+      slug === "product" ||
+      slug === "pricing" ||
+      slug === "plan" ||
+      slug === "feature" ||
+      slug === "card" ||
+      slug === "item" ||
+      slug === "metric"
+    ) {
+      return true;
+    }
+
+    if (repeatRole) {
+      const familySlug = slugifyAsciiToken(repeatRole.familyKey);
+      const labelSlug = slugifyAsciiToken(repeatRole.hybridLabel);
+      const suffixSlug = slugifyAsciiToken(repeatRole.hybridSuffix);
+      if (slug === labelSlug || slug === suffixSlug) {
+        return true;
+      }
+
+      if (familySlug && (familySlug === slug || familySlug.split("-").indexOf(slug) >= 0)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  function buildClusterTitleDrivenName(candidate, titleInfo) {
+    if (!candidate || !candidate.repeatRole || !titleInfo) {
+      return "";
+    }
+
+    if (candidate.nameMode === "display") {
+      let label = titleInfo.label;
+      const suffix = candidate.repeatRole.hybridSuffix;
+      if (suffix && !endsWithDisplaySuffix(label, suffix)) {
+        label = joinHybridDisplayParts(label, suffix);
+      }
+      return label;
+    }
+
+    const segments = Array.isArray(candidate.repeatRole.webSegments) ? candidate.repeatRole.webSegments.slice(0, 6) : [];
+    segments.push(titleInfo.slug);
+    return buildStructuredNameFromSegments(candidate.namingMode, segments);
+  }
+
+  function buildClusterIndexedName(candidate, index) {
+    if (!candidate) {
+      return "";
+    }
+
+    if (candidate.nameMode === "display") {
+      const baseLabel =
+        candidate.repeatRole && candidate.repeatRole.hybridLabel ? candidate.repeatRole.hybridLabel : candidate.baseName;
+      return appendHumanIndexSuffix(baseLabel, index);
+    }
+
+    if (candidate.repeatRole && Array.isArray(candidate.repeatRole.webSegments) && candidate.repeatRole.webSegments.length > 0) {
+      const segments = candidate.repeatRole.webSegments.slice(0, 6);
+      segments.push(formatRepeatIndex(index));
+      return buildStructuredNameFromSegments(candidate.namingMode, segments);
+    }
+
+    return appendStructuredOrdinal(candidate.baseName, index);
   }
 
   function isLabelTextNode(node) {
@@ -17147,6 +19832,10 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   function compareBounds(leftNode, rightNode) {
     const left = getNodeBounds(leftNode);
     const right = getNodeBounds(rightNode);
+    return compareStoredBounds(left, right);
+  }
+
+  function compareStoredBounds(left, right) {
     if (!left || !right) {
       return 0;
     }
@@ -17173,7 +19862,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     const structured = isWebCompatibleStructuredName(trimmed);
     const hybridStructured = isHybridStructuredName(trimmed);
     while (usedNames.has(canonicalizeName(candidate))) {
-      const suffix = String(index).padStart(2, "0");
+      const suffix = formatRepeatIndex(index);
       candidate = structured ? `${trimmed}-${suffix}` : hybridStructured ? `${trimmed} ${suffix}` : `${trimmed} ${suffix}`;
       index += 1;
     }
@@ -17252,6 +19941,53 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
 
     return null;
+  }
+
+  function snapshotNodeBounds(node) {
+    const bounds = getNodeBounds(node);
+    if (!bounds) {
+      return null;
+    }
+
+    return {
+      x: bounds.x,
+      y: bounds.y,
+      width: bounds.width,
+      height: bounds.height,
+    };
+  }
+
+  function getNodeByIdSafe(nodeId) {
+    if (typeof nodeId !== "string" || !nodeId) {
+      return null;
+    }
+
+    try {
+      return typeof figma.getNodeById === "function" ? figma.getNodeById(nodeId) : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function resolveNodeListByIds(nodeIds) {
+    const values = Array.isArray(nodeIds) ? nodeIds : [];
+    const nodes = [];
+    for (const nodeId of values) {
+      const node = getNodeByIdSafe(nodeId);
+      if (node) {
+        nodes.push(node);
+      }
+    }
+
+    return nodes;
+  }
+
+  function getContextSelectedRoots(context) {
+    if (!context) {
+      return [];
+    }
+
+    return resolveNodeListByIds(context.selectedRootIds);
   }
 
   function findLargestSelectedRoot(selection) {
@@ -17371,15 +20107,34 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   const AI_TYPO_FIX_CACHE_KEY = "pigma:ai-typo-fix-cache:v2";
   const AI_TYPO_CLEAR_CACHE_KEY = "pigma:ai-typo-clear-cache:v1";
   const AI_TRANSLATE_CACHE_KEY = "pigma:ai-translate-cache:v1";
-  const PATCH_VERSION = 9;
+  const AI_TRANSLATE_MEMORY_KEY = "pigma:ai-translate-memory:v1";
+  const AI_TEXT_HIGHLIGHT_DEFAULT_COLOR = "#F5FF74";
+  const AI_TEXT_HIGHLIGHT_DEFAULT_TEXT_COLOR = "#111111";
+  const AI_TEXT_HIGHLIGHT_DEFAULT_RADIUS = 0;
+  const AI_TEXT_HIGHLIGHT_DEFAULT_DECORATION_SCALE = 3;
+  const AI_TEXT_HIGHLIGHT_DEFAULT_BOX_PADDING_PX = 0;
+  const AI_TEXT_HIGHLIGHT_DEFAULT_STRIKE_RADIUS = 0;
+  const AI_TEXT_HIGHLIGHT_MEASURE_COLOR = "#FF00FF";
+  const AI_TEXT_HIGHLIGHT_GROUP_NAME = "#high-light-text";
+  const AI_TEXT_HIGHLIGHT_GROUP_PLUGIN_KEY = "pigma:text-highlight-group";
+  const AI_TEXT_HIGHLIGHT_GROUP_TEXT_NODE_KEY = "pigma:text-highlight-text-node-id";
+  const AI_TEXT_HIGHLIGHT_GROUP_WIDTH_KEY = "pigma:text-highlight-container-width";
+  const AI_TEXT_HIGHLIGHT_GROUP_HEIGHT_KEY = "pigma:text-highlight-container-height";
+  const PATCH_VERSION = 13;
   const TYPO_AUDIT_MODEL_BY_PROVIDER = Object.freeze({
     openai: "gpt-5-mini",
     gemini: "gemini-2.5-pro",
   });
   const AI_TRANSLATE_MODEL_BY_PROVIDER = Object.freeze({
-    openai: "gpt-5.4",
-    gemini: "gemini-2.5-pro",
+    openai: "gpt-4.1-mini",
+    gemini: "gemini-2.5-flash-lite",
   });
+  const AI_TRANSLATE_MAX_CHUNK_ITEMS = 24;
+  const AI_TRANSLATE_MAX_CHUNK_CHARS = 3600;
+  const AI_TRANSLATE_MEMORY_LIMIT = 400;
+  const loadedFontPromiseCache = new Map();
+  const pendingTextHighlightMeasureRequests = new Map();
+  let textHighlightMeasureRequestSequence = 0;
   const ANNOTATION_PREFIX = "[Ai 판단]";
   const LEGACY_ANNOTATION_PREFIXES = ["[AI Typo]", ANNOTATION_PREFIX, "[Pigma Ai Audit]"];
   const ANNOTATION_CATEGORY_LABEL = "Pigma Ai Audit";
@@ -17743,6 +20498,16 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         return;
       }
 
+      if (message.type === "request-ai-text-highlight-source") {
+        await postTextHighlightSource(message);
+        return;
+      }
+
+      if (message.type === "measure-ai-text-highlight-alpha-bounds-result") {
+        resolveTextHighlightAlphaBounds(message);
+        return;
+      }
+
       if (message.type === "run-ai-typo-fix") {
         await withTypoTaskLock("fix", runTypoFix);
         return;
@@ -17760,10 +20525,22 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         return;
       }
 
-      await withTypoTaskLock("audit", runTypoAudit);
+      if (message.type === "apply-ai-text-highlight") {
+        await withTypoTaskLock("highlight", async () => {
+          await runTextHighlight(message);
+        });
+        return;
+      }
+
+      if (message.type === "run-ai-typo-audit") {
+        await withTypoTaskLock("audit", async () => {
+          await runTypoAudit(message);
+        });
+        return;
+      }
+
       return;
     }
-
     return originalOnMessage(message);
   };
 
@@ -17779,7 +20556,10 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         message.type === "request-ai-typo-clear-cache" ||
         message.type === "run-ai-typo-clear" ||
         message.type === "request-ai-translate-cache" ||
-        message.type === "run-ai-translate")
+        message.type === "run-ai-translate" ||
+        message.type === "request-ai-text-highlight-source" ||
+        message.type === "apply-ai-text-highlight" ||
+        message.type === "measure-ai-text-highlight-alpha-bounds-result")
     );
   }
 
@@ -17803,6 +20583,9 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   }
 
   function getTypoTaskRunningMessage(task) {
+    if (task === "highlight") {
+      return "선택한 텍스트에 하이라이트를 적용하는 중입니다.";
+    }
     if (task === "fix") {
       return "오타 후보를 찾아 현재 선택의 텍스트를 직접 수정하고, 고친 부분에는 주석을 남기는 중입니다.";
     }
@@ -17816,6 +20599,10 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   }
 
   function postTypoTaskStatus(task, status, message) {
+    if (task === "highlight") {
+      postTextHighlightStatus(status, message);
+      return;
+    }
     if (task === "fix") {
       postFixStatus(status, message);
       return;
@@ -17832,6 +20619,13 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   }
 
   function postTypoTaskError(task, message) {
+    if (task === "highlight") {
+      figma.ui.postMessage({
+        type: "ai-text-highlight-error",
+        message,
+      });
+      return;
+    }
     if (task === "fix") {
       figma.ui.postMessage({
         type: "ai-typo-fix-error",
@@ -17859,13 +20653,33 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     });
   }
 
-  async function runTypoAudit() {
+  function normalizeTypoAuditProfile(value) {
+    return value === "speed" || value === "quality" ? value : "quality";
+  }
+
+  function getTypoAuditProfileLabel(profile) {
+    return normalizeTypoAuditProfile(profile) === "speed" ? "속도용" : "품질용";
+  }
+
+  function getTypoAuditProfileStrategyLabel(profile, strategy) {
+    const normalizedProfile = normalizeTypoAuditProfile(profile);
+    if (normalizedProfile === "speed") {
+      return "속도용 로컬 검수";
+    }
+    return strategy === "ai-primary" ? "품질용 AI 우선 + 로컬 보완" : "품질용 로컬 fallback";
+  }
+
+  async function runTypoAudit(options) {
+    const auditProfile = normalizeTypoAuditProfile(options && options.auditProfile);
     const runSelectionSignature = getSelectionSignature(figma.currentPage.selection);
-    postStatus("running", "오타 후보를 찾고 Dev Mode 주석 또는 결과 패널로 정리하는 중입니다.");
+    postStatus(
+      "running",
+      `${getTypoAuditProfileLabel(auditProfile)} 오타 후보를 찾고 Dev Mode 주석 또는 결과 패널로 정리하는 중입니다.`
+    );
 
     try {
       const designReadResult = await readDesignReadCache();
-      const result = await applyTypoAudit(designReadResult);
+      const result = await applyTypoAudit(designReadResult, { auditProfile });
       await writeTypoAuditCache(result);
 
       figma.ui.postMessage({
@@ -17985,6 +20799,506 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
   }
 
+  async function postTextHighlightSource(message) {
+    const requestId = message && typeof message.requestId === "string" ? message.requestId : "";
+    try {
+      const source = prepareTextHighlightSource();
+      figma.ui.postMessage({
+        type: "ai-text-highlight-source-ready",
+        requestId,
+        source,
+      });
+    } catch (error) {
+      figma.ui.postMessage({
+        type: "ai-text-highlight-source-error",
+        requestId,
+        message: normalizeErrorMessage(error, "드래그한 텍스트 범위를 먼저 선택해 주세요."),
+      });
+    }
+  }
+
+  function resolveTextHighlightMode(message) {
+    const rawMode = message && typeof message.highlightMode === "string" ? message.highlightMode.trim().toLowerCase() : "";
+    if (rawMode === "line" || rawMode === "strike") {
+      return rawMode;
+    }
+    return "box";
+  }
+
+  async function runTextHighlight(message) {
+    const highlightMode = resolveTextHighlightMode(message);
+    if (highlightMode === "line") {
+      await runTextHighlightLine(message);
+      return;
+    }
+    if (highlightMode === "strike") {
+      await runTextHighlightStrike(message);
+      return;
+    }
+    await runTextHighlightBox(message);
+  }
+
+  async function runTextHighlightBox(message) {
+    try {
+      const range = await resolveTextHighlightRange(message);
+      const parent = range.node.parent;
+      const colorSnapshot = extractTextRangeColorSnapshot(range.node, range.start, range.end);
+      const highlightColorHex = sanitizeHexColor(message && message.highlightColorHex, AI_TEXT_HIGHLIGHT_DEFAULT_COLOR);
+      const textColorHex = sanitizeHexColor(message && message.textColorHex, colorSnapshot.hex);
+      const cornerRadius = sanitizeTextHighlightRadius(
+        message && message.cornerRadius,
+        AI_TEXT_HIGHLIGHT_DEFAULT_RADIUS
+      );
+      const boxPaddingPx = sanitizeTextHighlightBoxPaddingPx(
+        message && message.decorationScale,
+        AI_TEXT_HIGHLIGHT_DEFAULT_BOX_PADDING_PX
+      );
+
+      if (!parent) {
+        throw new Error("하이라이트를 만들 부모 레이어를 찾지 못했습니다.");
+      }
+
+      postTextHighlightStatus("running", "텍스트 하이라이트 도형을 만드는 중입니다.");
+
+      const measurement = await measureTextHighlightBounds(range.node, range.start, range.end, textColorHex);
+      let boundsList = getTextHighlightMeasurementBoundsList(measurement);
+      if (!boundsList.length) {
+        throw new Error("선택한 텍스트 범위를 정확히 측정하지 못했습니다. 다시 드래그한 뒤 시도해 주세요.");
+      }
+      if (hasMergedTextHighlightBlockBounds(boundsList, measurement.fontSize)) {
+        boundsList = splitMergedTextHighlightBlockBounds(
+          boundsList,
+          measurement.fontSize,
+          measurement.lineHeight
+        );
+      }
+      boundsList = normalizeTextHighlightBoundsListForApply(
+        range.node,
+        range.start,
+        range.end,
+        boundsList,
+        measurement.fontSize,
+        measurement.lineHeight
+      );
+      if (!boundsList.length) {
+        throw new Error("선택한 텍스트 범위의 위치를 안전하게 계산하지 못했습니다. 다시 드래그한 뒤 시도해 주세요.");
+      }
+
+      await applyTextHighlightColor(range.node, range.start, range.end, textColorHex);
+
+      const container = prepareTextHighlightLayerContainer(parent, range.node);
+      const highlightParent = container.parent;
+      const nodeIndex = container.nodeIndex;
+      const anchorNodeId = container.anchorNodeId || range.node.id;
+      const rects = [];
+      for (let index = 0; index < boundsList.length; index += 1) {
+        const rect = createTextHighlightRect(
+          range.node,
+          highlightParent,
+          boundsList[index],
+          measurement.fontSize,
+          highlightColorHex,
+          cornerRadius,
+          boxPaddingPx
+        );
+        rect.name = boundsList.length > 1 ? `Highlight ${index + 1}` : "Highlight";
+        placeTextHighlightRectBehindNode(highlightParent, rect, anchorNodeId, nodeIndex >= 0 ? nodeIndex + index : -1);
+        rects.push(rect);
+      }
+      finalizeTextHighlightLayerContainer(highlightParent, range.node, container);
+
+      const group = groupTextHighlightSelection(highlightParent, range.node, rects, nodeIndex, container);
+
+      figma.ui.postMessage({
+        type: "ai-text-highlight-result",
+        result: {
+          groupId: group.id,
+          groupName: group.name,
+          nodeId: range.node.id,
+          selectionLabel: safeName(range.node),
+          textPreview: compactText(range.text) || previewText(range.text, 72),
+          highlightColorHex,
+          textColorHex,
+          rectCount: rects.length,
+          mode: "box",
+        },
+      });
+      figma.notify("박스형 텍스트 하이라이트를 만들었습니다.", { timeout: 2200 });
+    } catch (error) {
+      const messageText = normalizeErrorMessage(error, "텍스트 하이라이트를 적용하지 못했습니다.");
+      figma.ui.postMessage({
+        type: "ai-text-highlight-error",
+        message: messageText,
+      });
+      figma.notify(messageText, { error: true, timeout: 2200 });
+    }
+  }
+
+  async function runTextHighlightLine(message) {
+    try {
+      const range = await resolveTextHighlightRange(message);
+      const parent = range.node.parent;
+      const colorSnapshot = extractTextRangeColorSnapshot(range.node, range.start, range.end);
+      const fontSize = getTextRangeFontSize(range.node, range.start, range.end);
+      const lineHeight = getTextRangeLineHeight(range.node, range.start, range.end, fontSize);
+      const highlightColorHex = sanitizeHexColor(message && message.highlightColorHex, AI_TEXT_HIGHLIGHT_DEFAULT_COLOR);
+      const textColorHex = sanitizeHexColor(message && message.textColorHex, colorSnapshot.hex);
+      const decorationScale = sanitizeTextHighlightDecorationScale(
+        message && message.decorationScale,
+        buildTextHighlightAutoDecorationScale(fontSize, "line", lineHeight)
+      );
+      const lineCapRadius = sanitizeTextHighlightRadius(
+        message && message.strikeCapRadius,
+        AI_TEXT_HIGHLIGHT_DEFAULT_STRIKE_RADIUS
+      );
+
+      if (!parent) {
+        throw new Error("하이라이트를 만들 부모 레이어를 찾지 못했습니다.");
+      }
+
+      postTextHighlightStatus("running", "라인형 하이라이트를 만드는 중입니다.");
+
+      const measurement = await measureTextHighlightBounds(range.node, range.start, range.end, textColorHex);
+      let boundsList = getTextHighlightMeasurementBoundsList(measurement);
+      if (!boundsList.length) {
+        throw new Error("선택한 텍스트 범위를 정확히 측정하지 못했습니다. 다시 드래그한 뒤 시도해 주세요.");
+      }
+      if (hasMergedTextHighlightBlockBounds(boundsList, measurement.fontSize)) {
+        boundsList = splitMergedTextHighlightBlockBounds(
+          boundsList,
+          measurement.fontSize,
+          measurement.lineHeight
+        );
+      }
+      boundsList = normalizeTextHighlightBoundsListForApply(
+        range.node,
+        range.start,
+        range.end,
+        boundsList,
+        measurement.fontSize,
+        measurement.lineHeight
+      );
+      if (!boundsList.length) {
+        throw new Error("선택한 텍스트 범위의 위치를 안전하게 계산하지 못했습니다. 다시 드래그한 뒤 시도해 주세요.");
+      }
+
+      clearTextHighlightDecoration(range.node, range.start, range.end);
+      await applyTextHighlightColor(range.node, range.start, range.end, textColorHex);
+
+      const container = prepareTextHighlightLayerContainer(parent, range.node);
+      const highlightParent = container.parent;
+      const nodeIndex = container.nodeIndex;
+      const anchorNodeId = container.anchorNodeId || range.node.id;
+      const rects = [];
+      const thickness = buildTextHighlightDecorationThickness(measurement.fontSize, "line", decorationScale);
+      for (let index = 0; index < boundsList.length; index += 1) {
+        const rect = createTextHighlightLineRect(
+          range.node,
+          highlightParent,
+          boundsList[index],
+          measurement.fontSize,
+          thickness,
+          highlightColorHex,
+          lineCapRadius
+        );
+        rect.name = boundsList.length > 1 ? `Line Highlight ${index + 1}` : "Line Highlight";
+        placeTextHighlightRectBehindNode(highlightParent, rect, anchorNodeId, nodeIndex >= 0 ? nodeIndex + index : -1);
+        rects.push(rect);
+      }
+      finalizeTextHighlightLayerContainer(highlightParent, range.node, container);
+
+      const group = groupTextHighlightSelection(highlightParent, range.node, rects, nodeIndex, container);
+
+      figma.ui.postMessage({
+        type: "ai-text-highlight-result",
+        result: {
+          groupId: group.id,
+          groupName: group.name,
+          nodeId: range.node.id,
+          selectionLabel: safeName(range.node),
+          textPreview: compactText(range.text) || previewText(range.text, 72),
+          highlightColorHex,
+          textColorHex,
+          rectCount: rects.length,
+          mode: "line",
+        },
+      });
+      figma.notify("라인형 텍스트 하이라이트를 만들었습니다.", { timeout: 2200 });
+    } catch (error) {
+      const messageText = normalizeErrorMessage(error, "텍스트 하이라이트를 적용하지 못했습니다.");
+      figma.ui.postMessage({
+        type: "ai-text-highlight-error",
+        message: messageText,
+      });
+      figma.notify(messageText, { error: true, timeout: 2200 });
+    }
+  }
+
+  async function runTextHighlightStrike(message) {
+    try {
+      const range = await resolveTextHighlightRange(message);
+      const parent = range.node.parent;
+      const colorSnapshot = extractTextRangeColorSnapshot(range.node, range.start, range.end);
+      const fontSize = getTextRangeFontSize(range.node, range.start, range.end);
+      const lineHeight = getTextRangeLineHeight(range.node, range.start, range.end, fontSize);
+      const highlightColorHex = sanitizeHexColor(message && message.highlightColorHex, AI_TEXT_HIGHLIGHT_DEFAULT_COLOR);
+      const textColorHex = sanitizeHexColor(message && message.textColorHex, colorSnapshot.hex);
+      const decorationScale = sanitizeTextHighlightDecorationScale(
+        message && message.decorationScale,
+        buildTextHighlightAutoDecorationScale(fontSize, "strike", lineHeight)
+      );
+      const strikeCapRadius = sanitizeTextHighlightRadius(
+        message && message.strikeCapRadius,
+        AI_TEXT_HIGHLIGHT_DEFAULT_STRIKE_RADIUS
+      );
+
+      if (!parent) {
+        throw new Error("하이라이트를 만들 부모 레이어를 찾지 못했습니다.");
+      }
+
+      postTextHighlightStatus("running", "취소선형 하이라이트 라인을 만드는 중입니다.");
+
+      const measurement = await measureTextHighlightBounds(range.node, range.start, range.end, textColorHex);
+      let boundsList = getTextHighlightMeasurementBoundsList(measurement);
+      if (!boundsList.length) {
+        throw new Error("선택한 텍스트 범위를 정확히 측정하지 못했습니다. 다시 드래그한 뒤 시도해 주세요.");
+      }
+      if (hasMergedTextHighlightBlockBounds(boundsList, measurement.fontSize)) {
+        boundsList = splitMergedTextHighlightBlockBounds(
+          boundsList,
+          measurement.fontSize,
+          measurement.lineHeight
+        );
+      }
+      boundsList = normalizeTextHighlightBoundsListForApply(
+        range.node,
+        range.start,
+        range.end,
+        boundsList,
+        measurement.fontSize,
+        measurement.lineHeight
+      );
+      if (!boundsList.length) {
+        throw new Error("선택한 텍스트 범위의 위치를 안전하게 계산하지 못했습니다. 다시 드래그한 뒤 시도해 주세요.");
+      }
+
+      clearTextHighlightDecoration(range.node, range.start, range.end);
+      await applyTextHighlightColor(range.node, range.start, range.end, textColorHex);
+
+      const container = prepareTextHighlightLayerContainer(parent, range.node);
+      const highlightParent = container.parent;
+      const nodeIndex = container.nodeIndex;
+      const anchorNodeId = container.anchorNodeId || range.node.id;
+      const rects = [];
+      const thickness = buildTextHighlightDecorationThickness(measurement.fontSize, "strike", decorationScale);
+      for (let index = 0; index < boundsList.length; index += 1) {
+        const rect = createTextHighlightStrikeRect(
+          range.node,
+          highlightParent,
+          boundsList[index],
+          measurement.fontSize,
+          thickness,
+          highlightColorHex,
+          strikeCapRadius
+        );
+        rect.name = boundsList.length > 1 ? `Strike Highlight ${index + 1}` : "Strike Highlight";
+        placeTextHighlightRectBehindNode(highlightParent, rect, anchorNodeId, nodeIndex >= 0 ? nodeIndex + index : -1);
+        rects.push(rect);
+      }
+      finalizeTextHighlightLayerContainer(highlightParent, range.node, container);
+
+      const group = groupTextHighlightSelection(highlightParent, range.node, rects, nodeIndex, container);
+
+      figma.ui.postMessage({
+        type: "ai-text-highlight-result",
+        result: {
+          groupId: group.id,
+          groupName: group.name,
+          nodeId: range.node.id,
+          selectionLabel: safeName(range.node),
+          textPreview: compactText(range.text) || previewText(range.text, 72),
+          highlightColorHex,
+          textColorHex,
+          rectCount: rects.length,
+          mode: "strike",
+        },
+      });
+      figma.notify("취소선형 텍스트 하이라이트를 만들었습니다.", { timeout: 2200 });
+    } catch (error) {
+      const messageText = normalizeErrorMessage(error, "텍스트 하이라이트를 적용하지 못했습니다.");
+      figma.ui.postMessage({
+        type: "ai-text-highlight-error",
+        message: messageText,
+      });
+      figma.notify(messageText, { error: true, timeout: 2200 });
+    }
+  }
+
+  async function runTextHighlightNative(message, highlightMode) {
+    try {
+      const resolvedMode = highlightMode === "strike" ? "strike" : "line";
+      const range = await resolveTextHighlightRange(message);
+      const colorSnapshot = extractTextRangeColorSnapshot(range.node, range.start, range.end);
+      const highlightColorHex = sanitizeHexColor(message && message.highlightColorHex, AI_TEXT_HIGHLIGHT_DEFAULT_COLOR);
+      const textColorHex = sanitizeHexColor(message && message.textColorHex, colorSnapshot.hex);
+      const decorationScale = sanitizeTextHighlightDecorationScale(
+        message && message.decorationScale,
+        AI_TEXT_HIGHLIGHT_DEFAULT_DECORATION_SCALE
+      );
+
+      postTextHighlightStatus("running", "텍스트 하이라이트를 적용하는 중입니다.");
+      await applyTextHighlightDecoration(range.node, range.start, range.end, highlightColorHex, resolvedMode, decorationScale);
+      await applyTextHighlightColor(range.node, range.start, range.end, textColorHex);
+      figma.currentPage.selection = [range.node];
+      figma.viewport.scrollAndZoomIntoView([range.node]);
+
+      figma.ui.postMessage({
+        type: "ai-text-highlight-result",
+        result: {
+          groupId: "",
+          groupName: "",
+          nodeId: range.node.id,
+          selectionLabel: safeName(range.node),
+          textPreview: compactText(range.text) || previewText(range.text, 72),
+          highlightColorHex,
+          textColorHex,
+          mode: resolvedMode,
+        },
+      });
+      figma.notify(
+        resolvedMode === "strike" ? "취소선형 텍스트 하이라이트를 적용했습니다." : "라인형 텍스트 하이라이트를 적용했습니다.",
+        { timeout: 2200 }
+      );
+    } catch (error) {
+      const messageText = normalizeErrorMessage(error, "텍스트 하이라이트를 적용하지 못했습니다.");
+      figma.ui.postMessage({
+        type: "ai-text-highlight-error",
+        message: messageText,
+      });
+      figma.notify(messageText, { error: true, timeout: 2200 });
+    }
+  }
+
+  function clearTextHighlightDecoration(node, start, end) {
+    if (!node || typeof node.setRangeTextDecoration !== "function") {
+      return;
+    }
+
+    try {
+      node.setRangeTextDecoration(start, end, "NONE");
+    } catch (error) {}
+  }
+
+  async function applyTextHighlightDecoration(node, start, end, highlightColorHex, highlightMode, decorationScale) {
+    if (!node || node.type !== "TEXT") {
+      throw new Error("텍스트 하이라이트를 적용할 텍스트 레이어를 찾지 못했습니다.");
+    }
+
+    if (typeof node.setRangeTextDecoration !== "function") {
+      throw new Error("현재 Figma 버전에서는 텍스트 데코 하이라이트를 지원하지 않습니다.");
+    }
+
+    try {
+      await loadFontsForTextNode(node);
+    } catch (error) {}
+
+    const fontSize = getTextRangeFontSize(node, start, end);
+    const resolvedMode = highlightMode === "strike" ? "strike" : "line";
+    const resolvedScale = sanitizeTextHighlightDecorationScale(decorationScale, AI_TEXT_HIGHLIGHT_DEFAULT_DECORATION_SCALE);
+    const thicknessValue = buildTextHighlightDecorationThickness(fontSize, resolvedMode, resolvedScale);
+    const offsetValue = buildTextHighlightDecorationOffset(fontSize, resolvedMode, resolvedScale, thicknessValue);
+    const decorationKind = resolvedMode === "strike" ? "STRIKETHROUGH" : "UNDERLINE";
+
+    node.setRangeTextDecoration(start, end, decorationKind);
+
+    if (typeof node.setRangeTextDecorationStyle === "function") {
+      try {
+        node.setRangeTextDecorationStyle(start, end, "SOLID");
+      } catch (error) {}
+    }
+
+    if (typeof node.setRangeTextDecorationColor === "function") {
+      try {
+        node.setRangeTextDecorationColor(start, end, {
+          value: createSolidPaint(highlightColorHex),
+        });
+      } catch (error) {}
+    }
+
+    if (typeof node.setRangeTextDecorationSkipInk === "function") {
+      try {
+        node.setRangeTextDecorationSkipInk(start, end, false);
+      } catch (error) {}
+    }
+
+    if (typeof node.setRangeTextDecorationThickness === "function") {
+      try {
+        node.setRangeTextDecorationThickness(start, end, {
+          unit: "PIXELS",
+          value: thicknessValue,
+        });
+      } catch (error) {}
+    }
+
+    if (typeof node.setRangeTextDecorationOffset === "function") {
+      try {
+        node.setRangeTextDecorationOffset(start, end, {
+          unit: "PIXELS",
+          value: offsetValue,
+        });
+      } catch (error) {}
+    }
+  }
+
+  function buildTextHighlightDecorationThickness(fontSize, highlightMode, decorationScale) {
+    const size = Math.max(12, Number(fontSize) || 16);
+    const scale = sanitizeTextHighlightDecorationScale(decorationScale, AI_TEXT_HIGHLIGHT_DEFAULT_DECORATION_SCALE);
+    if (highlightMode === "strike") {
+      return roundTextHighlightThickness(Math.max(3, Math.min(size * 1.45, size * 0.22 * scale)));
+    }
+    return roundTextHighlightThickness(Math.max(2, Math.min(36, size * 0.1 * scale)));
+  }
+
+  function buildTextHighlightAutoDecorationScale(fontSize, highlightMode, lineHeight) {
+    const size = Math.max(12, Number(fontSize) || 16);
+    const mode = highlightMode === "line" ? "line" : "strike";
+    const baseThickness = buildTextHighlightDecorationThickness(size, mode, 1);
+    if (mode === "strike") {
+      const targetThickness = buildTextHighlightMinimumBoxThickness(size, lineHeight);
+      return Math.max(1, Math.min(10, Math.ceil(targetThickness / Math.max(1, baseThickness))));
+    }
+
+    const targetThickness = Math.max(2, Math.min(14, size * 0.1));
+    return sanitizeTextHighlightDecorationScale(
+      targetThickness / Math.max(1, baseThickness),
+      AI_TEXT_HIGHLIGHT_DEFAULT_DECORATION_SCALE
+    );
+  }
+
+  function buildTextHighlightMinimumBoxThickness(fontSize, lineHeight) {
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    return ceilTextHighlightThickness(Math.max(size * 0.78, Math.min(resolvedLineHeight, size)));
+  }
+
+  function buildTextHighlightDecorationOffset(fontSize, highlightMode, decorationScale, thicknessValue) {
+    const size = Math.max(12, Number(fontSize) || 16);
+    if (highlightMode === "strike") {
+      return roundTextHighlightMetric(0);
+    }
+
+    const scale = sanitizeTextHighlightDecorationScale(decorationScale, AI_TEXT_HIGHLIGHT_DEFAULT_DECORATION_SCALE);
+    const thickness =
+      Number(thicknessValue) > 0
+        ? Number(thicknessValue)
+        : buildTextHighlightDecorationThickness(size, highlightMode, scale);
+    const baseThickness = buildTextHighlightDecorationThickness(size, highlightMode, 1);
+    const baseCenterOffset = Math.max(3, Math.min(14, size * 0.2));
+    const fixedBottomOffset = baseCenterOffset + baseThickness / 2;
+    const centeredOffset = fixedBottomOffset - thickness / 2;
+    return roundTextHighlightMetric(Math.max(-size * 0.35, Math.min(baseCenterOffset, centeredOffset)));
+  }
+
   function getManagedAnnotationCategoryColor() {
     return ANNOTATION_CATEGORY_COLOR;
   }
@@ -18057,6 +21371,14 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     });
   }
 
+  function postTextHighlightStatus(status, message) {
+    figma.ui.postMessage({
+      type: "ai-text-highlight-status",
+      status,
+      message,
+    });
+  }
+
   async function readDesignReadCache() {
     try {
       const value = await figma.clientStorage.getAsync(AI_DESIGN_READ_CACHE_KEY);
@@ -18099,6 +21421,14 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       return value && typeof value === "object" ? value : null;
     } catch (error) {
       return null;
+    }
+  }
+
+  async function readTranslateMemory() {
+    try {
+      return normalizeTranslateMemory(await figma.clientStorage.getAsync(AI_TRANSLATE_MEMORY_KEY));
+    } catch (error) {
+      return [];
     }
   }
 
@@ -18148,6 +21478,14 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     } catch (error) {}
 
     return result;
+  }
+
+  async function writeTranslateMemory(entries) {
+    const normalized = normalizeTranslateMemory(entries);
+    try {
+      await figma.clientStorage.setAsync(AI_TRANSLATE_MEMORY_KEY, normalized);
+    } catch (error) {}
+    return normalized;
   }
 
   function matchesCurrentSelection(result) {
@@ -18762,12 +22100,13 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return count;
   }
 
-  async function applyTypoAudit(designReadResult) {
+  async function applyTypoAudit(designReadResult, options) {
     const selection = Array.from(figma.currentPage.selection || []);
     if (!selection.length) {
       throw new Error("프레임, 그룹, 레이어를 먼저 선택하세요.");
     }
 
+    const auditProfile = normalizeTypoAuditProfile(options && options.auditProfile);
     const proofingSettings = await readProofingSettings();
     const context = buildSelectionContext(selection, designReadResult, proofingSettings);
     const textNodes = collectTextNodes(selection);
@@ -18775,7 +22114,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       throw new Error("텍스트 레이어가 포함된 선택을 먼저 선택하세요.");
     }
 
-    const issueResult = await buildTypoIssues(textNodes, context, proofingSettings);
+    const issueResult = await buildTypoIssues(textNodes, context, proofingSettings, { auditProfile });
     const issues = issueResult.issues.slice(0, 24);
     const annotationNodes = getAnnotatableTextNodes(textNodes);
     const annotationSupported = annotationNodes.length > 0;
@@ -18797,7 +22136,12 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
     return {
       version: PATCH_VERSION,
-      source: issueResult.strategy === "ai-primary" ? "ai-primary-annotation" : "local-fallback-annotation",
+      source:
+        issueResult.strategy === "ai-primary"
+          ? "ai-primary-annotation"
+          : issueResult.strategy === "speed-local"
+            ? "speed-local-annotation"
+            : "local-fallback-annotation",
       mode: auditUsesAnnotations ? "figma-dev-annotation" : "result-only",
       selectionSignature: getSelectionSignature(selection),
       processedAt: new Date().toISOString(),
@@ -18812,7 +22156,9 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         skippedCount: applied.skipped.length,
         mode: auditUsesAnnotations ? "figma-dev-annotation" : "result-only",
         modeLabel: auditUsesAnnotations ? "Figma Dev Mode 주석" : "결과 패널만",
-        reviewStrategy: issueResult.strategy === "ai-primary" ? "AI 우선 + 로컬 보완" : "로컬 fallback",
+        auditProfile,
+        auditProfileLabel: getTypoAuditProfileLabel(auditProfile),
+        reviewStrategy: getTypoAuditProfileStrategyLabel(auditProfile, issueResult.strategy),
         aiStatusLabel: issueResult.aiMeta ? issueResult.aiMeta.statusLabel : "AI 상태 미확인",
         aiProviderLabel: issueResult.aiMeta ? issueResult.aiMeta.providerLabel : "",
         aiModelLabel: issueResult.aiMeta ? issueResult.aiMeta.modelLabel : "",
@@ -18918,7 +22264,14 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     const applied = await applyTranslatedText(textNodes, translationResult.issues, proofingSettings, targetLanguage);
     const sourceLanguageLabel =
       context.languageHintLabel || context.detectedLanguageLabel || context.languageLabel || "자동 감지";
-    const insights = buildTranslateInsights(context, textNodes, applied, translationResult.aiMeta, targetLanguage);
+    const insights = buildTranslateInsights(
+      context,
+      textNodes,
+      applied,
+      translationResult.aiMeta,
+      targetLanguage,
+      translationResult.cacheStats
+    );
 
     return {
       version: PATCH_VERSION,
@@ -18933,6 +22286,9 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         translatedCount: applied.appliedCount,
         unchangedCount: applied.unchangedCount,
         skippedCount: applied.skipped.length,
+        reusedCount: translationResult.cacheStats ? translationResult.cacheStats.reusedCount : 0,
+        requestedTextCount: translationResult.cacheStats ? translationResult.cacheStats.requestedCount : textNodes.length,
+        uniqueRequestedTextCount: translationResult.cacheStats ? translationResult.cacheStats.uniqueRequestedCount : textNodes.length,
         sourceLanguageLabel,
         targetLanguageCode: targetLanguage.code,
         targetLanguageLabel: targetLanguage.label,
@@ -18978,6 +22334,70 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       };
     }
 
+    const translationMemoryMap = buildTranslateMemoryMap(await readTranslateMemory());
+    const pendingCandidateMap = new Map();
+    const pendingCandidates = [];
+    const issues = [];
+    let cachedCount = 0;
+    let requestedCount = 0;
+    let translationMemoryDirty = false;
+
+    for (const candidate of candidates) {
+      const currentText = normalizeLineEndings(candidate.currentText || "");
+      const memoryKey = buildTranslateMemoryKey(targetLanguage.code, currentText);
+      const cachedEntry = translationMemoryMap.get(memoryKey);
+      if (cachedEntry && cachedEntry.translatedText) {
+        const cachedSuggestion = normalizeLineEndings(cachedEntry.translatedText);
+        if (
+          cachedSuggestion &&
+          compactText(currentText) !== compactText(cachedSuggestion) &&
+          issueRespectsProofingTerms(currentText, cachedSuggestion, proofingSettings) &&
+          translationPreservesCriticalTokens(currentText, cachedSuggestion)
+        ) {
+          issues.push(
+            createIssue(
+              candidate.node,
+              currentText,
+              cachedSuggestion,
+              "번역",
+              cachedEntry.reason || "이전 AI 번역 결과를 다시 사용했습니다.",
+              "ai"
+            )
+          );
+          cachedCount += 1;
+          continue;
+        }
+      }
+
+      requestedCount += 1;
+      let bucket = pendingCandidateMap.get(memoryKey);
+      if (!bucket) {
+        bucket = {
+          id: candidate.id,
+          memoryKey,
+          node: candidate.node,
+          currentText,
+          text: currentText,
+          members: [],
+        };
+        pendingCandidateMap.set(memoryKey, bucket);
+        pendingCandidates.push(bucket);
+      }
+      bucket.members.push(candidate);
+    }
+
+    if (!pendingCandidates.length) {
+      return {
+        issues,
+        aiMeta: createAiMeta("success", runInfo.provider, runInfo.model, ""),
+        cacheStats: {
+          reusedCount: cachedCount,
+          requestedCount,
+          uniqueRequestedCount: 0,
+        },
+      };
+    }
+
     const schema = {
       type: "object",
       properties: {
@@ -18997,17 +22417,15 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       required: ["translations"],
     };
     const instructions =
-      "You translate UI copy for a Figma plugin screen. Translate each text node from the detected source language into the requested target language. Preserve product names, brand names, protectedTerms, URLs, emails, placeholders such as {{name}}, ${name}, {name}, printf tokens such as %s or %1$d, numbers, HTML-like tags, slash commands, and code-like identifiers exactly as they appear. Keep punctuation and line breaks whenever possible. Do not summarize, censor, add explanations, or rewrite the content beyond what is needed for a faithful UI translation. If a string is already in the target language or should stay unchanged, omit it. Return the full translated string in text. Return concise reasons in Korean when possible.";
-    const chunkSize = 24;
-    const chunkCount = Math.max(1, Math.ceil(candidates.length / chunkSize));
-    const issues = [];
+      "Translate each text node into the requested target language. Preserve product names, brand names, protectedTerms, URLs, emails, placeholders such as {{name}}, ${name}, {name}, printf tokens such as %s or %1$d, numbers, HTML-like tags, slash commands, and code-like identifiers exactly. Keep punctuation and line breaks whenever possible. Do not summarize, censor, or add explanations. Omit entries that should stay unchanged. Return short reasons in Korean when possible.";
+    const candidateChunks = buildTranslateChunks(pendingCandidates);
+    const chunkCount = Math.max(1, candidateChunks.length);
     let resolvedProvider = runInfo.provider;
     let resolvedModel = runInfo.model;
 
-    for (let start = 0; start < candidates.length; start += chunkSize) {
-      const chunk = candidates.slice(start, start + chunkSize);
-      const chunkIndex = Math.floor(start / chunkSize) + 1;
-      postTranslateStatus("running", `${targetLanguage.label}로 번역하는 중입니다. (${chunkIndex}/${chunkCount})`);
+    for (let chunkIndex = 0; chunkIndex < candidateChunks.length; chunkIndex += 1) {
+      const chunk = candidateChunks[chunkIndex];
+      postTranslateStatus("running", `${targetLanguage.label}로 번역하는 중입니다. (${chunkIndex + 1}/${chunkCount})`);
 
       const payload = {
         selectionLabel: context.selectionLabel,
@@ -19021,11 +22439,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         userDictionary: proofingSettings ? proofingSettings.userDictionary : [],
         textNodes: chunk.map((entry) => ({
           id: entry.id,
-          name: entry.name,
           text: entry.text,
-          lineCount: countTextLines(entry.text),
-          lines: String(entry.text || "").split(/\r?\n/),
-          scriptFamilies: getActiveScriptFamilies(entry.text),
         })),
       };
 
@@ -19072,7 +22486,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         }
 
         const candidate = candidateMap.get(row.id);
-        if (!candidate || !candidate.node) {
+        if (!candidate || !Array.isArray(candidate.members) || !candidate.members.length) {
           continue;
         }
 
@@ -19103,10 +22517,203 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       }
     }
 
+    for (const issue of issues) {
+      if (!issue) {
+        continue;
+      }
+      upsertTranslateMemoryEntry(
+        translationMemoryMap,
+        targetLanguage.code,
+        normalizeLineEndings(issue.currentText || ""),
+        normalizeLineEndings(issue.suggestion || ""),
+        typeof issue.reason === "string" ? issue.reason : ""
+      );
+      translationMemoryDirty = true;
+    }
+
+    if (translationMemoryDirty) {
+      await writeTranslateMemory(collectTranslateMemoryEntries(translationMemoryMap));
+    }
+
     return {
-      issues,
+      issues: expandTranslateIssuesForDuplicateCandidates(issues, pendingCandidates),
       aiMeta: createAiMeta("success", resolvedProvider, resolvedModel, ""),
+      cacheStats: {
+        reusedCount: cachedCount,
+        requestedCount,
+        uniqueRequestedCount: pendingCandidates.length,
+      },
     };
+  }
+
+  function buildTranslateChunks(candidates) {
+    const chunks = [];
+    let currentChunk = [];
+    let currentChars = 0;
+
+    for (const candidate of Array.isArray(candidates) ? candidates : []) {
+      if (!candidate) {
+        continue;
+      }
+
+      const nextChars = currentChars + String(candidate.text || "").length;
+      const exceedsItemLimit = currentChunk.length >= AI_TRANSLATE_MAX_CHUNK_ITEMS;
+      const exceedsCharLimit = currentChunk.length > 0 && nextChars > AI_TRANSLATE_MAX_CHUNK_CHARS;
+
+      if (exceedsItemLimit || exceedsCharLimit) {
+        chunks.push(currentChunk);
+        currentChunk = [];
+        currentChars = 0;
+      }
+
+      currentChunk.push(candidate);
+      currentChars += String(candidate.text || "").length;
+    }
+
+    if (currentChunk.length > 0) {
+      chunks.push(currentChunk);
+    }
+
+    return chunks;
+  }
+
+  function buildTranslateMemoryMap(entries) {
+    const map = new Map();
+    for (const entry of normalizeTranslateMemory(entries)) {
+      map.set(entry.key, entry);
+    }
+    return map;
+  }
+
+  function collectTranslateMemoryEntries(memoryMap) {
+    const entries = [];
+    if (!memoryMap || typeof memoryMap.values !== "function") {
+      return entries;
+    }
+
+    for (const entry of memoryMap.values()) {
+      entries.push(entry);
+    }
+
+    return normalizeTranslateMemory(entries);
+  }
+
+  function normalizeTranslateMemory(entries) {
+    const source =
+      Array.isArray(entries)
+        ? entries
+        : entries && typeof entries === "object" && Array.isArray(entries.entries)
+          ? entries.entries
+          : [];
+    const normalized = [];
+    const seen = new Set();
+
+    for (const item of source) {
+      const entry = normalizeTranslateMemoryEntry(item);
+      if (!entry || seen.has(entry.key)) {
+        continue;
+      }
+      seen.add(entry.key);
+      normalized.push(entry);
+      if (normalized.length >= AI_TRANSLATE_MEMORY_LIMIT) {
+        break;
+      }
+    }
+
+    return normalized;
+  }
+
+  function normalizeTranslateMemoryEntry(value) {
+    const source = value && typeof value === "object" ? value : null;
+    if (!source) {
+      return null;
+    }
+
+    const targetLanguageCode = String(source.targetLanguageCode || "").trim();
+    const sourceText = normalizeLineEndings(source.sourceText || "");
+    const translatedText = normalizeLineEndings(source.translatedText || "");
+    if (!targetLanguageCode || !sourceText || !translatedText) {
+      return null;
+    }
+
+    return {
+      key: buildTranslateMemoryKey(targetLanguageCode, sourceText),
+      targetLanguageCode,
+      sourceText,
+      translatedText,
+      reason: typeof source.reason === "string" ? source.reason.trim() : "",
+      updatedAt:
+        typeof source.updatedAt === "string" && source.updatedAt.trim() ? source.updatedAt.trim() : new Date().toISOString(),
+    };
+  }
+
+  function buildTranslateMemoryKey(targetLanguageCode, sourceText) {
+    return `${String(targetLanguageCode || "").trim().toLowerCase()}::${normalizeLineEndings(sourceText || "")}`;
+  }
+
+  function upsertTranslateMemoryEntry(memoryMap, targetLanguageCode, sourceText, translatedText, reason) {
+    if (!memoryMap || typeof memoryMap.set !== "function") {
+      return;
+    }
+
+    const entry = normalizeTranslateMemoryEntry({
+      targetLanguageCode,
+      sourceText,
+      translatedText,
+      reason,
+      updatedAt: new Date().toISOString(),
+    });
+    if (!entry) {
+      return;
+    }
+
+    if (memoryMap.has(entry.key)) {
+      memoryMap.delete(entry.key);
+    }
+    memoryMap.set(entry.key, entry);
+  }
+
+  function expandTranslateIssuesForDuplicateCandidates(issues, pendingCandidates) {
+    const expanded = [];
+    const pendingByNodeId = new Map();
+
+    for (const candidate of Array.isArray(pendingCandidates) ? pendingCandidates : []) {
+      if (!candidate || !candidate.node || !candidate.node.id) {
+        continue;
+      }
+      pendingByNodeId.set(candidate.node.id, candidate);
+    }
+
+    for (const issue of Array.isArray(issues) ? issues : []) {
+      if (!issue || !issue.node || !issue.node.id) {
+        continue;
+      }
+
+      const candidate = pendingByNodeId.get(issue.node.id);
+      const members = candidate && Array.isArray(candidate.members) ? candidate.members : [];
+      if (!members.length) {
+        expanded.push(issue);
+        continue;
+      }
+
+      for (const member of members) {
+        if (!member || !member.node) {
+          continue;
+        }
+        expanded.push(
+          createIssue(
+            member.node,
+            issue.currentText,
+            issue.suggestion,
+            issue.kind || "번역",
+            issue.reason || "",
+            issue.source || "ai"
+          )
+        );
+      }
+    }
+
+    return expanded;
   }
 
   function buildAiTranslateCandidates(textNodes, proofingSettings) {
@@ -19171,6 +22778,8 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
       issuesByNode.set(issue.node.id, issue);
     }
+
+    await preloadFontsForTextNodes(textNodes, issuesByNode);
 
     for (const node of textNodes) {
       const currentText = getTextValue(node);
@@ -19306,7 +22915,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return normalizeTermList(tokens);
   }
 
-  function buildTranslateInsights(context, textNodes, applied, aiMeta, targetLanguage) {
+  function buildTranslateInsights(context, textNodes, applied, aiMeta, targetLanguage, cacheStats) {
     const sourceLanguageLabel =
       context.languageHintLabel || context.detectedLanguageLabel || context.languageLabel || "자동 감지";
     const insights = [
@@ -19323,6 +22932,14 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
     if (applied.skipped.length > 0) {
       insights.push(`안전 검사로 건너뜀 ${applied.skipped.length}개`);
+    }
+
+    if (cacheStats && cacheStats.reusedCount > 0) {
+      insights.push(`재사용 캐시 ${cacheStats.reusedCount}개`);
+    }
+
+    if (cacheStats && cacheStats.requestedCount > 0 && cacheStats.uniqueRequestedCount > 0) {
+      insights.push(`AI 요청 ${cacheStats.requestedCount}개 -> 중복 제거 후 ${cacheStats.uniqueRequestedCount}개`);
     }
 
     if (aiMeta && aiMeta.statusLabel) {
@@ -19940,7 +23557,72 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
     const fontNames = collectEditableFontNames(node);
     for (const fontName of fontNames) {
-      await figma.loadFontAsync(fontName);
+      await loadFontWithCache(fontName);
+    }
+  }
+
+  async function preloadFontsForTextNodes(textNodes, issuesByNode) {
+    const fontNames = [];
+    const seen = new Set();
+
+    for (const node of Array.isArray(textNodes) ? textNodes : []) {
+      if (!node || !node.id) {
+        continue;
+      }
+      if (issuesByNode && !issuesByNode.has(node.id)) {
+        continue;
+      }
+
+      const editableFontNames = collectEditableFontNames(node);
+      for (const fontName of editableFontNames) {
+        const key = getFontCacheKey(fontName);
+        if (!key || seen.has(key)) {
+          continue;
+        }
+
+        seen.add(key);
+        fontNames.push({
+          family: fontName.family,
+          style: fontName.style,
+        });
+      }
+    }
+
+    for (const fontName of fontNames) {
+      await loadFontWithCache(fontName);
+    }
+  }
+
+  function getFontCacheKey(fontName) {
+    if (!fontName || typeof fontName !== "object") {
+      return "";
+    }
+    if (typeof fontName.family !== "string" || typeof fontName.style !== "string") {
+      return "";
+    }
+    return `${fontName.family}::${fontName.style}`;
+  }
+
+  async function loadFontWithCache(fontName) {
+    const key = getFontCacheKey(fontName);
+    if (!key) {
+      return;
+    }
+
+    let pending = loadedFontPromiseCache.get(key);
+    if (!pending) {
+      pending = figma.loadFontAsync({
+        family: fontName.family,
+        style: fontName.style,
+      });
+      loadedFontPromiseCache.set(key, pending);
+    }
+
+    try {
+      await pending;
+    } catch (error) {
+      loadedFontPromiseCache.delete(key);
+      throw error;
     }
   }
 
@@ -20547,11 +24229,13 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return String(value || "").replace(/\s+/g, "");
   }
 
-  async function buildTypoIssues(textNodes, context, proofingSettings) {
+  async function buildTypoIssues(textNodes, context, proofingSettings, options) {
     const issues = [];
     const seen = new Set();
     let aiError = "";
-    const aiPromise = requestAiTypoIssues(textNodes, context, proofingSettings);
+    const auditProfile = normalizeTypoAuditProfile(options && options.auditProfile);
+    const useSpeedProfile = auditProfile === "speed";
+    const aiPromise = useSpeedProfile ? null : requestAiTypoIssues(textNodes, context, proofingSettings);
     const localIssues = [];
 
     for (const node of textNodes) {
@@ -20574,10 +24258,16 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       }
     }
 
-    const aiResult = await aiPromise;
+    const aiResult = aiPromise
+      ? await aiPromise
+      : {
+          issues: [],
+          aiError: "",
+          aiMeta: createAiMeta("local-only", "", "", "속도용 검수는 AI 호출 없이 로컬 규칙만 사용합니다."),
+        };
     aiResult.issues = filterIssuesForProofing(aiResult.issues, proofingSettings);
     aiError = aiResult.aiError || "";
-    const useAiPrimary = Array.isArray(aiResult.issues) && aiResult.issues.length > 0;
+    const useAiPrimary = !useSpeedProfile && Array.isArray(aiResult.issues) && aiResult.issues.length > 0;
     const primaryIssues = useAiPrimary ? aiResult.issues : localIssues;
     const secondaryIssues = useAiPrimary ? localIssues : [];
 
@@ -20592,7 +24282,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return {
       issues: mergeIssuesByNode(issues),
       aiError,
-      strategy: useAiPrimary ? "ai-primary" : "local-fallback",
+      strategy: useSpeedProfile ? "speed-local" : useAiPrimary ? "ai-primary" : "local-fallback",
       aiMeta: aiResult.aiMeta || createAiMeta("unknown", "", "", ""),
     };
   }
@@ -21029,6 +24719,8 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       statusLabel = "AI 설정 없음";
     } else if (normalizedStatus === "skipped") {
       statusLabel = "AI 호출 건너뜀";
+    } else if (normalizedStatus === "local-only") {
+      statusLabel = "AI 호출 안 함";
     } else if (normalizedStatus === "unavailable") {
       statusLabel = "AI helper 없음";
     }
@@ -22138,6 +25830,3207 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
   }
 
+  function prepareTextHighlightSource() {
+    const range = resolveSelectedTextHighlightRange();
+    const colorSnapshot = extractTextRangeColorSnapshot(range.node, range.start, range.end);
+    const fontSize = getTextRangeFontSize(range.node, range.start, range.end);
+    const lineHeight = getTextRangeLineHeight(range.node, range.start, range.end, fontSize);
+
+    return {
+      nodeId: range.node.id,
+      nodeName: safeName(range.node),
+      selectionLabel: safeName(range.node),
+      start: range.start,
+      end: range.end,
+      text: range.text,
+      textPreview: compactText(range.text) || previewText(range.text, 72),
+      fontSize,
+      lineHeight,
+      textColorHex: colorSnapshot.hex,
+      highlightColorHex: AI_TEXT_HIGHLIGHT_DEFAULT_COLOR,
+      cornerRadius: sanitizeTextHighlightRadius(
+        AI_TEXT_HIGHLIGHT_DEFAULT_RADIUS,
+        AI_TEXT_HIGHLIGHT_DEFAULT_RADIUS
+      ),
+      decorationScale: AI_TEXT_HIGHLIGHT_DEFAULT_BOX_PADDING_PX,
+      lineDecorationScale: buildTextHighlightAutoDecorationScale(fontSize, "line", lineHeight),
+      strikeCapRadius: sanitizeTextHighlightRadius(
+        AI_TEXT_HIGHLIGHT_DEFAULT_STRIKE_RADIUS,
+        AI_TEXT_HIGHLIGHT_DEFAULT_STRIKE_RADIUS
+      ),
+      hasMixedTextColor: colorSnapshot.mixed === true,
+    };
+  }
+
+  function requestTextHighlightAlphaBounds(payload) {
+    return new Promise((resolve, reject) => {
+      const requestId = `text-highlight-alpha-${Date.now()}-${(textHighlightMeasureRequestSequence += 1)}`;
+      const timeoutId = setTimeout(() => {
+        pendingTextHighlightMeasureRequests.delete(requestId);
+        reject(new Error("Text highlight measurement timed out."));
+      }, 15000);
+
+      pendingTextHighlightMeasureRequests.set(requestId, {
+        resolve,
+        reject,
+        timeoutId,
+      });
+
+      figma.ui.postMessage({
+        type: "measure-ai-text-highlight-alpha-bounds",
+        requestId,
+        payload,
+      });
+    });
+  }
+
+  function resolveTextHighlightAlphaBounds(message) {
+    const requestId = message && typeof message.requestId === "string" ? message.requestId : "";
+    if (!requestId || !pendingTextHighlightMeasureRequests.has(requestId)) {
+      return;
+    }
+
+    const pending = pendingTextHighlightMeasureRequests.get(requestId);
+    pendingTextHighlightMeasureRequests.delete(requestId);
+    if (pending && pending.timeoutId) {
+      clearTimeout(pending.timeoutId);
+    }
+
+    if (!pending) {
+      return;
+    }
+
+    if (message && typeof message.error === "string" && message.error) {
+      pending.reject(new Error(message.error));
+      return;
+    }
+
+    const bounds = message && message.bounds && typeof message.bounds === "object" ? message.bounds : null;
+    const segments = message && Array.isArray(message.segments) ? message.segments : [];
+    if (!bounds && !segments.length) {
+      pending.resolve(null);
+      return;
+    }
+
+    pending.resolve({
+      bounds,
+      segments,
+    });
+  }
+
+  async function resolveTextHighlightRange(message) {
+    const hasExplicitRange =
+      message &&
+      typeof message.nodeId === "string" &&
+      message.nodeId &&
+      Number.isFinite(Number(message.start)) &&
+      Number.isFinite(Number(message.end));
+
+    if (!hasExplicitRange) {
+      const liveRange = tryResolveLiveSelectedTextHighlightRange(message);
+      if (liveRange) {
+        return liveRange;
+      }
+      return resolveSelectedTextHighlightRange();
+    }
+
+    const node =
+      typeof figma.getNodeByIdAsync === "function"
+        ? await figma.getNodeByIdAsync(message.nodeId)
+        : typeof figma.getNodeById === "function"
+          ? figma.getNodeById(message.nodeId)
+          : null;
+    if (!node || node.removed || node.type !== "TEXT") {
+      throw new Error("선택한 텍스트 레이어를 다시 찾지 못했습니다. 다시 드래그한 뒤 시도해 주세요.");
+    }
+
+    const characters = typeof node.characters === "string" ? node.characters : "";
+    const start = Math.max(0, Math.floor(Number(message.start) || 0));
+    const end = Math.max(start, Math.min(characters.length, Math.floor(Number(message.end) || 0)));
+    const text = normalizeLineEndings(characters.slice(start, end));
+    const sourceText = normalizeLineEndings(message && typeof message.sourceText === "string" ? message.sourceText : "");
+    if (end <= start || !compactText(text)) {
+      throw new Error("하이라이트할 텍스트 범위를 먼저 드래그해 주세요.");
+    }
+
+    if (sourceText && compactText(sourceText) && text !== sourceText) {
+      const liveRange = tryResolveLiveSelectedTextHighlightRange(message);
+      if (liveRange && liveRange.text === sourceText) {
+        return liveRange;
+      }
+    }
+
+    return {
+      node,
+      start,
+      end,
+      text,
+    };
+  }
+
+  function tryResolveLiveSelectedTextHighlightRange(message) {
+    const page = figma.currentPage;
+    const selectedTextRange = page && "selectedTextRange" in page ? page.selectedTextRange : null;
+    if (!selectedTextRange || !selectedTextRange.node || selectedTextRange.node.removed || selectedTextRange.node.type !== "TEXT") {
+      return null;
+    }
+
+    const characters = typeof selectedTextRange.node.characters === "string" ? selectedTextRange.node.characters : "";
+    const start = Math.max(0, Math.floor(Number(selectedTextRange.start) || 0));
+    const end = Math.max(start, Math.min(characters.length, Math.floor(Number(selectedTextRange.end) || 0)));
+    const text = normalizeLineEndings(characters.slice(start, end));
+    if (end <= start || !compactText(text)) {
+      return null;
+    }
+
+    if (message && typeof message.nodeId === "string" && message.nodeId && message.nodeId !== selectedTextRange.node.id) {
+      return null;
+    }
+
+    return {
+      node: selectedTextRange.node,
+      start,
+      end,
+      text,
+    };
+  }
+
+  function resolveSelectedTextHighlightRange() {
+    const page = figma.currentPage;
+    const selectedTextRange = page && "selectedTextRange" in page ? page.selectedTextRange : null;
+    if (!selectedTextRange || !selectedTextRange.node || selectedTextRange.node.removed || selectedTextRange.node.type !== "TEXT") {
+      throw new Error("하이라이트할 텍스트를 Figma에서 드래그한 뒤 다시 시도해 주세요.");
+    }
+
+    const characters = typeof selectedTextRange.node.characters === "string" ? selectedTextRange.node.characters : "";
+    const start = Math.max(0, Math.floor(Number(selectedTextRange.start) || 0));
+    const end = Math.max(start, Math.min(characters.length, Math.floor(Number(selectedTextRange.end) || 0)));
+    const text = normalizeLineEndings(characters.slice(start, end));
+    if (end <= start || !compactText(text)) {
+      throw new Error("하이라이트할 텍스트 범위를 먼저 드래그해 주세요.");
+    }
+
+    return {
+      node: selectedTextRange.node,
+      start,
+      end,
+      text,
+    };
+  }
+
+  function isWholeTextHighlightRange(node, start, end) {
+    const characters = node && typeof node.characters === "string" ? node.characters : "";
+    const characterCount = characters.length;
+    if (!(characterCount > 0)) {
+      return false;
+    }
+
+    const rangeStart = Math.max(0, Math.floor(Number(start) || 0));
+    const rangeEnd = Math.max(rangeStart, Math.min(characterCount, Math.floor(Number(end) || 0)));
+    return rangeStart <= 0 && rangeEnd >= characterCount;
+  }
+
+  function extractTextRangeColorSnapshot(node, start, end) {
+    const fallbackHex = AI_TEXT_HIGHLIGHT_DEFAULT_TEXT_COLOR;
+    const segments = getTextHighlightStyledSegments(node, start, end, ["fills"]);
+    const seen = {};
+    let firstHex = "";
+    let uniqueCount = 0;
+
+    for (const segment of segments) {
+      const hex = extractVisibleSolidPaintHex(segment && segment.fills);
+      if (!hex) {
+        continue;
+      }
+
+      if (!firstHex) {
+        firstHex = hex;
+      }
+      if (!seen[hex]) {
+        seen[hex] = true;
+        uniqueCount += 1;
+      }
+    }
+
+    if (firstHex) {
+      return {
+        hex: firstHex,
+        mixed: uniqueCount > 1,
+      };
+    }
+
+    const rangeHex = extractVisibleSolidPaintHex(getTextHighlightPaints(node, start, end));
+    if (rangeHex) {
+      return {
+        hex: rangeHex,
+        mixed: false,
+      };
+    }
+
+    const singleCharHex = extractVisibleSolidPaintHex(getTextHighlightPaints(node, start, Math.min(end, start + 1)));
+    if (singleCharHex) {
+      return {
+        hex: singleCharHex,
+        mixed: false,
+      };
+    }
+
+    const nodeHex = extractVisibleSolidPaintHex(node && node.fills);
+    return {
+      hex: nodeHex || fallbackHex,
+      mixed: false,
+    };
+  }
+
+  async function measureTextHighlightBounds(node, start, end, textColorHex) {
+    const characters = node && typeof node.characters === "string" ? node.characters : "";
+    const characterCount = characters.length;
+    const rangeStart = Math.max(0, Math.min(characterCount, Math.floor(Number(start) || 0)));
+    const rangeEnd = Math.max(rangeStart, Math.min(characterCount, Math.floor(Number(end) || 0)));
+    const fontSize = getTextRangeFontSize(node, rangeStart, rangeEnd);
+    const lineHeight = getTextRangeLineHeight(node, rangeStart, rangeEnd, fontSize);
+    const selectedText = characters.slice(rangeStart, rangeEnd);
+    const isPartialSingleLineSelection =
+      !!selectedText &&
+      !/[\r\n]/.test(selectedText) &&
+      !isWholeTextHighlightRange(node, rangeStart, rangeEnd);
+    const directMeasurement = await measureExactTextHighlightBounds(
+      node,
+      rangeStart,
+      rangeEnd,
+      textColorHex,
+      fontSize,
+      lineHeight
+    );
+    const directBoundsList = getTextHighlightMeasurementBoundsList(directMeasurement);
+    if (
+      directBoundsList.length &&
+      !hasSuspiciousTextHighlightDirectBounds(node, directBoundsList, rangeStart, rangeEnd, fontSize, lineHeight)
+    ) {
+      return {
+        bounds: mergeTextHighlightBoundsList(directBoundsList),
+        boundsList: directBoundsList,
+        segments: directBoundsList.slice(),
+        fontSize,
+        lineHeight,
+      };
+    }
+
+    const underlineGeometryMeasurement = await measureTextHighlightUnderlineGeometryBounds(
+      node,
+      rangeStart,
+      rangeEnd,
+      fontSize,
+      lineHeight
+    );
+    const underlineGeometryBoundsList = getTextHighlightMeasurementBoundsList(underlineGeometryMeasurement);
+    if (underlineGeometryBoundsList.length) {
+      const glyphAwareBoundsList = await refineTextHighlightBoundsWithGlyphBounds(
+        node,
+        rangeStart,
+        rangeEnd,
+        textColorHex,
+        fontSize,
+        lineHeight,
+        underlineGeometryBoundsList
+      );
+      if (glyphAwareBoundsList.length) {
+        return {
+          bounds: mergeTextHighlightBoundsList(glyphAwareBoundsList),
+          boundsList: glyphAwareBoundsList,
+          segments: glyphAwareBoundsList.slice(),
+          fontSize,
+          lineHeight,
+        };
+      }
+    }
+
+    const endMeasurement = await measureTextHighlightPrefixBounds(node, rangeEnd, textColorHex, fontSize, lineHeight);
+    const endBoundsList = Array.isArray(endMeasurement && endMeasurement.boundsList) ? endMeasurement.boundsList : [];
+    let boundsList = rangeStart > 0 ? [] : endBoundsList.slice();
+    let startMeasurement = null;
+
+    if (endBoundsList.length && rangeStart > 0) {
+      startMeasurement = await measureTextHighlightPrefixBounds(
+        node,
+        rangeStart,
+        textColorHex,
+        fontSize,
+        lineHeight
+      );
+      const startBoundsList = Array.isArray(startMeasurement && startMeasurement.boundsList)
+        ? startMeasurement.boundsList
+        : [];
+      if (startBoundsList.length) {
+        if (isPartialSingleLineSelection) {
+          boundsList = await buildTextHighlightSelectionRowsFromPrefixStart(
+            node,
+            rangeStart,
+            rangeEnd,
+            textColorHex,
+            fontSize,
+            lineHeight,
+            endBoundsList,
+            startBoundsList,
+            selectedText
+          );
+        }
+        if (!boundsList.length) {
+          boundsList = subtractTextHighlightPrefixBounds(endBoundsList, startBoundsList, fontSize, lineHeight);
+        }
+        if (!boundsList.length) {
+          boundsList = extractTrailingTextHighlightBounds(endBoundsList, startBoundsList, fontSize, lineHeight);
+        }
+      }
+    }
+
+    if (!boundsList.length) {
+      if (directBoundsList.length && !hasSuspiciousTextHighlightDirectBounds(node, directBoundsList, rangeStart, rangeEnd, fontSize, lineHeight)) {
+        boundsList = directBoundsList;
+      }
+    }
+
+    if (!boundsList.length && isPartialSingleLineSelection) {
+      throw new Error("Could not safely measure the selected text highlight range.");
+    }
+
+    if (!boundsList.length) {
+      boundsList = buildConservativeTextHighlightBounds(
+        node,
+        rangeStart,
+        rangeEnd,
+        fontSize,
+        lineHeight,
+        startMeasurement && startMeasurement.fallbackBounds,
+        endMeasurement && endMeasurement.fallbackBounds
+      );
+    }
+
+    if (!boundsList.length) {
+      boundsList = buildEmergencyTextHighlightBounds(node, rangeStart, rangeEnd, fontSize, lineHeight);
+    }
+
+    if (!boundsList.length) {
+      throw new Error("선택한 텍스트 범위의 렌더 영역을 찾지 못했습니다.");
+    }
+
+    boundsList = await constrainTextHighlightBoundsListToExactSelection(
+      node,
+      rangeStart,
+      rangeEnd,
+      textColorHex,
+      fontSize,
+      lineHeight,
+      boundsList,
+      endBoundsList
+    );
+    if (!boundsList.length) {
+      throw new Error("\uc120\ud0dd \ud14d\uc2a4\ud2b8 \ubc94\uc704\ub97c \uc548\uc804\ud558\uac8c \uce21\uc815\ud558\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4.");
+    }
+    if (isPartialSingleLineSelection && sortTextHighlightBoundsList(boundsList).length !== 1) {
+      throw new Error("Could not safely measure the selected text highlight range.");
+    }
+    if (hasOverwideTextHighlightSelectionRows(boundsList, selectedText, fontSize, lineHeight)) {
+      throw new Error("Could not safely measure the selected text highlight range.");
+    }
+
+    return {
+      bounds: mergeTextHighlightBoundsList(boundsList),
+      boundsList,
+      segments: boundsList.slice(),
+      fontSize,
+      lineHeight,
+    };
+  }
+
+  async function measureTextHighlightUnderlineGeometryBounds(node, start, end, fontSize, lineHeight) {
+    const characterCount = node && typeof node.characters === "string" ? node.characters.length : 0;
+    const rangeStart = Math.max(0, Math.min(characterCount, Math.floor(Number(start) || 0)));
+    const rangeEnd = Math.max(rangeStart, Math.min(characterCount, Math.floor(Number(end) || 0)));
+    if (!(rangeEnd > rangeStart) || !node || typeof node.clone !== "function" || typeof node.setRangeTextDecoration !== "function") {
+      return {
+        bounds: null,
+        boundsList: [],
+        segments: [],
+        fontSize,
+        lineHeight,
+      };
+    }
+
+    const clone = node.clone();
+    try {
+      if ("effects" in clone && Array.isArray(clone.effects)) {
+        clone.effects = [];
+      }
+      if ("strokes" in clone && Array.isArray(clone.strokes)) {
+        clone.strokes = [];
+      }
+      if ("opacity" in clone && typeof clone.opacity === "number") {
+        clone.opacity = 1;
+      }
+      if ("blendMode" in clone) {
+        clone.blendMode = "NORMAL";
+      }
+
+      try {
+        await loadFontsForTextNode(clone);
+      } catch (error) {}
+
+      clearTextHighlightDecoration(clone, 0, characterCount);
+      if (typeof clone.setRangeFills === "function") {
+        try {
+          clone.setRangeFills(0, characterCount, [createTransparentPaint()]);
+        } catch (error) {}
+      }
+      clone.setRangeTextDecoration(rangeStart, rangeEnd, "UNDERLINE");
+      if (typeof clone.setRangeTextDecorationStyle === "function") {
+        try {
+          clone.setRangeTextDecorationStyle(rangeStart, rangeEnd, "SOLID");
+        } catch (error) {}
+      }
+      if (typeof clone.setRangeTextDecorationColor === "function") {
+        try {
+          clone.setRangeTextDecorationColor(rangeStart, rangeEnd, {
+            value: createSolidPaint(AI_TEXT_HIGHLIGHT_MEASURE_COLOR),
+          });
+        } catch (error) {}
+      }
+      if (typeof clone.setRangeTextDecorationSkipInk === "function") {
+        try {
+          clone.setRangeTextDecorationSkipInk(rangeStart, rangeEnd, false);
+        } catch (error) {}
+      }
+
+      const underlineLocalBoundsList = await waitForTextHighlightUnderlineGeometryBounds(clone, fontSize, lineHeight);
+      const boundsList = underlineLocalBoundsList
+        .map((localBounds) => buildTextHighlightBoundsFromUnderlineLocalBounds(node, localBounds, fontSize, lineHeight))
+        .filter(Boolean);
+
+      return {
+        bounds: mergeTextHighlightBoundsList(boundsList),
+        boundsList,
+        segments: boundsList.slice(),
+        fontSize,
+        lineHeight,
+      };
+    } catch (error) {
+      return {
+        bounds: null,
+        boundsList: [],
+        segments: [],
+        fontSize,
+        lineHeight,
+      };
+    } finally {
+      if (clone && !clone.removed) {
+        clone.remove();
+      }
+    }
+  }
+
+  async function waitForTextHighlightUnderlineGeometryBounds(node, fontSize, lineHeight) {
+    const attempts = 10;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      const boundsList = getTextHighlightUnderlineGeometryLocalBounds(node, fontSize, lineHeight);
+      if (boundsList.length) {
+        return boundsList;
+      }
+      await waitForTextHighlightGeometryTick(attempt < 2 ? 1 : 16);
+    }
+
+    return [];
+  }
+
+  function waitForTextHighlightGeometryTick(ms) {
+    return new Promise((resolve) => {
+      setTimeout(resolve, Math.max(1, Math.floor(Number(ms) || 1)));
+    });
+  }
+
+  function getTextHighlightUnderlineGeometryLocalBounds(node, fontSize, lineHeight) {
+    const geometry = node && Array.isArray(node.fillGeometry) ? node.fillGeometry : [];
+    if (!geometry.length) {
+      return [];
+    }
+
+    const boundsList = [];
+    for (let index = 0; index < geometry.length; index += 1) {
+      const path = geometry[index];
+      const pathBoundsList = parseTextHighlightSvgPathBoundsList(path && path.data, fontSize, lineHeight);
+      for (const pathBounds of pathBoundsList) {
+        boundsList.push(pathBounds);
+      }
+    }
+
+    return mergeTextHighlightLocalBoundsByRows(boundsList, fontSize, lineHeight);
+  }
+
+  function mergeTextHighlightLocalBoundsByRows(boundsList, fontSize, lineHeight) {
+    const sortedBoundsList = sortTextHighlightBoundsList(boundsList);
+    if (sortedBoundsList.length < 2) {
+      return sortedBoundsList;
+    }
+
+    const rowTolerance = getTextHighlightRowTolerance(fontSize, lineHeight);
+    const rows = [];
+    for (const bounds of sortedBoundsList) {
+      const normalizedBounds = normalizeTextHighlightWorldBounds(bounds);
+      if (!normalizedBounds) {
+        continue;
+      }
+
+      let matchedRow = null;
+      for (const row of rows) {
+        if (doTextHighlightBoundsShareRow(row, normalizedBounds, rowTolerance)) {
+          matchedRow = row;
+          break;
+        }
+      }
+
+      if (!matchedRow) {
+        rows.push({
+          x: normalizedBounds.x,
+          y: normalizedBounds.y,
+          width: normalizedBounds.width,
+          height: normalizedBounds.height,
+        });
+        continue;
+      }
+
+      const minX = Math.min(matchedRow.x, normalizedBounds.x);
+      const minY = Math.min(matchedRow.y, normalizedBounds.y);
+      const maxX = Math.max(matchedRow.x + matchedRow.width, normalizedBounds.x + normalizedBounds.width);
+      const maxY = Math.max(matchedRow.y + matchedRow.height, normalizedBounds.y + normalizedBounds.height);
+      matchedRow.x = roundTextHighlightMetric(minX);
+      matchedRow.y = roundTextHighlightMetric(minY);
+      matchedRow.width = roundTextHighlightMetric(Math.max(1, maxX - minX));
+      matchedRow.height = roundTextHighlightMetric(Math.max(0.5, maxY - minY));
+    }
+
+    return sortTextHighlightBoundsList(rows);
+  }
+
+  function parseTextHighlightSvgPathBoundsList(pathData, fontSize, lineHeight) {
+    if (typeof pathData !== "string" || !pathData.trim()) {
+      return [];
+    }
+
+    const chunks = pathData
+      .split(/[zZ]/)
+      .map((chunk) => chunk.trim())
+      .filter(Boolean);
+    const boundsList = [];
+    for (const chunk of chunks) {
+      const bounds = parseTextHighlightSvgPathChunkBounds(chunk);
+      if (!bounds) {
+        continue;
+      }
+
+      const minimumWidth = getTextHighlightMinimumWidth(fontSize);
+      const minimumHeight = Math.max(0.5, Math.min(Math.max(1, Number(lineHeight) || 1), Math.max(1, Number(fontSize) || 12) * 0.2));
+      if (bounds.width < minimumWidth || bounds.height < minimumHeight * 0.05) {
+        continue;
+      }
+
+      boundsList.push(bounds);
+    }
+
+    return boundsList;
+  }
+
+  function parseTextHighlightSvgPathChunkBounds(pathChunk) {
+    const matches = String(pathChunk || "").match(/[-+]?(?:\d*\.\d+|\d+)(?:e[-+]?\d+)?/gi);
+    if (!matches || matches.length < 4) {
+      return null;
+    }
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (let index = 0; index + 1 < matches.length; index += 2) {
+      const x = Number(matches[index]);
+      const y = Number(matches[index + 1]);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        continue;
+      }
+
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+    }
+
+    if (!Number.isFinite(minX) || !Number.isFinite(minY) || maxX <= minX || maxY < minY) {
+      return null;
+    }
+
+    return {
+      x: roundTextHighlightMetric(minX),
+      y: roundTextHighlightMetric(minY),
+      width: roundTextHighlightMetric(Math.max(1, maxX - minX)),
+      height: roundTextHighlightMetric(Math.max(0.5, maxY - minY)),
+    };
+  }
+
+  function buildTextHighlightBoundsFromUnderlineLocalBounds(node, underlineLocalBounds, fontSize, lineHeight) {
+    const localBounds = normalizeTextHighlightWorldBounds(underlineLocalBounds);
+    if (!localBounds) {
+      return null;
+    }
+
+    const metrics = buildTextHighlightBoxGlyphMetrics(fontSize, lineHeight);
+    const underlineTop = localBounds.y;
+    const textTop = roundTextHighlightMetric(underlineTop - metrics.ascent);
+    const highlightLocalBounds = {
+      x: localBounds.x,
+      y: textTop,
+      width: localBounds.width,
+      height: metrics.height,
+    };
+
+    return getTextHighlightWorldBoundsFromLocalBounds(node, highlightLocalBounds);
+  }
+
+  function buildTextHighlightBoxGlyphMetrics(fontSize, lineHeight) {
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const ascent = Math.max(size * 0.82, Math.min(resolvedLineHeight * 0.74, size * 0.92));
+    const descent = Math.max(size * 0.14, Math.min(resolvedLineHeight * 0.18, size * 0.22));
+    return {
+      ascent: roundTextHighlightMetric(ascent),
+      descent: roundTextHighlightMetric(descent),
+      height: roundTextHighlightMetric(Math.max(1, ascent + descent)),
+    };
+  }
+
+  async function refineTextHighlightBoundsWithGlyphBounds(
+    node,
+    start,
+    end,
+    textColorHex,
+    fontSize,
+    lineHeight,
+    boundsList
+  ) {
+    const baseRows = sortTextHighlightBoundsList(boundsList);
+    if (!baseRows.length) {
+      return [];
+    }
+
+    let glyphMeasurement = null;
+    try {
+      glyphMeasurement = await measureExactTextHighlightBounds(node, start, end, textColorHex, fontSize, lineHeight);
+    } catch (error) {}
+
+    let glyphRows = getTextHighlightMeasurementBoundsList(glyphMeasurement);
+    if (hasMergedTextHighlightBlockBounds(glyphRows, fontSize)) {
+      glyphRows = splitMergedTextHighlightBlockBounds(glyphRows, fontSize, lineHeight);
+    }
+    glyphRows = filterTextHighlightGlyphBoundsRows(glyphRows, fontSize, lineHeight);
+    if (!glyphRows.length) {
+      return [];
+    }
+
+    const refinedRows = [];
+    const usedGlyphRows = {};
+    for (const baseRow of baseRows) {
+      const glyphRow = findTextHighlightGlyphBoundsForBaseRow(
+        baseRow,
+        glyphRows,
+        usedGlyphRows,
+        fontSize,
+        lineHeight
+      );
+      if (!glyphRow) {
+        continue;
+      }
+
+      const constrainedBaseRow = constrainTextHighlightBaseRowToGlyphRow(baseRow, glyphRow, fontSize);
+      refinedRows.push(expandTextHighlightBoundsToGlyphHeight(constrainedBaseRow, glyphRow, fontSize, lineHeight));
+    }
+
+    return refinedRows;
+  }
+
+  async function constrainTextHighlightBoundsListToExactSelection(
+    node,
+    start,
+    end,
+    textColorHex,
+    fontSize,
+    lineHeight,
+    boundsList,
+    endBoundsList
+  ) {
+    const rows = sortTextHighlightBoundsList(boundsList);
+    if (!rows.length || isWholeTextHighlightRange(node, start, end)) {
+      return rows;
+    }
+
+    const characters = node && typeof node.characters === "string" ? node.characters : "";
+    const characterCount = characters.length;
+    const rangeStart = Math.max(0, Math.min(characterCount, Math.floor(Number(start) || 0)));
+    const rangeEnd = Math.max(rangeStart, Math.min(characterCount, Math.floor(Number(end) || 0)));
+    const selectedText = characters.slice(rangeStart, rangeEnd);
+    if (!selectedText || /[\r\n]/.test(selectedText)) {
+      return rows;
+    }
+
+    let exactMeasurement = null;
+    try {
+      exactMeasurement = await measureExactTextHighlightBounds(
+        node,
+        rangeStart,
+        rangeEnd,
+        textColorHex,
+        fontSize,
+        lineHeight
+      );
+    } catch (error) {}
+
+    let exactRows = getTextHighlightMeasurementBoundsList(exactMeasurement);
+    if (hasMergedTextHighlightBlockBounds(exactRows, fontSize)) {
+      exactRows = splitMergedTextHighlightBlockBounds(exactRows, fontSize, lineHeight);
+    }
+    exactRows = filterTextHighlightGlyphBoundsRows(exactRows, fontSize, lineHeight).filter((row) =>
+      isReasonableTextHighlightSelectionRow(row, selectedText, fontSize)
+    );
+    if (!exactRows.length) {
+      return rows;
+    }
+
+    const refinedRows = [];
+    const usedExactRows = {};
+    for (const row of rows) {
+      const exactRow = findTextHighlightGlyphBoundsForBaseRow(
+        row,
+        exactRows,
+        usedExactRows,
+        fontSize,
+        lineHeight
+      );
+      if (!exactRow) {
+        continue;
+      }
+
+      const constrainedRow = constrainTextHighlightBaseRowToGlyphRow(row, exactRow, fontSize);
+      refinedRows.push(expandTextHighlightBoundsToGlyphHeight(constrainedRow, exactRow, fontSize, lineHeight));
+    }
+
+    if (refinedRows.length) {
+      return refinedRows;
+    }
+
+    return exactRows;
+  }
+
+  async function buildTextHighlightSelectionRowsFromPrefixEnd(
+    node,
+    start,
+    end,
+    textColorHex,
+    fontSize,
+    lineHeight,
+    rows,
+    endBoundsList,
+    selectedText
+  ) {
+    const candidateRows = sortTextHighlightBoundsList(rows);
+    if (!candidateRows.length) {
+      return [];
+    }
+
+    const referenceRows = sortTextHighlightBoundsList(endBoundsList && endBoundsList.length ? endBoundsList : candidateRows);
+    const targetRow = candidateRows[candidateRows.length - 1];
+    const referenceRow = findTextHighlightReferenceRowForTarget(targetRow, referenceRows, fontSize, lineHeight) || targetRow;
+    const selectedWidth = await measureTextHighlightSelectedWidth(
+      node,
+      start,
+      end,
+      textColorHex,
+      fontSize,
+      lineHeight,
+      selectedText,
+      referenceRow.width
+    );
+
+    if (!(selectedWidth > 0)) {
+      return [];
+    }
+
+    const minimumWidth = getTextHighlightMinimumWidth(fontSize);
+    const endRight = referenceRow.x + referenceRow.width;
+    const nextWidth = roundTextHighlightMetric(
+      Math.max(minimumWidth, Math.min(referenceRow.width, selectedWidth))
+    );
+    const nextX = roundTextHighlightMetric(Math.max(referenceRow.x, endRight - nextWidth));
+
+    return [
+      {
+        x: nextX,
+        y: targetRow.y,
+        width: nextWidth,
+        height: targetRow.height,
+      },
+    ];
+  }
+
+  async function buildTextHighlightSelectionRowsFromPrefixStart(
+    node,
+    start,
+    end,
+    textColorHex,
+    fontSize,
+    lineHeight,
+    endBoundsList,
+    startBoundsList,
+    selectedText
+  ) {
+    if (!selectedText || /[\r\n]/.test(selectedText)) {
+      return [];
+    }
+
+    const endRows = sortTextHighlightBoundsList(endBoundsList);
+    if (!endRows.length) {
+      return [];
+    }
+
+    const startRows = sortTextHighlightBoundsList(startBoundsList);
+    const targetRowIndex = endRows.length - 1;
+    const targetRow = endRows[targetRowIndex];
+    if (!targetRow) {
+      return [];
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const rowTolerance = getTextHighlightRowTolerance(fontSize, lineHeight);
+    const minimumWidth = getTextHighlightMinimumWidth(fontSize);
+    const endRight = targetRow.x + targetRow.width;
+    let startRight = -Infinity;
+
+    if ((Number(start) || 0) <= 0) {
+      startRight = targetRow.x;
+    } else if (startRows.length === endRows.length) {
+      startRight = findTextHighlightMatchedStartRight(
+        targetRow,
+        startRows,
+        rowTolerance,
+        fontSize,
+        lineHeight
+      );
+      if (!Number.isFinite(startRight)) {
+        startRight = findTextHighlightIndexMatchedStartRight(
+          targetRow,
+          startRows,
+          targetRowIndex,
+          fontSize,
+          lineHeight
+        );
+      }
+      if (Number.isFinite(startRight)) {
+        startRight += getTextHighlightWhitespaceAdvanceBeforeSelection(node, start, fontSize);
+      }
+    } else if (endRows.length === startRows.length + 1) {
+      startRight = targetRow.x;
+    }
+
+    if (!Number.isFinite(startRight)) {
+      return [];
+    }
+
+    const nodeBounds = normalizeTextHighlightWorldBounds(getNodeRenderBounds(node));
+    const maximumWidth =
+      nodeBounds && Number.isFinite(nodeBounds.width)
+        ? Math.max(targetRow.width, nodeBounds.width)
+        : Math.max(targetRow.width, endRight - startRight);
+    const selectedWidth = await measureTextHighlightSelectedWidth(
+      node,
+      start,
+      end,
+      textColorHex,
+      fontSize,
+      lineHeight,
+      selectedText,
+      maximumWidth
+    );
+    if (!(selectedWidth > 0)) {
+      return [];
+    }
+
+    const prefixWidth = endRight - startRight;
+    const trustPrefixWidth =
+      prefixWidth >= minimumWidth &&
+      prefixWidth <= Math.max(selectedWidth * 1.28, selectedWidth + size * 0.65);
+    const nextX = roundTextHighlightMetric(Math.max(targetRow.x, Math.min(startRight, endRight - minimumWidth)));
+    let nextWidth = trustPrefixWidth ? prefixWidth : selectedWidth;
+    if (nodeBounds) {
+      const maxRight = nodeBounds.x + nodeBounds.width + Math.max(1, size * 0.2);
+      nextWidth = Math.min(nextWidth, Math.max(minimumWidth, maxRight - nextX));
+    }
+    nextWidth = roundTextHighlightMetric(Math.max(minimumWidth, nextWidth));
+
+    const row = {
+      x: nextX,
+      y: targetRow.y,
+      width: nextWidth,
+      height: targetRow.height,
+    };
+
+    if (hasOverwideTextHighlightSelectionRows([row], selectedText, fontSize, lineHeight)) {
+      return [];
+    }
+
+    return [row];
+  }
+
+  function getTextHighlightWhitespaceAdvanceBeforeSelection(node, start, fontSize) {
+    const characters = node && typeof node.characters === "string" ? node.characters : "";
+    const rangeStart = Math.max(0, Math.min(characters.length, Math.floor(Number(start) || 0)));
+    if (rangeStart <= 0) {
+      return 0;
+    }
+
+    let whitespaceCount = 0;
+    for (let index = rangeStart - 1; index >= 0; index -= 1) {
+      const character = characters[index];
+      if (character === "\n" || character === "\r") {
+        break;
+      }
+      if (!/\s/.test(character)) {
+        break;
+      }
+      whitespaceCount += 1;
+    }
+
+    if (!whitespaceCount) {
+      return 0;
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    return roundTextHighlightMetric(whitespaceCount * size * 0.28);
+  }
+
+  function findTextHighlightReferenceRowForTarget(targetRow, referenceRows, fontSize, lineHeight) {
+    const target = normalizeTextHighlightWorldBounds(targetRow);
+    const rows = sortTextHighlightBoundsList(referenceRows);
+    if (!target || !rows.length) {
+      return null;
+    }
+
+    const rowTolerance = Math.max(getTextHighlightRowTolerance(fontSize, lineHeight), Math.max(12, Number(fontSize) || 16) * 0.28);
+    let bestRow = null;
+    let bestDistance = Infinity;
+    for (const row of rows) {
+      if (!doTextHighlightBoundsShareRow(target, row, rowTolerance)) {
+        continue;
+      }
+
+      const targetCenter = target.y + target.height / 2;
+      const rowCenter = row.y + row.height / 2;
+      const distance = Math.abs(targetCenter - rowCenter);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestRow = row;
+      }
+    }
+
+    return bestRow || rows[rows.length - 1];
+  }
+
+  async function measureTextHighlightSelectedWidth(
+    node,
+    start,
+    end,
+    textColorHex,
+    fontSize,
+    lineHeight,
+    selectedText,
+    maximumWidth
+  ) {
+    try {
+      const measurement = await measureTextHighlightSelectedOnlyBounds(
+        node,
+        start,
+        end,
+        textColorHex,
+        fontSize,
+        lineHeight
+      );
+      const measuredBounds = normalizeTextHighlightWorldBounds(
+        mergeTextHighlightBoundsList(getTextHighlightMeasurementBoundsList(measurement))
+      );
+      if (measuredBounds && measuredBounds.width > 0 && measuredBounds.width <= Math.max(1, Number(maximumWidth) || Infinity)) {
+        return measuredBounds.width;
+      }
+    } catch (error) {}
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const selectedLength = Math.max(1, compactText(selectedText).length);
+    const estimatedWidth = selectedLength * size * 0.56;
+    return roundTextHighlightMetric(Math.max(getTextHighlightMinimumWidth(fontSize), Math.min(Number(maximumWidth) || estimatedWidth, estimatedWidth)));
+  }
+
+  function hasOverwideTextHighlightSelectionRows(boundsList, selectedText, fontSize, lineHeight) {
+    const rows = sortTextHighlightBoundsList(boundsList);
+    if (!rows.length || !selectedText || /[\r\n]/.test(selectedText)) {
+      return false;
+    }
+    if (rows.length > 1) {
+      return true;
+    }
+
+    const mergedBounds = normalizeTextHighlightWorldBounds(mergeTextHighlightBoundsList(rows));
+    if (!mergedBounds) {
+      return false;
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const selectedLength = Math.max(1, compactText(selectedText).length);
+    const maxExpectedWidth = Math.max(size * 2.8, selectedLength * size * 1.65);
+    const maxExpectedHeight = Math.max(resolvedLineHeight * 1.6, size * 2);
+    return mergedBounds.width > maxExpectedWidth && mergedBounds.height <= maxExpectedHeight;
+  }
+
+  function isReasonableTextHighlightSelectionRow(row, selectedText, fontSize) {
+    const bounds = normalizeTextHighlightWorldBounds(row);
+    if (!bounds) {
+      return false;
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const selectedLength = Math.max(1, compactText(selectedText).length);
+    const maxExpectedWidth = Math.max(size * 2.2, selectedLength * size * 1.25);
+    return bounds.width <= maxExpectedWidth;
+  }
+
+  function constrainTextHighlightBaseRowToGlyphRow(baseRow, glyphRow, fontSize) {
+    const base = normalizeTextHighlightWorldBounds(baseRow);
+    const glyph = normalizeTextHighlightWorldBounds(glyphRow);
+    if (!base || !glyph) {
+      return base;
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const baseRight = base.x + base.width;
+    const glyphRight = glyph.x + glyph.width;
+    const allowedOverflow = Math.max(2, Math.min(size * 0.5, 18));
+    const widthTooWide = base.width > Math.max(glyph.width + size * 1.2, glyph.width * 1.35);
+    const leaksOutsideGlyph =
+      base.x < glyph.x - allowedOverflow ||
+      baseRight > glyphRight + allowedOverflow;
+
+    if (!widthTooWide && !leaksOutsideGlyph) {
+      return base;
+    }
+
+    return {
+      x: glyph.x,
+      y: base.y,
+      width: glyph.width,
+      height: base.height,
+    };
+  }
+
+  function filterTextHighlightGlyphBoundsRows(boundsList, fontSize, lineHeight) {
+    const rows = sortTextHighlightBoundsList(boundsList);
+    if (!rows.length) {
+      return [];
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const maxGlyphRowHeight = Math.max(size * 1.75, resolvedLineHeight * 1.35);
+    return rows.filter((row) => row.height <= maxGlyphRowHeight);
+  }
+
+  function findTextHighlightGlyphBoundsForBaseRow(
+    baseRow,
+    glyphRows,
+    usedGlyphRows,
+    fontSize,
+    lineHeight
+  ) {
+    const base = normalizeTextHighlightWorldBounds(baseRow);
+    if (!base || !Array.isArray(glyphRows) || !glyphRows.length) {
+      return null;
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const rowTolerance = Math.max(getTextHighlightRowTolerance(fontSize, lineHeight), resolvedLineHeight * 0.32);
+    const baseCenterY = base.y + base.height / 2;
+    const baseRight = base.x + base.width;
+    let bestIndex = -1;
+    let bestScore = Infinity;
+
+    for (let index = 0; index < glyphRows.length; index += 1) {
+      if (usedGlyphRows[index]) {
+        continue;
+      }
+
+      const glyph = normalizeTextHighlightWorldBounds(glyphRows[index]);
+      if (!glyph) {
+        continue;
+      }
+
+      const glyphRight = glyph.x + glyph.width;
+      const glyphCenterY = glyph.y + glyph.height / 2;
+      const verticalDistance = Math.abs(baseCenterY - glyphCenterY);
+      const horizontalGap = Math.max(0, Math.max(base.x - glyphRight, glyph.x - baseRight));
+      const sharesRow = doTextHighlightBoundsShareRow(base, glyph, rowTolerance) || verticalDistance <= rowTolerance;
+      const isNearX = horizontalGap <= size;
+      if (!sharesRow || !isNearX) {
+        continue;
+      }
+
+      const score = verticalDistance + horizontalGap * 0.2;
+      if (score < bestScore) {
+        bestScore = score;
+        bestIndex = index;
+      }
+    }
+
+    if (bestIndex < 0) {
+      return null;
+    }
+
+    usedGlyphRows[bestIndex] = true;
+    return glyphRows[bestIndex];
+  }
+
+  function expandTextHighlightBoundsToGlyphHeight(baseRow, glyphRow, fontSize, lineHeight) {
+    const base = normalizeTextHighlightWorldBounds(baseRow);
+    const glyph = normalizeTextHighlightWorldBounds(glyphRow);
+    if (!base || !glyph) {
+      return base;
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const targetTop = Math.min(base.y, glyph.y);
+    const targetBottom = Math.max(base.y + base.height, glyph.y + glyph.height);
+    const maxHeight = Math.max(size * 0.95, Math.min(size * 1.22, resolvedLineHeight * 1.05));
+    const nextHeight = Math.min(maxHeight, Math.max(base.height, glyph.height, targetBottom - targetTop));
+    let nextY = targetTop;
+    if (nextY + nextHeight < glyph.y + glyph.height) {
+      nextY = Math.min(base.y, glyph.y + glyph.height - nextHeight);
+    }
+
+    return {
+      x: base.x,
+      y: roundTextHighlightMetric(nextY),
+      width: base.width,
+      height: roundTextHighlightMetric(Math.max(1, nextHeight)),
+    };
+  }
+
+  async function measureExactTextHighlightBounds(node, start, end, textColorHex, fontSize, lineHeight) {
+    const characterCount = node && typeof node.characters === "string" ? node.characters.length : 0;
+    const rangeStart = Math.max(0, Math.min(characterCount, Math.floor(Number(start) || 0)));
+    const rangeEnd = Math.max(rangeStart, Math.min(characterCount, Math.floor(Number(end) || 0)));
+    if (!(rangeEnd > rangeStart)) {
+      return {
+        bounds: null,
+        boundsList: [],
+        segments: [],
+        fontSize,
+        lineHeight,
+      };
+    }
+
+    try {
+      const clone = await createTextHighlightSelectionMeasurementClone(node, rangeStart, rangeEnd);
+      const measurement = await measureTextHighlightCloneBounds(node, clone, fontSize, lineHeight, {
+        targetColorHex: AI_TEXT_HIGHLIGHT_MEASURE_COLOR,
+      });
+      const boundsList = getTextHighlightMeasurementBoundsList(measurement);
+      if (boundsList.length) {
+        return measurement;
+      }
+
+      const fallbackBounds = normalizeTextHighlightWorldBounds(measurement && measurement.fallbackBounds);
+      if (isPlausibleExactTextHighlightFallbackBounds(node, fallbackBounds, rangeStart, rangeEnd, fontSize, lineHeight)) {
+        return {
+          bounds: fallbackBounds,
+          boundsList: [fallbackBounds],
+          segments: [fallbackBounds],
+          fallbackBounds,
+          fontSize,
+          lineHeight,
+        };
+      }
+
+      return measurement;
+    } catch (error) {
+      return {
+        bounds: null,
+        boundsList: [],
+        segments: [],
+        fontSize,
+        lineHeight,
+      };
+    }
+  }
+
+  async function measureTextHighlightPrefixBounds(node, end, textColorHex, fontSize, lineHeight) {
+    const characterCount = node && typeof node.characters === "string" ? node.characters.length : 0;
+    const prefixEnd = Math.max(
+      0,
+      Math.min(characterCount, Math.floor(Number(end) || 0))
+    );
+    if (!(prefixEnd > 0)) {
+      return {
+        bounds: null,
+        boundsList: [],
+        segments: [],
+        fontSize,
+        lineHeight,
+      };
+    }
+
+    const clone = await createTextHighlightMeasurementClone(node, prefixEnd, textColorHex);
+    try {
+      const geometryMeasurement = await measureTextHighlightCloneGeometryBounds(node, clone, fontSize, lineHeight);
+      if (getTextHighlightMeasurementBoundsList(geometryMeasurement).length) {
+        return geometryMeasurement;
+      }
+
+      return await measureTextHighlightCloneBounds(node, clone, fontSize, lineHeight);
+    } finally {
+      if (clone && !clone.removed) {
+        clone.remove();
+      }
+    }
+  }
+
+  async function measureTextHighlightCloneBounds(node, clone, fontSize, lineHeight, options) {
+    const probeBounds = getNodeRenderBounds(node);
+    const probe = figma.createFrame();
+    let boundsList = [];
+    let flattenedNode = null;
+
+    try {
+      probe.resize(
+        Math.max(1, roundTextHighlightMetric(probeBounds ? probeBounds.width : Number(node && node.width) || 1)),
+        Math.max(1, roundTextHighlightMetric(probeBounds ? probeBounds.height : Number(node && node.height) || 1))
+      );
+      probe.clipsContent = false;
+      probe.fills = [];
+      probe.strokes = [];
+      probe.name = "__pigma_text_highlight_measure__";
+      probe.x = roundTextHighlightMetric(probeBounds ? probeBounds.x : 0);
+      probe.y = roundTextHighlightMetric(probeBounds ? probeBounds.y : 0);
+      figma.currentPage.appendChild(probe);
+
+      moveTextHighlightMeasureClone(node, clone, probe, probe.x, probe.y);
+      boundsList = await measureTextHighlightProbeAlphaBounds(probe, fontSize, lineHeight, options);
+      if (!boundsList.length && clone && typeof figma.flatten === "function") {
+        try {
+          flattenedNode = figma.flatten([clone], probe);
+        } catch (error) {}
+        boundsList = await measureTextHighlightProbeAlphaBounds(probe, fontSize, lineHeight, options);
+      }
+
+      const fallbackBounds =
+        getVisibleTextHighlightBounds(flattenedNode && !flattenedNode.removed ? flattenedNode : clone) ||
+        getVisibleTextHighlightBounds(probe);
+
+      return {
+        bounds: mergeTextHighlightBoundsList(boundsList),
+        boundsList,
+        segments: boundsList.slice(),
+        fallbackBounds,
+        fontSize,
+        lineHeight,
+      };
+    } finally {
+      if (flattenedNode && !flattenedNode.removed) {
+        flattenedNode.remove();
+      }
+      if (probe && !probe.removed) {
+        probe.remove();
+      }
+    }
+  }
+
+  async function measureTextHighlightCloneGeometryBounds(sourceNode, clone, fontSize, lineHeight) {
+    const localBoundsList = await waitForTextHighlightFillGeometryBounds(clone, fontSize, lineHeight);
+    const boundsList = localBoundsList
+      .map((localBounds) => getTextHighlightWorldBoundsFromLocalBounds(sourceNode, localBounds))
+      .filter(Boolean);
+
+    return {
+      bounds: mergeTextHighlightBoundsList(boundsList),
+      boundsList,
+      segments: boundsList.slice(),
+      fontSize,
+      lineHeight,
+    };
+  }
+
+  async function waitForTextHighlightFillGeometryBounds(node, fontSize, lineHeight) {
+    const attempts = 8;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      const boundsList = getTextHighlightFillGeometryLocalBounds(node, fontSize, lineHeight);
+      if (boundsList.length) {
+        return boundsList;
+      }
+      await waitForTextHighlightGeometryTick(attempt < 2 ? 1 : 16);
+    }
+
+    return [];
+  }
+
+  function getTextHighlightFillGeometryLocalBounds(node, fontSize, lineHeight) {
+    const geometry = node && Array.isArray(node.fillGeometry) ? node.fillGeometry : [];
+    if (!geometry.length) {
+      return [];
+    }
+
+    const boundsList = [];
+    for (let index = 0; index < geometry.length; index += 1) {
+      const path = geometry[index];
+      const pathBoundsList = parseTextHighlightSvgPathBoundsList(path && path.data, fontSize, lineHeight);
+      for (const pathBounds of pathBoundsList) {
+        boundsList.push(pathBounds);
+      }
+    }
+
+    return mergeTextHighlightLocalBoundsByRows(boundsList, fontSize, lineHeight);
+  }
+
+  async function measureTextHighlightProbeAlphaBounds(probe, fontSize, lineHeight, options) {
+    let alphaMeasurement = null;
+
+    try {
+      const pngBytes = await probe.exportAsync({
+        format: "PNG",
+        useAbsoluteBounds: false,
+      });
+      alphaMeasurement = await requestTextHighlightAlphaBounds({
+        pngBytes,
+        probeX: probe.x,
+        probeY: probe.y,
+        probeWidth: probe.width,
+        probeHeight: probe.height,
+        fontSize,
+        lineHeight,
+        targetColor: buildTextHighlightMeasureTargetColor(options && options.targetColorHex),
+      });
+    } catch (error) {}
+
+    return getTextHighlightMeasurementBoundsList(alphaMeasurement);
+  }
+
+  function buildTextHighlightMeasureTargetColor(hexColor) {
+    const hex = sanitizeHexColor(hexColor, "");
+    if (!hex) {
+      return null;
+    }
+
+    const rgb = hexToFigmaRgb(hex);
+    return {
+      r: Math.round(rgb.r * 255),
+      g: Math.round(rgb.g * 255),
+      b: Math.round(rgb.b * 255),
+    };
+  }
+
+  async function createTextHighlightMeasurementClone(node, end, textColorHex) {
+    if (!node || typeof node.clone !== "function") {
+      throw new Error("텍스트 범위를 측정할 복제 레이어를 만들지 못했습니다.");
+    }
+
+    const clone = node.clone();
+
+    if ("effects" in clone && Array.isArray(clone.effects)) {
+      clone.effects = [];
+    }
+    if ("strokes" in clone && Array.isArray(clone.strokes)) {
+      clone.strokes = [];
+    }
+    if ("opacity" in clone && typeof clone.opacity === "number") {
+      clone.opacity = 1;
+    }
+    if ("blendMode" in clone) {
+      clone.blendMode = "NORMAL";
+    }
+    if (typeof clone.setRangeFills !== "function") {
+      throw new Error("선택 텍스트의 하이라이트 측정을 지원하지 않는 텍스트 레이어입니다.");
+    }
+
+    try {
+      await loadFontsForTextNode(clone);
+    } catch (error) {}
+
+    const characterCount = typeof clone.characters === "string" ? clone.characters.length : 0;
+    if (characterCount > 0) {
+      truncateTextHighlightMeasurementClone(clone, end);
+      const nextCharacterCount = typeof clone.characters === "string" ? clone.characters.length : 0;
+      if (nextCharacterCount > 0) {
+        clone.setRangeFills(0, nextCharacterCount, [createSolidPaint(textColorHex)]);
+      }
+    }
+    return clone;
+  }
+
+  async function createTextHighlightSelectionMeasurementClone(node, start, end) {
+    if (!node || typeof node.clone !== "function") {
+      throw new Error("선택한 텍스트 범위를 측정할 복제 레이어를 만들지 못했습니다.");
+    }
+
+    const clone = node.clone();
+
+    if ("effects" in clone && Array.isArray(clone.effects)) {
+      clone.effects = [];
+    }
+    if ("strokes" in clone && Array.isArray(clone.strokes)) {
+      clone.strokes = [];
+    }
+    if ("opacity" in clone && typeof clone.opacity === "number") {
+      clone.opacity = 1;
+    }
+    if ("blendMode" in clone) {
+      clone.blendMode = "NORMAL";
+    }
+    if (typeof clone.setRangeFills !== "function") {
+      throw new Error("선택 텍스트의 하이라이트 측정을 지원하지 않는 텍스트 레이어입니다.");
+    }
+
+    try {
+      await loadFontsForTextNode(clone);
+    } catch (error) {}
+
+    const characterCount = typeof clone.characters === "string" ? clone.characters.length : 0;
+    if (characterCount > 0) {
+      const rangeStart = Math.max(0, Math.min(characterCount, Math.floor(Number(start) || 0)));
+      const rangeEnd = Math.max(rangeStart, Math.min(characterCount, Math.floor(Number(end) || 0)));
+      clearTextHighlightDecoration(clone, 0, characterCount);
+      clone.setRangeFills(0, characterCount, [createTransparentPaint()]);
+      if (rangeEnd > rangeStart) {
+        clone.setRangeFills(rangeStart, rangeEnd, [createSolidPaint(AI_TEXT_HIGHLIGHT_MEASURE_COLOR)]);
+      }
+    }
+
+    return clone;
+  }
+
+  async function refineSingleLineTextHighlightBoundsWithSelectedWidth(
+    node,
+    start,
+    end,
+    textColorHex,
+    fontSize,
+    lineHeight,
+    boundsList,
+    endBoundsList
+  ) {
+    const characters = node && typeof node.characters === "string" ? node.characters : "";
+    const characterCount = characters.length;
+    const rangeStart = Math.max(0, Math.min(characterCount, Math.floor(Number(start) || 0)));
+    const rangeEnd = Math.max(rangeStart, Math.min(characterCount, Math.floor(Number(end) || 0)));
+    const selectedText = characters.slice(rangeStart, rangeEnd);
+    if (!selectedText || /[\r\n]/.test(selectedText)) {
+      return boundsList;
+    }
+
+    const sortedEndBoundsList = sortTextHighlightBoundsList(endBoundsList);
+    const endRowBounds = sortedEndBoundsList.length ? sortedEndBoundsList[sortedEndBoundsList.length - 1] : null;
+    if (!endRowBounds) {
+      return boundsList;
+    }
+
+    const selectedOnlyMeasurement = await measureTextHighlightSelectedOnlyBounds(
+      node,
+      rangeStart,
+      rangeEnd,
+      textColorHex,
+      fontSize,
+      lineHeight
+    );
+    const selectedOnlyBounds = mergeTextHighlightBoundsList(
+      getTextHighlightMeasurementBoundsList(selectedOnlyMeasurement)
+    );
+    const normalizedSelectedBounds = normalizeTextHighlightWorldBounds(selectedOnlyBounds);
+    if (!normalizedSelectedBounds) {
+      return boundsList;
+    }
+
+    const minimumWidth = getTextHighlightMinimumWidth(fontSize);
+    const selectedWidth = roundTextHighlightMetric(
+      Math.max(minimumWidth, Math.min(endRowBounds.width, normalizedSelectedBounds.width))
+    );
+    const endRight = endRowBounds.x + endRowBounds.width;
+    const nextX = roundTextHighlightMetric(Math.max(endRowBounds.x, endRight - selectedWidth));
+    const nextWidth = roundTextHighlightMetric(Math.max(minimumWidth, endRight - nextX));
+
+    return [
+      {
+        x: nextX,
+        y: endRowBounds.y,
+        width: nextWidth,
+        height: endRowBounds.height,
+      },
+    ];
+  }
+
+  async function measureTextHighlightSelectedOnlyBounds(node, start, end, textColorHex, fontSize, lineHeight) {
+    const clone = await createTextHighlightSelectedOnlyMeasurementClone(node, start, end, textColorHex);
+    try {
+      const geometryMeasurement = await measureTextHighlightCloneGeometryBounds(node, clone, fontSize, lineHeight);
+      if (getTextHighlightMeasurementBoundsList(geometryMeasurement).length) {
+        return geometryMeasurement;
+      }
+
+      return await measureTextHighlightCloneBounds(node, clone, fontSize, lineHeight);
+    } finally {
+      if (clone && !clone.removed) {
+        clone.remove();
+      }
+    }
+  }
+
+  async function createTextHighlightSelectedOnlyMeasurementClone(node, start, end, textColorHex) {
+    if (!node || typeof node.clone !== "function") {
+      throw new Error("선택 텍스트의 폭을 측정할 복제 레이어를 만들지 못했습니다.");
+    }
+
+    const clone = node.clone();
+
+    if ("effects" in clone && Array.isArray(clone.effects)) {
+      clone.effects = [];
+    }
+    if ("strokes" in clone && Array.isArray(clone.strokes)) {
+      clone.strokes = [];
+    }
+    if ("opacity" in clone && typeof clone.opacity === "number") {
+      clone.opacity = 1;
+    }
+    if ("blendMode" in clone) {
+      clone.blendMode = "NORMAL";
+    }
+    if (typeof clone.setRangeFills !== "function") {
+      throw new Error("선택 텍스트의 폭 측정을 지원하지 않는 텍스트 레이어입니다.");
+    }
+
+    try {
+      await loadFontsForTextNode(clone);
+    } catch (error) {}
+
+    const characterCount = typeof clone.characters === "string" ? clone.characters.length : 0;
+    const rangeStart = Math.max(0, Math.min(characterCount, Math.floor(Number(start) || 0)));
+    const rangeEnd = Math.max(rangeStart, Math.min(characterCount, Math.floor(Number(end) || 0)));
+    if (rangeEnd < characterCount) {
+      deleteTextHighlightMeasurementCloneRange(clone, rangeEnd, characterCount);
+    }
+    if (rangeStart > 0) {
+      deleteTextHighlightMeasurementCloneRange(clone, 0, rangeStart);
+    }
+
+    const nextCharacterCount = typeof clone.characters === "string" ? clone.characters.length : 0;
+    if (nextCharacterCount > 0) {
+      clearTextHighlightDecoration(clone, 0, nextCharacterCount);
+      clone.setRangeFills(0, nextCharacterCount, [createSolidPaint(textColorHex)]);
+    }
+
+    return clone;
+  }
+
+  function deleteTextHighlightMeasurementCloneRange(node, start, end) {
+    if (!node || typeof node.characters !== "string") {
+      return;
+    }
+
+    const characterCount = node.characters.length;
+    const rangeStart = Math.max(0, Math.min(characterCount, Math.floor(Number(start) || 0)));
+    const rangeEnd = Math.max(rangeStart, Math.min(characterCount, Math.floor(Number(end) || 0)));
+    if (rangeEnd <= rangeStart) {
+      return;
+    }
+
+    if (typeof node.deleteCharacters === "function") {
+      try {
+        node.deleteCharacters(rangeStart, rangeEnd);
+        return;
+      } catch (error) {}
+    }
+
+    try {
+      node.characters = node.characters.slice(0, rangeStart) + node.characters.slice(rangeEnd);
+    } catch (error) {}
+  }
+
+  function isPlausibleExactTextHighlightFallbackBounds(node, bounds, start, end, fontSize, lineHeight) {
+    const fallbackBounds = normalizeTextHighlightWorldBounds(bounds);
+    if (!fallbackBounds) {
+      return false;
+    }
+
+    if (isWholeTextHighlightRange(node, start, end)) {
+      return true;
+    }
+
+    const nodeBounds = normalizeTextHighlightWorldBounds(getNodeRenderBounds(node));
+    if (!nodeBounds) {
+      return true;
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const nearFullWidth = fallbackBounds.width >= nodeBounds.width * 0.96;
+    const nearFullHeight = fallbackBounds.height >= nodeBounds.height * 0.9;
+    const looksLikeSingleTextRow = fallbackBounds.height <= Math.max(resolvedLineHeight * 1.35, size * 1.7);
+    const characters = node && typeof node.characters === "string" ? node.characters : "";
+    const selectedText = characters.slice(
+      Math.max(0, Math.min(characters.length, Math.floor(Number(start) || 0))),
+      Math.max(0, Math.min(characters.length, Math.floor(Number(end) || 0)))
+    );
+    if (selectedText && !/[\r\n]/.test(selectedText) && looksLikeSingleTextRow) {
+      const selectedLength = Math.max(1, compactText(selectedText).length);
+      const maxExpectedWidth = Math.max(size * 2.6, selectedLength * size * 1.45);
+      if (fallbackBounds.width > maxExpectedWidth) {
+        return false;
+      }
+    }
+
+    return !nearFullHeight || (!nearFullWidth && looksLikeSingleTextRow);
+  }
+
+  function hasSuspiciousTextHighlightDirectBounds(node, boundsList, start, end, fontSize, lineHeight) {
+    const normalizedBoundsList = sortTextHighlightBoundsList(boundsList);
+    if (!normalizedBoundsList.length || isWholeTextHighlightRange(node, start, end)) {
+      return false;
+    }
+
+    const characters = node && typeof node.characters === "string" ? node.characters : "";
+    const selectedText = characters.slice(
+      Math.max(0, Math.min(characters.length, Math.floor(Number(start) || 0))),
+      Math.max(0, Math.min(characters.length, Math.floor(Number(end) || 0)))
+    );
+    if (/[\r\n]/.test(selectedText)) {
+      return false;
+    }
+    if (normalizedBoundsList.length > 1) {
+      return true;
+    }
+
+    const nodeBounds = normalizeTextHighlightWorldBounds(getNodeRenderBounds(node));
+    if (!nodeBounds) {
+      return false;
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const mergedBounds = mergeTextHighlightBoundsList(normalizedBoundsList);
+    const bounds = normalizeTextHighlightWorldBounds(mergedBounds);
+    if (!bounds) {
+      return false;
+    }
+
+    const selectedLength = compactText(selectedText).length;
+    const estimatedMaxWidth = Math.max(size * 2, selectedLength * size * 0.95);
+    const looksLikeWholeRow = bounds.height <= resolvedLineHeight * 1.35 && bounds.width >= nodeBounds.width * 0.72;
+    return looksLikeWholeRow && bounds.width > estimatedMaxWidth;
+  }
+
+  function subtractTextHighlightPrefixBounds(endBoundsList, startBoundsList, fontSize, lineHeight) {
+    const normalizedEndBoundsList = sortTextHighlightBoundsList(endBoundsList);
+    const normalizedStartBoundsList = sortTextHighlightBoundsList(startBoundsList);
+    if (!normalizedEndBoundsList.length) {
+      return [];
+    }
+    if (!normalizedStartBoundsList.length) {
+      return normalizedEndBoundsList;
+    }
+
+    const rowTolerance = getTextHighlightRowTolerance(fontSize, lineHeight);
+    const minimumWidth = getTextHighlightMinimumWidth(fontSize);
+    const nextBoundsList = [];
+
+    for (let index = 0; index < normalizedEndBoundsList.length; index += 1) {
+      const endBounds = normalizedEndBoundsList[index];
+      const endRight = endBounds.x + endBounds.width;
+      let matchedStartRight = findTextHighlightMatchedStartRight(
+        endBounds,
+        normalizedStartBoundsList,
+        rowTolerance,
+        fontSize,
+        lineHeight
+      );
+      if (!Number.isFinite(matchedStartRight)) {
+        matchedStartRight = findTextHighlightIndexMatchedStartRight(
+          endBounds,
+          normalizedStartBoundsList,
+          index,
+          fontSize,
+          lineHeight
+        );
+      }
+      if (!Number.isFinite(matchedStartRight)) {
+        continue;
+      }
+
+      const nextX = Math.max(endBounds.x, Math.min(endRight, matchedStartRight));
+      const nextWidth = endRight - nextX;
+      if (nextWidth < minimumWidth) {
+        continue;
+      }
+
+      nextBoundsList.push({
+        x: roundTextHighlightMetric(nextX),
+        y: endBounds.y,
+        width: roundTextHighlightMetric(nextWidth),
+        height: endBounds.height,
+      });
+    }
+
+    return nextBoundsList;
+  }
+
+  function extractTrailingTextHighlightBounds(endBoundsList, startBoundsList, fontSize, lineHeight) {
+    const normalizedEndBoundsList = sortTextHighlightBoundsList(endBoundsList);
+    const normalizedStartBoundsList = sortTextHighlightBoundsList(startBoundsList);
+    if (!normalizedEndBoundsList.length) {
+      return [];
+    }
+    if (!normalizedStartBoundsList.length) {
+      return normalizedEndBoundsList.slice(-1);
+    }
+
+    const rowTolerance = getTextHighlightRowTolerance(fontSize, lineHeight);
+    const minimumWidth = getTextHighlightMinimumWidth(fontSize);
+
+    for (let index = normalizedEndBoundsList.length - 1; index >= 0; index -= 1) {
+      const endBounds = normalizedEndBoundsList[index];
+      const endRight = endBounds.x + endBounds.width;
+      let matchedStartRight = findTextHighlightMatchedStartRight(
+        endBounds,
+        normalizedStartBoundsList,
+        rowTolerance,
+        fontSize,
+        lineHeight
+      );
+      if (!Number.isFinite(matchedStartRight)) {
+        matchedStartRight = findTextHighlightIndexMatchedStartRight(
+          endBounds,
+          normalizedStartBoundsList,
+          index,
+          fontSize,
+          lineHeight
+        );
+      }
+
+      if (!Number.isFinite(matchedStartRight)) {
+        continue;
+      }
+
+      const nextX = Math.max(endBounds.x, Math.min(endRight, matchedStartRight));
+      const nextWidth = endRight - nextX;
+      if (nextWidth >= minimumWidth) {
+        return [
+          {
+            x: roundTextHighlightMetric(nextX),
+            y: endBounds.y,
+            width: roundTextHighlightMetric(nextWidth),
+            height: endBounds.height,
+          },
+        ];
+      }
+    }
+
+    return [];
+  }
+
+  function findTextHighlightMatchedStartRight(endBounds, startBoundsList, rowTolerance, fontSize, lineHeight) {
+    const normalizedEndBounds = normalizeTextHighlightWorldBounds(endBounds);
+    if (!normalizedEndBounds || !Array.isArray(startBoundsList) || !startBoundsList.length) {
+      return -Infinity;
+    }
+
+    let matchedStartRight = -Infinity;
+    for (const startBounds of startBoundsList) {
+      if (!doTextHighlightBoundsShareRow(normalizedEndBounds, startBounds, rowTolerance)) {
+        continue;
+      }
+      matchedStartRight = Math.max(matchedStartRight, startBounds.x + startBounds.width);
+    }
+
+    if (Number.isFinite(matchedStartRight)) {
+      return matchedStartRight;
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const relaxedTolerance = Math.max(rowTolerance * 2.5, Math.min(resolvedLineHeight * 0.55, size * 0.9));
+    const endCenter = normalizedEndBounds.y + normalizedEndBounds.height / 2;
+    const endBottom = normalizedEndBounds.y + normalizedEndBounds.height;
+    let bestDistance = Infinity;
+    let bestRight = -Infinity;
+
+    for (const startBounds of startBoundsList) {
+      const normalizedStartBounds = normalizeTextHighlightWorldBounds(startBounds);
+      if (!normalizedStartBounds) {
+        continue;
+      }
+
+      const startCenter = normalizedStartBounds.y + normalizedStartBounds.height / 2;
+      const startBottom = normalizedStartBounds.y + normalizedStartBounds.height;
+      const distance = Math.min(Math.abs(startCenter - endCenter), Math.abs(startBottom - endBottom));
+      if (distance > relaxedTolerance || distance >= bestDistance) {
+        continue;
+      }
+
+      bestDistance = distance;
+      bestRight = normalizedStartBounds.x + normalizedStartBounds.width;
+    }
+
+    return bestRight;
+  }
+
+  function findTextHighlightIndexMatchedStartRight(endBounds, startBoundsList, index, fontSize, lineHeight) {
+    const normalizedEndBounds = normalizeTextHighlightWorldBounds(endBounds);
+    const normalizedStartBoundsList = sortTextHighlightBoundsList(startBoundsList);
+    if (!normalizedEndBounds || !normalizedStartBoundsList.length) {
+      return -Infinity;
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const relaxedTolerance = Math.max(resolvedLineHeight * 0.65, size);
+    const endRight = normalizedEndBounds.x + normalizedEndBounds.width;
+    const endCenter = normalizedEndBounds.y + normalizedEndBounds.height / 2;
+    const candidateIndexes = [index, index - 1, index + 1, normalizedStartBoundsList.length - 1];
+    let bestRight = -Infinity;
+    let bestScore = Infinity;
+
+    for (const candidateIndex of candidateIndexes) {
+      if (candidateIndex < 0 || candidateIndex >= normalizedStartBoundsList.length) {
+        continue;
+      }
+
+      const candidate = normalizeTextHighlightWorldBounds(normalizedStartBoundsList[candidateIndex]);
+      if (!candidate) {
+        continue;
+      }
+
+      const candidateRight = candidate.x + candidate.width;
+      const verticalDistance = Math.abs(candidate.y + candidate.height / 2 - endCenter);
+      if (candidateRight <= normalizedEndBounds.x - size * 0.5 || candidateRight > endRight + size * 0.5) {
+        continue;
+      }
+      if (verticalDistance > relaxedTolerance) {
+        continue;
+      }
+
+      const score = verticalDistance + Math.abs(endRight - candidateRight) * 0.02;
+      if (score < bestScore) {
+        bestScore = score;
+        bestRight = candidateRight;
+      }
+    }
+
+    return bestRight;
+  }
+
+  function sortTextHighlightBoundsList(boundsList) {
+    if (!Array.isArray(boundsList) || !boundsList.length) {
+      return [];
+    }
+
+    return boundsList
+      .map((bounds) => normalizeTextHighlightWorldBounds(bounds))
+      .filter(Boolean)
+      .sort((left, right) => {
+        if (Math.abs(left.y - right.y) > 0.5) {
+          return left.y - right.y;
+        }
+        if (Math.abs(left.x - right.x) > 0.5) {
+          return left.x - right.x;
+        }
+        return left.width - right.width;
+      });
+  }
+
+  function getTextHighlightRowTolerance(fontSize, lineHeight) {
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    return roundTextHighlightMetric(Math.max(2, Math.min(12, resolvedLineHeight * 0.18)));
+  }
+
+  function getTextHighlightMinimumWidth(fontSize) {
+    const size = Math.max(12, Number(fontSize) || 16);
+    return roundTextHighlightMetric(Math.max(1, Math.min(6, size * 0.08)));
+  }
+
+  function doTextHighlightBoundsShareRow(leftBounds, rightBounds, rowTolerance) {
+    const left = normalizeTextHighlightWorldBounds(leftBounds);
+    const right = normalizeTextHighlightWorldBounds(rightBounds);
+    if (!left || !right) {
+      return false;
+    }
+
+    const leftBottom = left.y + left.height;
+    const rightBottom = right.y + right.height;
+    const overlap = Math.min(leftBottom, rightBottom) - Math.max(left.y, right.y);
+    const minimumOverlap = Math.max(1, Math.min(left.height, right.height) * 0.25);
+    if (overlap >= minimumOverlap) {
+      return true;
+    }
+
+    const leftCenter = left.y + left.height / 2;
+    const rightCenter = right.y + right.height / 2;
+    return Math.abs(leftCenter - rightCenter) <= Math.max(1, Number(rowTolerance) || 0);
+  }
+
+  function buildConservativeTextHighlightBounds(node, start, end, fontSize, lineHeight, startBounds, endBounds) {
+    const resolvedEndBounds = normalizeTextHighlightWorldBounds(endBounds);
+    if (!resolvedEndBounds) {
+      return [];
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const minimumWidth = getTextHighlightMinimumWidth(size);
+    const approximateLineHeight = roundTextHighlightMetric(
+      Math.max(1, Math.min(resolvedEndBounds.height, resolvedLineHeight))
+    );
+    const endBottom = resolvedEndBounds.y + resolvedEndBounds.height;
+    const nextY = roundTextHighlightMetric(Math.max(resolvedEndBounds.y, endBottom - approximateLineHeight));
+    const endRight = resolvedEndBounds.x + resolvedEndBounds.width;
+    let nextX = resolvedEndBounds.x;
+
+    const resolvedStartBounds = normalizeTextHighlightWorldBounds(startBounds);
+    if (resolvedStartBounds) {
+      const startBottom = resolvedStartBounds.y + resolvedStartBounds.height;
+      if (Math.abs(startBottom - endBottom) <= Math.max(2, resolvedLineHeight * 0.75)) {
+        nextX = Math.max(resolvedEndBounds.x, Math.min(endRight, resolvedStartBounds.x + resolvedStartBounds.width));
+      }
+    } else if ((Number(start) || 0) <= 0) {
+      nextX = resolvedEndBounds.x;
+    }
+
+    let nextWidth = endRight - nextX;
+    if (nextWidth < minimumWidth) {
+      nextX = Math.max(resolvedEndBounds.x, endRight - Math.max(minimumWidth, resolvedEndBounds.width * 0.18));
+      nextWidth = endRight - nextX;
+    }
+
+    if (nextWidth < minimumWidth) {
+      return [];
+    }
+
+    return [
+      {
+        x: roundTextHighlightMetric(nextX),
+        y: nextY,
+        width: roundTextHighlightMetric(nextWidth),
+        height: approximateLineHeight,
+      },
+    ];
+  }
+
+  function buildEmergencyTextHighlightBounds(node, start, end, fontSize, lineHeight) {
+    const nodeBounds = getNodeRenderBounds(node);
+    const resolvedNodeBounds = normalizeTextHighlightWorldBounds(nodeBounds);
+    if (!resolvedNodeBounds) {
+      return [];
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const approximateLineHeight = roundTextHighlightMetric(
+      Math.max(1, Math.min(resolvedNodeBounds.height, resolvedLineHeight))
+    );
+    const selectionLength = Math.max(1, Math.floor(Number(end) || 0) - Math.floor(Number(start) || 0));
+    const estimatedWidth = roundTextHighlightMetric(
+      Math.max(
+        getTextHighlightMinimumWidth(size),
+        Math.min(resolvedNodeBounds.width, selectionLength * Math.max(4, size * 0.42))
+      )
+    );
+
+    return [
+      {
+        x: resolvedNodeBounds.x,
+        y: roundTextHighlightMetric(
+          Math.max(resolvedNodeBounds.y, resolvedNodeBounds.y + resolvedNodeBounds.height - approximateLineHeight)
+        ),
+        width: estimatedWidth,
+        height: approximateLineHeight,
+      },
+    ];
+  }
+
+  function truncateTextHighlightMeasurementClone(node, end) {
+    if (!node || typeof node.characters !== "string") {
+      return;
+    }
+
+    const characterCount = node.characters.length;
+    const truncateAt = Math.max(0, Math.min(characterCount, Math.floor(Number(end) || 0)));
+    if (truncateAt >= characterCount) {
+      return;
+    }
+
+    if (typeof node.deleteCharacters === "function") {
+      try {
+        node.deleteCharacters(truncateAt, characterCount);
+        return;
+      } catch (error) {}
+    }
+
+    try {
+      node.characters = node.characters.slice(0, truncateAt);
+    } catch (error) {}
+  }
+
+  function moveTextHighlightMeasureClone(sourceNode, cloneNode, parentNode, offsetX, offsetY) {
+    const targetParent = parentNode && !parentNode.removed ? parentNode : figma.currentPage;
+    if (cloneNode.parent !== targetParent) {
+      targetParent.appendChild(cloneNode);
+    }
+
+    if ("layoutPositioning" in cloneNode) {
+      try {
+        cloneNode.layoutPositioning = "ABSOLUTE";
+      } catch (error) {}
+    }
+
+    const sourceTransform = getAbsoluteTransformMatrix(sourceNode);
+    const xOffset = Number(offsetX) || 0;
+    const yOffset = Number(offsetY) || 0;
+    if ("relativeTransform" in cloneNode && Array.isArray(cloneNode.relativeTransform)) {
+      cloneNode.relativeTransform = [
+        [sourceTransform[0][0], sourceTransform[0][1], sourceTransform[0][2] - xOffset],
+        [sourceTransform[1][0], sourceTransform[1][1], sourceTransform[1][2] - yOffset],
+      ];
+      return;
+    }
+
+    if ("x" in cloneNode && typeof cloneNode.x === "number" && "y" in cloneNode && typeof cloneNode.y === "number") {
+      cloneNode.x = roundTextHighlightMetric(sourceTransform[0][2] - xOffset);
+      cloneNode.y = roundTextHighlightMetric(sourceTransform[1][2] - yOffset);
+    }
+  }
+
+  function getVisibleTextHighlightBounds(node) {
+    if (!node) {
+      return null;
+    }
+
+    const bounds = getNodeRenderBounds(node);
+    if (bounds) {
+      return bounds;
+    }
+
+    return null;
+  }
+
+  function getTextHighlightMeasurementBoundsList(measurement, fallbackNode) {
+    const boundsList = [];
+    const measurementSegments =
+      measurement && Array.isArray(measurement.boundsList)
+        ? measurement.boundsList
+        : measurement && Array.isArray(measurement.segments)
+          ? measurement.segments
+          : null;
+    if (measurementSegments) {
+      for (const segment of measurementSegments) {
+        const normalizedSegment = normalizeTextHighlightWorldBounds(segment);
+        if (normalizedSegment) {
+          boundsList.push(normalizedSegment);
+        }
+      }
+    }
+
+    if (!boundsList.length && measurement && measurement.bounds) {
+      const normalizedBounds = normalizeTextHighlightWorldBounds(measurement.bounds);
+      if (normalizedBounds) {
+        boundsList.push(normalizedBounds);
+      }
+    }
+
+    if (!boundsList.length && fallbackNode) {
+      const fallbackBounds = getVisibleTextHighlightBounds(fallbackNode);
+      if (fallbackBounds) {
+        boundsList.push(fallbackBounds);
+      }
+    }
+
+    return boundsList;
+  }
+
+  function normalizeTextHighlightWorldBounds(bounds) {
+    if (!bounds || typeof bounds !== "object") {
+      return null;
+    }
+
+    const x = Number(bounds.x);
+    const y = Number(bounds.y);
+    const width = Number(bounds.width);
+    const height = Number(bounds.height);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(width) || !Number.isFinite(height)) {
+      return null;
+    }
+
+    if (width <= 0 || height <= 0) {
+      return null;
+    }
+
+    return {
+      x: roundTextHighlightMetric(x),
+      y: roundTextHighlightMetric(y),
+      width: roundTextHighlightMetric(width),
+      height: roundTextHighlightMetric(height),
+    };
+  }
+
+  function mergeTextHighlightBoundsList(boundsList) {
+    if (!Array.isArray(boundsList) || !boundsList.length) {
+      return null;
+    }
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const bounds of boundsList) {
+      const normalizedBounds = normalizeTextHighlightWorldBounds(bounds);
+      if (!normalizedBounds) {
+        continue;
+      }
+
+      minX = Math.min(minX, normalizedBounds.x);
+      minY = Math.min(minY, normalizedBounds.y);
+      maxX = Math.max(maxX, normalizedBounds.x + normalizedBounds.width);
+      maxY = Math.max(maxY, normalizedBounds.y + normalizedBounds.height);
+    }
+
+    if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+      return null;
+    }
+
+    return {
+      x: roundTextHighlightMetric(minX),
+      y: roundTextHighlightMetric(minY),
+      width: roundTextHighlightMetric(Math.max(1, maxX - minX)),
+      height: roundTextHighlightMetric(Math.max(1, maxY - minY)),
+    };
+  }
+
+  function hasMergedTextHighlightBlockBounds(boundsList, fontSize) {
+    if (!Array.isArray(boundsList) || boundsList.length !== 1) {
+      return false;
+    }
+
+    const bounds = normalizeTextHighlightWorldBounds(boundsList[0]);
+    if (!bounds) {
+      return false;
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    return bounds.height > Math.max(size * 1.9, 30);
+  }
+
+  function splitMergedTextHighlightBlockBounds(boundsList, fontSize, lineHeight) {
+    const mergedBounds = mergeTextHighlightBoundsList(boundsList);
+    const bounds = normalizeTextHighlightWorldBounds(mergedBounds);
+    if (!bounds) {
+      return Array.isArray(boundsList) ? boundsList : [];
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const lineCount = Math.max(2, Math.min(80, Math.ceil(Math.max(0, bounds.height - size) / resolvedLineHeight) + 1));
+    if (lineCount <= 1) {
+      return [bounds];
+    }
+
+    const chunkHeight = bounds.height / lineCount;
+    const nextBoundsList = [];
+    for (let index = 0; index < lineCount; index += 1) {
+      const chunkY = bounds.y + chunkHeight * index;
+      const nextY = index === lineCount - 1 ? bounds.y + bounds.height : bounds.y + chunkHeight * (index + 1);
+      const nextHeight = Math.max(1, nextY - chunkY);
+      nextBoundsList.push({
+        x: bounds.x,
+        y: roundTextHighlightMetric(chunkY),
+        width: bounds.width,
+        height: roundTextHighlightMetric(nextHeight),
+      });
+    }
+
+    return nextBoundsList.length ? nextBoundsList : [bounds];
+  }
+
+  function normalizeTextHighlightBoundsListForApply(node, start, end, boundsList, fontSize, lineHeight) {
+    let rows = sortTextHighlightBoundsList(boundsList);
+    if (!rows.length) {
+      rows = buildConservativeTextHighlightBounds(node, start, end, fontSize, lineHeight, null, null);
+    }
+    if (!rows.length) {
+      rows = buildEmergencyTextHighlightBounds(node, start, end, fontSize, lineHeight);
+    }
+    if (!rows.length) {
+      return [];
+    }
+
+    const nodeBounds = normalizeTextHighlightWorldBounds(getNodeRenderBounds(node));
+    if (!nodeBounds) {
+      return rows;
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const padding = Math.max(120, size * 4, resolvedLineHeight * 3);
+    const expandedNodeBounds = {
+      x: nodeBounds.x - padding,
+      y: nodeBounds.y - padding,
+      width: nodeBounds.width + padding * 2,
+      height: nodeBounds.height + padding * 2,
+    };
+    const maximumRowHeight = Math.max(resolvedLineHeight * 2.6, size * 3.2);
+    const filteredRows = rows.filter((row) => {
+      const bounds = normalizeTextHighlightWorldBounds(row);
+      if (!bounds) {
+        return false;
+      }
+      if (bounds.height > maximumRowHeight && bounds.height > nodeBounds.height * 0.65) {
+        return false;
+      }
+      return doTextHighlightBoundsIntersect(bounds, expandedNodeBounds);
+    });
+
+    if (filteredRows.length) {
+      return filteredRows;
+    }
+
+    const conservativeRows = buildConservativeTextHighlightBounds(node, start, end, fontSize, lineHeight, null, null);
+    const safeConservativeRows = conservativeRows.filter((row) => {
+      const bounds = normalizeTextHighlightWorldBounds(row);
+      return !!bounds && doTextHighlightBoundsIntersect(bounds, expandedNodeBounds);
+    });
+    if (safeConservativeRows.length) {
+      return safeConservativeRows;
+    }
+
+    return buildEmergencyTextHighlightBounds(node, start, end, fontSize, lineHeight).filter((row) => {
+      const bounds = normalizeTextHighlightWorldBounds(row);
+      return !!bounds && doTextHighlightBoundsIntersect(bounds, expandedNodeBounds);
+    });
+  }
+
+  function doTextHighlightBoundsIntersect(left, right) {
+    const leftBounds = normalizeTextHighlightWorldBounds(left);
+    const rightBounds = normalizeTextHighlightWorldBounds(right);
+    if (!leftBounds || !rightBounds) {
+      return false;
+    }
+
+    return (
+      leftBounds.x < rightBounds.x + rightBounds.width &&
+      leftBounds.x + leftBounds.width > rightBounds.x &&
+      leftBounds.y < rightBounds.y + rightBounds.height &&
+      leftBounds.y + leftBounds.height > rightBounds.y
+    );
+  }
+
+  function getTextRangeFontSize(node, start, end) {
+    const segments = getTextHighlightStyledSegments(node, start, end, ["fontSize"]);
+    let maxSize = 0;
+
+    for (const segment of segments) {
+      const fontSize = segment && typeof segment.fontSize === "number" ? segment.fontSize : 0;
+      if (fontSize > maxSize) {
+        maxSize = fontSize;
+      }
+    }
+
+    if (maxSize > 0) {
+      return maxSize;
+    }
+
+    if (node && typeof node.getRangeFontSize === "function") {
+      try {
+        const rangeFontSize = node.getRangeFontSize(start, end);
+        if (typeof rangeFontSize === "number" && Number.isFinite(rangeFontSize) && rangeFontSize > 0) {
+          return rangeFontSize;
+        }
+      } catch (error) {}
+    }
+
+    if (node && typeof node.fontSize === "number" && Number.isFinite(node.fontSize) && node.fontSize > 0) {
+      return node.fontSize;
+    }
+
+    return 16;
+  }
+
+  function getTextRangeLineHeight(node, start, end, fontSize) {
+    const fallback = getFallbackTextHighlightLineHeight(fontSize);
+    const segments = getTextHighlightStyledSegments(node, start, end, ["fontSize", "lineHeight"]);
+    let maxLineHeight = 0;
+
+    for (const segment of segments) {
+      const segmentFontSize =
+        segment && typeof segment.fontSize === "number" && Number.isFinite(segment.fontSize)
+          ? segment.fontSize
+          : fontSize;
+      const nextLineHeight = resolveTextHighlightLineHeight(segment && segment.lineHeight, segmentFontSize);
+      if (nextLineHeight > maxLineHeight) {
+        maxLineHeight = nextLineHeight;
+      }
+    }
+
+    if (maxLineHeight > 0) {
+      return roundTextHighlightMetric(maxLineHeight);
+    }
+
+    if (node && typeof node.getRangeLineHeight === "function") {
+      try {
+        const rangeLineHeight = resolveTextHighlightLineHeight(node.getRangeLineHeight(start, end), fontSize);
+        if (rangeLineHeight > 0) {
+          return roundTextHighlightMetric(rangeLineHeight);
+        }
+      } catch (error) {}
+    }
+
+    return fallback;
+  }
+
+  function resolveTextHighlightLineHeight(lineHeight, fontSize) {
+    const size = Math.max(12, Number(fontSize) || 16);
+    if (!lineHeight || lineHeight === figma.mixed) {
+      return 0;
+    }
+
+    if (typeof lineHeight === "number" && Number.isFinite(lineHeight) && lineHeight > 0) {
+      return lineHeight;
+    }
+
+    if (typeof lineHeight !== "object") {
+      return 0;
+    }
+
+    const unit = typeof lineHeight.unit === "string" ? lineHeight.unit.toUpperCase() : "";
+    const value = Number(lineHeight.value);
+    if (unit === "PIXELS" && Number.isFinite(value) && value > 0) {
+      return value;
+    }
+    if (unit === "PERCENT" && Number.isFinite(value) && value > 0) {
+      return size * (value / 100);
+    }
+    if (unit === "AUTO") {
+      return getFallbackTextHighlightLineHeight(size);
+    }
+
+    return 0;
+  }
+
+  function getFallbackTextHighlightLineHeight(fontSize) {
+    const size = Math.max(12, Number(fontSize) || 16);
+    return roundTextHighlightMetric(size * 1.2);
+  }
+
+  function getTextHighlightStyledSegments(node, start, end, fields) {
+    if (!node || typeof node.getStyledTextSegments !== "function") {
+      return [];
+    }
+
+    try {
+      const segments = node.getStyledTextSegments(fields, start, end);
+      return Array.isArray(segments) ? segments : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function getTextHighlightPaints(node, start, end) {
+    if (!node || typeof node.getRangeFills !== "function") {
+      return null;
+    }
+
+    try {
+      const fills = node.getRangeFills(start, end);
+      return Array.isArray(fills) ? fills : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  async function applyTextHighlightColor(node, start, end, textColorHex) {
+    if (!node || typeof node.setRangeFills !== "function") {
+      throw new Error("선택한 텍스트 색상을 변경할 수 없습니다.");
+    }
+
+    try {
+      await loadFontsForTextNode(node);
+    } catch (error) {}
+
+    node.setRangeFills(start, end, [createSolidPaint(textColorHex)]);
+  }
+
+  function createTextHighlightRect(node, parent, worldBounds, fontSize, colorHex, cornerRadius, boxPaddingPx) {
+    const nodeTransform = getAbsoluteTransformMatrix(node);
+    const inverseNodeTransform = invertAffineTransform(nodeTransform);
+    if (!inverseNodeTransform) {
+      throw new Error("텍스트 하이라이트 위치를 계산하지 못했습니다.");
+    }
+
+    const localBounds = getTextHighlightLocalBounds(inverseNodeTransform, worldBounds);
+    const padding = buildTextHighlightBoxPixelPadding(fontSize, boxPaddingPx);
+    const localX = localBounds.x - padding.left;
+    const localY = localBounds.y - padding.top;
+    const localWidth = Math.max(1, localBounds.width + padding.left + padding.right);
+    const localHeight = ceilTextHighlightMetric(localBounds.height + padding.top + padding.bottom);
+    const clampedGeometry = clampTextHighlightLocalGeometryToParentBounds(node, parent, {
+      x: localX,
+      y: localY,
+      width: localWidth,
+      height: localHeight,
+    });
+    return createTextHighlightRectFromLocalGeometry(
+      node,
+      parent,
+      clampedGeometry.x,
+      clampedGeometry.y,
+      clampedGeometry.width,
+      clampedGeometry.height,
+      colorHex,
+      sanitizeTextHighlightRadius(cornerRadius, padding.radius)
+    );
+  }
+
+  function createTextHighlightLineRect(node, parent, worldBounds, fontSize, thickness, colorHex, cornerRadius) {
+    const nodeTransform = getAbsoluteTransformMatrix(node);
+    const inverseNodeTransform = invertAffineTransform(nodeTransform);
+    if (!inverseNodeTransform) {
+      throw new Error("라인형 하이라이트 위치를 계산하지 못했습니다.");
+    }
+
+    const localBounds = getTextHighlightLocalBounds(inverseNodeTransform, worldBounds);
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedThickness = roundTextHighlightThickness(
+      Math.max(2, Math.min(size * 1.35, Number(thickness) || size * 0.16))
+    );
+    const horizontalPadding = 0;
+    const lineBottomAnchor = roundTextHighlightMetric(localBounds.y + localBounds.height + Math.max(0.5, size * 0.02));
+    const localX = localBounds.x - horizontalPadding;
+    const localY = lineBottomAnchor - resolvedThickness;
+    const localWidth = Math.max(1, localBounds.width + horizontalPadding * 2);
+    const localHeight = Math.max(1, resolvedThickness);
+    const clampedGeometry = clampTextHighlightLocalGeometryToParentBounds(node, parent, {
+      x: localX,
+      y: localY,
+      width: localWidth,
+      height: localHeight,
+    });
+
+    return createTextHighlightRectFromLocalGeometry(
+      node,
+      parent,
+      clampedGeometry.x,
+      clampedGeometry.y,
+      clampedGeometry.width,
+      clampedGeometry.height,
+      colorHex,
+      sanitizeTextHighlightRadius(cornerRadius, AI_TEXT_HIGHLIGHT_DEFAULT_STRIKE_RADIUS)
+    );
+  }
+
+  function createTextHighlightStrikeRect(node, parent, worldBounds, fontSize, thickness, colorHex, cornerRadius) {
+    const nodeTransform = getAbsoluteTransformMatrix(node);
+    const inverseNodeTransform = invertAffineTransform(nodeTransform);
+    if (!inverseNodeTransform) {
+      throw new Error("취소선형 하이라이트 위치를 계산하지 못했습니다.");
+    }
+
+    const localBounds = getTextHighlightLocalBounds(inverseNodeTransform, worldBounds);
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedThickness = roundTextHighlightThickness(
+      Math.max(2, Math.min(size * 1.45, Number(thickness) || size * 0.22))
+    );
+    const horizontalPadding = 0;
+    const centerY = localBounds.y + localBounds.height * 0.5;
+    const localX = localBounds.x - horizontalPadding;
+    const localY = centerY - resolvedThickness / 2;
+    const localWidth = Math.max(1, localBounds.width + horizontalPadding * 2);
+    const localHeight = Math.max(1, resolvedThickness);
+    const clampedGeometry = clampTextHighlightLocalGeometryToParentBounds(node, parent, {
+      x: localX,
+      y: localY,
+      width: localWidth,
+      height: localHeight,
+    });
+
+    return createTextHighlightRectFromLocalGeometry(
+      node,
+      parent,
+      clampedGeometry.x,
+      clampedGeometry.y,
+      clampedGeometry.width,
+      clampedGeometry.height,
+      colorHex,
+      sanitizeTextHighlightRadius(cornerRadius, roundTextHighlightMetric(Math.max(0, Math.min(999, resolvedThickness / 2))))
+    );
+  }
+
+  function clampTextHighlightLocalGeometryToParentBounds(node, parent, geometry) {
+    return normalizeTextHighlightLocalGeometry(geometry);
+  }
+
+  function normalizeTextHighlightLocalGeometry(geometry) {
+    return {
+      x: roundTextHighlightMetric(Number(geometry && geometry.x) || 0),
+      y: roundTextHighlightMetric(Number(geometry && geometry.y) || 0),
+      width: roundTextHighlightMetric(Math.max(1, Number(geometry && geometry.width) || 1)),
+      height: ceilTextHighlightMetric(Math.max(1, Number(geometry && geometry.height) || 1)),
+    };
+  }
+
+  function createTextHighlightRectFromLocalGeometry(node, parent, localX, localY, localWidth, localHeight, colorHex, cornerRadius) {
+    const nodeTransform = getAbsoluteTransformMatrix(node);
+    const rect = figma.createRectangle();
+
+    rect.resize(Math.max(1, localWidth), Math.max(1, localHeight));
+    rect.cornerRadius = sanitizeTextHighlightRadius(cornerRadius, 0);
+    rect.fills = [createSolidPaint(colorHex)];
+    rect.strokes = [];
+
+    if ("layoutPositioning" in rect && (isAutoLayoutParent(parent) || isReusableTextHighlightContainer(parent))) {
+      setTextHighlightAbsoluteLayout(rect);
+    }
+
+    const absoluteOrigin = transformPointWithMatrix(nodeTransform, localX, localY);
+    const desiredAbsoluteTransform = [
+      [nodeTransform[0][0], nodeTransform[0][1], absoluteOrigin.x],
+      [nodeTransform[1][0], nodeTransform[1][1], absoluteOrigin.y],
+    ];
+    const parentTransform = getAbsoluteTransformMatrix(parent);
+    const inverseParentTransform = invertAffineTransform(parentTransform);
+    const relativeTransform = inverseParentTransform
+      ? multiplyAffineTransforms(inverseParentTransform, desiredAbsoluteTransform)
+      : desiredAbsoluteTransform;
+
+    if (rect.parent !== parent) {
+      if ("relativeTransform" in rect && Array.isArray(rect.relativeTransform)) {
+        rect.relativeTransform = relativeTransform;
+      } else if ("x" in rect && typeof rect.x === "number" && "y" in rect && typeof rect.y === "number") {
+        rect.x = roundTextHighlightMetric(relativeTransform[0][2]);
+        rect.y = roundTextHighlightMetric(relativeTransform[1][2]);
+      }
+      parent.appendChild(rect);
+      if (isAutoLayoutParent(parent)) {
+        setTextHighlightAbsoluteLayout(rect);
+      }
+    }
+
+    if ("relativeTransform" in rect && Array.isArray(rect.relativeTransform)) {
+      rect.relativeTransform = relativeTransform;
+    } else if ("x" in rect && typeof rect.x === "number" && "y" in rect && typeof rect.y === "number") {
+      rect.x = roundTextHighlightMetric(relativeTransform[0][2]);
+      rect.y = roundTextHighlightMetric(relativeTransform[1][2]);
+    }
+
+    return rect;
+  }
+
+  function setTextHighlightAbsoluteLayout(node) {
+    if (!node || !("layoutPositioning" in node)) {
+      return;
+    }
+
+    try {
+      node.layoutPositioning = "ABSOLUTE";
+    } catch (error) {}
+  }
+
+  function prepareTextHighlightLayerContainer(parent, node) {
+    const nodeIndex = findNodeChildIndex(parent, node && node.id);
+    const groupOverlayTarget = getTextHighlightGroupOverlayTarget(parent);
+    if (groupOverlayTarget) {
+      return {
+        parent: groupOverlayTarget.parent,
+        nodeIndex: findNodeChildIndex(groupOverlayTarget.parent, groupOverlayTarget.anchorNodeId),
+        anchorNodeId: groupOverlayTarget.anchorNodeId,
+        looseHighlights: true,
+        externalOverlay: true,
+      };
+    }
+
+    return {
+      parent,
+      nodeIndex,
+      looseHighlights: true,
+      anchorNodeId: node && node.id,
+    };
+  }
+
+  function getTextHighlightGroupOverlayTarget(parent) {
+    if (!parent || parent.type !== "GROUP") {
+      return null;
+    }
+
+    let anchor = parent;
+    let overlayParent = parent.parent;
+    while (overlayParent && overlayParent.type === "GROUP") {
+      anchor = overlayParent;
+      overlayParent = overlayParent.parent;
+    }
+
+    if (!anchor || !overlayParent || overlayParent.type === "DOCUMENT" || !("children" in overlayParent)) {
+      return null;
+    }
+
+    return {
+      parent: overlayParent,
+      anchorNodeId: anchor.id,
+    };
+  }
+
+  function finalizeTextHighlightLayerContainer(container, node, options) {
+    return;
+  }
+
+  function groupTextHighlightSelection(parent, node, rect, index, options) {
+    const rects = Array.isArray(rect) ? rect.filter(Boolean) : rect ? [rect] : [];
+    return groupLooseTextHighlightSelection(rects);
+  }
+
+  function groupLooseTextHighlightSelection(rects) {
+    const nodesToGroup = Array.isArray(rects) ? rects.filter(Boolean) : [];
+    if (!nodesToGroup.length) {
+      throw new Error("Could not prepare text highlight layers.");
+    }
+
+    for (let nodeIndex = 0; nodeIndex < nodesToGroup.length; nodeIndex += 1) {
+      const highlightNode = nodesToGroup[nodeIndex];
+      try {
+        highlightNode.name =
+          nodesToGroup.length > 1
+            ? `Text Highlight ${nodeIndex + 1}`
+            : "Text Highlight";
+      } catch (error) {}
+    }
+
+    return nodesToGroup[0];
+  }
+
+  function markTextHighlightGroup(group, node) {
+    if (!group) {
+      return;
+    }
+
+    try {
+      group.name = AI_TEXT_HIGHLIGHT_GROUP_NAME;
+    } catch (error) {}
+
+    if (typeof group.setPluginData === "function") {
+      try {
+        group.setPluginData(AI_TEXT_HIGHLIGHT_GROUP_PLUGIN_KEY, "1");
+        group.setPluginData(AI_TEXT_HIGHLIGHT_GROUP_TEXT_NODE_KEY, node && typeof node.id === "string" ? node.id : "");
+      } catch (error) {}
+    }
+  }
+
+  function isReusableTextHighlightGroup(group, node) {
+    if (!group || group.removed || (group.type !== "GROUP" && group.type !== "FRAME")) {
+      return false;
+    }
+
+    if (!node || node.removed || node.parent !== group) {
+      return false;
+    }
+
+    if (safeName(group) === AI_TEXT_HIGHLIGHT_GROUP_NAME || looksLikeLegacyTextHighlightGroup(group, node)) {
+      return true;
+    }
+
+    if (typeof group.getPluginData === "function") {
+      try {
+        return group.getPluginData(AI_TEXT_HIGHLIGHT_GROUP_PLUGIN_KEY) === "1";
+      } catch (error) {}
+    }
+
+    return false;
+  }
+
+  function isReusableTextHighlightContainer(group) {
+    if (!group || group.removed || (group.type !== "GROUP" && group.type !== "FRAME")) {
+      return false;
+    }
+
+    if (safeName(group) === AI_TEXT_HIGHLIGHT_GROUP_NAME) {
+      return true;
+    }
+
+    if (typeof group.getPluginData === "function") {
+      try {
+        return group.getPluginData(AI_TEXT_HIGHLIGHT_GROUP_PLUGIN_KEY) === "1";
+      } catch (error) {}
+    }
+
+    return false;
+  }
+
+  function looksLikeLegacyTextHighlightGroup(group, node) {
+    if (!group || group.type !== "GROUP" || !node || node.parent !== group) {
+      return false;
+    }
+    if (!("children" in group) || !Array.isArray(group.children)) {
+      return false;
+    }
+
+    let hasText = false;
+    let hasHighlightShape = false;
+    for (const child of group.children) {
+      if (!child || child.removed) {
+        continue;
+      }
+      if (child.id === node.id || child.type === "TEXT") {
+        hasText = true;
+      }
+      const childName = safeName(child);
+      if (
+        /highlight/i.test(childName) &&
+        (child.type === "RECTANGLE" || child.type === "VECTOR" || child.type === "LINE" || child.type === "BOOLEAN_OPERATION")
+      ) {
+        hasHighlightShape = true;
+      }
+    }
+
+    return hasText && hasHighlightShape && /highlight/i.test(safeName(group));
+  }
+
+  function placeTextHighlightRectBehindNode(parent, rect, nodeId, index) {
+    if (!parent || !rect || typeof parent.insertChild !== "function") {
+      return;
+    }
+
+    const targetIndex =
+      typeof index === "number" && index >= 0 ? index : findNodeChildIndex(parent, typeof nodeId === "string" ? nodeId : "");
+    if (targetIndex < 0) {
+      return;
+    }
+
+    try {
+      parent.insertChild(targetIndex, rect);
+      if (isAutoLayoutParent(parent)) {
+        setTextHighlightAbsoluteLayout(rect);
+      }
+    } catch (error) {}
+  }
+
+  function findNodeChildIndex(parent, nodeId) {
+    if (!parent || !("children" in parent) || !Array.isArray(parent.children)) {
+      return -1;
+    }
+
+    for (let index = 0; index < parent.children.length; index += 1) {
+      if (parent.children[index] && parent.children[index].id === nodeId) {
+        return index;
+      }
+    }
+
+    return -1;
+  }
+
+  function isAutoLayoutParent(node) {
+    return !!node && "layoutMode" in node && typeof node.layoutMode === "string" && node.layoutMode !== "NONE";
+  }
+
+  function shouldPreserveAbsoluteLayoutPositioning(node) {
+    return !!node && "layoutPositioning" in node && node.layoutPositioning === "ABSOLUTE";
+  }
+
+  function buildTextHighlightPadding(fontSize) {
+    const size = Math.max(12, Number(fontSize) || 16);
+    return {
+      left: roundTextHighlightMetric(Math.max(6, size * 0.18)),
+      right: roundTextHighlightMetric(Math.max(6, size * 0.18)),
+      top: roundTextHighlightMetric(Math.max(3, size * 0.08)),
+      bottom: roundTextHighlightMetric(Math.max(4, size * 0.12)),
+      radius: roundTextHighlightMetric(Math.max(4, Math.min(14, size * 0.16))),
+    };
+  }
+
+  function buildTextHighlightBoxPixelPadding(fontSize, boxPaddingPx) {
+    const size = Math.max(12, Number(fontSize) || 16);
+    const padding = sanitizeTextHighlightBoxPaddingPx(boxPaddingPx, AI_TEXT_HIGHLIGHT_DEFAULT_BOX_PADDING_PX);
+    return {
+      left: padding,
+      right: padding,
+      top: padding,
+      bottom: padding,
+      radius: roundTextHighlightMetric(Math.max(0, Math.min(14, size * 0.16))),
+    };
+  }
+
+  function getNodeRenderBounds(node) {
+    if (!node || node.removed) {
+      return null;
+    }
+
+    try {
+      const renderBounds = "absoluteRenderBounds" in node ? node.absoluteRenderBounds : null;
+      if (renderBounds && renderBounds.width > 0 && renderBounds.height > 0) {
+        return {
+          x: roundTextHighlightMetric(renderBounds.x),
+          y: roundTextHighlightMetric(renderBounds.y),
+          width: roundTextHighlightMetric(renderBounds.width),
+          height: roundTextHighlightMetric(renderBounds.height),
+        };
+      }
+    } catch (error) {}
+
+    try {
+      const absoluteBounds = "absoluteBoundingBox" in node ? node.absoluteBoundingBox : null;
+      if (absoluteBounds && absoluteBounds.width > 0 && absoluteBounds.height > 0) {
+        return {
+          x: roundTextHighlightMetric(absoluteBounds.x),
+          y: roundTextHighlightMetric(absoluteBounds.y),
+          width: roundTextHighlightMetric(absoluteBounds.width),
+          height: roundTextHighlightMetric(absoluteBounds.height),
+        };
+      }
+    } catch (error) {}
+
+    try {
+      if ("width" in node && "height" in node && Number(node.width) > 0 && Number(node.height) > 0) {
+        const matrix = getAbsoluteTransformMatrix(node);
+        const isAxisAligned =
+          Math.abs(Number(matrix[0][1]) || 0) <= 0.0001 &&
+          Math.abs(Number(matrix[1][0]) || 0) <= 0.0001;
+        if (isAxisAligned) {
+          return {
+            x: roundTextHighlightMetric(Number(matrix[0][2]) || 0),
+            y: roundTextHighlightMetric(Number(matrix[1][2]) || 0),
+            width: roundTextHighlightMetric(Number(node.width) || 0),
+            height: roundTextHighlightMetric(Number(node.height) || 0),
+          };
+        }
+      }
+    } catch (error) {}
+
+    return null;
+  }
+
+  function getAbsoluteTransformMatrix(node) {
+    if (node && Array.isArray(node.absoluteTransform) && node.absoluteTransform.length >= 2) {
+      const row0 = Array.isArray(node.absoluteTransform[0]) ? node.absoluteTransform[0] : [];
+      const row1 = Array.isArray(node.absoluteTransform[1]) ? node.absoluteTransform[1] : [];
+      const a = Number(row0[0]);
+      const c = Number(row0[1]);
+      const e = Number(row0[2]);
+      const b = Number(row1[0]);
+      const d = Number(row1[1]);
+      const f = Number(row1[2]);
+      return [
+        [Number.isFinite(a) ? a : 1, Number.isFinite(c) ? c : 0, Number.isFinite(e) ? e : 0],
+        [Number.isFinite(b) ? b : 0, Number.isFinite(d) ? d : 1, Number.isFinite(f) ? f : 0],
+      ];
+    }
+
+    if (node && "x" in node && typeof node.x === "number" && "y" in node && typeof node.y === "number") {
+      return [
+        [1, 0, Number(node.x) || 0],
+        [0, 1, Number(node.y) || 0],
+      ];
+    }
+
+    return createIdentityTransform();
+  }
+
+  function createIdentityTransform() {
+    return [
+      [1, 0, 0],
+      [0, 1, 0],
+    ];
+  }
+
+  function invertAffineTransform(matrix) {
+    if (!Array.isArray(matrix) || matrix.length < 2) {
+      return null;
+    }
+
+    const a = Number(matrix[0][0]) || 0;
+    const c = Number(matrix[0][1]) || 0;
+    const e = Number(matrix[0][2]) || 0;
+    const b = Number(matrix[1][0]) || 0;
+    const d = Number(matrix[1][1]) || 0;
+    const f = Number(matrix[1][2]) || 0;
+    const determinant = a * d - b * c;
+
+    if (!Number.isFinite(determinant) || Math.abs(determinant) < 1e-8) {
+      return null;
+    }
+
+    return [
+      [d / determinant, -c / determinant, (c * f - d * e) / determinant],
+      [-b / determinant, a / determinant, (b * e - a * f) / determinant],
+    ];
+  }
+
+  function multiplyAffineTransforms(left, right) {
+    return [
+      [
+        left[0][0] * right[0][0] + left[0][1] * right[1][0],
+        left[0][0] * right[0][1] + left[0][1] * right[1][1],
+        left[0][0] * right[0][2] + left[0][1] * right[1][2] + left[0][2],
+      ],
+      [
+        left[1][0] * right[0][0] + left[1][1] * right[1][0],
+        left[1][0] * right[0][1] + left[1][1] * right[1][1],
+        left[1][0] * right[0][2] + left[1][1] * right[1][2] + left[1][2],
+      ],
+    ];
+  }
+
+  function transformPointWithMatrix(matrix, x, y) {
+    return {
+      x: matrix[0][0] * x + matrix[0][1] * y + matrix[0][2],
+      y: matrix[1][0] * x + matrix[1][1] * y + matrix[1][2],
+    };
+  }
+
+  function getTextHighlightLocalBounds(inverseTransform, worldBounds) {
+    const corners = [
+      transformPointWithMatrix(inverseTransform, worldBounds.x, worldBounds.y),
+      transformPointWithMatrix(inverseTransform, worldBounds.x + worldBounds.width, worldBounds.y),
+      transformPointWithMatrix(inverseTransform, worldBounds.x, worldBounds.y + worldBounds.height),
+      transformPointWithMatrix(inverseTransform, worldBounds.x + worldBounds.width, worldBounds.y + worldBounds.height),
+    ];
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    for (const point of corners) {
+      minX = Math.min(minX, point.x);
+      minY = Math.min(minY, point.y);
+      maxX = Math.max(maxX, point.x);
+      maxY = Math.max(maxY, point.y);
+    }
+
+    return {
+      x: roundTextHighlightMetric(minX),
+      y: roundTextHighlightMetric(minY),
+      width: roundTextHighlightMetric(Math.max(1, maxX - minX)),
+      height: roundTextHighlightMetric(Math.max(1, maxY - minY)),
+    };
+  }
+
+  function getTextHighlightWorldBoundsFromLocalBounds(node, localBounds) {
+    const bounds = normalizeTextHighlightWorldBounds(localBounds);
+    if (!bounds) {
+      return null;
+    }
+
+    const matrix = getAbsoluteTransformMatrix(node);
+    const corners = [
+      transformPointWithMatrix(matrix, bounds.x, bounds.y),
+      transformPointWithMatrix(matrix, bounds.x + bounds.width, bounds.y),
+      transformPointWithMatrix(matrix, bounds.x, bounds.y + bounds.height),
+      transformPointWithMatrix(matrix, bounds.x + bounds.width, bounds.y + bounds.height),
+    ];
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    for (const point of corners) {
+      minX = Math.min(minX, point.x);
+      minY = Math.min(minY, point.y);
+      maxX = Math.max(maxX, point.x);
+      maxY = Math.max(maxY, point.y);
+    }
+
+    if (!Number.isFinite(minX) || !Number.isFinite(minY) || maxX <= minX || maxY <= minY) {
+      return null;
+    }
+
+    return {
+      x: roundTextHighlightMetric(minX),
+      y: roundTextHighlightMetric(minY),
+      width: roundTextHighlightMetric(Math.max(1, maxX - minX)),
+      height: roundTextHighlightMetric(Math.max(1, maxY - minY)),
+    };
+  }
+
+  function roundTextHighlightMetric(value) {
+    return Math.round((Number(value) || 0) * 1000) / 1000;
+  }
+
+  function ceilTextHighlightMetric(value) {
+    return Math.max(1, Math.ceil(Number(value) || 0));
+  }
+
+  function roundTextHighlightThickness(value) {
+    return Math.max(1, Math.round(Number(value) || 0));
+  }
+
+  function ceilTextHighlightThickness(value) {
+    return Math.max(1, Math.ceil(Number(value) || 0));
+  }
+
+  function sanitizeHexColor(value, fallback) {
+    const next = normalizeHexCandidate(value);
+    if (next) {
+      return next;
+    }
+
+    const fallbackValue = normalizeHexCandidate(fallback);
+    return fallbackValue || AI_TEXT_HIGHLIGHT_DEFAULT_TEXT_COLOR;
+  }
+
+  function sanitizeTextHighlightRadius(value, fallback) {
+    const next = parseTextHighlightRadius(value);
+    if (typeof next === "number") {
+      return next;
+    }
+
+    const fallbackValue = parseTextHighlightRadius(fallback);
+    return typeof fallbackValue === "number" ? fallbackValue : AI_TEXT_HIGHLIGHT_DEFAULT_RADIUS;
+  }
+
+  function sanitizeTextHighlightDecorationScale(value, fallback) {
+    const next = parseTextHighlightDecorationScale(value);
+    if (typeof next === "number") {
+      return next;
+    }
+
+    const fallbackValue = parseTextHighlightDecorationScale(fallback);
+    return typeof fallbackValue === "number" ? fallbackValue : AI_TEXT_HIGHLIGHT_DEFAULT_DECORATION_SCALE;
+  }
+
+  function sanitizeTextHighlightBoxPaddingPx(value, fallback) {
+    const numeric = parseFloat(typeof value === "number" ? String(value) : String(value || "").trim());
+    if (isFinite(numeric)) {
+      return roundTextHighlightMetric(Math.max(-999, Math.min(999, Math.round(numeric))));
+    }
+
+    const fallbackValue = parseFloat(typeof fallback === "number" ? String(fallback) : String(fallback || "").trim());
+    if (isFinite(fallbackValue)) {
+      return roundTextHighlightMetric(Math.max(-999, Math.min(999, Math.round(fallbackValue))));
+    }
+
+    return AI_TEXT_HIGHLIGHT_DEFAULT_BOX_PADDING_PX;
+  }
+
+  function parseTextHighlightRadius(value) {
+    const raw = typeof value === "number" ? String(value) : String(value || "").trim();
+    if (!raw) {
+      return null;
+    }
+
+    const numeric = parseFloat(raw);
+    if (!isFinite(numeric)) {
+      return null;
+    }
+
+    return roundTextHighlightMetric(Math.max(0, Math.min(999, Math.round(numeric))));
+  }
+
+  function parseTextHighlightDecorationScale(value) {
+    const raw = typeof value === "number" ? String(value) : String(value || "").trim();
+    if (!raw) {
+      return null;
+    }
+
+    const numeric = parseFloat(raw);
+    if (!isFinite(numeric)) {
+      return null;
+    }
+
+    return roundTextHighlightMetric(Math.max(1, Math.min(10, Math.round(numeric * 10) / 10)));
+  }
+
+  function normalizeHexCandidate(value) {
+    const raw = String(value || "")
+      .trim()
+      .replace(/^#+/, "")
+      .toUpperCase();
+
+    if (/^[0-9A-F]{6}$/.test(raw)) {
+      return `#${raw}`;
+    }
+
+    if (/^[0-9A-F]{3}$/.test(raw)) {
+      return `#${raw[0]}${raw[0]}${raw[1]}${raw[1]}${raw[2]}${raw[2]}`;
+    }
+
+    return "";
+  }
+
+  function hexToFigmaRgb(value) {
+    const hex = sanitizeHexColor(value, AI_TEXT_HIGHLIGHT_DEFAULT_TEXT_COLOR);
+    return {
+      r: parseInt(hex.slice(1, 3), 16) / 255,
+      g: parseInt(hex.slice(3, 5), 16) / 255,
+      b: parseInt(hex.slice(5, 7), 16) / 255,
+    };
+  }
+
+  function rgbToHex(color) {
+    if (!color || typeof color !== "object") {
+      return "";
+    }
+
+    const red = Math.max(0, Math.min(255, Math.round((Number(color.r) || 0) * 255)));
+    const green = Math.max(0, Math.min(255, Math.round((Number(color.g) || 0) * 255)));
+    const blue = Math.max(0, Math.min(255, Math.round((Number(color.b) || 0) * 255)));
+
+    return `#${red.toString(16).padStart(2, "0")}${green.toString(16).padStart(2, "0")}${blue
+      .toString(16)
+      .padStart(2, "0")}`.toUpperCase();
+  }
+
+  function extractVisibleSolidPaintHex(paints) {
+    if (!Array.isArray(paints)) {
+      return "";
+    }
+
+    for (const paint of paints) {
+      if (!paint || paint.type !== "SOLID" || paint.visible === false || !paint.color) {
+        continue;
+      }
+
+      const opacity = typeof paint.opacity === "number" ? paint.opacity : 1;
+      if (!Number.isFinite(opacity) || opacity <= 0) {
+        continue;
+      }
+
+      const hex = rgbToHex(paint.color);
+      if (hex) {
+        return hex;
+      }
+    }
+
+    return "";
+  }
+
+  function createSolidPaint(hexColor) {
+    return {
+      type: "SOLID",
+      visible: true,
+      opacity: 1,
+      blendMode: "NORMAL",
+      color: hexToFigmaRgb(hexColor),
+    };
+  }
+
+  function createTransparentPaint() {
+    return {
+      type: "SOLID",
+      visible: true,
+      opacity: 0,
+      blendMode: "NORMAL",
+      color: { r: 0, g: 0, b: 0 },
+    };
+  }
+
   function normalizeErrorMessage(error, fallback) {
     if (error && typeof error === "object" && typeof error.message === "string" && error.message.trim()) {
       return error.message.trim();
@@ -22651,9 +29544,21 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       node,
       nodeName,
       nodeType,
+      fieldKey: "rotation",
+      label: "rotation",
+      value: node.rotation,
+      kind: "direct",
+      category: "rotation",
+    });
+    maybeAddCandidate({
+      candidates,
+      excluded,
+      node,
+      nodeName,
+      nodeType,
       fieldKey: "x",
       label: "x",
-      value: node.x,
+      value: getVisualPositionValue(node, "x"),
       kind: "position",
       category: "position",
     });
@@ -22665,11 +29570,10 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       nodeType,
       fieldKey: "y",
       label: "y",
-      value: node.y,
+      value: getVisualPositionValue(node, "y"),
       kind: "position",
       category: "position",
     });
-
     if (resizable) {
       maybeAddCandidate({
         candidates,
@@ -22697,6 +29601,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       });
     }
 
+    collectAutoLayoutCandidates(node, nodeName, nodeType, candidates, excluded);
     maybeAddCandidate({
       candidates,
       excluded,
@@ -22776,6 +29681,86 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     collectPaintOpacityCandidates(node, nodeName, nodeType, "fills", "fill", candidates, excluded);
     collectPaintOpacityCandidates(node, nodeName, nodeType, "strokes", "stroke paint", candidates, excluded);
     collectLayerOpacityCandidate(node, nodeName, nodeType, candidates, excluded);
+  }
+
+  function collectAutoLayoutCandidates(node, nodeName, nodeType, candidates, excluded) {
+    if (!hasAutoLayout(node)) {
+      return;
+    }
+
+    maybeAddCandidate({
+      candidates,
+      excluded,
+      node,
+      nodeName,
+      nodeType,
+      fieldKey: "itemSpacing",
+      label: "auto layout gap",
+      value: typeof node.itemSpacing === "number" ? node.itemSpacing : null,
+      kind: "direct",
+      category: "auto-layout-gap",
+    });
+    maybeAddCandidate({
+      candidates,
+      excluded,
+      node,
+      nodeName,
+      nodeType,
+      fieldKey: "counterAxisSpacing",
+      label: "auto layout wrap gap",
+      value: typeof node.counterAxisSpacing === "number" ? node.counterAxisSpacing : null,
+      kind: "direct",
+      category: "auto-layout-gap",
+    });
+
+    maybeAddCandidate({
+      candidates,
+      excluded,
+      node,
+      nodeName,
+      nodeType,
+      fieldKey: "paddingTop",
+      label: "padding top",
+      value: typeof node.paddingTop === "number" ? node.paddingTop : null,
+      kind: "direct",
+      category: "auto-layout-padding",
+    });
+    maybeAddCandidate({
+      candidates,
+      excluded,
+      node,
+      nodeName,
+      nodeType,
+      fieldKey: "paddingRight",
+      label: "padding right",
+      value: typeof node.paddingRight === "number" ? node.paddingRight : null,
+      kind: "direct",
+      category: "auto-layout-padding",
+    });
+    maybeAddCandidate({
+      candidates,
+      excluded,
+      node,
+      nodeName,
+      nodeType,
+      fieldKey: "paddingBottom",
+      label: "padding bottom",
+      value: typeof node.paddingBottom === "number" ? node.paddingBottom : null,
+      kind: "direct",
+      category: "auto-layout-padding",
+    });
+    maybeAddCandidate({
+      candidates,
+      excluded,
+      node,
+      nodeName,
+      nodeType,
+      fieldKey: "paddingLeft",
+      label: "padding left",
+      value: typeof node.paddingLeft === "number" ? node.paddingLeft : null,
+      kind: "direct",
+      category: "auto-layout-padding",
+    });
   }
 
   function collectEffectCandidates(node, nodeName, nodeType, candidates, excluded) {
@@ -23093,8 +30078,14 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     switch (candidate.category) {
       case "position":
         return "가장 가까운 정수 좌표로 스냅했습니다.";
+      case "rotation":
+        return "Snap rotation to the nearest whole degree.";
       case "size":
         return "가장 가까운 정수 크기로 스냅했습니다.";
+      case "auto-layout-gap":
+        return "가장 가까운 정수 오토레이아웃 간격으로 스냅했습니다.";
+      case "auto-layout-padding":
+        return "가장 가까운 정수 오토레이아웃 패딩으로 스냅했습니다.";
       case "radius":
         return "가장 가까운 정수 반경 값으로 스냅했습니다.";
       case "effect-blur":
@@ -23154,29 +30145,34 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   }
 
   function applyPositionChange(node, fieldKey, targetValue) {
-    const currentX = typeof node.x === "number" ? node.x : null;
-    const currentY = typeof node.y === "number" ? node.y : null;
+    const position = getVisualPosition(node);
+    const currentX = position && typeof position.x === "number" ? position.x : null;
+    const currentY = position && typeof position.y === "number" ? position.y : null;
     if (!Number.isFinite(currentX) || !Number.isFinite(currentY)) {
       throw new Error("position 속성을 읽을 수 없습니다.");
     }
 
     const desiredX = fieldKey === "x" ? targetValue : currentX;
     const desiredY = fieldKey === "y" ? targetValue : currentY;
+    const deltaX = desiredX - currentX;
+    const deltaY = desiredY - currentY;
+
+    if (Math.abs(deltaX) <= VALUE_EPSILON && Math.abs(deltaY) <= VALUE_EPSILON) {
+      return;
+    }
 
     if ("x" in node && "y" in node) {
       try {
-        node.x = desiredX;
-        node.y = desiredY;
+        node.x += deltaX;
+        node.y += deltaY;
       } catch (error) {}
     }
 
-    if (isCloseEnough(node.x, desiredX) && isCloseEnough(node.y, desiredY)) {
+    if (isVisualPositionCloseEnough(node, desiredX, desiredY)) {
       return;
     }
 
     if (Array.isArray(node.relativeTransform) && node.relativeTransform.length === 2) {
-      const deltaX = desiredX - currentX;
-      const deltaY = desiredY - currentY;
       const transform = node.relativeTransform;
       node.relativeTransform = [
         [transform[0][0], transform[0][1], roundValue(transform[0][2] + deltaX)],
@@ -23184,9 +30180,61 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       ];
     }
 
-    if (!isCloseEnough(node.x, desiredX) || !isCloseEnough(node.y, desiredY)) {
+    if (!isVisualPositionCloseEnough(node, desiredX, desiredY)) {
       throw new Error("position 적용에 실패했습니다.");
     }
+  }
+
+  function getVisualPositionValue(node, axis) {
+    const position = getVisualPosition(node);
+    return position && typeof position[axis] === "number" ? position[axis] : null;
+  }
+
+  function getVisualPosition(node) {
+    if (!node) {
+      return null;
+    }
+
+    const nodeBounds = getAbsoluteBounds(node);
+    if (nodeBounds) {
+      const parentBounds = getAbsoluteBounds(node.parent);
+      return {
+        x: parentBounds ? nodeBounds.x - parentBounds.x : nodeBounds.x,
+        y: parentBounds ? nodeBounds.y - parentBounds.y : nodeBounds.y,
+      };
+    }
+
+    if (typeof node.x === "number" && typeof node.y === "number") {
+      return {
+        x: node.x,
+        y: node.y,
+      };
+    }
+
+    return null;
+  }
+
+  function getAbsoluteBounds(node) {
+    if (!node || !node.absoluteBoundingBox) {
+      return null;
+    }
+
+    const bounds = node.absoluteBoundingBox;
+    if (
+      typeof bounds.x !== "number" ||
+      typeof bounds.y !== "number" ||
+      !Number.isFinite(bounds.x) ||
+      !Number.isFinite(bounds.y)
+    ) {
+      return null;
+    }
+
+    return bounds;
+  }
+
+  function isVisualPositionCloseEnough(node, expectedX, expectedY) {
+    const position = getVisualPosition(node);
+    return !!position && isCloseEnough(position.x, expectedX) && isCloseEnough(position.y, expectedY);
   }
 
   function applySizeChange(node, fieldKey, targetValue) {
@@ -23582,6 +30630,10 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
 
     return typeof node.resizeWithoutConstraints === "function" || typeof node.resize === "function";
+  }
+
+  function hasAutoLayout(node) {
+    return !!node && typeof node.layoutMode === "string" && node.layoutMode !== "NONE";
   }
 
   function cloneEffects(effects) {
@@ -24132,6 +31184,600 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
 ;(() => {
   const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
+  if (globalScope.__PIGMA_FIGMA_URL_SHORTENER_PATCH__) {
+    return;
+  }
+
+  const originalOnMessage = figma.ui.onmessage;
+  const AI_SETTINGS_KEY = "pigma:ai-settings:v1";
+  const DUB_LINKS_API_URL = "https://api.dub.co/links";
+  const DUB_SHORTENER_PROXY_URL = "";
+  const BUNDLED_DUB_API_KEY = "dub_r1y6JZGJtEAGD5vqJ17gIOqU";
+  const shortUrlCache = {};
+  let isRunning = false;
+
+  if (typeof originalOnMessage !== "function") {
+    return;
+  }
+
+  figma.ui.onmessage = async (message) => {
+    if (isShortenRequestMessage(message)) {
+      if (isRunning) {
+        postStatus("running", "주소 줄이기를 이미 진행 중입니다.");
+        return;
+      }
+
+      await runShortenFigmaUrl();
+      return;
+    }
+
+    return originalOnMessage(message);
+  };
+
+  globalScope.__PIGMA_FIGMA_URL_SHORTENER_PATCH__ = true;
+
+  function isShortenRequestMessage(message) {
+    return !!message && message.type === "run-shorten-figma-url";
+  }
+
+  async function runShortenFigmaUrl() {
+    isRunning = true;
+    postStatus("running", "선택한 프레임 또는 섹션의 프로토타입 주소를 줄이는 중입니다.");
+
+    try {
+      await ensureCurrentPageLoaded();
+      const target = collectTargetNode();
+      const longUrl = buildPrototypeLink(target);
+      const shortUrl = await getShortUrl(longUrl);
+      figma.ui.postMessage({
+        type: "shorten-figma-url-result",
+        result: {
+          selectionId: target.node.id,
+          shareNodeId: target.shareNode.id,
+          selectionLabel: safeName(target.node),
+          selectionType: safeNodeType(target.node),
+          longUrl: longUrl,
+          shortUrl: shortUrl,
+        },
+      });
+      figma.notify("단축 주소를 준비했습니다.", { timeout: 1800 });
+    } catch (error) {
+      const message = normalizeErrorMessage(error, "주소 줄이기에 실패했습니다.");
+      figma.ui.postMessage({
+        type: "shorten-figma-url-error",
+        message: message,
+      });
+      figma.notify(message, { error: true, timeout: 2600 });
+    } finally {
+      isRunning = false;
+    }
+  }
+
+  function postStatus(status, message) {
+    figma.ui.postMessage({
+      type: "shorten-figma-url-status",
+      status: status,
+      message: message,
+    });
+  }
+
+  function collectTargetNode() {
+    const selection = Array.from(figma.currentPage.selection || []).filter(Boolean);
+    if (!selection.length) {
+      throw new Error("프레임 또는 섹션 1개를 먼저 선택해 주세요.");
+    }
+
+    if (selection.length !== 1) {
+      throw new Error("프레임 또는 섹션은 1개만 선택할 수 있습니다.");
+    }
+
+    const node = selection[0];
+    if (!node || node.removed) {
+      throw new Error("선택한 대상을 다시 찾지 못했습니다. 다시 선택해 주세요.");
+    }
+
+    if (node.type !== "FRAME" && node.type !== "SECTION") {
+      throw new Error("프레임 또는 섹션 1개를 선택한 경우에만 주소 줄이기를 사용할 수 있습니다.");
+    }
+
+    const shareNode = resolvePrototypeShareNode(node);
+    const page = getPageNode(shareNode);
+
+    return {
+      node: node,
+      shareNode: shareNode,
+      page: page,
+    };
+  }
+
+  async function getShortUrl(longUrl) {
+    const normalizedLongUrl = String(longUrl || "").trim();
+    if (!normalizedLongUrl) {
+      throw new Error("단축할 주소를 만들지 못했습니다.");
+    }
+
+    const dubApiKey = (await readDubApiKey()) || sanitizeApiKey(BUNDLED_DUB_API_KEY);
+    const cacheKey = (dubApiKey ? "dub:" : "public:") + normalizedLongUrl;
+    if (shortUrlCache[cacheKey]) {
+      return shortUrlCache[cacheKey];
+    }
+
+    let lastError = "";
+
+    if (DUB_SHORTENER_PROXY_URL) {
+      const proxyCacheKey = "proxy:" + normalizedLongUrl;
+      if (shortUrlCache[proxyCacheKey]) {
+        return shortUrlCache[proxyCacheKey];
+      }
+
+      try {
+        const proxyShortUrl = await requestProxyShortUrl(normalizedLongUrl);
+        shortUrlCache[proxyCacheKey] = proxyShortUrl;
+        return proxyShortUrl;
+      } catch (error) {
+        lastError = normalizeErrorMessage(error, "주소 단축 서버로 주소를 줄이지 못했습니다.");
+      }
+    }
+
+    if (dubApiKey) {
+      try {
+        const dubShortUrl = await requestDubShortUrl(normalizedLongUrl, dubApiKey);
+        shortUrlCache[cacheKey] = dubShortUrl;
+        return dubShortUrl;
+      } catch (error) {
+        lastError = normalizeErrorMessage(error, "Dub로 주소를 줄이지 못했습니다.");
+      }
+    }
+
+    try {
+      const isGdShortUrl = await requestIsGdShortUrl(normalizedLongUrl);
+      shortUrlCache[cacheKey] = isGdShortUrl;
+      return isGdShortUrl;
+    } catch (error) {
+      const isGdError = normalizeErrorMessage(error, "is.gd로 주소를 줄이지 못했습니다.");
+      lastError = lastError ? lastError + " / " + isGdError : isGdError;
+    }
+
+    try {
+      const tinyUrlShortUrl = await requestTinyUrlShortUrl(normalizedLongUrl);
+      shortUrlCache[cacheKey] = tinyUrlShortUrl;
+      return tinyUrlShortUrl;
+    } catch (error) {
+      const tinyUrlError = normalizeErrorMessage(error, "TinyURL로 주소를 줄이지 못했습니다.");
+      throw new Error(lastError ? lastError + " / " + tinyUrlError : tinyUrlError);
+    }
+  }
+
+  async function readDubApiKey() {
+    try {
+      const settings = await figma.clientStorage.getAsync(AI_SETTINGS_KEY);
+      if (!settings || typeof settings !== "object") {
+        return "";
+      }
+
+      return sanitizeApiKey(settings.dubApiKey);
+    } catch (error) {
+      return "";
+    }
+  }
+
+  async function requestDubShortUrl(longUrl, apiKey) {
+    let response;
+    let text = "";
+    try {
+      response = await fetch(DUB_LINKS_API_URL, {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + apiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          url: longUrl,
+        }),
+      });
+      text = String(await response.text()).trim();
+    } catch (error) {
+      throw new Error("Dub에 연결하지 못했습니다.");
+    }
+
+    let payload = null;
+    if (text) {
+      try {
+        payload = JSON.parse(text);
+      } catch (error) {
+        payload = null;
+      }
+    }
+
+    if (!response.ok) {
+      throw new Error(normalizeDubError(payload, text, response.status));
+    }
+
+    const shortLink =
+      payload && typeof payload.shortLink === "string" && payload.shortLink.trim()
+        ? payload.shortLink.trim()
+        : payload && typeof payload.shortUrl === "string" && payload.shortUrl.trim()
+          ? payload.shortUrl.trim()
+          : "";
+
+    if (!shortLink) {
+      throw new Error("Dub에서 단축 주소를 받지 못했습니다.");
+    }
+
+    if (!/^https?:\/\//i.test(shortLink)) {
+      throw new Error("Dub 응답 형식을 확인하지 못했습니다.");
+    }
+
+    return shortLink;
+  }
+
+  async function requestProxyShortUrl(longUrl) {
+    let response;
+    let text = "";
+    try {
+      response = await fetch(DUB_SHORTENER_PROXY_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          url: longUrl,
+        }),
+      });
+      text = String(await response.text()).trim();
+    } catch (error) {
+      throw new Error("주소 단축 서버에 연결하지 못했습니다.");
+    }
+
+    let payload = null;
+    if (text) {
+      try {
+        payload = JSON.parse(text);
+      } catch (error) {
+        payload = null;
+      }
+    }
+
+    if (!response.ok) {
+      throw new Error(normalizeProxyError(payload, text, response.status));
+    }
+
+    const shortUrl =
+      payload && typeof payload.shortUrl === "string" && payload.shortUrl.trim()
+        ? payload.shortUrl.trim()
+        : payload && typeof payload.shortLink === "string" && payload.shortLink.trim()
+          ? payload.shortLink.trim()
+          : "";
+
+    if (!shortUrl) {
+      throw new Error("주소 단축 서버에서 단축 주소를 받지 못했습니다.");
+    }
+
+    if (!/^https?:\/\//i.test(shortUrl)) {
+      throw new Error("주소 단축 서버 응답 형식을 확인하지 못했습니다.");
+    }
+
+    return shortUrl;
+  }
+
+  function normalizeDubError(payload, text, statusCode) {
+    const data = payload && typeof payload === "object" ? payload : {};
+    const message =
+      typeof data.message === "string" && data.message.trim()
+        ? data.message.trim()
+        : typeof data.error === "string" && data.error.trim()
+          ? data.error.trim()
+          : String(text || "").replace(/\s+/g, " ").trim();
+
+    if (message) {
+      return message;
+    }
+
+    if (statusCode === 401 || statusCode === 403) {
+      return "Dub API 키 권한을 확인해 주세요.";
+    }
+
+    if (statusCode === 429) {
+      return "Dub 사용량 또는 요청 제한을 초과했습니다.";
+    }
+
+    return "Dub로 주소를 줄이지 못했습니다.";
+  }
+
+  function normalizeProxyError(payload, text, statusCode) {
+    const data = payload && typeof payload === "object" ? payload : {};
+    const message =
+      typeof data.message === "string" && data.message.trim()
+        ? data.message.trim()
+        : typeof data.error === "string" && data.error.trim()
+          ? data.error.trim()
+          : String(text || "").replace(/\s+/g, " ").trim();
+
+    if (message) {
+      return message;
+    }
+
+    if (statusCode === 429) {
+      return "주소 단축 서버 사용량 또는 요청 제한을 초과했습니다.";
+    }
+
+    return "주소 단축 서버로 주소를 줄이지 못했습니다.";
+  }
+
+  function sanitizeApiKey(value) {
+    return String(value || "")
+      .replace(/[\u0000-\u001F\u007F-\u009F]/g, "")
+      .replace(/[\u200B-\u200D\uFEFF]/g, "")
+      .replace(/\s+/g, "")
+      .replace(/^['"`]+|['"`]+$/g, "")
+      .replace(/[^\x21-\x7E]/g, "")
+      .trim();
+  }
+
+  async function requestIsGdShortUrl(longUrl) {
+    let response;
+    try {
+      response = await fetch("https://is.gd/create.php?format=simple&url=" + encodeURIComponent(longUrl), {
+        method: "GET",
+      });
+    } catch (error) {
+      throw new Error("is.gd에 연결하지 못했습니다.");
+    }
+
+    const text = String(await response.text()).trim();
+    if (!response.ok) {
+      throw new Error(normalizeShortenerError("is.gd", text, response.status));
+    }
+
+    if (!text) {
+      throw new Error("is.gd에서 단축 주소를 받지 못했습니다.");
+    }
+
+    if (/^Error:\s*/i.test(text)) {
+      throw new Error(text.replace(/^Error:\s*/i, "").trim() || "is.gd가 주소 단축 요청을 처리하지 못했습니다.");
+    }
+
+    if (!/^https?:\/\//i.test(text)) {
+      throw new Error("is.gd 응답 형식을 확인하지 못했습니다.");
+    }
+
+    return text;
+  }
+
+  async function requestTinyUrlShortUrl(longUrl) {
+    let response;
+    try {
+      response = await fetch("https://tinyurl.com/api-create.php?url=" + encodeURIComponent(longUrl), {
+        method: "GET",
+      });
+    } catch (error) {
+      throw new Error("TinyURL에 연결하지 못했습니다.");
+    }
+
+    const text = String(await response.text()).trim();
+    if (!response.ok) {
+      throw new Error(normalizeShortenerError("TinyURL", text, response.status));
+    }
+
+    if (!text) {
+      throw new Error("TinyURL에서 단축 주소를 받지 못했습니다.");
+    }
+
+    if (/^Error:\s*/i.test(text)) {
+      throw new Error(text.replace(/^Error:\s*/i, "").trim() || "TinyURL이 주소 단축 요청을 처리하지 못했습니다.");
+    }
+
+    if (!/^https?:\/\//i.test(text)) {
+      throw new Error("TinyURL 응답 형식을 확인하지 못했습니다.");
+    }
+
+    return text;
+  }
+
+  function normalizeShortenerError(providerLabel, text, statusCode) {
+    const normalized = String(text || "").replace(/^Error:\s*/i, "").replace(/\s+/g, " ").trim();
+    if (normalized) {
+      return normalized;
+    }
+
+    if (statusCode === 502) {
+      return providerLabel + " 요청 한도를 초과했습니다. 잠시 후 다시 시도해 주세요.";
+    }
+
+    if (statusCode === 503) {
+      return providerLabel + " 서비스를 지금 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.";
+    }
+
+    return providerLabel + "로 주소를 줄이지 못했습니다.";
+  }
+
+  async function ensureCurrentPageLoaded() {
+    if (figma.currentPage && typeof figma.currentPage.loadAsync === "function") {
+      await figma.currentPage.loadAsync();
+    }
+  }
+
+  function buildPrototypeLink(target) {
+    const fileKey = getFileKey();
+    const fileNameSegment = buildFileNameSegment();
+    const shareNode = target && target.shareNode ? target.shareNode : null;
+    const page = target && target.page ? target.page : getPageNode(shareNode);
+    const nodeId = normalizeNodeIdForUrl(shareNode && shareNode.id);
+    const pageId = normalizePageIdForUrl(page && page.id);
+    return (
+      "https://www.figma.com/proto/" +
+      encodeURIComponent(fileKey) +
+      "/" +
+      fileNameSegment +
+      "?node-id=" +
+      nodeId +
+      "&page-id=" +
+      pageId +
+      "&scaling=min-zoom&content-scaling=fixed"
+    );
+  }
+
+  function getFileKey() {
+    const fileKey = typeof figma.fileKey === "string" ? figma.fileKey.trim() : "";
+    if (fileKey) {
+      return fileKey;
+    }
+
+    throw new Error("이 파일에서는 공유 주소를 만들 수 없습니다. 파일을 저장한 뒤 다시 시도해 주세요.");
+  }
+
+  function buildFileNameSegment() {
+    const rootName =
+      figma.root && typeof figma.root.name === "string" && figma.root.name.trim()
+        ? figma.root.name.trim()
+        : "shared-frame";
+    return encodeURIComponent(rootName).replace(/%20/g, "-");
+  }
+
+  function normalizeNodeIdForUrl(value) {
+    const raw = String(value || "").trim();
+    if (!raw) {
+      throw new Error("선택한 대상의 node id를 읽지 못했습니다.");
+    }
+
+    return encodeURIComponent(raw).replace(/%3A/gi, "-");
+  }
+
+  function normalizePageIdForUrl(value) {
+    const raw = String(value || "").trim();
+    if (!raw) {
+      throw new Error("선택한 페이지 id를 읽지 못했습니다.");
+    }
+
+    return encodeURIComponent(raw);
+  }
+
+  function resolvePrototypeShareNode(node) {
+    if (isPrototypePresentableNode(node)) {
+      return node;
+    }
+
+    if (!node || node.type !== "SECTION") {
+      throw new Error("프로토타입 공유용 프레임을 찾지 못했습니다.");
+    }
+
+    const candidates = collectSectionPrototypeCandidates(node);
+    if (!candidates.length) {
+      throw new Error("선택한 섹션 안에서 프로토타입으로 공유할 프레임을 찾지 못했습니다.");
+    }
+
+    const candidateById = new Map();
+    for (const candidate of candidates) {
+      candidateById.set(candidate.id, candidate);
+    }
+
+    const page = getPageNode(node);
+    if (page) {
+      const flowStartingPoints = Array.isArray(page.flowStartingPoints) ? page.flowStartingPoints : [];
+      for (const flow of flowStartingPoints) {
+        const flowNodeId = flow && typeof flow.nodeId === "string" ? flow.nodeId : "";
+        if (flowNodeId && candidateById.has(flowNodeId)) {
+          return candidateById.get(flowNodeId);
+        }
+      }
+
+      if (
+        page.prototypeStartNode &&
+        !page.prototypeStartNode.removed &&
+        candidateById.has(page.prototypeStartNode.id)
+      ) {
+        return candidateById.get(page.prototypeStartNode.id);
+      }
+    }
+
+    const reactionCandidate = candidates.find((candidate) => hasReactions(candidate));
+    if (reactionCandidate) {
+      return reactionCandidate;
+    }
+
+    return candidates[0];
+  }
+
+  function collectSectionPrototypeCandidates(section) {
+    const visibleMatches = [];
+    const hiddenMatches = [];
+    const stack = Array.isArray(section && section.children) ? Array.from(section.children) : [];
+
+    while (stack.length) {
+      const current = stack.shift();
+      if (!current || current.removed) {
+        continue;
+      }
+
+      if (isPrototypePresentableNode(current)) {
+        if (current.visible === false) {
+          hiddenMatches.push(current);
+        } else {
+          visibleMatches.push(current);
+        }
+      }
+
+      if (Array.isArray(current.children) && current.children.length) {
+        for (const child of current.children) {
+          stack.push(child);
+        }
+      }
+    }
+
+    return visibleMatches.length ? visibleMatches : hiddenMatches;
+  }
+
+  function isPrototypePresentableNode(node) {
+    if (!node || node.removed || typeof node.type !== "string") {
+      return false;
+    }
+
+    return node.type === "FRAME" || node.type === "GROUP" || node.type === "COMPONENT" || node.type === "INSTANCE";
+  }
+
+  function hasReactions(node) {
+    return !!node && Array.isArray(node.reactions) && node.reactions.length > 0;
+  }
+
+  function getPageNode(node) {
+    let current = node || null;
+    while (current) {
+      if (current.type === "PAGE") {
+        return current;
+      }
+      current = current.parent || null;
+    }
+
+    throw new Error("선택한 대상의 페이지를 찾지 못했습니다.");
+  }
+
+  function safeName(node) {
+    if (node && typeof node.name === "string" && node.name.trim()) {
+      return node.name.trim();
+    }
+
+    return safeNodeType(node);
+  }
+
+  function safeNodeType(node) {
+    return node && typeof node.type === "string" && node.type ? node.type : "NODE";
+  }
+
+  function normalizeErrorMessage(error, fallback) {
+    if (error && typeof error === "object" && typeof error.message === "string" && error.message.trim()) {
+      return error.message.trim();
+    }
+
+    if (typeof error === "string" && error.trim()) {
+      return error.trim();
+    }
+
+    return fallback;
+  }
+})();
+
+;(() => {
+  const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
   if (globalScope.__PIGMA_AI_COLOR_EXTRACT_PATCH__) {
     return;
   }
@@ -24302,7 +31948,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
           paletteName: created.group.name,
           swatchCount: created.swatches.length,
           columnCount: 3,
-          rowCount: 5,
+          rowCount: 7,
           domain: analysis.domain,
           brand: analysis.brand,
           intent: analysis.intent,
@@ -24598,29 +32244,12 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   function createPaletteNodes(palette, origin, selectionLabel, analysis) {
     const cellSize = 92;
     const gap = 12;
-    const rowLabels = [
-      "\uB300\uD45C\uC0C9",
-      "\uC5B4\uC6B8\uB9AC\uB294 \uC0C9",
-      "\uD3EC\uC778\uD2B8 \uC0C9",
-      "\uD14D\uC2A4\uD2B8 \uC5ED\uD560\uC0C9",
-      "\uADF8\uB77C\uB370\uC774\uC158 \uC0C9",
-    ];
-    const accentLabels = [
-      "\uD3EC\uC778\uD2B8 \uC0C9 1",
-      "\uD3EC\uC778\uD2B8 \uC0C9 2",
-      "\uD3EC\uC778\uD2B8 \uC0C9 3",
-    ];
-    const textRoleLabels = ["\uD14D\uC2A4\uD2B8 \uC8FC\uC870\uC0C9", "\uD14D\uC2A4\uD2B8 \uD558\uC774\uB77C\uC774\uD2B8", "\uD14D\uC2A4\uD2B8 \uC11C\uBE0C\uC0C9"];
-    const gradientLabels = [
-      "\uADF8\uB77C\uB370\uC774\uC158 \uC138\uD2B8 1",
-      "\uADF8\uB77C\uB370\uC774\uC158 \uC138\uD2B8 2",
-      "\uADF8\uB77C\uB370\uC774\uC158 \uC138\uD2B8 3",
-    ];
+    const rowDefinitions = buildPaletteRowDefinitions();
     const swatches = [];
-    const colors = [palette.representative, palette.companions, palette.accents, palette.text, palette.surfaces];
 
-    for (let rowIndex = 0; rowIndex < colors.length; rowIndex += 1) {
-      const row = colors[rowIndex];
+    for (let rowIndex = 0; rowIndex < rowDefinitions.length; rowIndex += 1) {
+      const rowDefinition = rowDefinitions[rowIndex];
+      const row = rowDefinition && palette && Array.isArray(palette[rowDefinition.key]) ? palette[rowDefinition.key] : [];
       for (let columnIndex = 0; columnIndex < row.length; columnIndex += 1) {
         const hex = row[columnIndex];
         const rectangle = figma.createRectangle();
@@ -24628,10 +32257,11 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         rectangle.y = origin.y + rowIndex * (cellSize + gap);
         rectangle.resize(cellSize, cellSize);
         rectangle.cornerRadius = 14;
-        const swatchLabel = getPaletteSwatchLabel(rowIndex, columnIndex, rowLabels, accentLabels, textRoleLabels, gradientLabels);
-        const swatchValue = getPaletteSwatchValue(rowIndex, columnIndex, palette);
+        const swatchLabel = getPaletteSwatchLabel(rowDefinition, columnIndex);
+        const swatchValue = getPaletteSwatchValue(rowDefinition, columnIndex, palette);
         rectangle.name = swatchLabel + " \u00B7 " + swatchValue;
-        rectangle.fills = rowIndex === 4 ? [buildGradientSwatchPaint(palette, columnIndex)] : [solidPaintFromHex(hex, 1)];
+        rectangle.fills =
+          rowDefinition && rowDefinition.gradient ? [buildGradientSwatchPaint(palette, columnIndex)] : [solidPaintFromHex(hex, 1)];
         rectangle.strokes = [solidPaintFromHex("#111827", 0.14)];
         rectangle.strokeWeight = 1;
         swatches.push(rectangle);
@@ -24664,26 +32294,62 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     };
   }
 
-  function getPaletteSwatchLabel(rowIndex, columnIndex, rowLabels, accentLabels, textRoleLabels, gradientLabels) {
-    if (rowIndex === 2) {
-      return accentLabels[columnIndex] || rowLabels[rowIndex] + " " + (columnIndex + 1);
-    }
-    if (rowIndex === 3) {
-      return textRoleLabels[columnIndex] || rowLabels[rowIndex] + " " + (columnIndex + 1);
-    }
-    if (rowIndex === 4) {
-      return gradientLabels[columnIndex] || rowLabels[rowIndex] + " " + (columnIndex + 1);
-    }
-    return rowLabels[rowIndex] + " " + (columnIndex + 1);
+  function buildPaletteRowDefinitions() {
+    return [
+      {
+        key: "representative",
+        label: "\uB300\uD45C\uC0C9",
+      },
+      {
+        key: "adobe",
+        label: "\uC5B4\uB3C4\uBE44 \uCD94\uCC9C\uC0C9",
+        columnLabels: ["\uC5B4\uB3C4\uBE44 \uCD94\uCC9C 1", "\uC5B4\uB3C4\uBE44 \uCD94\uCC9C 2", "\uC5B4\uB3C4\uBE44 \uCD94\uCC9C 3"],
+      },
+      {
+        key: "trendy",
+        label: "\uD2B8\uB80C\uB514 \uCEEC\uB7EC",
+        columnLabels: ["\uD2B8\uB80C\uB514 \uCEEC\uB7EC 1", "\uD2B8\uB80C\uB514 \uCEEC\uB7EC 2", "\uD2B8\uB80C\uB514 \uCEEC\uB7EC 3"],
+      },
+      {
+        key: "companions",
+        label: "\uC5B4\uC6B8\uB9AC\uB294 \uC0C9",
+      },
+      {
+        key: "accents",
+        label: "\uD3EC\uC778\uD2B8 \uC0C9",
+        columnLabels: ["\uD3EC\uC778\uD2B8 \uC0C9 1", "\uD3EC\uC778\uD2B8 \uC0C9 2", "\uD3EC\uC778\uD2B8 \uC0C9 3"],
+      },
+      {
+        key: "text",
+        label: "\uD14D\uC2A4\uD2B8 \uC5ED\uD560\uC0C9",
+        columnLabels: ["\uD14D\uC2A4\uD2B8 \uC8FC\uC870\uC0C9", "\uD14D\uC2A4\uD2B8 \uD558\uC774\uB77C\uC774\uD2B8", "\uD14D\uC2A4\uD2B8 \uC11C\uBE0C\uC0C9"],
+      },
+      {
+        key: "surfaces",
+        label: "\uADF8\uB77C\uB370\uC774\uC158 \uC0C9",
+        columnLabels: [
+          "\uADF8\uB77C\uB370\uC774\uC158 \uC138\uD2B8 1",
+          "\uADF8\uB77C\uB370\uC774\uC158 \uC138\uD2B8 2",
+          "\uADF8\uB77C\uB370\uC774\uC158 \uC138\uD2B8 3",
+        ],
+        gradient: true,
+      },
+    ];
   }
 
-  function getPaletteSwatchValue(rowIndex, columnIndex, palette) {
-    if (rowIndex === 4) {
+  function getPaletteSwatchLabel(rowDefinition, columnIndex) {
+    const rowLabel = rowDefinition && typeof rowDefinition.label === "string" ? rowDefinition.label : "\uC0C9";
+    const columnLabels = rowDefinition && Array.isArray(rowDefinition.columnLabels) ? rowDefinition.columnLabels : [];
+    return columnLabels[columnIndex] || rowLabel + " " + (columnIndex + 1);
+  }
+
+  function getPaletteSwatchValue(rowDefinition, columnIndex, palette) {
+    if (rowDefinition && rowDefinition.gradient) {
       return buildGradientSwatchColorLabel(palette, columnIndex);
     }
 
-    const rows = [palette.representative, palette.companions, palette.accents, palette.text, palette.surfaces];
-    const row = Array.isArray(rows[rowIndex]) ? rows[rowIndex] : [];
+    const key = rowDefinition && typeof rowDefinition.key === "string" ? rowDefinition.key : "";
+    const row = key && palette && Array.isArray(palette[key]) ? palette[key] : [];
     return row[columnIndex] || "#000000";
   }
 
@@ -24754,12 +32420,20 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     const accents = hasCompletePaletteRow(source.accents)
       ? normalizePaletteRow(source.accents, ["#EC4899", "#22C55E", "#FACC15"])
       : buildDerivedAccentRow(representative, companions);
+    const adobe = hasCompletePaletteRow(source.adobe)
+      ? normalizePaletteRow(source.adobe, buildDerivedAdobeRow(representative, companions, accents))
+      : buildDerivedAdobeRow(representative, companions, accents);
+    const trendy = hasCompletePaletteRow(source.trendy)
+      ? normalizePaletteRow(source.trendy, buildDerivedTrendyRow(representative, companions))
+      : buildDerivedTrendyRow(representative, companions);
     const text = normalizePaletteRow(source.text, ["#0F172A", "#2563EB", "#64748B"]);
     const surfaces = hasCompletePaletteRow(source.surfaces)
       ? normalizePaletteRow(source.surfaces, ["#E0F2FE", "#F5D0FE", "#FEF3C7"])
       : buildDerivedSurfaceRow(representative, companions, accents);
     return {
       representative: representative,
+      adobe: adobe,
+      trendy: trendy,
       companions: companions,
       accents: accents,
       text: text,
@@ -24794,6 +32468,40 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
           normalizeHue(base.h + hueShifts[index % hueShifts.length]),
           clampNumber(base.s < 0.22 ? 0.62 : base.s * 0.82 + 0.12, 0.48, 0.88),
           clampNumber(base.l < 0.25 ? 0.52 : base.l > 0.72 ? 0.58 : base.l, 0.38, 0.68)
+        )
+      );
+    }
+    return row;
+  }
+
+  function buildDerivedAdobeRow(representative, companions, accents) {
+    const hueShifts = [24, -18, 34];
+    const row = [];
+    for (let index = 0; index < 3; index += 1) {
+      const baseHex = accents[index] || companions[index] || representative[index] || "#EC4899";
+      const base = rgbBytesToHsl(hexToRgb(baseHex));
+      row.push(
+        hslByteToHex(
+          normalizeHue(base.h + hueShifts[index % hueShifts.length]),
+          clampNumber(base.s < 0.28 ? 0.68 : base.s * 0.82 + 0.1, 0.54, 0.92),
+          clampNumber(base.l < 0.24 ? 0.56 : base.l > 0.72 ? 0.58 : base.l, 0.42, 0.72)
+        )
+      );
+    }
+    return row;
+  }
+
+  function buildDerivedTrendyRow(representative, companions) {
+    const hueShifts = [22, -34, 48];
+    const row = [];
+    for (let index = 0; index < 3; index += 1) {
+      const baseHex = companions[index] || representative[index] || "#0EA5E9";
+      const base = rgbBytesToHsl(hexToRgb(baseHex));
+      row.push(
+        hslByteToHex(
+          normalizeHue(base.h + hueShifts[index % hueShifts.length]),
+          clampNumber(base.s < 0.26 ? 0.62 : base.s * 0.88 + 0.08, 0.48, 0.9),
+          clampNumber(base.l < 0.22 ? 0.56 : base.l > 0.76 ? 0.62 : base.l + 0.04, 0.42, 0.74)
         )
       );
     }
@@ -25532,6 +33240,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   let isBoundsFitApplying = false;
   let pendingBoundsFitSession = null;
   let isReferencePreparing = false;
+  let isPromptDraftPreparing = false;
   let isTextOverlayPreparing = false;
   let isTextOverlayApplying = false;
   let pendingTextOverlaySession = null;
@@ -25543,7 +33252,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   const UPSCALE_RESULT_BYTES_MISSING_MESSAGE = "No generated image bytes were provided.";
   const UPSCALE_IMAGE_CREATE_ERROR_MESSAGE = "Failed to create an image hash from the generated result.";
   const UPSCALE_APPLY_ERROR_MESSAGE = "Failed to apply the generated AI image result.";
-  const BOUNDS_FIT_SOURCE_PREPARE_ERROR_MESSAGE = "Failed to prepare the bounds-fit image source.";
+  const BOUNDS_FIT_SOURCE_PREPARE_ERROR_MESSAGE = "Failed to prepare the bounds-fit source.";
   const REFERENCE_SEARCH_SOURCE_PREPARE_ERROR_MESSAGE = "Failed to prepare the reference search source.";
   const REFERENCE_SEARCH_QUERY_REQUIRED_MESSAGE = "Enter a search query before opening reference pages.";
   const REFERENCE_SEARCH_OPENED_MESSAGE_PREFIX = "Opened reference search: ";
@@ -25567,6 +33276,15 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   const SHAPE_TARGET_UNAVAILABLE_REASON = "Could not find an editable shape layer to apply the generated image.";
   const SHAPE_FILL_APPLY_ERROR_MESSAGE = "Failed to apply the generated image to the shape fill.";
   const REFERENCE_SOURCE_NOT_FOUND_MESSAGE = "Could not find usable text or image content in the selection.";
+  const PROMPT_DRAFT_SOURCE_PREPARE_ERROR_MESSAGE = "Failed to prepare the prompt draft source.";
+  const PROMPT_DRAFT_SOURCE_NOT_FOUND_MESSAGE = "Select one image, frame, shape, or text layer to generate a prompt.";
+  const PROMPT_SMART_SELECTION_MESSAGE = "Select at most one visual layer plus optional text layers for prompt edit/generation.";
+  const PROMPT_MULTI_IMAGE_CONTAINER_MESSAGE =
+    "Prompt edit/generation supports a frame only when it contains one main image plus optional text. Select a single image layer instead.";
+  const PROMPT_TARGET_EXPORT_ERROR_MESSAGE = "Failed to export the selected layer for prompt edit/generation.";
+  const PROMPT_TARGET_EXPORT_EMPTY_MESSAGE = "The selected layer export for prompt edit/generation was empty.";
+  const PROMPT_PLACEMENT_APPLY_ERROR_MESSAGE = "Failed to place the generated prompt image.";
+  const PROMPT_TEXT_ANCHOR_GAP = 24;
 
   if (typeof originalOnMessage !== "function") {
     return;
@@ -25576,6 +33294,11 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     if (isAiImageUpscaleMessage(message)) {
       if (message.type === "request-ai-image-upscale-source") {
         await prepareUpscaleSource(message);
+        return;
+      }
+
+      if (message.type === "request-ai-image-prompt-draft-source") {
+        await preparePromptDraftSource(message);
         return;
       }
 
@@ -25619,6 +33342,11 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       if (message.type === "image-composite-report-error") {
         pendingCompositeSession = null;
         notifyUiReportedError(message);
+        return;
+      }
+
+      if (message.type === "run-image-merge") {
+        await runImageMerge(message);
         return;
       }
 
@@ -25678,6 +33406,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return (
       !!message &&
       (message.type === "request-ai-image-upscale-source" ||
+        message.type === "request-ai-image-prompt-draft-source" ||
         message.type === "apply-ai-image-upscaled-image" ||
         message.type === "ai-image-upscale-report-error" ||
         message.type === "request-image-extend-source" ||
@@ -25686,6 +33415,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         message.type === "request-image-composite-source" ||
         message.type === "apply-image-composite-image" ||
         message.type === "image-composite-report-error" ||
+        message.type === "run-image-merge" ||
         message.type === "request-image-bounds-fit-source" ||
         message.type === "apply-image-bounds-fit-image" ||
         message.type === "image-bounds-fit-report-error" ||
@@ -25708,6 +33438,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       isCompositeApplying ||
       isBoundsFitPreparing ||
       isBoundsFitApplying ||
+      isPromptDraftPreparing ||
       isTextOverlayPreparing ||
       isTextOverlayApplying
     ) {
@@ -25719,19 +33450,31 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     pendingSession = null;
 
     try {
-      const target = collectAiImageSourceTargetFromSelection(sanitizeSourceMode(message && message.sourceMode));
-      const source = await buildAiImageSource(target);
+      const target = collectAiImageSourceTargetFromSelection(
+        sanitizeSourceMode(message && message.sourceMode),
+        message
+      );
+      const source = await buildAiImageSource(target, {
+        preferOriginalImageBytes: shouldPreferOriginalUpscaleSource(message),
+      });
       const sessionId = buildSessionId();
 
       pendingSession = {
         id: sessionId,
         clientRequestId: sanitizeClientRequestId(message && message.clientRequestId),
         targetKind: target.kind,
-        targetNodeId: target.entry.nodeId,
+        captureMode: source && source.summary && typeof source.summary.captureMode === "string" ? source.summary.captureMode : "",
+        targetNodeId: target.entry && target.entry.nodeId ? target.entry.nodeId : "",
         originalHash: target.kind === "image-fill" ? target.entry.imageHash : "",
         usages: target.kind === "image-fill" ? target.usages : [],
         selectionLabel: formatSelectionLabel(target.selection),
-        targetNodeName: target.entry.nodeName,
+        targetNodeName: target.entry && target.entry.nodeName ? target.entry.nodeName : "",
+        targetWidth: target.targetWidth || 0,
+        targetHeight: target.targetHeight || 0,
+        targetParentId: target.targetParentId || "",
+        targetX: target.targetX || 0,
+        targetY: target.targetY || 0,
+        placementMode: target.placementMode || "",
         operationLabel: sanitizeOperationLabel(message && message.operationLabel),
         preparedAt: new Date().toISOString(),
       };
@@ -25742,11 +33485,14 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         clientRequestId: pendingSession.clientRequestId,
         image: source.image,
         summary: source.summary,
+        composite: source.composite || null,
       });
     } catch (error) {
       pendingSession = null;
       postPrepareError(
-        normalizeErrorMessage(error, UPSCALE_SOURCE_PREPARE_ERROR_MESSAGE),
+        normalizeErrorMessage(error, UPSCALE_SOURCE_PREPARE_ERROR_MESSAGE, {
+          operationLabel: sanitizeOperationLabel(message && message.operationLabel),
+        }),
         sanitizeClientRequestId(message && message.clientRequestId)
       );
     } finally {
@@ -25763,6 +33509,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       isCompositeApplying ||
       isBoundsFitPreparing ||
       isBoundsFitApplying ||
+      isPromptDraftPreparing ||
       isTextOverlayPreparing ||
       isTextOverlayApplying
     ) {
@@ -25787,10 +33534,14 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         throw new Error(UPSCALE_IMAGE_CREATE_ERROR_MESSAGE);
       }
 
-      const result =
-        pendingSession.targetKind === "shape-export"
-          ? await applyGeneratedImageToShapeNode(pendingSession, createdImage.hash, bytes.length)
-          : await replaceSelectionImageFills(pendingSession, createdImage.hash, bytes.length);
+      let result = null;
+      if (pendingSession.targetKind === "shape-export") {
+        result = await applyGeneratedImageToShapeNode(pendingSession, createdImage.hash, bytes.length);
+      } else if (pendingSession.targetKind === "container-placement" || pendingSession.targetKind === "new-image-placement") {
+        result = await applyGeneratedPromptImagePlacement(pendingSession, createdImage.hash, bytes.length);
+      } else {
+        result = await replaceSelectionImageFills(pendingSession, createdImage.hash, bytes.length);
+      }
       figma.ui.postMessage({
         type: "ai-image-upscale-apply-result",
         clientRequestId: pendingSession.clientRequestId,
@@ -25799,7 +33550,12 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       notifyApplyResult(result, sanitizeOperationLabel(message && message.operationLabel) || pendingSession.operationLabel);
       pendingSession = null;
     } catch (error) {
-      const messageText = normalizeErrorMessage(error, UPSCALE_APPLY_ERROR_MESSAGE);
+      const messageText = normalizeErrorMessage(error, UPSCALE_APPLY_ERROR_MESSAGE, {
+        operationLabel:
+          sanitizeOperationLabel(message && message.operationLabel) ||
+          (pendingSession && pendingSession.operationLabel) ||
+          "",
+      });
       figma.ui.postMessage({
         type: "ai-image-upscale-apply-error",
         clientRequestId: pendingSession && pendingSession.clientRequestId ? pendingSession.clientRequestId : sanitizeClientRequestId(message && message.clientRequestId),
@@ -25821,6 +33577,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       isCompositeApplying ||
       isBoundsFitPreparing ||
       isBoundsFitApplying ||
+      isPromptDraftPreparing ||
       isReferencePreparing ||
       isTextOverlayPreparing ||
       isTextOverlayApplying
@@ -25837,7 +33594,8 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
     try {
       const target = await collectImageExtendTargetFromSelection();
-      const expand = sanitizeImageExtendPadding(message && message.expand);
+      const requestedExpand = sanitizeImageExtendPadding(message && message.expand);
+      const expand = resolveImageExtendEffectivePadding(requestedExpand, target.boundsPadding);
       const sessionId = buildImageExtendSessionId();
 
       pendingImageExtendSession = {
@@ -25849,6 +33607,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         targetNodeName: target.entry.nodeName,
         originalHash: target.entry.imageHash,
         expand: expand,
+        imageBounds: target.imageBounds,
         preparedAt: new Date().toISOString(),
       };
 
@@ -25860,7 +33619,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         summary: {
           selectionLabel: pendingImageExtendSession.selectionLabel,
           targetNodeName: target.entry.nodeName,
-          captureMode: "rendered-node",
+          captureMode: "image-bounds",
           currentWidth: target.currentWidth,
           currentHeight: target.currentHeight,
           targetWidth: target.currentWidth + expand.left + expand.right,
@@ -25869,6 +33628,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
           expandRight: expand.right,
           expandBottom: expand.bottom,
           expandLeft: expand.left,
+          expansionSource: expand.source || "prompt",
           byteLength: target.image.bytes.length,
         },
       });
@@ -25893,6 +33653,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       isCompositeApplying ||
       isBoundsFitPreparing ||
       isBoundsFitApplying ||
+      isPromptDraftPreparing ||
       isTextOverlayPreparing ||
       isTextOverlayApplying
     ) {
@@ -25956,6 +33717,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       isCompositeApplying ||
       isBoundsFitPreparing ||
       isBoundsFitApplying ||
+      isPromptDraftPreparing ||
       isReferencePreparing ||
       isTextOverlayPreparing ||
       isTextOverlayApplying
@@ -25983,6 +33745,8 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         operationLabel: sanitizeOperationLabel(message && message.operationLabel),
         selectionLabel: formatSelectionLabel(collection.selection),
         unionRect: collection.unionRect,
+        selectedRootNodeId: collection.selectedRoot && collection.selectedRoot.id ? collection.selectedRoot.id : "",
+        selectedRootNodeName: collection.selectedRoot ? safeName(collection.selectedRoot) : "",
         layerCount: collection.layers.length,
         preparedAt: new Date().toISOString(),
       };
@@ -26000,6 +33764,9 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
             fileName: layer.fileName,
             mimeType: layer.mimeType,
             bytes: layer.bytes,
+            layerKind: layer.layerKind || "image",
+            nodeType: layer.nodeType || "",
+            textContent: layer.textContent || "",
             offsetX: layer.offsetX,
             offsetY: layer.offsetY,
             width: layer.visibleRect.width,
@@ -26010,7 +33777,8 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
           selectionLabel: pendingCompositeSession.selectionLabel,
           layerCount: collection.layers.length,
           skippedCount: collection.skipped.length,
-          backgroundNodeName: collection.layers[0].nodeName,
+          backgroundNodeName:
+            pendingCompositeSession.selectedRootNodeName || (collection.layers[0] ? collection.layers[0].nodeName : ""),
           foregroundCount: Math.max(0, collection.layers.length - 1),
           canvasWidth: collection.unionRect.width,
           canvasHeight: collection.unionRect.height,
@@ -26037,6 +33805,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       isCompositeApplying ||
       isBoundsFitPreparing ||
       isBoundsFitApplying ||
+      isPromptDraftPreparing ||
       isTextOverlayPreparing ||
       isTextOverlayApplying
     ) {
@@ -26100,6 +33869,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       isCompositeApplying ||
       isBoundsFitPreparing ||
       isBoundsFitApplying ||
+      isPromptDraftPreparing ||
       isTextOverlayPreparing ||
       isTextOverlayApplying
     ) {
@@ -26126,6 +33896,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         operationLabel: sanitizeOperationLabel(message && message.operationLabel),
         selectionLabel: formatSelectionLabel(collection.selection),
         targets: collection.targets,
+        containers: collection.containers,
         skipped: collection.skipped,
         requestedCount: collection.selection.length,
         preparedAt: new Date().toISOString(),
@@ -26135,21 +33906,38 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         type: "image-bounds-fit-source-ready",
         sessionId: sessionId,
         clientRequestId: pendingBoundsFitSession.clientRequestId,
-        items: collection.targets.map(function (target) {
-          return {
-            nodeId: target.nodeId,
-            nodeName: target.nodeName,
-            imageHash: target.originalHash,
-            fileName: target.fileName,
-            mimeType: target.mimeType,
-            bytes: target.bytes,
-            sourceWidth: target.sourceWidth,
-            sourceHeight: target.sourceHeight,
-          };
-        }),
+        items: collection.targets
+          .filter(function (target) {
+            return !target || target.skipRasterAnalysis !== true;
+          })
+          .map(function (target) {
+            return {
+              nodeId: target.nodeId,
+              nodeName: target.nodeName,
+              imageHash: target.originalHash,
+              fileName: target.fileName,
+              mimeType: target.mimeType,
+              bytes: target.bytes,
+              sourceWidth: target.sourceWidth,
+              sourceHeight: target.sourceHeight,
+              analysisOffsetX: target.analysisOffsetX,
+              analysisOffsetY: target.analysisOffsetY,
+              analysisWidth: target.analysisWidth,
+              analysisHeight: target.analysisHeight,
+              rasterAnalysisOffsetX: Number.isFinite(Number(target.rasterAnalysisOffsetX))
+                ? Number(target.rasterAnalysisOffsetX)
+                : Number(target.analysisOffsetX) || 0,
+              rasterAnalysisOffsetY: Number.isFinite(Number(target.rasterAnalysisOffsetY))
+                ? Number(target.rasterAnalysisOffsetY)
+                : Number(target.analysisOffsetY) || 0,
+              rasterAnalysisWidth: Number(target.rasterAnalysisWidth) > 0 ? Number(target.rasterAnalysisWidth) : Number(target.analysisWidth) || 0,
+              rasterAnalysisHeight:
+                Number(target.rasterAnalysisHeight) > 0 ? Number(target.rasterAnalysisHeight) : Number(target.analysisHeight) || 0,
+            };
+          }),
         summary: {
           selectionLabel: pendingBoundsFitSession.selectionLabel,
-          eligibleCount: collection.targets.length,
+          eligibleCount: collection.targets.length + collection.containers.length,
           skippedCount: collection.skipped.length,
         },
       });
@@ -26174,6 +33962,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       isCompositeApplying ||
       isBoundsFitPreparing ||
       isBoundsFitApplying ||
+      isPromptDraftPreparing ||
       isReferencePreparing ||
       isTextOverlayPreparing ||
       isTextOverlayApplying
@@ -26207,6 +33996,50 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
   }
 
+  async function preparePromptDraftSource(message) {
+    if (
+      isPreparing ||
+      isApplying ||
+      isImageExtendPreparing ||
+      isImageExtendApplying ||
+      isCompositePreparing ||
+      isCompositeApplying ||
+      isBoundsFitPreparing ||
+      isBoundsFitApplying ||
+      isReferencePreparing ||
+      isPromptDraftPreparing ||
+      isTextOverlayPreparing ||
+      isTextOverlayApplying
+    ) {
+      postPromptDraftSourceError(
+        IMAGE_TASK_ALREADY_RUNNING_MESSAGE,
+        sanitizeClientRequestId(message && message.clientRequestId)
+      );
+      return;
+    }
+
+    isPromptDraftPreparing = true;
+
+    try {
+      const source = await collectPromptDraftSourceFromSelection();
+      figma.ui.postMessage({
+        type: "ai-image-prompt-draft-source-ready",
+        clientRequestId: sanitizeClientRequestId(message && message.clientRequestId),
+        sourceType: source.sourceType,
+        text: source.text || "",
+        image: source.image || null,
+        summary: source.summary || {},
+      });
+    } catch (error) {
+      postPromptDraftSourceError(
+        normalizeErrorMessage(error, PROMPT_DRAFT_SOURCE_PREPARE_ERROR_MESSAGE),
+        sanitizeClientRequestId(message && message.clientRequestId)
+      );
+    } finally {
+      isPromptDraftPreparing = false;
+    }
+  }
+
   async function prepareImageTextOverlaySource(message) {
     if (
       isPreparing ||
@@ -26218,6 +34051,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       isBoundsFitPreparing ||
       isBoundsFitApplying ||
       isReferencePreparing ||
+      isPromptDraftPreparing ||
       isTextOverlayPreparing ||
       isTextOverlayApplying
     ) {
@@ -26265,6 +34099,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       isBoundsFitPreparing ||
       isBoundsFitApplying ||
       isReferencePreparing ||
+      isPromptDraftPreparing ||
       isTextOverlayPreparing ||
       isTextOverlayApplying
     ) {
@@ -26393,7 +34228,11 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       message && typeof message.message === "string" && message.message.trim()
         ? message.message.trim()
         : UI_REPORTED_IMAGE_ERROR_FALLBACK,
-      UI_REPORTED_IMAGE_ERROR_FALLBACK
+      UI_REPORTED_IMAGE_ERROR_FALLBACK,
+      {
+        operationLabel: sanitizeOperationLabel(message && message.operationLabel),
+        operationKind: message && typeof message.operationKind === "string" ? message.operationKind : "",
+      }
     );
     figma.notify(text, { error: true, timeout: 2600 });
   }
@@ -26401,6 +34240,15 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   function postPrepareError(message, clientRequestId) {
     figma.ui.postMessage({
       type: "ai-image-upscale-source-error",
+      clientRequestId: sanitizeClientRequestId(clientRequestId),
+      message: message,
+    });
+    figma.notify(message, { error: true, timeout: 2600 });
+  }
+
+  function postPromptDraftSourceError(message, clientRequestId) {
+    figma.ui.postMessage({
+      type: "ai-image-prompt-draft-source-error",
       clientRequestId: sanitizeClientRequestId(clientRequestId),
       message: message,
     });
@@ -26506,7 +34354,11 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     figma.notify(message, { error: true, timeout: 2600 });
   }
 
-  function collectAiImageSourceTargetFromSelection(sourceMode) {
+  function collectAiImageSourceTargetFromSelection(sourceMode, message) {
+    if (sanitizeSourceMode(sourceMode) === "prompt-smart") {
+      return collectPromptSmartTargetFromSelection(message);
+    }
+
     try {
       const imageTarget = collectSingleUpscaleTargetFromSelection();
       imageTarget.kind = "image-fill";
@@ -26519,27 +34371,327 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
   }
 
-  async function buildAiImageSource(target) {
+  function collectPromptSmartTargetFromSelection(message) {
+    const selection = Array.from(figma.currentPage.selection || []).filter(Boolean);
+    const outputSize = sanitizePromptOutputSize(message && message.requestedOutputSize);
+    const visualNodes = selection.filter(function (node) {
+      return !!node && !node.removed && node.type !== "TEXT";
+    });
+
+    if (!visualNodes.length) {
+      return buildPromptPlacementTarget(selection, outputSize);
+    }
+
+    if (visualNodes.length > 1) {
+      throw new Error(PROMPT_SMART_SELECTION_MESSAGE);
+    }
+
+    const node = visualNodes[0];
+    if ("locked" in node && node.locked) {
+      throw new Error("Locked layers are not supported for prompt edit/generation.");
+    }
+
+    const directImageTarget = collectDirectImageFillTarget(node, selection);
+    if (directImageTarget) {
+      return directImageTarget;
+    }
+
+    if (isPromptEditableShapeNode(node)) {
+      const localBounds = getImageExtendLocalBounds(node);
+      return {
+        kind: "shape-export",
+        selection: selection,
+        entry: {
+          nodeId: node.id,
+          nodeName: safeName(node),
+          path: safeName(node),
+        },
+        targetWidth: localBounds ? localBounds.width : roundBoundsFitMetric(node.width),
+        targetHeight: localBounds ? localBounds.height : roundBoundsFitMetric(node.height),
+      };
+    }
+
+    if (!isPromptSmartContainerTarget(node)) {
+      throw new Error(PROMPT_SMART_SELECTION_MESSAGE);
+    }
+
+    return {
+      kind: "container-placement",
+      selection: selection,
+      entry: {
+        nodeId: node.id,
+        nodeName: safeName(node),
+        path: safeName(node),
+      },
+      targetWidth: roundBoundsFitMetric(node.width),
+      targetHeight: roundBoundsFitMetric(node.height),
+    };
+  }
+
+  function buildPromptPlacementTarget(selection, outputSize) {
+    const dimensions = buildPromptPlacementDimensions(outputSize);
+    const target = {
+      kind: "new-image-placement",
+      selection: Array.isArray(selection) ? selection.slice() : [],
+      entry: {
+        nodeId: "",
+        nodeName: Array.isArray(selection) && selection.length ? safeName(selection[0]) : "Viewport center",
+        path: "",
+      },
+      targetWidth: dimensions.width,
+      targetHeight: dimensions.height,
+    };
+
+    if (Array.isArray(selection) && selection.length === 1 && selection[0] && selection[0].type === "TEXT") {
+      const textNode = selection[0];
+      const textRect = getBoundsFitNodeRect(textNode);
+      target.entry.nodeId = textNode.id;
+      target.entry.nodeName = safeName(textNode);
+      target.entry.path = safeName(textNode);
+      target.targetParentId = textNode.parent && typeof textNode.parent.id === "string" ? textNode.parent.id : "";
+      target.targetX = textRect ? textRect.x : 0;
+      target.targetY = textRect ? textRect.y : 0;
+      target.placementMode = "below-selected-text";
+    }
+
+    return target;
+  }
+
+  function collectDirectImageFillTarget(node, selection) {
+    if (!node || node.removed || !hasSimpleVisibleImagePaint(node)) {
+      return null;
+    }
+
+    const fills = getNodeFills(node);
+    const fillIndex = getPrimaryVisibleImageFillIndex(fills);
+    if (fillIndex < 0) {
+      return null;
+    }
+
+    const fill = fills[fillIndex];
+    if (!fill || !fill.imageHash) {
+      return null;
+    }
+
+    return {
+      kind: "image-fill",
+      selection: Array.isArray(selection) ? selection.slice() : [node],
+      entry: {
+        imageHash: fill.imageHash,
+        nodeId: node.id,
+        nodeName: safeName(node),
+        path: safeName(node),
+      },
+      usages: [
+        {
+          nodeId: node.id,
+          nodeName: safeName(node),
+          fillIndex: fillIndex,
+          imageHash: fill.imageHash,
+          path: safeName(node),
+        },
+      ],
+      targetWidth: roundBoundsFitMetric(node.width),
+      targetHeight: roundBoundsFitMetric(node.height),
+    };
+  }
+
+  function isPromptSmartContainerTarget(node) {
+    return (
+      !!node &&
+      !node.removed &&
+      node.type !== "TEXT" &&
+      (!("locked" in node) || !node.locked) &&
+      typeof node.exportAsync === "function" &&
+      typeof node.width === "number" &&
+      typeof node.height === "number" &&
+      node.width > 0 &&
+      node.height > 0
+    );
+  }
+
+  async function buildAiImageSource(target, options) {
     if (target && target.kind === "shape-export") {
       return await buildShapeEditSource(target);
     }
-    return await buildUpscaleImageSource(target);
+    if (target && target.kind === "container-placement") {
+      return await buildContainerPromptSource(target);
+    }
+    if (target && target.kind === "new-image-placement") {
+      return buildPromptPlacementSource(target);
+    }
+    return await buildUpscaleImageSource(target, options);
   }
 
-  async function buildUpscaleImageSource(target) {
-    const image = figma.getImageByHash(target.entry.imageHash);
-    if (!image) {
-      throw new Error(IMAGE_FILL_NOT_FOUND_MESSAGE);
+  function buildPromptPlacementSource(target) {
+    return {
+      image: null,
+      summary: {
+        selectionLabel: formatSelectionLabel(target.selection),
+        targetNodeName: target.entry && target.entry.nodeName ? target.entry.nodeName : "Viewport center",
+        targetWidth: target.targetWidth || 0,
+        targetHeight: target.targetHeight || 0,
+        placementMode: "viewport-center",
+        requestMode: "prompt-only",
+        byteLength: 0,
+      },
+    };
+  }
+
+  async function buildContainerPromptSource(target) {
+    const node = await figma.getNodeByIdAsync(target.entry.nodeId);
+    if (!isPromptSmartContainerTarget(node)) {
+      throw new Error(PROMPT_TARGET_EXPORT_ERROR_MESSAGE);
     }
 
-    const bytes = await image.getBytesAsync();
+    let composite = null;
+    let collection = null;
+    if (hasChildren(node)) {
+      try {
+        collection = await collectImageCompositeTargetsFromSelection([node]);
+      } catch (error) {
+        collection = null;
+      }
+      if (collection && Array.isArray(collection.layers)) {
+        const imageLayerCount = collection.layers.filter(function (layer) {
+          return !!layer && layer.layerKind === "image";
+        }).length;
+        if (imageLayerCount >= 2) {
+          throw new Error(PROMPT_MULTI_IMAGE_CONTAINER_MESSAGE);
+        }
+        if (collection.layers.length >= 2 && collection.unionRect) {
+          composite = {
+            layers: collection.layers.map(function (layer) {
+              return {
+                nodeId: layer.nodeId,
+                nodeName: layer.nodeName,
+                role: layer.role,
+                orderIndex: layer.orderIndex,
+                fileName: layer.fileName,
+                mimeType: layer.mimeType,
+                bytes: layer.bytes,
+                layerKind: layer.layerKind || "image",
+                nodeType: layer.nodeType || "",
+                textContent: layer.textContent || "",
+                offsetX: layer.offsetX,
+                offsetY: layer.offsetY,
+                width: layer.visibleRect.width,
+                height: layer.visibleRect.height,
+              };
+            }),
+            summary: {
+              selectionLabel: formatSelectionLabel(target.selection),
+              layerCount: collection.layers.length,
+              skippedCount: Array.isArray(collection.skipped) ? collection.skipped.length : 0,
+              backgroundNodeName: safeName(node),
+              foregroundCount: Math.max(0, collection.layers.length - 1),
+              canvasWidth: collection.unionRect.width,
+              canvasHeight: collection.unionRect.height,
+            },
+          };
+        }
+      }
+    }
+
+    const bytes = await node.exportAsync({
+      format: "PNG",
+      useAbsoluteBounds: false,
+    });
     if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
-      throw new Error(IMAGE_FILL_BYTES_MISSING_MESSAGE);
+      throw new Error(PROMPT_TARGET_EXPORT_EMPTY_MESSAGE);
     }
 
-    const extension = detectImageExtension(bytes);
-    const mimeType = detectImageMimeType(bytes);
-    const fileName = buildFileName(target.entry, extension === "bin" ? "png" : extension);
+    return {
+      image: {
+        bytes: bytes,
+        mimeType: "image/png",
+        fileName: buildFileName(
+          {
+            nodeName: safeName(node),
+            imageHash: node.id,
+          },
+          "png"
+        ),
+      },
+      summary: {
+        selectionLabel: formatSelectionLabel(target.selection),
+        targetNodeName: safeName(node),
+        captureMode: "rendered-node",
+        targetWidth: roundBoundsFitMetric(node.width),
+        targetHeight: roundBoundsFitMetric(node.height),
+        requestMode: "image-edit",
+        byteLength: bytes.length,
+        pipelineMode: composite ? "composite" : "upscale",
+      },
+      composite: composite,
+    };
+  }
+
+  async function buildUpscaleImageSource(target, options) {
+    const targetNode = await figma.getNodeByIdAsync(target.entry.nodeId);
+    const preferOriginalImageBytes = !!(options && options.preferOriginalImageBytes);
+    const sourceFill = resolveUpscaleSourceFill(targetNode, target);
+    const requiresRenderedSource = sourceFill ? await isRenderedUpscaleSourceRequired(targetNode, sourceFill) : false;
+    const localBounds = getImageExtendLocalBounds(targetNode);
+    let sourceWidth = 0;
+    let sourceHeight = 0;
+    if (target && target.entry && target.entry.imageHash) {
+      const sourceImage = figma.getImageByHash(target.entry.imageHash);
+      if (sourceImage && typeof sourceImage.getSizeAsync === "function") {
+        try {
+          const size = await sourceImage.getSizeAsync();
+          sourceWidth = size && typeof size.width === "number" && Number.isFinite(size.width) ? Math.max(0, Math.round(size.width)) : 0;
+          sourceHeight =
+            size && typeof size.height === "number" && Number.isFinite(size.height) ? Math.max(0, Math.round(size.height)) : 0;
+        } catch (error) {}
+      }
+    }
+    const summary = {
+      selectionLabel: formatSelectionLabel(target.selection),
+      targetNodeName: target.entry.nodeName,
+      targetFillCount: target.usages.length,
+      imageHash: target.entry.imageHash,
+      captureMode: "rendered-node",
+      targetWidth: localBounds ? localBounds.width : 0,
+      targetHeight: localBounds ? localBounds.height : 0,
+      sourceWidth: sourceWidth,
+      sourceHeight: sourceHeight,
+      byteLength: 0,
+    };
+    let bytes = new Uint8Array(0);
+    let mimeType = "image/png";
+    let fileName = buildFileName(target.entry, "png");
+
+    if (!preferOriginalImageBytes && targetNode && !targetNode.removed && typeof targetNode.exportAsync === "function") {
+      try {
+        bytes = await targetNode.exportAsync({
+          format: "PNG",
+          useAbsoluteBounds: false,
+        });
+      } catch (error) {
+        bytes = new Uint8Array(0);
+      }
+    }
+
+    if (!bytes.length) {
+      if (requiresRenderedSource && !preferOriginalImageBytes) {
+        throw new Error("Could not export the currently visible image bytes for upscale.");
+      }
+      const image = figma.getImageByHash(target.entry.imageHash);
+      if (!image) {
+        throw new Error(IMAGE_FILL_NOT_FOUND_MESSAGE);
+      }
+      bytes = await image.getBytesAsync();
+      if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
+        throw new Error(IMAGE_FILL_BYTES_MISSING_MESSAGE);
+      }
+      const extension = detectImageExtension(bytes);
+      mimeType = detectImageMimeType(bytes);
+      fileName = buildFileName(target.entry, extension === "bin" ? "png" : extension);
+      summary.captureMode = "source-image";
+    }
+
+    summary.byteLength = bytes.length;
 
     return {
       image: {
@@ -26547,14 +34699,64 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         mimeType: mimeType,
         fileName: fileName,
       },
-      summary: {
-        selectionLabel: formatSelectionLabel(target.selection),
-        targetNodeName: target.entry.nodeName,
-        targetFillCount: target.usages.length,
-        imageHash: target.entry.imageHash,
-        byteLength: bytes.length,
-      },
+      summary: summary,
     };
+  }
+
+  function resolveUpscaleSourceFill(node, target) {
+    if (!node || node.removed) {
+      return null;
+    }
+    const fills = getNodeFills(node);
+    if (!fills.length) {
+      return null;
+    }
+    const preferredUsage = target && Array.isArray(target.usages) && target.usages.length ? target.usages[0] : null;
+    if (
+      preferredUsage &&
+      Number.isInteger(preferredUsage.fillIndex) &&
+      preferredUsage.fillIndex >= 0 &&
+      preferredUsage.fillIndex < fills.length
+    ) {
+      const directFill = fills[preferredUsage.fillIndex];
+      if (isImagePaint(directFill) && directFill.imageHash === target.entry.imageHash) {
+        return directFill;
+      }
+    }
+    for (let index = 0; index < fills.length; index += 1) {
+      const fill = fills[index];
+      if (isImagePaint(fill) && fill.imageHash === target.entry.imageHash) {
+        return fill;
+      }
+    }
+    return null;
+  }
+
+  async function isRenderedUpscaleSourceRequired(node, fill) {
+    if (!node || !fill || !fill.imageHash) {
+      return false;
+    }
+    const nodeWidth = typeof node.width === "number" && Number.isFinite(node.width) ? node.width : 0;
+    const nodeHeight = typeof node.height === "number" && Number.isFinite(node.height) ? node.height : 0;
+    const image = figma.getImageByHash(fill.imageHash);
+    if (!image) {
+      return false;
+    }
+    const size = await image.getSizeAsync();
+    const sourceWidth = size && typeof size.width === "number" ? size.width : 0;
+    const sourceHeight = size && typeof size.height === "number" ? size.height : 0;
+    if (!(nodeWidth > 0) || !(nodeHeight > 0) || !(sourceWidth > 0) || !(sourceHeight > 0)) {
+      return false;
+    }
+    const scaleMode = typeof fill.scaleMode === "string" ? fill.scaleMode : "FILL";
+    const fillRotation = typeof fill.rotation === "number" && Number.isFinite(fill.rotation) ? fill.rotation : 0;
+    return (
+      scaleMode === "CROP" ||
+      scaleMode === "TILE" ||
+      !!fill.imageTransform ||
+      Math.abs(fillRotation) > 0.01 ||
+      !hasMatchingAspectRatio(nodeWidth, nodeHeight, sourceWidth, sourceHeight)
+    );
   }
 
   function collectSingleUpscaleTargetFromSelection(selectionInput) {
@@ -26675,11 +34877,17 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     if (!isPromptEditableShapeNode(node) || typeof node.exportAsync !== "function") {
       throw new Error(SHAPE_EXPORT_SOURCE_ERROR_MESSAGE);
     }
+    const localBounds = getImageExtendLocalBounds(node);
 
-    const bytes = await node.exportAsync({
-      format: "PNG",
-      useAbsoluteBounds: false,
-    });
+    let bytes = new Uint8Array(0);
+    if (shapeEditNeedsPlaceholderSource(node)) {
+      bytes = await exportShapeEditPlaceholderPng(node);
+    } else {
+      bytes = await node.exportAsync({
+        format: "PNG",
+        useAbsoluteBounds: false,
+      });
+    }
     if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
       throw new Error(SHAPE_EXPORT_EMPTY_MESSAGE);
     }
@@ -26702,6 +34910,8 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         targetFillCount: 1,
         imageHash: "",
         captureMode: "rendered-node",
+        targetWidth: localBounds ? localBounds.width : 0,
+        targetHeight: localBounds ? localBounds.height : 0,
         byteLength: bytes.length,
       },
     };
@@ -26763,14 +34973,9 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       throw new Error("Could not determine the current layer size.");
     }
 
-    if (typeof node.exportAsync !== "function") {
-      throw new Error("Could not export the selected image layer for image extend.");
-    }
-
-    const bytes = await node.exportAsync({
-      format: "PNG",
-      useAbsoluteBounds: false,
-    });
+    const imageBounds = await resolveImageExtendImageLocalBounds(node, fill, width, height);
+    const boundsPadding = buildImageExtendBoundsPadding(imageBounds, width, height);
+    const bytes = await exportImageExtendSourcePng(node, imageBounds);
     if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
       throw new Error("Could not export the selected image layer as PNG.");
     }
@@ -26782,8 +34987,10 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         nodeName: safeName(node),
         imageHash: fill.imageHash || "",
       },
-      currentWidth: width,
-      currentHeight: height,
+      currentWidth: imageBounds.width,
+      currentHeight: imageBounds.height,
+      imageBounds: imageBounds,
+      boundsPadding: boundsPadding,
       image: {
         bytes: bytes,
         mimeType: "image/png",
@@ -26796,6 +35003,158 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         ),
       },
     };
+  }
+
+  async function resolveImageExtendImageLocalBounds(node, fill, fallbackWidth, fallbackHeight) {
+    const nodeWidth = Math.max(1, Number(fallbackWidth) || 1);
+    const nodeHeight = Math.max(1, Number(fallbackHeight) || 1);
+    const fullBounds = buildImageExtendFullLocalBounds(nodeWidth, nodeHeight);
+    if (!fill || !isImagePaint(fill)) {
+      return fullBounds;
+    }
+
+    const fillRotation = typeof fill.rotation === "number" && Number.isFinite(fill.rotation) ? fill.rotation : 0;
+    if (Math.abs(fillRotation) > 0.01 || !!fill.imageTransform) {
+      return fullBounds;
+    }
+
+    const scaleMode = typeof fill.scaleMode === "string" ? fill.scaleMode : "FILL";
+    if (scaleMode !== "FIT") {
+      return fullBounds;
+    }
+
+    const sourceSize = await getImageExtendSourceSize(fill);
+    if (!sourceSize) {
+      return fullBounds;
+    }
+
+    const scale = Math.min(nodeWidth / sourceSize.width, nodeHeight / sourceSize.height);
+    if (!(scale > 0)) {
+      return fullBounds;
+    }
+
+    const imageWidth = Math.max(1, roundBoundsFitMetric(sourceSize.width * scale));
+    const imageHeight = Math.max(1, roundBoundsFitMetric(sourceSize.height * scale));
+    return normalizeImageExtendLocalBounds(
+      {
+        x: roundBoundsFitMetric((nodeWidth - imageWidth) / 2),
+        y: roundBoundsFitMetric((nodeHeight - imageHeight) / 2),
+        width: imageWidth,
+        height: imageHeight,
+      },
+      nodeWidth,
+      nodeHeight
+    );
+  }
+
+  async function getImageExtendSourceSize(fill) {
+    if (!fill || !fill.imageHash) {
+      return null;
+    }
+
+    const image = figma.getImageByHash(fill.imageHash);
+    if (!image || typeof image.getSizeAsync !== "function") {
+      return null;
+    }
+
+    try {
+      const size = await image.getSizeAsync();
+      const width = size && typeof size.width === "number" && Number.isFinite(size.width) ? size.width : 0;
+      const height = size && typeof size.height === "number" && Number.isFinite(size.height) ? size.height : 0;
+      if (!(width > 0) || !(height > 0)) {
+        return null;
+      }
+      return {
+        width: width,
+        height: height,
+      };
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function buildImageExtendFullLocalBounds(width, height) {
+    return {
+      x: 0,
+      y: 0,
+      width: Math.max(1, roundBoundsFitMetric(width)),
+      height: Math.max(1, roundBoundsFitMetric(height)),
+    };
+  }
+
+  function normalizeImageExtendLocalBounds(value, fallbackWidth, fallbackHeight) {
+    const fallback = buildImageExtendFullLocalBounds(fallbackWidth, fallbackHeight);
+    if (!value || typeof value !== "object") {
+      return fallback;
+    }
+
+    const x = Number(value.x);
+    const y = Number(value.y);
+    const width = Number(value.width);
+    const height = Number(value.height);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !(width > 0) || !(height > 0)) {
+      return fallback;
+    }
+
+    return {
+      x: roundBoundsFitMetric(x),
+      y: roundBoundsFitMetric(y),
+      width: Math.max(1, roundBoundsFitMetric(width)),
+      height: Math.max(1, roundBoundsFitMetric(height)),
+    };
+  }
+
+  function areImageExtendLocalBoundsFullNode(bounds, width, height) {
+    const normalized = normalizeImageExtendLocalBounds(bounds, width, height);
+    return (
+      Math.abs(normalized.x) <= 0.01 &&
+      Math.abs(normalized.y) <= 0.01 &&
+      Math.abs(normalized.width - Math.max(1, Number(width) || 1)) <= 0.01 &&
+      Math.abs(normalized.height - Math.max(1, Number(height) || 1)) <= 0.01
+    );
+  }
+
+  async function exportImageExtendSourcePng(node, imageBounds) {
+    if (!node || typeof node.exportAsync !== "function") {
+      throw new Error("Could not export the selected image layer for image extend.");
+    }
+
+    const nodeWidth = typeof node.width === "number" && Number.isFinite(node.width) ? node.width : 0;
+    const nodeHeight = typeof node.height === "number" && Number.isFinite(node.height) ? node.height : 0;
+    const bounds = normalizeImageExtendLocalBounds(imageBounds, nodeWidth, nodeHeight);
+    if (areImageExtendLocalBoundsFullNode(bounds, nodeWidth, nodeHeight)) {
+      return await node.exportAsync({
+        format: "PNG",
+        useAbsoluteBounds: false,
+      });
+    }
+
+    const preview = figma.createFrame();
+    let clone = null;
+    try {
+      preview.name = "__pigma-image-extend-source-bounds__";
+      preview.resize(bounds.width, bounds.height);
+      preview.clipsContent = true;
+      preview.fills = [];
+      preview.strokes = [];
+      figma.currentPage.appendChild(preview);
+
+      clone = node.clone();
+      preview.appendChild(clone);
+      setImageExtendNodePosition(clone, -bounds.x, -bounds.y);
+
+      return await preview.exportAsync({
+        format: "PNG",
+        useAbsoluteBounds: false,
+      });
+    } finally {
+      if (clone && !clone.removed) {
+        clone.remove();
+      }
+      if (preview && !preview.removed) {
+        preview.remove();
+      }
+    }
   }
 
   function sanitizeImageExtendPadding(value) {
@@ -26812,6 +35171,43 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
 
     return next;
+  }
+
+  function buildImageExtendBoundsPadding(imageBounds, nodeWidth, nodeHeight) {
+    const bounds = normalizeImageExtendLocalBounds(imageBounds, nodeWidth, nodeHeight);
+    const width = Math.max(1, Number(nodeWidth) || 1);
+    const height = Math.max(1, Number(nodeHeight) || 1);
+    return {
+      top: sanitizeImageExtendPaddingValue(bounds.y),
+      right: sanitizeImageExtendPaddingValue(width - (bounds.x + bounds.width)),
+      bottom: sanitizeImageExtendPaddingValue(height - (bounds.y + bounds.height)),
+      left: sanitizeImageExtendPaddingValue(bounds.x),
+    };
+  }
+
+  function hasPositiveImageExtendPadding(padding) {
+    return !!padding && (padding.top > 0 || padding.right > 0 || padding.bottom > 0 || padding.left > 0);
+  }
+
+  function resolveImageExtendEffectivePadding(requestedPadding, boundsPadding) {
+    const requested = requestedPadding || { top: 0, right: 0, bottom: 0, left: 0 };
+    const bounds = boundsPadding || { top: 0, right: 0, bottom: 0, left: 0 };
+    if (hasPositiveImageExtendPadding(bounds)) {
+      return {
+        top: sanitizeImageExtendPaddingValue(bounds.top),
+        right: sanitizeImageExtendPaddingValue(bounds.right),
+        bottom: sanitizeImageExtendPaddingValue(bounds.bottom),
+        left: sanitizeImageExtendPaddingValue(bounds.left),
+        source: "image-bounds",
+      };
+    }
+    return {
+      top: sanitizeImageExtendPaddingValue(requested.top),
+      right: sanitizeImageExtendPaddingValue(requested.right),
+      bottom: sanitizeImageExtendPaddingValue(requested.bottom),
+      left: sanitizeImageExtendPaddingValue(requested.left),
+      source: "prompt",
+    };
   }
 
   function sanitizeImageExtendPaddingValue(value) {
@@ -26836,6 +35232,35 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
 
     return true;
+  }
+
+  async function resolveImageExtendCurrentImageBounds(node, session, localBounds) {
+    const width = localBounds && localBounds.width > 0 ? localBounds.width : typeof node.width === "number" ? node.width : 0;
+    const height = localBounds && localBounds.height > 0 ? localBounds.height : typeof node.height === "number" ? node.height : 0;
+    const fallback = normalizeImageExtendLocalBounds(session && session.imageBounds, width, height);
+    const fills = getNodeFills(node);
+    let fill = null;
+    const originalHash = session && typeof session.originalHash === "string" ? session.originalHash : "";
+
+    if (originalHash) {
+      const fillIndex = findVisibleImageFillIndexByHash(fills, originalHash);
+      if (fillIndex >= 0) {
+        fill = fills[fillIndex];
+      }
+    }
+
+    if (!fill) {
+      const primaryFillIndex = getPrimaryVisibleImageFillIndex(fills);
+      if (primaryFillIndex >= 0) {
+        fill = fills[primaryFillIndex];
+      }
+    }
+
+    if (!fill) {
+      return fallback;
+    }
+
+    return await resolveImageExtendImageLocalBounds(node, fill, width, height);
   }
 
   async function applyImageExtendUnderlayToSelection(session, newImageHash, byteLength) {
@@ -26893,10 +35318,11 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
     const parent = node.parent;
     const expand = session.expand || { top: 0, right: 0, bottom: 0, left: 0 };
-    const nextX = localBounds.x - expand.left;
-    const nextY = localBounds.y - expand.top;
-    const nextWidth = Math.max(1, roundBoundsFitMetric(localBounds.width + expand.left + expand.right));
-    const nextHeight = Math.max(1, roundBoundsFitMetric(localBounds.height + expand.top + expand.bottom));
+    const imageBounds = await resolveImageExtendCurrentImageBounds(node, session, localBounds);
+    const nextX = localBounds.x + imageBounds.x - expand.left;
+    const nextY = localBounds.y + imageBounds.y - expand.top;
+    const nextWidth = Math.max(1, roundBoundsFitMetric(imageBounds.width + expand.left + expand.right));
+    const nextHeight = Math.max(1, roundBoundsFitMetric(imageBounds.height + expand.top + expand.bottom));
     let background = null;
 
     try {
@@ -26958,7 +35384,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     };
   }
 
-  function buildImageCompositeApplyResult(session, resultNode, byteLength, skipped) {
+  function buildImageCompositeApplyResult(session, resultNode, byteLength, skipped, placementMode) {
     const appliedCount = resultNode ? 1 : 0;
     const nodeName = resultNode && typeof resultNode.name === "string" ? resultNode.name : "";
     const nodeId = resultNode && typeof resultNode.id === "string" ? resultNode.id : "";
@@ -26970,10 +35396,155 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         skippedCount: Array.isArray(skipped) ? skipped.length : 0,
         resultNodeId: nodeId,
         resultNodeName: nodeName,
+        placementMode: typeof placementMode === "string" ? placementMode : "",
         resultByteLength: byteLength,
       },
       skipped: Array.isArray(skipped) ? skipped.slice(0, 24) : [],
     };
+  }
+
+  async function runImageMerge(message) {
+    const clientRequestId = message && typeof message.clientRequestId === "string" ? message.clientRequestId : "";
+    try {
+      const source = await exportImageMergeSelection();
+      const createdImage = figma.createImage(source.bytes);
+      if (!createdImage || !createdImage.hash) {
+        throw new Error("이미지 병합 결과를 Figma 이미지로 만들지 못했습니다.");
+      }
+
+      const result = await applyImageCompositeToSelection(
+        {
+          selectionLabel: source.selectionLabel,
+          selectedRootNodeId: source.selectedRootNodeId,
+          selectedRootNodeName: source.selectedRootNodeName,
+          unionRect: source.unionRect,
+          preserveSelectedRootTransform: source.preserveSelectedRootTransform,
+          selectedRootWidth: source.selectedRootWidth,
+          selectedRootHeight: source.selectedRootHeight,
+        },
+        createdImage.hash,
+        source.bytes.length
+      );
+
+      figma.ui.postMessage({
+        type: "image-merge-result",
+        clientRequestId: clientRequestId,
+        result: result,
+      });
+
+      const appliedCount = result && result.summary && Number(result.summary.appliedCount) > 0 ? 1 : 0;
+      figma.notify(appliedCount ? "이미지 병합 레이어를 만들었습니다." : "이미지 병합 레이어를 만들지 못했습니다.", {
+        timeout: 2200,
+      });
+    } catch (error) {
+      const messageText = normalizeErrorMessage(error, "이미지 병합에 실패했습니다.");
+      figma.ui.postMessage({
+        type: "image-merge-error",
+        clientRequestId: clientRequestId,
+        message: messageText,
+      });
+      figma.notify(messageText, { error: true, timeout: 2600 });
+    }
+  }
+
+  async function exportImageMergeSelection() {
+    const selection = Array.from(figma.currentPage.selection || []).filter(function (node) {
+      return !!node && !node.removed && typeof node.exportAsync === "function";
+    });
+    if (!selection.length) {
+      throw new Error("이미지로 병합할 프레임, 그룹, 레이어를 먼저 선택해주세요.");
+    }
+
+    const rects = selection
+      .map(function (node) {
+        return getBoundsFitNodeRect(node);
+      })
+      .filter(Boolean);
+    const unionRect = unionAbsoluteRects(rects);
+    if (!unionRect || !(unionRect.width > 0) || !(unionRect.height > 0)) {
+      throw new Error("선택한 항목의 병합 영역을 계산하지 못했습니다.");
+    }
+
+    const exportSettings = {
+      format: "PNG",
+      useAbsoluteBounds: true,
+    };
+
+    let bytes = null;
+    if (selection.length === 1) {
+      bytes = await selection[0].exportAsync(exportSettings);
+    } else {
+      bytes = await exportImageMergeMultipleSelection(selection, unionRect, exportSettings);
+    }
+
+    if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
+      throw new Error("이미지 병합 PNG가 비어 있습니다.");
+    }
+
+    return {
+      selectionLabel: formatSelectionLabel(selection),
+      selectedRootNodeId: selection.length === 1 && selection[0] && typeof selection[0].id === "string" ? selection[0].id : "",
+      selectedRootNodeName: selection.length === 1 ? safeName(selection[0]) : "",
+      preserveSelectedRootTransform: selection.length === 1,
+      selectedRootWidth:
+        selection.length === 1 && typeof selection[0].width === "number" && Number.isFinite(selection[0].width)
+          ? selection[0].width
+          : 0,
+      selectedRootHeight:
+        selection.length === 1 && typeof selection[0].height === "number" && Number.isFinite(selection[0].height)
+          ? selection[0].height
+          : 0,
+      unionRect: unionRect,
+      bytes: bytes,
+    };
+  }
+
+  async function exportImageMergeMultipleSelection(selection, unionRect, exportSettings) {
+    const preview = figma.createFrame();
+    const clones = [];
+    try {
+      preview.name = "__pigma-image-merge-preview__";
+      preview.resize(unionRect.width, unionRect.height);
+      preview.clipsContent = true;
+      preview.fills = [];
+      preview.strokes = [];
+      preview.x = unionRect.x;
+      preview.y = unionRect.y;
+      figma.currentPage.appendChild(preview);
+
+      const orderedSelection = selection.slice().sort(compareSceneNodeCanvasOrder);
+      for (let index = 0; index < orderedSelection.length; index += 1) {
+        const node = orderedSelection[index];
+        const rect = getBoundsFitNodeRect(node);
+        if (!rect) {
+          continue;
+        }
+        const clone = node.clone();
+        preview.appendChild(clone);
+        clones.push(clone);
+        if ("x" in clone && typeof clone.x === "number") {
+          clone.x = roundBoundsFitMetric(rect.x - unionRect.x);
+        }
+        if ("y" in clone && typeof clone.y === "number") {
+          clone.y = roundBoundsFitMetric(rect.y - unionRect.y);
+        }
+      }
+
+      if (!clones.length) {
+        throw new Error("병합 가능한 선택 레이어를 찾지 못했습니다.");
+      }
+
+      return await preview.exportAsync(exportSettings);
+    } finally {
+      for (let index = 0; index < clones.length; index += 1) {
+        if (clones[index] && !clones[index].removed) {
+          clones[index].remove();
+        }
+      }
+      if (preview && !preview.removed) {
+        preview.remove();
+      }
+    }
   }
 
   async function applyImageCompositeToSelection(session, newImageHash, byteLength) {
@@ -26985,23 +35556,91 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         nodeName: "",
         reason: "Could not calculate the composite placement bounds.",
       });
-      return buildImageCompositeApplyResult(session, null, byteLength, skipped);
+      return buildImageCompositeApplyResult(session, null, byteLength, skipped, "");
     }
+    let resultNode = null;
+    let placementMode = "";
 
-    const resultNode = figma.createRectangle();
-    resultNode.name = buildImageCompositeResultName(session && session.selectionLabel ? session.selectionLabel : "");
-    resultNode.resize(unionRect.width, unionRect.height);
-    resultNode.fills = [buildVisibleImageFill(newImageHash)];
-    resultNode.strokes = [];
-    if ("cornerRadius" in resultNode) {
-      resultNode.cornerRadius = 0;
+    try {
+      resultNode = figma.createRectangle();
+      resultNode.name = buildImageCompositeResultName(session && session.selectionLabel ? session.selectionLabel : "");
+      const resultWidth =
+        session && session.preserveSelectedRootTransform && Number(session.selectedRootWidth) > 0
+          ? Number(session.selectedRootWidth)
+          : unionRect.width;
+      const resultHeight =
+        session && session.preserveSelectedRootTransform && Number(session.selectedRootHeight) > 0
+          ? Number(session.selectedRootHeight)
+          : unionRect.height;
+      resultNode.resize(resultWidth, resultHeight);
+      resultNode.fills = [buildVisibleImageFill(newImageHash)];
+      resultNode.strokes = [];
+      if ("cornerRadius" in resultNode) {
+        resultNode.cornerRadius = 0;
+      }
+
+      let placed = false;
+      if (session && session.selectedRootNodeId) {
+        const selectedRootNode = await figma.getNodeByIdAsync(session.selectedRootNodeId);
+        if (
+          selectedRootNode &&
+          !selectedRootNode.removed &&
+          (!("locked" in selectedRootNode) || !selectedRootNode.locked)
+        ) {
+          if (canUsePromptPlacementContainer(selectedRootNode)) {
+            selectedRootNode.insertChild(selectedRootNode.children.length, resultNode);
+            setImageExtendNodePosition(resultNode, 0, 0);
+            placementMode = "inside-selected-root";
+            placed = true;
+          } else if (
+            selectedRootNode.parent &&
+            canUsePromptPlacementContainer(selectedRootNode.parent) &&
+            !isAutoLayoutNode(selectedRootNode.parent)
+          ) {
+            const localBounds = getImageExtendLocalBounds(selectedRootNode);
+            if (localBounds) {
+              const parent = selectedRootNode.parent;
+              const insertIndex = findNodeChildIndex(parent, selectedRootNode.id);
+              parent.insertChild(insertIndex >= 0 ? insertIndex + 1 : parent.children.length, resultNode);
+              if (
+                session &&
+                session.preserveSelectedRootTransform &&
+                copyNodeRelativeTransform(resultNode, selectedRootNode)
+              ) {
+                placementMode = "selected-root-sibling-transform";
+              } else {
+                setImageExtendNodePosition(resultNode, localBounds.x, localBounds.y);
+                placementMode = "selected-root-sibling";
+              }
+              placed = true;
+            }
+          }
+        }
+      }
+
+      if (!placed) {
+        figma.currentPage.appendChild(resultNode);
+        resultNode.x = unionRect.x;
+        resultNode.y = unionRect.y;
+        placementMode = "page-overlay";
+      }
+
+      figma.currentPage.selection = [resultNode];
+      if (typeof figma.viewport.scrollAndZoomIntoView === "function") {
+        figma.viewport.scrollAndZoomIntoView([resultNode]);
+      }
+      return buildImageCompositeApplyResult(session, resultNode, byteLength, skipped, placementMode);
+    } catch (error) {
+      if (resultNode && !resultNode.removed && resultNode.parent) {
+        resultNode.remove();
+      }
+      skipped.push({
+        nodeId: session && session.selectedRootNodeId ? session.selectedRootNodeId : "",
+        nodeName: session && session.selectedRootNodeName ? session.selectedRootNodeName : "",
+        reason: normalizeErrorMessage(error, "Failed to place the generated composite image."),
+      });
+      return buildImageCompositeApplyResult(session, null, byteLength, skipped, placementMode);
     }
-    resultNode.x = unionRect.x;
-    resultNode.y = unionRect.y;
-    figma.currentPage.appendChild(resultNode);
-    figma.currentPage.selection = [resultNode];
-
-    return buildImageCompositeApplyResult(session, resultNode, byteLength, skipped);
   }
 
   function getImageExtendLocalBounds(node) {
@@ -27059,6 +35698,31 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
 
     throw new Error("Could not update the layer position.");
+  }
+
+  function copyNodeRelativeTransform(targetNode, sourceNode) {
+    if (
+      !targetNode ||
+      !sourceNode ||
+      !("relativeTransform" in targetNode) ||
+      !("relativeTransform" in sourceNode) ||
+      !Array.isArray(sourceNode.relativeTransform) ||
+      sourceNode.relativeTransform.length < 2
+    ) {
+      return false;
+    }
+
+    const row0 = Array.isArray(sourceNode.relativeTransform[0]) ? sourceNode.relativeTransform[0] : null;
+    const row1 = Array.isArray(sourceNode.relativeTransform[1]) ? sourceNode.relativeTransform[1] : null;
+    if (!row0 || !row1 || row0.length < 3 || row1.length < 3) {
+      return false;
+    }
+
+    targetNode.relativeTransform = [
+      [Number(row0[0]) || 0, Number(row0[1]) || 0, roundBoundsFitMetric(Number(row0[2]) || 0)],
+      [Number(row1[0]) || 0, Number(row1[1]) || 0, roundBoundsFitMetric(Number(row1[2]) || 0)],
+    ];
+    return true;
   }
 
   function findNodeChildIndex(parent, nodeId) {
@@ -28065,7 +36729,10 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       const nextFills = fills.slice();
       const originalFill = nextFills[targetIndex];
       const hiddenOriginalFill = cloneImagePaintWithHashAndVisibility(originalFill, session.originalHash, false);
-      const newVisibleFill = cloneImagePaintWithHashAndVisibility(originalFill, newImageHash, true);
+      const newVisibleFill =
+        session && session.captureMode === "source-image"
+          ? cloneImagePaintWithHash(originalFill, newImageHash)
+          : cloneRenderedUpscaleImagePaint(originalFill, newImageHash);
       nextFills.splice(targetIndex, 1, hiddenOriginalFill, newVisibleFill);
 
       try {
@@ -28141,6 +36808,180 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     };
   }
 
+  async function applyGeneratedPromptImagePlacement(session, newImageHash, byteLength) {
+    const skipped = [];
+    let resultNode = null;
+    let placementMode = "";
+
+    try {
+      if (session.targetKind === "new-image-placement") {
+        resultNode = createPromptPlacementResultNode(session, newImageHash);
+        placementMode = await placePromptGeneratedNodeFromAnchor(session, resultNode);
+      } else {
+        const targetNode = await figma.getNodeByIdAsync(session.targetNodeId);
+        if (!targetNode || targetNode.removed) {
+          throw new Error("Could not find the selected target layer again.");
+        }
+        if ("locked" in targetNode && targetNode.locked) {
+          throw new Error("Locked layers are not supported for prompt edit/generation.");
+        }
+        if ("rotation" in targetNode && typeof targetNode.rotation === "number" && Math.abs(targetNode.rotation) > 0.01) {
+          throw new Error("Rotated layers are not supported for prompt edit/generation yet.");
+        }
+
+        resultNode = createPromptPlacementResultNode(session, newImageHash);
+        if (canUsePromptPlacementContainer(targetNode)) {
+          targetNode.insertChild(targetNode.children.length, resultNode);
+          setImageExtendNodePosition(resultNode, 0, 0);
+          placementMode = "inside-target";
+        } else if (
+          targetNode.parent &&
+          canUsePromptPlacementContainer(targetNode.parent) &&
+          !isAutoLayoutNode(targetNode.parent)
+        ) {
+          const localBounds = getImageExtendLocalBounds(targetNode);
+          if (!localBounds) {
+            throw new Error("Could not determine the selected layer position.");
+          }
+          const parent = targetNode.parent;
+          const insertIndex = findNodeChildIndex(parent, targetNode.id);
+          if (insertIndex >= 0) {
+            parent.insertChild(insertIndex + 1, resultNode);
+          } else {
+            parent.insertChild(parent.children.length, resultNode);
+          }
+          setImageExtendNodePosition(resultNode, localBounds.x, localBounds.y);
+          placementMode = "sibling-overlay";
+        } else {
+          const absoluteRect = getBoundsFitNodeRect(targetNode);
+          if (!absoluteRect) {
+            throw new Error("Could not determine the selected layer bounds.");
+          }
+          figma.currentPage.appendChild(resultNode);
+          resultNode.x = absoluteRect.x;
+          resultNode.y = absoluteRect.y;
+          placementMode = "page-overlay";
+        }
+      }
+
+      if (resultNode) {
+        figma.currentPage.selection = [resultNode];
+        if (typeof figma.viewport.scrollAndZoomIntoView === "function") {
+          figma.viewport.scrollAndZoomIntoView([resultNode]);
+        }
+      }
+    } catch (error) {
+      if (resultNode && !resultNode.removed && resultNode.parent) {
+        resultNode.remove();
+      }
+      skipped.push({
+        nodeId: session.targetNodeId,
+        nodeName: session.targetNodeName,
+        reason: normalizeErrorMessage(error, PROMPT_PLACEMENT_APPLY_ERROR_MESSAGE),
+      });
+      resultNode = null;
+    }
+
+    return buildPromptPlacementApplyResult(session, resultNode, byteLength, skipped, placementMode);
+  }
+
+  async function placePromptGeneratedNodeFromAnchor(session, resultNode) {
+    if (
+      session &&
+      session.targetNodeId &&
+      typeof session.targetNodeId === "string" &&
+      session.targetNodeId &&
+      session.placementMode === "below-selected-text"
+    ) {
+      const anchorNode = await figma.getNodeByIdAsync(session.targetNodeId);
+      if (
+        anchorNode &&
+        !anchorNode.removed &&
+        (!("locked" in anchorNode) || !anchorNode.locked) &&
+        (!("rotation" in anchorNode) || typeof anchorNode.rotation !== "number" || Math.abs(anchorNode.rotation) <= 0.01)
+      ) {
+        const localBounds = getImageExtendLocalBounds(anchorNode);
+        if (
+          localBounds &&
+          anchorNode.parent &&
+          canUsePromptPlacementContainer(anchorNode.parent) &&
+          !isAutoLayoutNode(anchorNode.parent)
+        ) {
+          const parent = anchorNode.parent;
+          const insertIndex = findNodeChildIndex(parent, anchorNode.id);
+          if (insertIndex >= 0) {
+            parent.insertChild(insertIndex + 1, resultNode);
+          } else {
+            parent.insertChild(parent.children.length, resultNode);
+          }
+          setImageExtendNodePosition(resultNode, localBounds.x, localBounds.y + localBounds.height + PROMPT_TEXT_ANCHOR_GAP);
+          return "below-selected-text";
+        }
+
+        const absoluteRect = getBoundsFitNodeRect(anchorNode);
+        if (absoluteRect) {
+          figma.currentPage.appendChild(resultNode);
+          resultNode.x = absoluteRect.x;
+          resultNode.y = absoluteRect.y + absoluteRect.height + PROMPT_TEXT_ANCHOR_GAP;
+          return "below-selected-text-page";
+        }
+      }
+    }
+
+    const viewportCenter = figma.viewport && figma.viewport.center ? figma.viewport.center : { x: 0, y: 0 };
+    figma.currentPage.appendChild(resultNode);
+    resultNode.x = roundBoundsFitMetric(viewportCenter.x - resultNode.width / 2);
+    resultNode.y = roundBoundsFitMetric(viewportCenter.y - resultNode.height / 2);
+    return "viewport-center";
+  }
+
+  function createPromptPlacementResultNode(session, newImageHash) {
+    const width = Math.max(1, roundBoundsFitPixel(session && session.targetWidth ? session.targetWidth : 1024));
+    const height = Math.max(1, roundBoundsFitPixel(session && session.targetHeight ? session.targetHeight : 1024));
+    const node = figma.createRectangle();
+    node.name = buildPromptPlacementResultName(session);
+    node.resize(width, height);
+    node.fills = [buildVisibleImageFill(newImageHash)];
+    node.strokes = [];
+    if ("cornerRadius" in node) {
+      node.cornerRadius = 0;
+    }
+    return node;
+  }
+
+  function buildPromptPlacementResultName(session) {
+    const baseName =
+      session && typeof session.targetNodeName === "string" && session.targetNodeName.trim()
+        ? session.targetNodeName.trim()
+        : "AI generated image";
+    return baseName + " / generated";
+  }
+
+  function buildPromptPlacementApplyResult(session, resultNode, byteLength, skipped, placementMode) {
+    return {
+      processedAt: new Date().toISOString(),
+      summary: {
+        selectionLabel: session && session.selectionLabel ? session.selectionLabel : "",
+        targetNodeName: session && session.targetNodeName ? session.targetNodeName : "",
+        appliedNodeCount: resultNode ? 1 : 0,
+        skippedCount: Array.isArray(skipped) ? skipped.length : 0,
+        resultNodeId: resultNode && resultNode.id ? resultNode.id : "",
+        resultNodeName: resultNode && resultNode.name ? resultNode.name : "",
+        placementMode: placementMode || "",
+        resultByteLength: byteLength,
+      },
+      skipped: Array.isArray(skipped) ? skipped.slice(0, 24) : [],
+    };
+  }
+
+  function isAutoLayoutNode(node) {
+    return !!node && "layoutMode" in node && typeof node.layoutMode === "string" && node.layoutMode !== "NONE";
+  }
+
+  function canUsePromptPlacementContainer(node) {
+    return canUseImageExtendParent(node) && !isAutoLayoutNode(node);
+  }
+
   function notifyApplyResult(result) {
     const summary = result && result.summary ? result.summary : {};
     const appliedFillCount =
@@ -28187,6 +37028,30 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     };
   }
 
+  function resolveRenderedUpscaleScaleMode(fill) {
+    const scaleMode = typeof (fill && fill.scaleMode) === "string" ? fill.scaleMode : "FILL";
+    if (scaleMode === "FIT" || scaleMode === "STRETCH" || scaleMode === "FILL") {
+      return scaleMode;
+    }
+    return "FIT";
+  }
+
+  function cloneRenderedUpscaleImagePaint(fill, imageHash) {
+    const cloned = cloneImagePaintWithHash(fill, imageHash);
+    const resolvedScaleMode = resolveRenderedUpscaleScaleMode(fill);
+    cloned.scaleMode = resolvedScaleMode;
+    if ("imageTransform" in cloned) {
+      delete cloned.imageTransform;
+    }
+    if ("scalingFactor" in cloned) {
+      delete cloned.scalingFactor;
+    }
+    if ("rotation" in cloned) {
+      delete cloned.rotation;
+    }
+    return cloned;
+  }
+
   function cloneBoundsFitImagePaint(fill, imageHash) {
     const cloned = cloneImagePaintWithHash(fill, imageHash);
     cloned.scaleMode = "FILL";
@@ -28202,21 +37067,86 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return cloned;
   }
 
+  function cloneBoundsFitPreservedImagePaint(fill, target, processed) {
+    if (!fill || !isImagePaint(fill) || !fill.imageHash || !target || !processed) {
+      return null;
+    }
+
+    const useRenderedAnalysis = target.analysisMode === "rendered-node";
+    const sourceWidth =
+      useRenderedAnalysis && Number(processed.sourceWidth) > 0
+        ? Number(processed.sourceWidth)
+        : Number(target.sourceWidth) > 0
+          ? Number(target.sourceWidth)
+          : 0;
+    const sourceHeight =
+      useRenderedAnalysis && Number(processed.sourceHeight) > 0
+        ? Number(processed.sourceHeight)
+        : Number(target.sourceHeight) > 0
+          ? Number(target.sourceHeight)
+          : 0;
+    const rasterOffsetX =
+      useRenderedAnalysis || !Number.isFinite(Number(target.rasterAnalysisOffsetX))
+        ? 0
+        : Number(target.rasterAnalysisOffsetX);
+    const rasterOffsetY =
+      useRenderedAnalysis || !Number.isFinite(Number(target.rasterAnalysisOffsetY))
+        ? 0
+        : Number(target.rasterAnalysisOffsetY);
+    const cropX = rasterOffsetX + (Number(processed.cropX) || 0);
+    const cropY = rasterOffsetY + (Number(processed.cropY) || 0);
+    const cropWidth = Number(processed.cropWidth) > 0 ? Number(processed.cropWidth) : 0;
+    const cropHeight = Number(processed.cropHeight) > 0 ? Number(processed.cropHeight) : 0;
+
+    if (!(sourceWidth > 0) || !(sourceHeight > 0) || !(cropWidth > 0) || !(cropHeight > 0)) {
+      return null;
+    }
+
+    const cloned = cloneImagePaintWithHash(fill, fill.imageHash);
+    cloned.scaleMode = "CROP";
+    cloned.imageTransform = [
+      [cropWidth / sourceWidth, 0, cropX / sourceWidth],
+      [0, cropHeight / sourceHeight, cropY / sourceHeight],
+    ];
+    if ("scalingFactor" in cloned) {
+      delete cloned.scalingFactor;
+    }
+    if ("rotation" in cloned) {
+      delete cloned.rotation;
+    }
+    return cloned;
+  }
+
   function notifyApplyResult(result, operationLabel) {
     const summary = result && result.summary ? result.summary : {};
     const appliedFillCount =
       typeof summary.appliedFillCount === "number" && Number.isFinite(summary.appliedFillCount)
         ? summary.appliedFillCount
         : 0;
+    const appliedNodeCount =
+      typeof summary.appliedNodeCount === "number" && Number.isFinite(summary.appliedNodeCount)
+        ? summary.appliedNodeCount
+        : 0;
     const skippedCount =
       typeof summary.skippedCount === "number" && Number.isFinite(summary.skippedCount) ? summary.skippedCount : 0;
+    const skipped = result && Array.isArray(result.skipped) ? result.skipped : [];
+    const firstSkippedReason =
+      skipped.length && skipped[0] && typeof skipped[0].reason === "string" ? skipped[0].reason.trim() : "";
 
-    if (!appliedFillCount) {
-      figma.notify("AI image result could not find an IMAGE fill to apply.", { timeout: 2200 });
+    if (!appliedFillCount && !appliedNodeCount) {
+      const message = firstSkippedReason
+        ? "AI image result could not be applied: " + firstSkippedReason
+        : "AI image result could not be applied.";
+      figma.notify(message, { timeout: 3200, error: true });
       return;
     }
 
-    let message = (operationLabel || "AI Image") + " complete (" + appliedFillCount + " fill applied";
+    let message = operationLabel || "AI Image";
+    if (appliedFillCount > 0) {
+      message += " complete (" + appliedFillCount + " fill applied";
+    } else {
+      message += " complete (" + appliedNodeCount + " layer created";
+    }
     if (skippedCount > 0) {
       message += ", " + skippedCount + " skipped";
     }
@@ -28228,9 +37158,69 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return label || "AI Image";
   }
 
+  function isBoundsFitOperation(options) {
+    const operationKind =
+      options && typeof options.operationKind === "string" ? options.operationKind.replace(/\s+/g, " ").trim().toLowerCase() : "";
+    if (operationKind === "bounds-fit") {
+      return true;
+    }
+    const operationLabel = sanitizeOperationLabel(options && options.operationLabel);
+    return /bounds\s*fit/i.test(operationLabel);
+  }
+
+  function isImageExtendOperation(options) {
+    const operationKind =
+      options && typeof options.operationKind === "string" ? options.operationKind.replace(/\s+/g, " ").trim().toLowerCase() : "";
+    if (operationKind === "image-extend") {
+      return true;
+    }
+    const operationLabel = sanitizeOperationLabel(options && options.operationLabel);
+    return /extend|확장/i.test(operationLabel);
+  }
+
   function sanitizeSourceMode(value) {
     const mode = typeof value === "string" ? value.replace(/\s+/g, " ").trim().toLowerCase() : "";
-    return mode === "shape-or-image" ? mode : "image-fill-only";
+    return mode === "shape-or-image" || mode === "prompt-smart" ? mode : "image-fill-only";
+  }
+
+  function shouldPreferOriginalUpscaleSource(message) {
+    if (message && message.preferOriginalImageBytes === true) {
+      return true;
+    }
+    return isSharpenOperationLabel(message && message.operationLabel) || isUpscaleOperationLabel(message && message.operationLabel);
+  }
+
+  function sanitizePromptOutputSize(value) {
+    const normalized = typeof value === "string" ? value.replace(/\s+/g, "").trim().toUpperCase() : "";
+    return normalized === "2K" || normalized === "4K" ? normalized : "1K";
+  }
+
+  function isSharpenOperationLabel(value) {
+    const label = sanitizeOperationLabel(value);
+    return label === "샤프닝" || /sharpen/i.test(label);
+  }
+
+  function isUpscaleOperationLabel(value) {
+    const label = sanitizeOperationLabel(value);
+    return /업스케일|upscale/i.test(label);
+  }
+
+  function shouldPreferOriginalUpscaleSource(message) {
+    if (message && message.preferOriginalImageBytes === true) {
+      return true;
+    }
+    return isSharpenOperationLabel(message && message.operationLabel) || isUpscaleOperationLabel(message && message.operationLabel);
+  }
+
+  function buildPromptPlacementDimensions(outputSize) {
+    const normalizedSize = sanitizePromptOutputSize(outputSize);
+    if (normalizedSize === "4K") {
+      return { width: 4096, height: 4096 };
+    }
+    if (normalizedSize === "2K") {
+      return { width: 2048, height: 2048 };
+    }
+    return { width: 1024, height: 1024 };
   }
 
   async function collectReferenceSearchSourceFromSelection() {
@@ -28437,6 +37427,145 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     };
   }
 
+  async function collectPromptDraftSourceFromSelection() {
+    const selection = Array.from(figma.currentPage.selection || []).filter(Boolean);
+    if (!selection.length) {
+      throw new Error(PROMPT_DRAFT_SOURCE_NOT_FOUND_MESSAGE);
+    }
+
+    const selectedRangeText = getSelectedTextRangeSnapshot();
+    const textPayload = collectPromptDraftTextPayload(selection, selectedRangeText);
+    const visualNodes = selection.filter(function (node) {
+      return !!node && !node.removed && node.type !== "TEXT";
+    });
+
+    if (visualNodes.length > 1) {
+      throw new Error(PROMPT_SMART_SELECTION_MESSAGE);
+    }
+
+    if (visualNodes.length === 1) {
+      const source = await buildPromptDraftVisualSource(visualNodes[0], selection);
+      if (textPayload && textPayload.text) {
+        source.sourceType = "mixed";
+        source.text = textPayload.text;
+        source.summary = source.summary || {};
+        source.summary.textLength = textPayload.text.length;
+        source.summary.textMode = textPayload.textMode;
+      }
+      return source;
+    }
+
+    if (textPayload && textPayload.text) {
+      return {
+        sourceType: "text",
+        text: textPayload.text,
+        summary: {
+          selectionLabel: formatSelectionLabel(selection),
+          targetNodeName: textPayload.nodeName || safeName(selection[0]),
+          textMode: textPayload.textMode,
+          textLength: textPayload.text.length,
+        },
+      };
+    }
+
+    throw new Error(PROMPT_DRAFT_SOURCE_NOT_FOUND_MESSAGE);
+  }
+
+  function collectPromptDraftTextPayload(selection, selectedRangeText) {
+    if (selectedRangeText && selectedRangeText.text) {
+      return {
+        text: selectedRangeText.text,
+        textMode: "selected-range",
+        nodeName: selectedRangeText.nodeName,
+      };
+    }
+
+    if (selection.every(function (node) { return node && node.type === "TEXT"; })) {
+      const directText = collectReferenceTextFromNodes(selection, {
+        maxNodes: 8,
+        maxLength: 600,
+        includeDescendants: false,
+      });
+      if (directText) {
+        return {
+          text: directText,
+          textMode: "text-selection",
+          nodeName: safeName(selection[0]),
+        };
+      }
+    }
+
+    const fallbackText = collectReferenceTextFromNodes(selection, {
+      maxNodes: 10,
+      maxLength: 720,
+      includeDescendants: true,
+    });
+    if (fallbackText) {
+      return {
+        text: fallbackText,
+        textMode: "selection-descendants",
+        nodeName: safeName(selection[0]),
+      };
+    }
+
+    return null;
+  }
+
+  async function buildPromptDraftVisualSource(node, selection) {
+    if (!node || node.removed || typeof node.exportAsync !== "function") {
+      throw new Error(PROMPT_TARGET_EXPORT_ERROR_MESSAGE);
+    }
+
+    if (hasChildren(node)) {
+      let collection = null;
+      try {
+        collection = await collectImageCompositeTargetsFromSelection([node]);
+      } catch (error) {
+        collection = null;
+      }
+      if (collection && Array.isArray(collection.layers)) {
+        const imageLayerCount = collection.layers.filter(function (layer) {
+          return !!layer && layer.layerKind === "image";
+        }).length;
+        if (imageLayerCount >= 2) {
+          throw new Error(PROMPT_MULTI_IMAGE_CONTAINER_MESSAGE);
+        }
+      }
+    }
+
+    const bytes = await node.exportAsync({
+      format: "PNG",
+      useAbsoluteBounds: false,
+    });
+    if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
+      throw new Error(PROMPT_TARGET_EXPORT_EMPTY_MESSAGE);
+    }
+
+    const bounds = getBoundsFitNodeRect(node);
+    return {
+      sourceType: "image",
+      image: {
+        bytes: bytes,
+        mimeType: "image/png",
+        fileName: buildFileName(
+          {
+            nodeName: safeName(node),
+            imageHash: node.id,
+          },
+          "png"
+        ),
+      },
+      summary: {
+        selectionLabel: formatSelectionLabel(selection),
+        targetNodeName: safeName(node),
+        captureMode: "rendered-node",
+        targetWidth: bounds ? bounds.width : roundBoundsFitMetric(node.width),
+        targetHeight: bounds ? bounds.height : roundBoundsFitMetric(node.height),
+        byteLength: bytes.length,
+      },
+    };
+  }
+
   async function collectImageTextOverlaySourceFromSelection(message) {
     let overlayReason = "";
 
@@ -28570,6 +37699,64 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     };
   }
 
+  function shapeEditNeedsPlaceholderSource(node) {
+    return !hasRenderablePaints(node && node.fills) && !hasRenderablePaints(node && node.strokes);
+  }
+
+  function hasRenderablePaints(paints) {
+    return Array.isArray(paints) && paints.some(isRenderablePaint);
+  }
+
+  function isRenderablePaint(paint) {
+    if (!paint || paint.visible === false) {
+      return false;
+    }
+
+    if (paint.type === "IMAGE") {
+      return typeof paint.imageHash === "string" && paint.imageHash.length > 0;
+    }
+
+    const opacity = typeof paint.opacity === "number" && Number.isFinite(paint.opacity) ? Number(paint.opacity) : 1;
+    if (!(opacity > 0.001)) {
+      return false;
+    }
+
+    return (
+      paint.type === "SOLID" ||
+      paint.type === "GRADIENT_LINEAR" ||
+      paint.type === "GRADIENT_RADIAL" ||
+      paint.type === "GRADIENT_ANGULAR" ||
+      paint.type === "GRADIENT_DIAMOND"
+    );
+  }
+
+  async function exportShapeEditPlaceholderPng(node) {
+    const width = typeof node.width === "number" && Number.isFinite(node.width) ? Math.max(1, Math.round(node.width)) : 0;
+    const height = typeof node.height === "number" && Number.isFinite(node.height) ? Math.max(1, Math.round(node.height)) : 0;
+    if (!(width > 0) || !(height > 0)) {
+      throw new Error(SHAPE_EXPORT_SOURCE_ERROR_MESSAGE);
+    }
+
+    const placeholder = figma.createRectangle();
+    try {
+      placeholder.name = "__pigma-shape-source-placeholder__";
+      placeholder.resize(width, height);
+      placeholder.fills = [createSolidPaintFromColor("#f4f4f5", 1)];
+      placeholder.strokes = [];
+      placeholder.x = -100000;
+      placeholder.y = -100000;
+      figma.currentPage.appendChild(placeholder);
+      return await placeholder.exportAsync({
+        format: "PNG",
+        useAbsoluteBounds: false,
+      });
+    } finally {
+      if (placeholder && !placeholder.removed) {
+        placeholder.remove();
+      }
+    }
+  }
+
   function sanitizeReferenceSearchQuery(value) {
     const normalized = typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
     return normalized ? normalized.slice(0, 120) : "";
@@ -28584,42 +37771,316 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   }
 
   async function collectBoundsFitTargetsFromSelection() {
-    const selection = Array.from(figma.currentPage.selection || []);
+    const selection = Array.from(figma.currentPage.selection || []).filter(Boolean);
     if (!selection.length) {
-      throw new Error("Select a frame, group, or layer first.");
+      throw new Error("Select a frame, group, text, or image layer first.");
     }
 
-    const targets = [];
-    const skipped = [];
+    const state = {
+      targets: [],
+      containers: [],
+      skipped: [],
+      targetNodeIds: {},
+      containerNodeIds: {},
+      skippedNodeIds: {},
+    };
 
     for (let index = 0; index < selection.length; index += 1) {
-      const analysis = await analyzeBoundsFitSelectionNode(selection[index]);
-      if (analysis && analysis.target) {
-        targets.push(analysis.target);
-      } else if (analysis && analysis.skipped) {
-        skipped.push(analysis.skipped);
-      }
+      await collectBoundsFitPlansFromNode(selection[index], state, true);
     }
 
     return {
       selection: selection,
-      targets: targets,
-      skipped: skipped,
+      targets: state.targets,
+      containers: state.containers,
+      skipped: state.skipped,
     };
   }
 
-  async function collectImageCompositeTargetsFromSelection() {
-    const selection = Array.from(figma.currentPage.selection || []).filter(Boolean);
-    if (!selection.length) {
-      throw new Error("Select 2 to 5 image layers first.");
+  async function collectBoundsFitPlansFromNode(node, state, isRootSelection) {
+    if (!node || node.removed) {
+      if (isRootSelection) {
+        appendBoundsFitSkipped(buildBoundsFitSkipped(node, "The selected layer could not be read."), state);
+      }
+      return false;
     }
+
+    if (!isBoundsFitNodeVisible(node)) {
+      if (isRootSelection) {
+        appendBoundsFitSkipped(buildBoundsFitSkipped(node, "Hidden layers are not supported for bounds-fit."), state);
+      }
+      return false;
+    }
+
+    if ("locked" in node && node.locked) {
+      if (isRootSelection) {
+        appendBoundsFitSkipped(buildBoundsFitSkipped(node, "Locked layers are not supported for bounds-fit."), state);
+      }
+      return false;
+    }
+
+    if (hasChildren(node)) {
+      let hasEligibleDescendant = false;
+      for (let index = 0; index < node.children.length; index += 1) {
+        if (await collectBoundsFitPlansFromNode(node.children[index], state, false)) {
+          hasEligibleDescendant = true;
+        }
+      }
+
+      if (hasEligibleDescendant && canApplyBoundsFitContainer(node)) {
+        appendBoundsFitContainerPlan(node, state, {
+          selectedRoot: isRootSelection,
+        });
+      } else if (isRootSelection && !hasEligibleDescendant) {
+        appendBoundsFitSkipped(
+          buildBoundsFitSkipped(
+            node,
+            isBoundsFitContainerTreeNode(node)
+              ? "Could not find visible text or image layers inside the selected container."
+              : buildBoundsFitUnsupportedRootReason(node)
+          ),
+          state
+        );
+      }
+
+      return hasEligibleDescendant;
+    }
+
+    let analysis = null;
+    if (isBoundsFitTextSelectionNodeCandidate(node)) {
+      analysis = await analyzeBoundsFitTextSelectionNode(node);
+    } else if (isBoundsFitImageSelectionNodeCandidate(node)) {
+      analysis = await analyzeBoundsFitImageSelectionNode(node);
+    } else {
+      if (isRootSelection) {
+        appendBoundsFitSkipped(buildBoundsFitSkipped(node, buildBoundsFitUnsupportedRootReason(node)), state);
+      }
+      return false;
+    }
+
+    if (analysis && analysis.target) {
+      appendBoundsFitTarget(analysis.target, state);
+      return true;
+    }
+
+    if (analysis && analysis.skipped && isRootSelection) {
+      appendBoundsFitSkipped(analysis, state);
+    }
+
+    return false;
+  }
+
+  function appendBoundsFitTarget(target, state) {
+    if (!target || !target.nodeId || !state || !state.targetNodeIds) {
+      return;
+    }
+
+    if (state.targetNodeIds[target.nodeId]) {
+      return;
+    }
+
+    state.targetNodeIds[target.nodeId] = true;
+    state.targets.push(target);
+  }
+
+  function appendBoundsFitContainerPlan(node, state, options) {
+    if (!node || !node.id || !state || !state.containerNodeIds) {
+      return;
+    }
+
+    const existingIndex =
+      typeof state.containerNodeIds[node.id] === "number" && state.containerNodeIds[node.id] >= 0
+        ? state.containerNodeIds[node.id]
+        : -1;
+    if (existingIndex >= 0) {
+      if (options && options.selectedRoot === true && state.containers[existingIndex]) {
+        state.containers[existingIndex].selectedRoot = true;
+      }
+      return;
+    }
+
+    state.containerNodeIds[node.id] = state.containers.length;
+    state.containers.push({
+      nodeId: node.id,
+      nodeName: safeName(node),
+      nodeType: typeof node.type === "string" ? node.type : "",
+      depth: getBoundsFitNodeDepth(node),
+      selectedRoot: !!(options && options.selectedRoot === true),
+    });
+  }
+
+  function appendBoundsFitSkipped(analysis, state) {
+    const skipped = analysis && analysis.skipped ? analysis.skipped : analysis;
+    if (!skipped || !state || !Array.isArray(state.skipped)) {
+      return;
+    }
+
+    const key = skipped.nodeId || skipped.nodeName || skipped.reason;
+    if (key && state.skippedNodeIds && state.skippedNodeIds[key]) {
+      return;
+    }
+
+    if (key && state.skippedNodeIds) {
+      state.skippedNodeIds[key] = true;
+    }
+
+    state.skipped.push(skipped);
+  }
+
+  function isBoundsFitNodeVisible(node) {
+    return !!node && (!("visible" in node) || node.visible !== false);
+  }
+
+  function isBoundsFitContainerTreeNode(node) {
+    if (!node || !hasChildren(node)) {
+      return false;
+    }
+
+    return node.type === "FRAME" || node.type === "GROUP" || node.type === "SECTION" || node.type === "INSTANCE";
+  }
+
+  function isBoundsFitAutoLayoutNode(node) {
+    return !!node && "layoutMode" in node && typeof node.layoutMode === "string" && node.layoutMode !== "NONE";
+  }
+
+  function isBoundsFitAutoLayoutChildNode(node) {
+    return !!node && !!node.parent && isBoundsFitAutoLayoutNode(node.parent);
+  }
+
+  function canMoveBoundsFitNode(node) {
+    if (!node) {
+      return false;
+    }
+
+    if (!isBoundsFitAutoLayoutChildNode(node)) {
+      return true;
+    }
+
+    return "layoutPositioning" in node && node.layoutPositioning === "ABSOLUTE";
+  }
+
+  function shouldPreserveBoundsFitTextWidth(node) {
+    if (!node || node.type !== "TEXT") {
+      return false;
+    }
+
+    if (isBoundsFitAutoLayoutChildNode(node)) {
+      return true;
+    }
+
+    if ("textAutoResize" in node && typeof node.textAutoResize === "string" && node.textAutoResize === "NONE") {
+      return true;
+    }
+
+    return false;
+  }
+
+  function shouldResizeBoundsFitContainer(node) {
+    if (!node || node.type === "GROUP") {
+      return false;
+    }
+
+    if (isBoundsFitAutoLayoutChildNode(node) && (!("layoutPositioning" in node) || node.layoutPositioning !== "ABSOLUTE")) {
+      return false;
+    }
+
+    return true;
+  }
+
+  function canApplyBoundsFitContainer(node) {
+    if (!isBoundsFitContainerTreeNode(node)) {
+      return false;
+    }
+
+    if ("rotation" in node && typeof node.rotation === "number" && Math.abs(node.rotation) > 0.01) {
+      return false;
+    }
+
+    if (node.type !== "GROUP" && !canResizeBoundsFitNode(node)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  function buildBoundsFitUnsupportedRootReason(node) {
+    if (!node) {
+      return "Could not find an eligible layer for bounds-fit.";
+    }
+
+    if (hasChildren(node)) {
+      return buildBoundsFitContainerUnsupportedReason(node);
+    }
+
+    return "Bounds-fit currently supports text layers, image layers, and groups/frames that contain them.";
+  }
+
+  function buildBoundsFitContainerUnsupportedReason(node) {
+    if (!node) {
+      return "Could not find an eligible container for bounds-fit.";
+    }
+
+    if (!isBoundsFitContainerTreeNode(node)) {
+      return "Bounds-fit container mode currently supports groups, frames, sections, and instances that contain text or image layers.";
+    }
+
+    if ("rotation" in node && typeof node.rotation === "number" && Math.abs(node.rotation) > 0.01) {
+      return "Rotated containers are not supported yet.";
+    }
+
+    if (node.type !== "GROUP" && !canResizeBoundsFitNode(node)) {
+      return "Bounds-fit could not resize the selected container.";
+    }
+
+    return "Bounds-fit could not find visible text or image layers inside the selected container.";
+  }
+
+  function isBoundsFitTextSelectionNodeCandidate(node) {
+    return !!node && node.type === "TEXT";
+  }
+
+  function isBoundsFitImageSelectionNodeCandidate(node) {
+    return !!node && !hasChildren(node) && hasSimpleVisibleImagePaint(node);
+  }
+
+  function isBoundsFitPreferredContentNode(node) {
+    return isBoundsFitTextSelectionNodeCandidate(node) || isBoundsFitImageSelectionNodeCandidate(node);
+  }
+
+  function canResizeBoundsFitNode(node) {
+    return !!node && (typeof node.resizeWithoutConstraints === "function" || typeof node.resize === "function");
+  }
+
+  function getBoundsFitNodeDepth(node) {
+    let depth = 0;
+    let current = node && node.parent ? node.parent : null;
+    while (current) {
+      depth += 1;
+      current = current.parent;
+    }
+    return depth;
+  }
+
+  const IMAGE_COMPOSITE_MAX_LAYER_COUNT = 8;
+
+  async function collectImageCompositeTargetsFromSelection(selectionInput) {
+    const selection = Array.isArray(selectionInput)
+      ? selectionInput.filter(Boolean)
+      : Array.from(figma.currentPage.selection || []).filter(Boolean);
+    if (!selection.length) {
+      throw new Error("Select a frame or 2 to 8 visible visual layers first.");
+    }
+    const rootSelection = resolveImageCompositeSelectionRoot(selection);
+    const rootRect = rootSelection ? getBoundsFitNodeRect(rootSelection) : null;
     const candidateNodes = collectImageCompositeCandidateNodes(selection);
 
     const layers = [];
     const skipped = [];
 
     for (let index = 0; index < candidateNodes.length; index += 1) {
-      const analysis = await analyzeImageCompositeSelectionNode(candidateNodes[index]);
+      const analysis = await analyzeImageCompositeSelectionNode(candidateNodes[index], {
+        rootRect: rootRect,
+      });
       if (analysis && analysis.target) {
         layers.push(analysis.target);
       } else if (analysis && analysis.skipped) {
@@ -28627,25 +38088,29 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       }
     }
 
-    if (layers.length > 5) {
-      throw new Error("Image composite currently supports up to 5 eligible image layers.");
+    if (!layers.length) {
+      throw new Error(buildImageCompositeEmptySelectionMessage(layers, skipped));
     }
 
     layers.sort(function (left, right) {
       return compareSceneNodeCanvasOrder(left.node, right.node);
     });
 
-    const unionRect = unionAbsoluteRects(
-      layers.map(function (layer) {
-        return layer.visibleRect;
-      })
-    );
+    const trimmedLayers = trimImageCompositeLayersForPayload(layers, skipped, IMAGE_COMPOSITE_MAX_LAYER_COUNT);
+
+    const unionRect =
+      rootRect ||
+      unionAbsoluteRects(
+        trimmedLayers.map(function (layer) {
+          return layer.visibleRect;
+        })
+      );
     if (!unionRect) {
-      throw new Error(buildImageCompositeEmptySelectionMessage(layers, skipped));
+      throw new Error(buildImageCompositeEmptySelectionMessage(trimmedLayers, skipped));
     }
 
-    for (let index = 0; index < layers.length; index += 1) {
-      const layer = layers[index];
+    for (let index = 0; index < trimmedLayers.length; index += 1) {
+      const layer = trimmedLayers[index];
       layer.role = index === 0 ? "background" : "foreground";
       layer.orderIndex = index;
       layer.offsetX = roundBoundsFitMetric(layer.visibleRect.x - unionRect.x);
@@ -28654,10 +38119,80 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
     return {
       selection: selection,
-      layers: layers,
+      selectedRoot: rootSelection,
+      layers: trimmedLayers,
       skipped: skipped,
       unionRect: unionRect,
     };
+  }
+
+  function resolveImageCompositeSelectionRoot(selection) {
+    if (!Array.isArray(selection) || selection.length !== 1) {
+      return null;
+    }
+
+    const node = selection[0];
+    if (!node || node.removed || !hasChildren(node)) {
+      return null;
+    }
+
+    return getBoundsFitNodeRect(node) ? node : null;
+  }
+
+  function getImageCompositeLayerArea(layer) {
+    const rect = layer && layer.visibleRect ? layer.visibleRect : null;
+    const width = rect && Number(rect.width) > 0 ? Number(rect.width) : 0;
+    const height = rect && Number(rect.height) > 0 ? Number(rect.height) : 0;
+    return width * height;
+  }
+
+  function getImageCompositeLayerWeight(layer) {
+    if (!layer || layer.layerKind === "image") {
+      return 3;
+    }
+    if (layer.layerKind === "text") {
+      return 2.4;
+    }
+    return 1.8;
+  }
+
+  function trimImageCompositeLayersForPayload(layers, skipped, maxCount) {
+    if (!Array.isArray(layers) || layers.length <= maxCount) {
+      return Array.isArray(layers) ? layers.slice() : [];
+    }
+
+    const ranked = layers
+      .slice()
+      .sort(function (left, right) {
+        const scoreDelta =
+          getImageCompositeLayerArea(right) * getImageCompositeLayerWeight(right) -
+          getImageCompositeLayerArea(left) * getImageCompositeLayerWeight(left);
+        if (Math.abs(scoreDelta) > 0.01) {
+          return scoreDelta > 0 ? 1 : -1;
+        }
+        return compareSceneNodeCanvasOrder(left.node, right.node);
+      })
+      .slice(0, maxCount);
+    const kept = {};
+    for (let index = 0; index < ranked.length; index += 1) {
+      kept[ranked[index].nodeId] = true;
+    }
+
+    const result = [];
+    for (let index = 0; index < layers.length; index += 1) {
+      const layer = layers[index];
+      if (layer && kept[layer.nodeId]) {
+        result.push(layer);
+        continue;
+      }
+      skipped.push({
+        nodeId: layer && typeof layer.nodeId === "string" ? layer.nodeId : "",
+        nodeName: layer && typeof layer.nodeName === "string" ? layer.nodeName : "",
+        reason: "Skipped because image composite currently keeps up to 8 of the most prominent visible layers.",
+      });
+    }
+
+    return result;
   }
 
   function collectImageCompositeCandidateNodes(selection) {
@@ -28691,6 +38226,10 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
   function roundBoundsFitMetric(value) {
     return Math.round((Number(value) || 0) * 1000) / 1000;
+  }
+
+  function roundBoundsFitPixel(value) {
+    return Math.round(Number(value) || 0);
   }
 
   function unionAbsoluteRects(rects) {
@@ -28728,29 +38267,102 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     };
   }
 
+  function readBoundsFitRectCandidate(getter) {
+    if (typeof getter !== "function") {
+      return null;
+    }
+    try {
+      const rect = getter();
+      if (!rect) {
+        return null;
+      }
+      const width = Number(rect.width) || 0;
+      const height = Number(rect.height) || 0;
+      if (!(width > 0) || !(height > 0)) {
+        return null;
+      }
+      return {
+        x: roundBoundsFitMetric(rect.x),
+        y: roundBoundsFitMetric(rect.y),
+        width: roundBoundsFitMetric(width),
+        height: roundBoundsFitMetric(height),
+      };
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function getBoundsFitTransformRect(node) {
+    if (!node) {
+      return null;
+    }
+
+    try {
+      const width = Number(node.width) || 0;
+      const height = Number(node.height) || 0;
+      if (!(width > 0) || !(height > 0)) {
+        return null;
+      }
+
+      const transform = Array.isArray(node.absoluteTransform) ? node.absoluteTransform : null;
+      if (!transform || transform.length < 2) {
+        return null;
+      }
+
+      const axisAligned =
+        Math.abs(Number(transform[0][1]) || 0) <= 0.0001 && Math.abs(Number(transform[1][0]) || 0) <= 0.0001;
+      if (!axisAligned) {
+        return null;
+      }
+
+      return {
+        x: roundBoundsFitMetric(Number(transform[0][2]) || 0),
+        y: roundBoundsFitMetric(Number(transform[1][2]) || 0),
+        width: roundBoundsFitMetric(width),
+        height: roundBoundsFitMetric(height),
+      };
+    } catch (error) {
+      return null;
+    }
+  }
+
   function getBoundsFitNodeRect(node) {
-    const rect =
-      node && node.absoluteBoundingBox
-        ? node.absoluteBoundingBox
-        : node && node.absoluteRenderBounds
-          ? node.absoluteRenderBounds
-          : null;
-    if (!rect) {
-      return null;
-    }
+    const isTextNode = !!node && node.type === "TEXT";
+    const transformRect = getBoundsFitTransformRect(node);
 
-    const width = Number(rect.width) || 0;
-    const height = Number(rect.height) || 0;
-    if (!(width > 0) || !(height > 0)) {
-      return null;
-    }
+    const preferredRect = isTextNode
+      ? readBoundsFitRectCandidate(function () {
+          return node.absoluteRenderBounds;
+        }) ||
+        readBoundsFitRectCandidate(function () {
+          return node.absoluteBoundingBox;
+        }) ||
+        transformRect
+      : transformRect ||
+        readBoundsFitRectCandidate(function () {
+          return node.absoluteBoundingBox;
+        }) ||
+        readBoundsFitRectCandidate(function () {
+          return node.absoluteRenderBounds;
+        });
 
-    return {
-      x: roundBoundsFitMetric(rect.x),
-      y: roundBoundsFitMetric(rect.y),
-      width: roundBoundsFitMetric(width),
-      height: roundBoundsFitMetric(height),
-    };
+    return preferredRect || null;
+  }
+
+  function getBoundsFitNodeLayoutRect(node) {
+    return (
+      readBoundsFitRectCandidate(function () {
+        return node.absoluteBoundingBox;
+      }) ||
+      getBoundsFitTransformRect(node) ||
+      getBoundsFitNodeRect(node)
+    );
+  }
+
+  function getBoundsFitNodeRenderRect(node) {
+    return readBoundsFitRectCandidate(function () {
+      return node.absoluteRenderBounds;
+    });
   }
 
   function intersectBoundsFitRects(baseRect, clipRect) {
@@ -28862,17 +38474,98 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     throw new Error("Could not position the preview clone for bounds-fit analysis.");
   }
 
-  async function exportBoundsFitRenderedAnalysisBytes(node, analysisContext) {
+  function resolveBoundsFitRenderedExportScale(nodeWidth, nodeHeight, sourceWidth, sourceHeight) {
+    // Bounds-fit only needs the currently visible pixels to shrink the layer.
+    // Exporting at the on-canvas size is the most stable path for edited Figma images.
+    return 1;
+  }
+
+  function resolveBoundsFitSourceImageAnalysis(fill, nodeWidth, nodeHeight, sourceWidth, sourceHeight, analysisContext) {
+    if (!fill || !(nodeWidth > 0) || !(nodeHeight > 0) || !(sourceWidth > 0) || !(sourceHeight > 0) || !analysisContext) {
+      return null;
+    }
+
+    const scaleMode = typeof fill.scaleMode === "string" ? fill.scaleMode : "FILL";
+    const fillRotation = typeof fill.rotation === "number" && Number.isFinite(fill.rotation) ? fill.rotation : 0;
+    if (!!fill.imageTransform || Math.abs(fillRotation) > 0.01 || scaleMode === "CROP" || scaleMode === "TILE") {
+      return null;
+    }
+
+    const localVisibleRect = {
+      x: roundBoundsFitMetric(analysisContext.offsetX),
+      y: roundBoundsFitMetric(analysisContext.offsetY),
+      width: roundBoundsFitMetric(analysisContext.visibleRect.width),
+      height: roundBoundsFitMetric(analysisContext.visibleRect.height),
+    };
+
+    if (scaleMode === "STRETCH") {
+      const scaleX = sourceWidth / nodeWidth;
+      const scaleY = sourceHeight / nodeHeight;
+      return {
+        analysisOffsetX: localVisibleRect.x,
+        analysisOffsetY: localVisibleRect.y,
+        analysisWidth: localVisibleRect.width,
+        analysisHeight: localVisibleRect.height,
+        rasterAnalysisOffsetX: roundBoundsFitMetric(localVisibleRect.x * scaleX),
+        rasterAnalysisOffsetY: roundBoundsFitMetric(localVisibleRect.y * scaleY),
+        rasterAnalysisWidth: roundBoundsFitMetric(localVisibleRect.width * scaleX),
+        rasterAnalysisHeight: roundBoundsFitMetric(localVisibleRect.height * scaleY),
+      };
+    }
+
+    const uniformScale =
+      scaleMode === "FIT" ? Math.min(nodeWidth / sourceWidth, nodeHeight / sourceHeight) : Math.max(nodeWidth / sourceWidth, nodeHeight / sourceHeight);
+    if (!(uniformScale > 0)) {
+      return null;
+    }
+
+    const displayRect = {
+      x: roundBoundsFitMetric((nodeWidth - sourceWidth * uniformScale) / 2),
+      y: roundBoundsFitMetric((nodeHeight - sourceHeight * uniformScale) / 2),
+      width: roundBoundsFitMetric(sourceWidth * uniformScale),
+      height: roundBoundsFitMetric(sourceHeight * uniformScale),
+    };
+    const visibleImageRect = intersectBoundsFitRects(localVisibleRect, displayRect);
+    if (!visibleImageRect) {
+      return null;
+    }
+
+    return {
+      analysisOffsetX: visibleImageRect.x,
+      analysisOffsetY: visibleImageRect.y,
+      analysisWidth: visibleImageRect.width,
+      analysisHeight: visibleImageRect.height,
+      rasterAnalysisOffsetX: roundBoundsFitMetric((visibleImageRect.x - displayRect.x) / uniformScale),
+      rasterAnalysisOffsetY: roundBoundsFitMetric((visibleImageRect.y - displayRect.y) / uniformScale),
+      rasterAnalysisWidth: roundBoundsFitMetric(visibleImageRect.width / uniformScale),
+      rasterAnalysisHeight: roundBoundsFitMetric(visibleImageRect.height / uniformScale),
+    };
+  }
+
+  async function exportBoundsFitRenderedAnalysisBytes(node, analysisContext, exportScale) {
     const visibleRect = analysisContext && analysisContext.visibleRect ? analysisContext.visibleRect : null;
     if (!visibleRect) {
       return new Uint8Array(0);
     }
 
+    const resolvedExportScale =
+      Number.isFinite(Number(exportScale)) && Number(exportScale) > 0 ? Number(exportScale) : 1;
+    const exportSettings = {
+      format: "PNG",
+      // Bounds-fit needs the full node/frame area so the UI can crop visible pixels itself.
+      // Using absolute bounds also avoids Figma's internal render-bounds crop path, which
+      // has been unstable for some edited images such as background-removed assets.
+      useAbsoluteBounds: true,
+    };
+    if (Math.abs(resolvedExportScale - 1) > 0.01) {
+      exportSettings.constraint = {
+        type: "SCALE",
+        value: resolvedExportScale,
+      };
+    }
+
     if (!analysisContext.clipped) {
-      return await node.exportAsync({
-        format: "PNG",
-        useAbsoluteBounds: false,
-      });
+      return await node.exportAsync(exportSettings);
     }
 
     const preview = figma.createFrame();
@@ -28892,21 +38585,18 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       preview.appendChild(clonedNode);
       positionBoundsFitPreviewClone(node, clonedNode, visibleRect);
 
-      return await preview.exportAsync({
-        format: "PNG",
-        useAbsoluteBounds: false,
-      });
+      return await preview.exportAsync(exportSettings);
     } finally {
-      if (preview && !preview.removed) {
-        preview.remove();
-      }
       if (clonedNode && !clonedNode.removed) {
         clonedNode.remove();
+      }
+      if (preview && !preview.removed) {
+        preview.remove();
       }
     }
   }
 
-  async function analyzeBoundsFitSelectionNode(node) {
+  async function analyzeBoundsFitImageSelectionNode(node) {
     if (!node || node.removed) {
       return buildBoundsFitSkipped(node, "The selected image layer could not be read.");
     }
@@ -28925,15 +38615,6 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
     if ("rotation" in node && typeof node.rotation === "number" && Math.abs(node.rotation) > 0.01) {
       return buildBoundsFitSkipped(node, "Rotated image layers are not supported yet.");
-    }
-
-    if (
-      node.parent &&
-      "layoutMode" in node.parent &&
-      typeof node.parent.layoutMode === "string" &&
-      node.parent.layoutMode !== "NONE"
-    ) {
-      return buildBoundsFitSkipped(node, "Bounds-fit does not support image layers inside auto-layout parents yet.");
     }
 
     if (!hasSimpleVisibleImagePaint(node)) {
@@ -28974,42 +38655,162 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       return buildBoundsFitSkipped(node, "Could not read the source image size.");
     }
 
-    const scaleMode = typeof fill.scaleMode === "string" ? fill.scaleMode : "FILL";
-    const fillRotation = typeof fill.rotation === "number" && Number.isFinite(fill.rotation) ? fill.rotation : 0;
-    const needsRenderedAnalysis =
-      scaleMode === "CROP" ||
-      scaleMode === "TILE" ||
-      !!fill.imageTransform ||
-      Math.abs(fillRotation) > 0.01 ||
-      !hasMatchingAspectRatio(nodeWidth, nodeHeight, sourceWidth, sourceHeight);
-    const analysisContext = needsRenderedAnalysis ? getBoundsFitAnalysisContext(node) : null;
-    if (needsRenderedAnalysis && !analysisContext) {
+    const renderedExportScale = resolveBoundsFitRenderedExportScale(nodeWidth, nodeHeight, sourceWidth, sourceHeight);
+    // Bounds-fit must follow the pixels currently visible on canvas. Raw getImageByHash() bytes can lag
+    // behind in-editor image edits such as background removal, so we always analyze the rendered node.
+    const analysisContext = getBoundsFitAnalysisContext(node);
+    if (!analysisContext) {
       return buildBoundsFitSkipped(node, "Could not calculate the visible bounds for analysis.");
     }
 
-    const bytes = needsRenderedAnalysis
-      ? await exportBoundsFitRenderedAnalysisBytes(node, analysisContext)
-      : await image.getBytesAsync();
+    const directSourceAnalysis = resolveBoundsFitSourceImageAnalysis(
+      fill,
+      nodeWidth,
+      nodeHeight,
+      sourceWidth,
+      sourceHeight,
+      analysisContext
+    );
+    if (directSourceAnalysis) {
+      const directBytes = await image.getBytesAsync();
+      if (!directBytes || typeof directBytes.length !== "number" || directBytes.length <= 0) {
+        return buildBoundsFitSkipped(node, "Could not read the source image bytes.");
+      }
+
+      return {
+        target: {
+          nodeId: node.id,
+          nodeName: safeName(node),
+          targetKind: "image-fill",
+          analysisMode: "source-image",
+          fillIndex: fillIndex,
+          originalHash: fill.imageHash,
+          sourceWidth: sourceWidth,
+          sourceHeight: sourceHeight,
+          analysisOffsetX: directSourceAnalysis.analysisOffsetX,
+          analysisOffsetY: directSourceAnalysis.analysisOffsetY,
+          analysisWidth: directSourceAnalysis.analysisWidth,
+          analysisHeight: directSourceAnalysis.analysisHeight,
+          rasterAnalysisOffsetX: directSourceAnalysis.rasterAnalysisOffsetX,
+          rasterAnalysisOffsetY: directSourceAnalysis.rasterAnalysisOffsetY,
+          rasterAnalysisWidth: directSourceAnalysis.rasterAnalysisWidth,
+          rasterAnalysisHeight: directSourceAnalysis.rasterAnalysisHeight,
+          fileName: buildFileName(
+            {
+              nodeName: safeName(node),
+              imageHash: fill.imageHash,
+            },
+            detectImageExtension(directBytes) === "bin" ? "png" : detectImageExtension(directBytes)
+          ),
+          mimeType: detectImageMimeType(directBytes),
+          bytes: directBytes,
+        },
+      };
+    }
+
+    const exportSettings = {
+      format: "PNG",
+      useAbsoluteBounds: true,
+    };
+    if (Math.abs(renderedExportScale - 1) > 0.01) {
+      exportSettings.constraint = {
+        type: "SCALE",
+        value: renderedExportScale,
+      };
+    }
+
+    let bytes = new Uint8Array(0);
+    let analysisMode = "rendered-node";
+    let mimeType = "image/png";
+    let rasterAnalysisOffsetX = analysisContext.offsetX;
+    let rasterAnalysisOffsetY = analysisContext.offsetY;
+    let rasterAnalysisWidth = analysisContext.visibleRect.width;
+    let rasterAnalysisHeight = analysisContext.visibleRect.height;
+
+    try {
+      bytes = await node.exportAsync(exportSettings);
+    } catch (error) {
+      let previewExportError = null;
+      try {
+        // Some edited fills (notably background-removed assets in crop mode) can fail
+        // direct exportAsync(). Exporting a temporary preview clone still captures the
+        // currently visible pixels and keeps bounds-fit usable for those layers.
+        bytes = await exportBoundsFitRenderedAnalysisBytes(
+          node,
+          {
+            visibleRect: analysisContext.visibleRect,
+            clipped: true,
+          },
+          renderedExportScale
+        );
+        if (bytes && typeof bytes.length === "number" && bytes.length > 0) {
+          rasterAnalysisOffsetX = 0;
+          rasterAnalysisOffsetY = 0;
+          rasterAnalysisWidth = analysisContext.visibleRect.width;
+          rasterAnalysisHeight = analysisContext.visibleRect.height;
+        }
+      } catch (previewError) {
+        previewExportError = previewError;
+      }
+
+      if (bytes && typeof bytes.length === "number" && bytes.length > 0) {
+        // Recovered with the preview export path.
+      } else {
+        const scaleMode = typeof fill.scaleMode === "string" ? fill.scaleMode : "FILL";
+        const fillRotation = typeof fill.rotation === "number" && Number.isFinite(fill.rotation) ? fill.rotation : 0;
+        const canFallbackToSourceImage =
+          scaleMode !== "CROP" &&
+          scaleMode !== "TILE" &&
+          !fill.imageTransform &&
+          Math.abs(fillRotation) <= 0.01 &&
+          hasMatchingAspectRatio(nodeWidth, nodeHeight, sourceWidth, sourceHeight);
+        if (!canFallbackToSourceImage) {
+          return buildBoundsFitSkipped(
+            node,
+            normalizeErrorMessage(
+              previewExportError,
+              normalizeErrorMessage(error, "Could not export the currently visible image bytes.")
+            )
+          );
+        }
+
+        bytes = await image.getBytesAsync();
+        if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
+          return buildBoundsFitSkipped(node, "Could not read the source image bytes.");
+        }
+
+        analysisMode = "source-image";
+        mimeType = detectImageMimeType(bytes);
+        const scaleX = sourceWidth / nodeWidth;
+        const scaleY = sourceHeight / nodeHeight;
+        rasterAnalysisOffsetX = roundBoundsFitMetric(analysisContext.offsetX * scaleX);
+        rasterAnalysisOffsetY = roundBoundsFitMetric(analysisContext.offsetY * scaleY);
+        rasterAnalysisWidth = roundBoundsFitMetric(analysisContext.visibleRect.width * scaleX);
+        rasterAnalysisHeight = roundBoundsFitMetric(analysisContext.visibleRect.height * scaleY);
+      }
+    }
     if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
-      return buildBoundsFitSkipped(
-        node,
-        needsRenderedAnalysis ? "Could not export the currently visible image bytes." : "Could not read the source image bytes."
-      );
+      return buildBoundsFitSkipped(node, "Could not export the currently visible image bytes.");
     }
 
     return {
       target: {
         nodeId: node.id,
         nodeName: safeName(node),
-        analysisMode: needsRenderedAnalysis ? "rendered-node" : "source-image",
+        targetKind: "image-fill",
+        analysisMode: analysisMode,
         fillIndex: fillIndex,
         originalHash: fill.imageHash,
         sourceWidth: sourceWidth,
         sourceHeight: sourceHeight,
-        analysisOffsetX: needsRenderedAnalysis ? analysisContext.offsetX : 0,
-        analysisOffsetY: needsRenderedAnalysis ? analysisContext.offsetY : 0,
-        analysisWidth: needsRenderedAnalysis ? analysisContext.visibleRect.width : nodeWidth,
-        analysisHeight: needsRenderedAnalysis ? analysisContext.visibleRect.height : nodeHeight,
+        analysisOffsetX: analysisContext.offsetX,
+        analysisOffsetY: analysisContext.offsetY,
+        analysisWidth: analysisContext.visibleRect.width,
+        analysisHeight: analysisContext.visibleRect.height,
+        rasterAnalysisOffsetX: rasterAnalysisOffsetX,
+        rasterAnalysisOffsetY: rasterAnalysisOffsetY,
+        rasterAnalysisWidth: rasterAnalysisWidth,
+        rasterAnalysisHeight: rasterAnalysisHeight,
         fileName: buildFileName(
           {
             nodeName: safeName(node),
@@ -29017,7 +38818,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
           },
           "png"
         ),
-        mimeType: needsRenderedAnalysis ? "image/png" : detectImageMimeType(bytes),
+        mimeType: mimeType,
         bytes: bytes,
       },
     };
@@ -29040,7 +38841,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     for (let index = 0; index < session.targets.length; index += 1) {
       const target = session.targets[index];
       const processed = resultByNodeId[target.nodeId];
-      if (!processed) {
+      if (!processed && !(target && target.skipRasterAnalysis === true)) {
         skipped.push({
           nodeId: target.nodeId,
           nodeName: target.nodeName,
@@ -29049,12 +38850,22 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         continue;
       }
 
+      if (!processed && target && target.skipRasterAnalysis === true) {
+        const directStatus = await applyBoundsFitTargetResult(target, null, skipped);
+        if (directStatus === "applied") {
+          appliedCount += 1;
+        } else if (directStatus === "unchanged") {
+          unchangedCount += 1;
+        }
+        continue;
+      }
+
       if (processed.status === "unchanged") {
         unchangedCount += 1;
         continue;
       }
 
-      if (processed.status !== "trimmed") {
+      if (processed.status === "skipped" || processed.status !== "trimmed") {
         skipped.push({
           nodeId: target.nodeId,
           nodeName: target.nodeName,
@@ -29063,137 +38874,21 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         continue;
       }
 
-      const node = await figma.getNodeByIdAsync(target.nodeId);
-      if (!node || node.removed) {
-        skipped.push({
-          nodeId: target.nodeId,
-          nodeName: target.nodeName,
-          reason: "Could not find the layer again.",
-        });
-        continue;
-      }
-
-      if (!("resize" in node) || typeof node.resize !== "function") {
-        skipped.push({
-          nodeId: target.nodeId,
-          nodeName: safeName(node),
-          reason: "This layer cannot be resized.",
-        });
-        continue;
-      }
-
-      const fills = getNodeFills(node);
-      if (!fills.length) {
-        skipped.push({
-          nodeId: target.nodeId,
-          nodeName: safeName(node),
-          reason: "The IMAGE fill is no longer available.",
-        });
-        continue;
-      }
-
-      let targetIndex = -1;
-      if (target.fillIndex >= 0 && target.fillIndex < fills.length) {
-        const directFill = fills[target.fillIndex];
-        if (isImagePaint(directFill) && directFill.imageHash === target.originalHash) {
-          targetIndex = target.fillIndex;
-        }
-      }
-
-      if (targetIndex < 0) {
-        targetIndex = findVisibleImageFillIndexByHash(fills, target.originalHash);
-      }
-
-      if (targetIndex < 0) {
-        skipped.push({
-          nodeId: target.nodeId,
-          nodeName: safeName(node),
-          reason: "Could not find the IMAGE fill with the original image hash.",
-        });
-        continue;
-      }
-
-      const currentWidth = typeof node.width === "number" && Number.isFinite(node.width) ? node.width : 0;
-      const currentHeight = typeof node.height === "number" && Number.isFinite(node.height) ? node.height : 0;
-      if (!(currentWidth > 0) || !(currentHeight > 0)) {
-        skipped.push({
-          nodeId: target.nodeId,
-          nodeName: safeName(node),
-          reason: "Could not calculate the current layer size.",
-        });
-        continue;
-      }
-
-      const analysisWidth =
-        Number(target.analysisWidth) > 0 ? Number(target.analysisWidth) : Number(currentWidth) > 0 ? Number(currentWidth) : 0;
-      const analysisHeight =
-        Number(target.analysisHeight) > 0 ? Number(target.analysisHeight) : Number(currentHeight) > 0 ? Number(currentHeight) : 0;
-      const analysisOffsetX = Number.isFinite(Number(target.analysisOffsetX)) ? Number(target.analysisOffsetX) : 0;
-      const analysisOffsetY = Number.isFinite(Number(target.analysisOffsetY)) ? Number(target.analysisOffsetY) : 0;
-      if (!(analysisWidth > 0) || !(analysisHeight > 0)) {
-        skipped.push({
-          nodeId: target.nodeId,
-          nodeName: safeName(node),
-          reason: "Could not calculate the visible bounds size.",
-        });
-        continue;
-      }
-
-      if (!hasMatchingAspectRatio(analysisWidth, analysisHeight, processed.sourceWidth, processed.sourceHeight)) {
-        skipped.push({
-          nodeId: target.nodeId,
-          nodeName: safeName(node),
-          reason: "The analyzed crop aspect ratio no longer matches the source image.",
-        });
-        continue;
-      }
-
-      const bytes = normalizeBytes(processed.bytes);
-      if (!bytes.length) {
-        skipped.push({
-          nodeId: target.nodeId,
-          nodeName: safeName(node),
-          reason: "The trimmed image bytes are empty.",
-        });
-        continue;
-      }
-
-      const cropWidth = Number(processed.cropWidth) || 0;
-      const cropHeight = Number(processed.cropHeight) || 0;
-      const cropX = Number(processed.cropX) || 0;
-      const cropY = Number(processed.cropY) || 0;
-      if (!(cropWidth > 0) || !(cropHeight > 0)) {
-        skipped.push({
-          nodeId: target.nodeId,
-          nodeName: safeName(node),
-          reason: "The trimmed image size is invalid.",
-        });
-        continue;
-      }
-
-      const scaleX = analysisWidth / processed.sourceWidth;
-      const scaleY = analysisHeight / processed.sourceHeight;
-      const nextWidth = Math.max(1, roundBoundsFitMetric(cropWidth * scaleX));
-      const nextHeight = Math.max(1, roundBoundsFitMetric(cropHeight * scaleY));
-      const shiftX = roundBoundsFitMetric(analysisOffsetX + cropX * scaleX);
-      const shiftY = roundBoundsFitMetric(analysisOffsetY + cropY * scaleY);
-
-      try {
-        const createdImage = figma.createImage(bytes);
-        const nextFills = fills.slice();
-        nextFills[targetIndex] =
-          target.analysisMode === "rendered-node"
-            ? cloneBoundsFitImagePaint(nextFills[targetIndex], createdImage.hash)
-            : cloneImagePaintWithHash(nextFills[targetIndex], createdImage.hash);
-        node.fills = nextFills;
-        applyBoundsFitGeometry(node, nextWidth, nextHeight, shiftX, shiftY);
+      const applyStatus = await applyBoundsFitTargetResult(target, processed, skipped);
+      if (applyStatus === "applied") {
         appliedCount += 1;
-      } catch (error) {
-        skipped.push({
-          nodeId: target.nodeId,
-          nodeName: safeName(node),
-          reason: normalizeErrorMessage(error, "Failed to apply bounds-fit."),
-        });
+      } else if (applyStatus === "unchanged") {
+        unchangedCount += 1;
+      }
+    }
+
+    const containerPlans = sortBoundsFitContainerPlans(session && Array.isArray(session.containers) ? session.containers : []);
+    for (let index = 0; index < containerPlans.length; index += 1) {
+      const containerStatus = await applyBoundsFitContainerPlan(containerPlans[index], skipped);
+      if (containerStatus === "applied") {
+        appliedCount += 1;
+      } else if (containerStatus === "unchanged") {
+        unchangedCount += 1;
       }
     }
 
@@ -29202,7 +38897,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       summary: {
         selectionLabel: session.selectionLabel,
         requestedCount: session.requestedCount,
-        eligibleCount: session.targets.length,
+        eligibleCount: session.targets.length + (session && Array.isArray(session.containers) ? session.containers.length : 0),
         appliedCount: appliedCount,
         unchangedCount: unchangedCount,
         skippedCount: skipped.length,
@@ -29211,20 +38906,638 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     };
   }
 
-  function applyBoundsFitGeometry(node, width, height, shiftX, shiftY) {
-    if ("x" in node && typeof node.x === "number" && "y" in node && typeof node.y === "number") {
-      node.x = node.x + shiftX;
-      node.y = node.y + shiftY;
-    } else if ("relativeTransform" in node && Array.isArray(node.relativeTransform)) {
-      node.relativeTransform = [
-        [node.relativeTransform[0][0], node.relativeTransform[0][1], node.relativeTransform[0][2] + shiftX],
-        [node.relativeTransform[1][0], node.relativeTransform[1][1], node.relativeTransform[1][2] + shiftY],
-      ];
-    } else if (shiftX !== 0 || shiftY !== 0) {
-      throw new Error("Could not move the layer to the analyzed position.");
+  async function applyBoundsFitTargetResult(target, processed, skipped) {
+    if (!target) {
+      return "skipped";
     }
 
-    node.resize(width, height);
+    if (!processed && !(target.targetKind === "text" && target.skipRasterAnalysis === true)) {
+      return "skipped";
+    }
+
+    if (target.targetKind === "text") {
+      return await applyBoundsFitTextTargetResult(target, processed, skipped);
+    }
+
+    return await applyBoundsFitImageTargetResult(target, processed, skipped);
+  }
+
+  async function applyBoundsFitImageTargetResult(target, processed, skipped) {
+    const node = await figma.getNodeByIdAsync(target.nodeId);
+    if (!node || node.removed) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: target.nodeName,
+        reason: "Could not find the layer again.",
+      });
+      return "skipped";
+    }
+
+    if (!canResizeBoundsFitNode(node)) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: "This layer cannot be resized.",
+      });
+      return "skipped";
+    }
+
+    const fills = getNodeFills(node);
+    if (!fills.length) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: "The IMAGE fill is no longer available.",
+      });
+      return "skipped";
+    }
+
+    let targetIndex = -1;
+    if (target.fillIndex >= 0 && target.fillIndex < fills.length) {
+      const directFill = fills[target.fillIndex];
+      if (isImagePaint(directFill) && directFill.imageHash === target.originalHash) {
+        targetIndex = target.fillIndex;
+      }
+    }
+
+    if (targetIndex < 0) {
+      targetIndex = findVisibleImageFillIndexByHash(fills, target.originalHash);
+    }
+
+    if (targetIndex < 0) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: "Could not find the IMAGE fill with the original image hash.",
+      });
+      return "skipped";
+    }
+
+    const currentWidth = typeof node.width === "number" && Number.isFinite(node.width) ? node.width : 0;
+    const currentHeight = typeof node.height === "number" && Number.isFinite(node.height) ? node.height : 0;
+    if (!(currentWidth > 0) || !(currentHeight > 0)) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: "Could not calculate the current layer size.",
+      });
+      return "skipped";
+    }
+
+    const geometry = resolveBoundsFitProcessedGeometry(target, processed, currentWidth, currentHeight);
+    if (!geometry) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: "Could not calculate the visible bounds size.",
+      });
+      return "skipped";
+    }
+
+    if (!hasMatchingAspectRatio(geometry.analysisWidth, geometry.analysisHeight, processed.sourceWidth, processed.sourceHeight)) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: "The analyzed crop aspect ratio no longer matches the source image.",
+      });
+      return "skipped";
+    }
+
+    try {
+      const nextFills = fills.slice();
+      const cropPaint = cloneBoundsFitPreservedImagePaint(nextFills[targetIndex], target, processed);
+      if (!cropPaint) {
+        skipped.push({
+          nodeId: target.nodeId,
+          nodeName: safeName(node),
+          reason: "Could not preserve the original IMAGE fill while fitting visible bounds.",
+        });
+        return "skipped";
+      }
+      nextFills[targetIndex] = cropPaint;
+      node.fills = nextFills;
+      applyBoundsFitGeometry(node, geometry.nextWidth, geometry.nextHeight, geometry.shiftX, geometry.shiftY, null);
+      return "applied";
+    } catch (error) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: normalizeErrorMessage(error, "Failed to apply bounds-fit."),
+      });
+      return "skipped";
+    }
+  }
+
+  async function loadBoundsFitTextFonts(node) {
+    if (!node || node.type !== "TEXT") {
+      return;
+    }
+
+    const fontNames = collectBoundsFitTextFontNames(node);
+    for (let index = 0; index < fontNames.length; index += 1) {
+      await figma.loadFontAsync(fontNames[index]);
+    }
+  }
+
+  function collectBoundsFitTextFontNames(node) {
+    const fontNames = [];
+    const seen = {};
+
+    function pushFont(fontName) {
+      if (!fontName || typeof fontName !== "object") {
+        return;
+      }
+
+      if (typeof fontName.family !== "string" || typeof fontName.style !== "string") {
+        return;
+      }
+
+      const key = fontName.family + "::" + fontName.style;
+      if (seen[key]) {
+        return;
+      }
+
+      seen[key] = true;
+      fontNames.push({
+        family: fontName.family,
+        style: fontName.style,
+      });
+    }
+
+    if (typeof node.getRangeAllFontNames === "function" && typeof node.characters === "string" && node.characters.length > 0) {
+      try {
+        const rangeFonts = node.getRangeAllFontNames(0, node.characters.length);
+        for (let index = 0; index < rangeFonts.length; index += 1) {
+          pushFont(rangeFonts[index]);
+        }
+      } catch (error) {}
+    }
+
+    if (!fontNames.length && node.fontName && node.fontName !== figma.mixed && typeof node.fontName === "object") {
+      pushFont(node.fontName);
+    }
+
+    return fontNames;
+  }
+
+  async function resolveBoundsFitTextMeasuredRect(node) {
+    const layoutRect = getBoundsFitNodeLayoutRect(node);
+    if (!layoutRect) {
+      return null;
+    }
+
+    const renderRect = getBoundsFitNodeRenderRect(node);
+    if (renderRect) {
+      if (!areBoundsFitRectsEqual(renderRect, layoutRect)) {
+        return renderRect;
+      }
+    }
+
+    await loadBoundsFitTextFonts(node);
+
+    const probe = figma.createFrame();
+    let clonedNode = null;
+    let flattenedNode = null;
+
+    try {
+      probe.name = "__pigma-bounds-fit-text-probe__";
+      probe.resize(layoutRect.width, layoutRect.height);
+      probe.clipsContent = false;
+      probe.fills = [];
+      probe.strokes = [];
+      probe.x = layoutRect.x;
+      probe.y = layoutRect.y;
+      figma.currentPage.appendChild(probe);
+
+      clonedNode = node.clone();
+      probe.appendChild(clonedNode);
+      positionBoundsFitPreviewClone(node, clonedNode, layoutRect);
+
+      flattenedNode = figma.flatten([clonedNode], probe);
+      const flattenedRect = getBoundsFitNodeRect(flattenedNode);
+      if (!flattenedRect) {
+        return renderRect || layoutRect;
+      }
+
+      return flattenedRect;
+    } catch (error) {
+      return renderRect || layoutRect;
+    } finally {
+      if (clonedNode && !clonedNode.removed) {
+        clonedNode.remove();
+      }
+      if (flattenedNode && !flattenedNode.removed) {
+        flattenedNode.remove();
+      }
+      if (probe && !probe.removed) {
+        probe.remove();
+      }
+    }
+  }
+
+  async function applyBoundsFitTextTargetResult(target, processed, skipped) {
+    const node = await figma.getNodeByIdAsync(target.nodeId);
+    if (!node || node.removed) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: target.nodeName,
+        reason: "Could not find the layer again.",
+      });
+      return "skipped";
+    }
+
+    if (!canResizeBoundsFitNode(node)) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: "This text layer cannot be resized.",
+      });
+      return "skipped";
+    }
+
+    const currentWidth = typeof node.width === "number" && Number.isFinite(node.width) ? node.width : 0;
+    const currentHeight = typeof node.height === "number" && Number.isFinite(node.height) ? node.height : 0;
+    if (!(currentWidth > 0) || !(currentHeight > 0)) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: "Could not calculate the current text layer size.",
+      });
+      return "skipped";
+    }
+
+    const geometry =
+      target.skipRasterAnalysis === true
+        ? resolveBoundsFitDirectGeometry(target, currentWidth, currentHeight)
+        : resolveBoundsFitProcessedGeometry(target, processed, currentWidth, currentHeight);
+    if (!geometry) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: "The visible text bounds are invalid.",
+      });
+      return "skipped";
+    }
+
+    if (shouldPreserveBoundsFitTextWidth(node)) {
+      geometry.nextWidth = currentWidth;
+      geometry.shiftX = 0;
+      geometry.nextHeight = Math.max(currentHeight, geometry.nextHeight);
+    }
+
+    if (isBoundsFitAutoLayoutChildNode(node)) {
+      geometry.shiftX = 0;
+      geometry.shiftY = 0;
+      geometry.nextHeight = Math.max(currentHeight, geometry.nextHeight);
+    }
+
+    if (
+      Math.abs(geometry.shiftX) <= 0.01 &&
+      Math.abs(geometry.shiftY) <= 0.01 &&
+      Math.abs(geometry.nextWidth - currentWidth) <= 0.01 &&
+      Math.abs(geometry.nextHeight - currentHeight) <= 0.01
+    ) {
+      return "unchanged";
+    }
+
+    try {
+      applyBoundsFitGeometry(node, geometry.nextWidth, geometry.nextHeight, geometry.shiftX, geometry.shiftY, {
+        textAutoResizeNone: true,
+        preferWithoutConstraints: true,
+      });
+      return "applied";
+    } catch (error) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: normalizeErrorMessage(error, "Failed to apply bounds-fit to the selected text layer."),
+      });
+      return "skipped";
+    }
+  }
+
+  function resolveBoundsFitProcessedGeometry(target, processed, fallbackWidth, fallbackHeight) {
+    const analysisWidth =
+      Number(target.analysisWidth) > 0 ? Number(target.analysisWidth) : Number(fallbackWidth) > 0 ? Number(fallbackWidth) : 0;
+    const analysisHeight =
+      Number(target.analysisHeight) > 0 ? Number(target.analysisHeight) : Number(fallbackHeight) > 0 ? Number(fallbackHeight) : 0;
+    const analysisOffsetX = Number.isFinite(Number(target.analysisOffsetX)) ? Number(target.analysisOffsetX) : 0;
+    const analysisOffsetY = Number.isFinite(Number(target.analysisOffsetY)) ? Number(target.analysisOffsetY) : 0;
+    const cropWidth = Number(processed.cropWidth) || 0;
+    const cropHeight = Number(processed.cropHeight) || 0;
+    const cropX = Number(processed.cropX) || 0;
+    const cropY = Number(processed.cropY) || 0;
+
+    if (!(analysisWidth > 0) || !(analysisHeight > 0)) {
+      return null;
+    }
+
+    if (!(processed.sourceWidth > 0) || !(processed.sourceHeight > 0)) {
+      return null;
+    }
+
+    if (!(cropWidth > 0) || !(cropHeight > 0)) {
+      return null;
+    }
+
+    const scaleX = analysisWidth / processed.sourceWidth;
+    const scaleY = analysisHeight / processed.sourceHeight;
+    return {
+      analysisWidth: analysisWidth,
+      analysisHeight: analysisHeight,
+      nextWidth: Math.max(1, roundBoundsFitMetric(cropWidth * scaleX)),
+      nextHeight: Math.max(1, roundBoundsFitMetric(cropHeight * scaleY)),
+      shiftX: roundBoundsFitMetric(analysisOffsetX + cropX * scaleX),
+      shiftY: roundBoundsFitMetric(analysisOffsetY + cropY * scaleY),
+    };
+  }
+
+  function resolveBoundsFitDirectGeometry(target, fallbackWidth, fallbackHeight) {
+    const analysisWidth = Number(fallbackWidth) > 0 ? Number(fallbackWidth) : 0;
+    const analysisHeight = Number(fallbackHeight) > 0 ? Number(fallbackHeight) : 0;
+    const cropWidth = Number(target.directCropWidth) || 0;
+    const cropHeight = Number(target.directCropHeight) || 0;
+    const cropX = Number(target.directCropX) || 0;
+    const cropY = Number(target.directCropY) || 0;
+
+    if (!(analysisWidth > 0) || !(analysisHeight > 0)) {
+      return null;
+    }
+
+    if (!(cropWidth > 0) || !(cropHeight > 0)) {
+      return null;
+    }
+
+    return {
+      analysisWidth: analysisWidth,
+      analysisHeight: analysisHeight,
+      nextWidth: Math.max(1, roundBoundsFitMetric(cropWidth)),
+      nextHeight: Math.max(1, roundBoundsFitMetric(cropHeight)),
+      shiftX: roundBoundsFitMetric(cropX),
+      shiftY: roundBoundsFitMetric(cropY),
+    };
+  }
+
+  function sortBoundsFitContainerPlans(plans) {
+    if (!Array.isArray(plans) || !plans.length) {
+      return [];
+    }
+
+    return plans.slice().sort(function (left, right) {
+      const leftDepth = left && typeof left.depth === "number" ? left.depth : 0;
+      const rightDepth = right && typeof right.depth === "number" ? right.depth : 0;
+      return rightDepth - leftDepth;
+    });
+  }
+
+  async function applyBoundsFitContainerPlan(plan, skipped) {
+    if (!plan || !plan.nodeId) {
+      return "skipped";
+    }
+
+    const node = await figma.getNodeByIdAsync(plan.nodeId);
+    if (!node || node.removed) {
+      skipped.push({
+        nodeId: plan.nodeId,
+        nodeName: plan.nodeName || "Unnamed",
+        reason: "Could not find the selected container again.",
+      });
+      return "skipped";
+    }
+
+    if (!canApplyBoundsFitContainer(node)) {
+      skipped.push({
+        nodeId: plan.nodeId,
+        nodeName: safeName(node),
+        reason: buildBoundsFitContainerUnsupportedReason(node),
+      });
+      return "skipped";
+    }
+
+    const containerRect = getBoundsFitNodeRect(node);
+    if (!containerRect) {
+      skipped.push({
+        nodeId: plan.nodeId,
+        nodeName: safeName(node),
+        reason: "Could not calculate the current container bounds.",
+      });
+      return "skipped";
+    }
+
+    const childUnion = getBoundsFitContainerChildrenUnionRect(node, containerRect);
+    if (!childUnion) {
+      skipped.push({
+        nodeId: plan.nodeId,
+        nodeName: safeName(node),
+        reason: "Could not calculate the visible child bounds inside the selected container.",
+      });
+      return "skipped";
+    }
+
+    const shiftX = roundBoundsFitMetric(childUnion.x - containerRect.x);
+    const shiftY = roundBoundsFitMetric(childUnion.y - containerRect.y);
+    const needsMove = Math.abs(shiftX) > 0.01 || Math.abs(shiftY) > 0.01;
+    const needsResize =
+      shouldResizeBoundsFitContainer(node) &&
+      (Math.abs(childUnion.width - containerRect.width) > 0.01 || Math.abs(childUnion.height - containerRect.height) > 0.01);
+
+    if (!needsMove && !needsResize) {
+      return "unchanged";
+    }
+
+    try {
+      if (isBoundsFitAutoLayoutNode(node)) {
+        applyBoundsFitAutoLayoutContainerGeometry(node, containerRect, childUnion, {
+          preserveLeadingInsets: !!(plan && plan.selectedRoot === true),
+        });
+      } else {
+        if (plan && plan.selectedRoot === true) {
+          applyBoundsFitSelectedRootContainerGeometry(node, containerRect, childUnion);
+        } else {
+          if (canMoveBoundsFitNode(node)) {
+            moveBoundsFitNode(node, shiftX, shiftY);
+          }
+          moveBoundsFitContainerChildren(node, -shiftX, -shiftY);
+          if (shouldResizeBoundsFitContainer(node)) {
+            resizeBoundsFitNode(node, childUnion.width, childUnion.height, false);
+          }
+        }
+      }
+      return "applied";
+    } catch (error) {
+      skipped.push({
+        nodeId: plan.nodeId,
+        nodeName: safeName(node),
+        reason: normalizeErrorMessage(error, "Failed to apply bounds-fit to the selected container."),
+      });
+      return "skipped";
+    }
+  }
+
+  function getBoundsFitContainerChildrenUnionRect(node, containerRect) {
+    if (!node || !hasChildren(node)) {
+      return null;
+    }
+
+    const preferredRects = [];
+    const fallbackRects = [];
+    const clipRect = containerRect || getBoundsFitNodeRect(node);
+    const nextClipRect =
+      "clipsContent" in node && node.clipsContent === true && clipRect ? clipRect : null;
+    collectBoundsFitDescendantRects(node, nextClipRect, preferredRects, fallbackRects);
+
+    return unionAbsoluteRects(preferredRects.length ? preferredRects : fallbackRects);
+  }
+
+  function collectBoundsFitDescendantRects(node, clipRect, preferredRects, fallbackRects) {
+    if (!node || !hasChildren(node) || !Array.isArray(preferredRects) || !Array.isArray(fallbackRects)) {
+      return;
+    }
+
+    for (let index = 0; index < node.children.length; index += 1) {
+      const child = node.children[index];
+      if (!child || child.removed || !isBoundsFitNodeVisible(child)) {
+        continue;
+      }
+
+      let childRect = getBoundsFitNodeRect(child);
+      if (!childRect) {
+        continue;
+      }
+
+      if (clipRect) {
+        childRect = intersectBoundsFitRects(childRect, clipRect);
+        if (!childRect) {
+          continue;
+        }
+      }
+
+      if (hasChildren(child)) {
+        const descendantClipRect =
+          "clipsContent" in child && child.clipsContent === true ? childRect : clipRect;
+        collectBoundsFitDescendantRects(child, descendantClipRect, preferredRects, fallbackRects);
+        continue;
+      }
+
+      fallbackRects.push(childRect);
+      if (isBoundsFitPreferredContentNode(child)) {
+        preferredRects.push(childRect);
+      }
+    }
+  }
+
+  function moveBoundsFitContainerChildren(node, shiftX, shiftY) {
+    if (!node || !hasChildren(node)) {
+      return;
+    }
+
+    for (let index = 0; index < node.children.length; index += 1) {
+      moveBoundsFitNode(node.children[index], shiftX, shiftY);
+    }
+  }
+
+  function applyBoundsFitSelectedRootContainerGeometry(node, containerRect, childUnion) {
+    const nextLeft = Math.min(containerRect.x, childUnion.x);
+    const nextTop = Math.min(containerRect.y, childUnion.y);
+    const nextRight = Math.max(containerRect.x, childUnion.x + childUnion.width);
+    const nextBottom = Math.max(containerRect.y, childUnion.y + childUnion.height);
+    const shiftX = roundBoundsFitMetric(nextLeft - containerRect.x);
+    const shiftY = roundBoundsFitMetric(nextTop - containerRect.y);
+    const nextWidth = Math.max(1, roundBoundsFitMetric(nextRight - nextLeft));
+    const nextHeight = Math.max(1, roundBoundsFitMetric(nextBottom - nextTop));
+
+    if (canMoveBoundsFitNode(node) && (Math.abs(shiftX) > 0.01 || Math.abs(shiftY) > 0.01)) {
+      moveBoundsFitNode(node, shiftX, shiftY);
+    }
+
+    if (shouldResizeBoundsFitContainer(node)) {
+      resizeBoundsFitNode(node, nextWidth, nextHeight, false);
+    }
+  }
+
+  function applyBoundsFitAutoLayoutContainerGeometry(node, containerRect, childUnion, options) {
+    const preserveLeadingInsets = !!(options && options.preserveLeadingInsets === true);
+    const leftInset = roundBoundsFitMetric(childUnion.x - containerRect.x);
+    const topInset = roundBoundsFitMetric(childUnion.y - containerRect.y);
+    const rightInset = roundBoundsFitMetric(containerRect.x + containerRect.width - (childUnion.x + childUnion.width));
+    const bottomInset = roundBoundsFitMetric(containerRect.y + containerRect.height - (childUnion.y + childUnion.height));
+
+    if (!preserveLeadingInsets && canMoveBoundsFitNode(node)) {
+      moveBoundsFitNode(node, leftInset, topInset);
+    }
+
+    if ("paddingLeft" in node && typeof node.paddingLeft === "number") {
+      node.paddingLeft = preserveLeadingInsets && leftInset >= 0 ? roundBoundsFitPixel(node.paddingLeft) : Math.max(0, roundBoundsFitPixel(node.paddingLeft - leftInset));
+    }
+    if ("paddingTop" in node && typeof node.paddingTop === "number") {
+      node.paddingTop = preserveLeadingInsets && topInset >= 0 ? roundBoundsFitPixel(node.paddingTop) : Math.max(0, roundBoundsFitPixel(node.paddingTop - topInset));
+    }
+    if ("paddingRight" in node && typeof node.paddingRight === "number") {
+      node.paddingRight = Math.max(0, roundBoundsFitPixel(node.paddingRight - rightInset));
+    }
+    if ("paddingBottom" in node && typeof node.paddingBottom === "number") {
+      node.paddingBottom = Math.max(0, roundBoundsFitPixel(node.paddingBottom - bottomInset));
+    }
+
+    if (shouldResizeBoundsFitContainer(node)) {
+      const nextWidth = preserveLeadingInsets && leftInset >= 0 ? childUnion.width + leftInset : childUnion.width;
+      const nextHeight = preserveLeadingInsets && topInset >= 0 ? childUnion.height + topInset : childUnion.height;
+      resizeBoundsFitNode(node, nextWidth, nextHeight, false);
+    }
+  }
+
+  function applyBoundsFitGeometry(node, width, height, shiftX, shiftY, options) {
+    if (canMoveBoundsFitNode(node)) {
+      moveBoundsFitNode(node, shiftX, shiftY);
+    }
+
+    if (options && options.textAutoResizeNone === true && node && node.type === "TEXT" && "textAutoResize" in node) {
+      try {
+        node.textAutoResize = "NONE";
+      } catch (error) {
+        // Ignore text nodes that do not allow changing auto-resize in the current runtime.
+      }
+    }
+
+    resizeBoundsFitNode(node, width, height, !!(options && options.preferWithoutConstraints === true));
+  }
+
+  function moveBoundsFitNode(node, shiftX, shiftY) {
+    const nextShiftX = roundBoundsFitPixel(shiftX);
+    const nextShiftY = roundBoundsFitPixel(shiftY);
+    if ("x" in node && typeof node.x === "number" && "y" in node && typeof node.y === "number") {
+      node.x = roundBoundsFitPixel(node.x + nextShiftX);
+      node.y = roundBoundsFitPixel(node.y + nextShiftY);
+    } else if ("relativeTransform" in node && Array.isArray(node.relativeTransform)) {
+      node.relativeTransform = [
+        [node.relativeTransform[0][0], node.relativeTransform[0][1], roundBoundsFitPixel(node.relativeTransform[0][2] + nextShiftX)],
+        [node.relativeTransform[1][0], node.relativeTransform[1][1], roundBoundsFitPixel(node.relativeTransform[1][2] + nextShiftY)],
+      ];
+    } else if (nextShiftX !== 0 || nextShiftY !== 0) {
+      throw new Error("Could not move the layer to the analyzed position.");
+    }
+  }
+
+  function resizeBoundsFitNode(node, width, height, preferWithoutConstraints) {
+    const nextWidth = Math.max(1, roundBoundsFitPixel(width));
+    const nextHeight = Math.max(1, roundBoundsFitPixel(height));
+
+    if (preferWithoutConstraints && typeof node.resizeWithoutConstraints === "function") {
+      node.resizeWithoutConstraints(nextWidth, nextHeight);
+      return;
+    }
+
+    if (typeof node.resize === "function") {
+      node.resize(nextWidth, nextHeight);
+      return;
+    }
+
+    if (typeof node.resizeWithoutConstraints === "function") {
+      node.resizeWithoutConstraints(nextWidth, nextHeight);
+      return;
+    }
+
+    throw new Error("Could not resize the selected layer.");
   }
 
   function normalizeBoundsFitResults(value) {
@@ -29262,6 +39575,69 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     };
   }
 
+  async function analyzeBoundsFitTextSelectionNode(node) {
+    if (!node || node.removed) {
+      return buildBoundsFitSkipped(node, "The selected text layer could not be read.");
+    }
+
+    if (node.type !== "TEXT") {
+      return buildBoundsFitSkipped(node, "Bounds-fit text mode requires a text layer.");
+    }
+
+    if ("locked" in node && node.locked) {
+      return buildBoundsFitSkipped(node, "Locked text layers are not supported for bounds-fit.");
+    }
+
+    if (!canResizeBoundsFitNode(node)) {
+      return buildBoundsFitSkipped(node, "Bounds-fit could not resize the selected text layer.");
+    }
+
+    if ("rotation" in node && typeof node.rotation === "number" && Math.abs(node.rotation) > 0.01) {
+      return buildBoundsFitSkipped(node, "Rotated text layers are not supported yet.");
+    }
+
+    const layoutRect = getBoundsFitNodeLayoutRect(node);
+    if (!layoutRect) {
+      return buildBoundsFitSkipped(node, "Could not calculate the selected text layer bounds.");
+    }
+
+    const measuredRect = await resolveBoundsFitTextMeasuredRect(node);
+    if (!measuredRect) {
+      return buildBoundsFitSkipped(node, "Could not calculate the visible bounds for the selected text layer.");
+    }
+
+    const measuredWidth = Number(measuredRect.width) || 0;
+    const measuredHeight = Number(measuredRect.height) || 0;
+    if (!(measuredWidth > 0) || !(measuredHeight > 0)) {
+      return buildBoundsFitSkipped(node, "Could not calculate the visible text bounds inside the selected layer.");
+    }
+
+    return {
+      target: {
+        nodeId: node.id,
+        nodeName: safeName(node),
+        targetKind: "text",
+        analysisMode: "direct-text-bounds",
+        skipRasterAnalysis: true,
+        fillIndex: -1,
+        originalHash: "",
+        sourceWidth: layoutRect.width,
+        sourceHeight: layoutRect.height,
+        analysisOffsetX: 0,
+        analysisOffsetY: 0,
+        analysisWidth: layoutRect.width,
+        analysisHeight: layoutRect.height,
+        directCropX: roundBoundsFitMetric(measuredRect.x - layoutRect.x),
+        directCropY: roundBoundsFitMetric(measuredRect.y - layoutRect.y),
+        directCropWidth: measuredRect.width,
+        directCropHeight: measuredRect.height,
+        fileName: "",
+        mimeType: "",
+        bytes: new Uint8Array(0),
+      },
+    };
+  }
+
   function buildImageCompositeSkipped(node, reason) {
     return {
       skipped: {
@@ -29279,12 +39655,12 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         return first.reason.trim();
       }
     }
-    return "Could not find an eligible image layer for bounds-fit.";
+    return "Could not find an eligible text, image, or supported container for bounds-fit.";
   }
 
   function buildImageCompositeEmptySelectionMessage(layers, skipped) {
     if (Array.isArray(layers) && layers.length === 1) {
-      return "Image composite requires at least 2 eligible image layers.";
+      return "Image composite requires at least 2 eligible visible layers.";
     }
 
     if (Array.isArray(skipped) && skipped.length > 0 && (!Array.isArray(layers) || !layers.length)) {
@@ -29294,46 +39670,66 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       }
     }
 
-    return "Could not find 2 to 5 eligible image layers for image composite.";
+    return "Could not find 2 to 8 eligible visible layers for image composite.";
   }
 
-  async function analyzeImageCompositeSelectionNode(node) {
+  function resolveImageCompositeLayerKind(node) {
+    if (node && node.type === "TEXT") {
+      return "text";
+    }
+    if (hasSimpleVisibleImagePaint(node)) {
+      return "image";
+    }
+    return "shape";
+  }
+
+  function getImageCompositeTextContent(node) {
+    if (!node || node.type !== "TEXT" || typeof node.characters !== "string") {
+      return "";
+    }
+
+    return node.characters.replace(/\s+/g, " ").trim().slice(0, 240);
+  }
+
+  function hasRenderableImageCompositeAppearance(node) {
+    if (!node) {
+      return false;
+    }
+
+    if (node.type === "TEXT") {
+      return hasVisiblePaints(node.fills) || hasVisibleEffects(node.effects);
+    }
+
+    if (hasSimpleVisibleImagePaint(node)) {
+      return true;
+    }
+
+    return hasVisiblePaints(getNodeFills(node)) || hasVisiblePaints(node.strokes) || hasVisibleEffects(node.effects);
+  }
+
+  async function analyzeImageCompositeSelectionNode(node, options) {
     if (!node || node.removed) {
-      return buildImageCompositeSkipped(node, "The selected image layer could not be read.");
+      return buildImageCompositeSkipped(node, "The selected layer could not be read.");
+    }
+
+    if (!isBoundsFitNodeVisible(node)) {
+      return buildImageCompositeSkipped(node, "The selected layer is hidden.");
     }
 
     if (hasChildren(node)) {
-      return buildImageCompositeSkipped(node, "Image composite does not support frames, groups, or layers with children yet.");
+      return buildImageCompositeSkipped(node, "Image composite supports visible leaf layers only inside the selected frame.");
     }
 
     if ("locked" in node && node.locked) {
-      return buildImageCompositeSkipped(node, "Locked image layers are not supported for image composite.");
+      return buildImageCompositeSkipped(node, "Locked layers are not supported for image composite.");
     }
 
     if (typeof node.exportAsync !== "function") {
       return buildImageCompositeSkipped(node, "The selected layer cannot be exported for image composite.");
     }
 
-    if ("rotation" in node && typeof node.rotation === "number" && Math.abs(node.rotation) > 0.01) {
-      return buildImageCompositeSkipped(node, "Rotated image layers are not supported yet.");
-    }
-
-    if (!hasSimpleVisibleImagePaint(node)) {
-      return buildImageCompositeSkipped(node, "Image composite requires layers with exactly one visible IMAGE fill.");
-    }
-
-    if (hasVisiblePaints(node.strokes)) {
-      return buildImageCompositeSkipped(node, "Image layers with visible strokes are not supported yet.");
-    }
-
-    if (hasVisibleEffects(node.effects)) {
-      return buildImageCompositeSkipped(node, "Image layers with visible effects are not supported yet.");
-    }
-
-    const fills = getNodeFills(node);
-    const fillIndex = getPrimaryVisibleImageFillIndex(fills);
-    if (fillIndex < 0) {
-      return buildImageCompositeSkipped(node, "Could not find an IMAGE fill.");
+    if (!hasRenderableImageCompositeAppearance(node)) {
+      return buildImageCompositeSkipped(node, "The selected layer does not have visible pixels to composite.");
     }
 
     const analysisContext = getBoundsFitAnalysisContext(node);
@@ -29341,20 +39737,45 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       return buildImageCompositeSkipped(node, "Could not calculate the visible bounds for the selected layer.");
     }
 
-    const bytes = await exportBoundsFitRenderedAnalysisBytes(node, analysisContext);
+    let visibleRect = analysisContext.visibleRect;
+    const rootRect = options && options.rootRect ? options.rootRect : null;
+    if (rootRect) {
+      visibleRect = intersectBoundsFitRects(visibleRect, rootRect);
+      if (!visibleRect) {
+        return buildImageCompositeSkipped(node, "The selected layer is outside the chosen frame bounds.");
+      }
+    }
+
+    const exportContext =
+      rootRect && !areBoundsFitRectsEqual(visibleRect, analysisContext.visibleRect)
+        ? {
+            nodeRect: analysisContext.nodeRect,
+            visibleRect: visibleRect,
+            clipped: true,
+            offsetX: roundBoundsFitMetric(visibleRect.x - analysisContext.nodeRect.x),
+            offsetY: roundBoundsFitMetric(visibleRect.y - analysisContext.nodeRect.y),
+          }
+        : analysisContext;
+
+    const bytes = await exportBoundsFitRenderedAnalysisBytes(node, exportContext);
     if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
       return buildImageCompositeSkipped(node, "Could not export the current layer as PNG.");
     }
 
-    const fill = fills[fillIndex];
+    const fills = getNodeFills(node);
+    const fillIndex = hasSimpleVisibleImagePaint(node) ? getPrimaryVisibleImageFillIndex(fills) : -1;
+    const fill = fillIndex >= 0 ? fills[fillIndex] : null;
     return {
       target: {
         node: node,
         nodeId: node.id,
         nodeName: safeName(node),
+        layerKind: resolveImageCompositeLayerKind(node),
+        nodeType: node.type,
+        textContent: getImageCompositeTextContent(node),
         fillIndex: fillIndex,
         originalHash: fill && typeof fill.imageHash === "string" ? fill.imageHash : "",
-        visibleRect: analysisContext.visibleRect,
+        visibleRect: visibleRect,
         fileName: buildFileName(
           {
             nodeName: safeName(node),
@@ -29492,12 +39913,12 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     const label = operationLabel || "Bounds Fit";
 
     if (!appliedCount && unchangedCount > 0 && skippedCount === 0) {
-      figma.notify("The selected image is already tightly fit to its visible bounds.", { timeout: 2200 });
+      figma.notify("The selected layer is already tightly fit to its visible bounds.", { timeout: 2200 });
       return;
     }
 
     if (!appliedCount && skippedCount > 0) {
-      figma.notify(label + " could not find an eligible image layer to apply.", { timeout: 2200 });
+      figma.notify(label + " could not find an eligible layer or container to apply.", { timeout: 2200 });
       return;
     }
 
@@ -29579,7 +40000,45 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return questionCount >= 2 && nonAsciiCount >= 4;
   }
 
-  function toKoreanImageErrorMessage(value, fallback) {
+  function buildSharpenSpecificImageError(text, provider) {
+    const providerLabel = provider && provider !== "AI" ? provider + " " : "";
+
+    if (
+      /(select at least one node|could not find the selected image fill|could not find an image fill in the current selection|select one editable shape layer|shape layer or a layer that uses an image fill|select exactly one editable shape layer)/i.test(
+        text
+      )
+    ) {
+      return "샤프닝할 이미지를 찾지 못했습니다. 이미지 레이어를 다시 선택해주세요.";
+    }
+
+    if (
+      /(could not read bytes|bytes from the selected image fill|image fill bytes missing|input image bytes|source image .*empty|exported shape image was empty|empty image bytes|no generated image bytes)/i.test(
+        text
+      )
+    ) {
+      return "샤프닝 원본 이미지 바이트를 읽지 못했습니다. 원본 이미지가 비었거나 손상되었을 수 있습니다.";
+    }
+
+    if (/(application\/octet-stream|unsupported|mime|format|image\/gif|image\/bmp|image\/tiff|image\/heic|image\/heif)/i.test(text)) {
+      return "샤프닝 입력 이미지 형식을 지원하지 않습니다. PNG, JPG, WEBP처럼 일반적인 이미지로 다시 시도해주세요.";
+    }
+
+    if (/(payload|request size|20 ?mb|inline[_ ]data|too large|exceeds?.*limit|max(?:imum)? size)/i.test(text)) {
+      return "샤프닝 입력 이미지가 너무 큽니다. 더 작은 이미지로 다시 시도해주세요.";
+    }
+
+    if (/(aspect[_ -]?ratio|unsupported image setting|image dimensions|width|height)/i.test(text)) {
+      return "샤프닝 입력 이미지 비율이나 크기가 현재 처리 범위를 벗어났습니다. 일반적인 비율이나 크기로 다시 시도해주세요.";
+    }
+
+    if (/(400|invalid_argument|invalid image|unsupported image|image|size)/i.test(text)) {
+      return providerLabel + "샤프닝 입력 이미지를 현재 요청 형식으로 처리하지 못했습니다. 이미지 소스나 설정을 다시 확인해주세요.";
+    }
+
+    return "";
+  }
+
+  function toKoreanImageErrorMessage(value, fallback, options) {
     const text = typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
     if (!text) {
       return fallback;
@@ -29589,7 +40048,24 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       return fallback;
     }
 
+    if (isBoundsFitOperation(options)) {
+      return text;
+    }
+
+    if (isImageExtendOperation(options)) {
+      return text;
+    }
+
+    if (
+      /(bounds-fit|auto-layout|text overlay|selected text layer|selected container|visible bounds|cannot be resized|could not resize)/i.test(
+        text
+      )
+    ) {
+      return text;
+    }
+
     const provider = /openai/i.test(text) ? "OpenAI" : /gemini/i.test(text) ? "Gemini" : "AI";
+    const operationLabel = sanitizeOperationLabel(options && options.operationLabel);
 
     if (/(401|403|permission|forbidden|unauthori|auth|api key|credential)/i.test(text)) {
       return provider + " image request permission was denied. Check your API key or credentials.";
@@ -29601,6 +40077,13 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
     if (/(503|unavailable|high demand|overloaded|temporar|try again later|busy)/i.test(text)) {
       return provider + " image request is temporarily unavailable. Please try again later.";
+    }
+
+    if (isSharpenOperationLabel(operationLabel)) {
+      const sharpenSpecificMessage = buildSharpenSpecificImageError(text, provider);
+      if (sharpenSpecificMessage) {
+        return sharpenSpecificMessage;
+      }
     }
 
     if (/(payload|request size|20 ?mb|inline[_ ]data|aspect[_ -]?ratio|too large)/i.test(text)) {
@@ -29776,13 +40259,13 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return "Unnamed";
   }
 
-  function normalizeErrorMessage(error, fallback) {
+  function normalizeErrorMessage(error, fallback, options) {
     if (error && typeof error === "object" && typeof error.message === "string" && error.message.trim()) {
-      return toKoreanImageErrorMessage(error.message, fallback);
+      return toKoreanImageErrorMessage(error.message, fallback, options);
     }
 
     if (typeof error === "string" && error.trim()) {
-      return toKoreanImageErrorMessage(error, fallback);
+      return toKoreanImageErrorMessage(error, fallback, options);
     }
 
     return fallback;
@@ -30229,6 +40712,752 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       return error.trim();
     }
 
+    return fallback;
+  }
+})();
+
+;(() => {
+  const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
+  if (globalScope.__PIGMA_AI_DESIGN_CHAT_PATCH__) {
+    return;
+  }
+
+  const ANNOTATION_CATEGORY_LABEL = "Pigma Design Chat";
+  const ANNOTATION_CATEGORY_COLOR = "yellow";
+  const ANNOTATION_LABEL_PREFIX = "[Design Chat]";
+  const TEXT_PREVIEW_LIMIT = 320;
+  const TEXT_PREVIEW_EDGE_LENGTH = 10;
+  const TEXT_CONTENT_LIMIT = 2400;
+  const SOURCE_EXPORT_EDGE = 1600;
+  const originalOnMessage = typeof figma.ui.onmessage === "function" ? figma.ui.onmessage : null;
+
+  const designChatOnMessage = async (message) => {
+    if (isDesignChatMessage(message)) {
+      if (message.type === "request-ai-design-chat-selection") {
+        postSelectionState();
+        return;
+      }
+
+      if (message.type === "request-ai-design-chat-source") {
+        await handleSourceRequest(message);
+        return;
+      }
+
+      if (message.type === "apply-ai-design-chat-annotation") {
+        await handleAnnotationRequest(message);
+        return;
+      }
+    }
+
+    if (typeof originalOnMessage === "function") {
+      return originalOnMessage(message);
+    }
+  };
+
+  globalScope.__PIGMA_AI_DESIGN_CHAT_PATCH__ = true;
+
+  figma.on("selectionchange", () => {
+    postSelectionState();
+  });
+  figma.on("currentpagechange", () => {
+    postSelectionState();
+  });
+
+  figma.ui.onmessage = designChatOnMessage;
+
+  postSelectionState();
+
+  function isDesignChatMessage(message) {
+    return (
+      !!message &&
+      (message.type === "request-ai-design-chat-selection" ||
+        message.type === "request-ai-design-chat-source" ||
+        message.type === "apply-ai-design-chat-annotation")
+    );
+  }
+
+  function postSelectionState() {
+    let selection = null;
+    try {
+      selection = buildSelectionState();
+    } catch (error) {
+      selection = buildSelectionFallbackState();
+    }
+    figma.ui.postMessage({
+      type: "ai-design-chat-selection",
+      selection: selection,
+    });
+  }
+
+  async function handleSourceRequest(message) {
+    const clientRequestId = sanitizeText(message && message.clientRequestId);
+    try {
+      const roots = getSelectedRoots();
+      const exportRoots = roots.filter((node) => canExportNode(node));
+      const selection = buildSelectionStateFromRoots(roots);
+      if (!selection.ready) {
+        throw new Error("프레임, 이미지, 텍스트를 먼저 선택해 주세요.");
+      }
+
+      if (!exportRoots.length) {
+        throw new Error("Could not export the current selection.");
+      }
+
+      const exportSelection = buildSelectionStateFromRoots(exportRoots);
+      const bytes =
+        exportRoots.length === 1
+          ? await exportSingleRoot(exportRoots[0], exportSelection)
+          : exportSelection.bounds
+            ? await exportCombinedRoots(
+                exportRoots,
+                exportSelection.bounds,
+                exportSelection.width || exportSelection.bounds.width,
+                exportSelection.height || exportSelection.bounds.height
+              )
+            : await exportSingleRoot(exportRoots[0], exportSelection);
+      if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
+        throw new Error("선택 영역 캡처 결과가 비어 있습니다.");
+      }
+
+      figma.ui.postMessage({
+        type: "ai-design-chat-source-ready",
+        clientRequestId,
+        selection,
+        image: {
+          bytes,
+          mimeType: "image/png",
+          fileName: buildFileName(selection.selectionLabel || "design-chat") + ".png",
+        },
+      });
+    } catch (error) {
+      figma.ui.postMessage({
+        type: "ai-design-chat-source-error",
+        clientRequestId,
+        message: normalizeErrorMessage(error, "선택 캡처를 준비하지 못했습니다."),
+      });
+    }
+  }
+
+  async function handleAnnotationRequest(message) {
+    const clientRequestId = sanitizeText(message && message.clientRequestId);
+    const messageId = sanitizeText(message && message.messageId);
+    try {
+      const annotationText = clipText(message && message.annotationText, 120);
+      if (!annotationText) {
+        throw new Error("주석으로 남길 텍스트가 없습니다.");
+      }
+
+      const roots = getSelectedRoots();
+      const selection = buildSelectionStateFromRoots(roots);
+      if (!selection.ready) {
+        throw new Error("주석을 남길 선택이 없습니다.");
+      }
+
+      const requestedSignature = sanitizeText(message && message.selectionSignature);
+      if (requestedSignature && selection.selectionSignature !== requestedSignature) {
+        throw new Error("선택이 바뀌어서 주석을 남길 수 없습니다. 다시 질문해 주세요.");
+      }
+
+      const annotationNodes = roots.filter((node) => supportsAnnotationsOnNode(node));
+      if (!annotationNodes.length) {
+        throw new Error("현재 선택에는 주석을 남길 수 있는 노드가 없습니다.");
+      }
+
+      const category = await ensureAnnotationCategory(ANNOTATION_CATEGORY_COLOR);
+      let annotationCount = 0;
+
+      for (const node of annotationNodes) {
+        const existing = Array.isArray(node.annotations) ? Array.from(node.annotations) : [];
+        const preserved = existing.filter((annotation) => !isManagedAnnotation(annotation, category));
+        node.annotations = preserved.concat(buildAnnotation(annotationText, category));
+        annotationCount += 1;
+      }
+
+      figma.ui.postMessage({
+        type: "ai-design-chat-annotation-result",
+        clientRequestId,
+        messageId,
+        selectionSignature: selection.selectionSignature,
+        annotationCount,
+        annotatedNodeCount: annotationNodes.length,
+      });
+      figma.notify(`디자인 채팅 주석 ${annotationNodes.length}개를 남겼습니다.`, { timeout: 1800 });
+    } catch (error) {
+      const messageText = normalizeErrorMessage(error, "주석을 남기지 못했습니다.");
+      figma.ui.postMessage({
+        type: "ai-design-chat-annotation-error",
+        clientRequestId,
+        messageId,
+        message: messageText,
+      });
+      figma.notify(messageText, { error: true, timeout: 2200 });
+    }
+  }
+
+  function buildSelectionState() {
+    return buildSelectionStateFromRoots(getSelectedRoots());
+  }
+
+  function buildSelectionStateFromRoots(roots) {
+    const selectionRoots = Array.isArray(roots) ? roots.filter(Boolean) : [];
+    const bounds = combineBounds(selectionRoots.map((node) => getNodeBoundsSafe(node)).filter(Boolean));
+    const typeLabels = uniqueStrings(selectionRoots.map((node) => formatNodeType(getNodeTypeSafe(node))), 4);
+    const sourceType = resolveSourceType(selectionRoots);
+    const captureMode = selectionRoots.length > 1 ? "combined" : sourceType === "text" ? "text" : selectionRoots.length === 1 ? "single" : "idle";
+
+    if (!selectionRoots.length) {
+      return {
+        ready: false,
+        selectionSignature: getSelectionSignature([], ""),
+        selectionLabel: "",
+        selectionCount: 0,
+        selectionTypeLabel: "",
+        captureMode: "idle",
+        captureModeLabel: "대기",
+        width: 0,
+        height: 0,
+        textPreview: "",
+        textContent: "",
+        hint: "프레임, 이미지, 텍스트를 선택하면 대화를 시작할 수 있습니다.",
+        roots: [],
+        annotationTargetCount: 0,
+        sourceType: "visual",
+        bounds: null,
+      };
+    }
+
+    const textContent = collectTextContent(selectionRoots, sourceType === "text");
+
+    return {
+      ready: true,
+      selectionSignature: getSelectionSignature(selectionRoots, textContent),
+      selectionLabel: formatSelectionLabel(selectionRoots, textContent),
+      selectionCount: selectionRoots.length,
+      selectionTypeLabel: typeLabels.join(" · "),
+      captureMode,
+      captureModeLabel:
+        captureMode === "combined" ? "통합 화면" : captureMode === "text" ? "텍스트 단일" : captureMode === "single" ? "단일 선택" : "대기",
+      width: bounds ? roundPixel(bounds.width) : 0,
+      height: bounds ? roundPixel(bounds.height) : 0,
+      textPreview: abbreviateMiddleText(textContent, TEXT_PREVIEW_EDGE_LENGTH),
+      textContent,
+      hint:
+        captureMode === "combined"
+          ? "다중 선택을 한 화면으로 묶어 캡처합니다."
+          : sourceType === "text"
+            ? "선택한 텍스트만 캡처해서 질문합니다."
+            : "현재 선택을 그대로 캡처해서 질문합니다.",
+      roots: selectionRoots.map((node) => ({
+        id: node.id,
+        name: safeName(node),
+        type: getNodeTypeSafe(node),
+      })),
+      annotationTargetCount: selectionRoots.filter((node) => supportsAnnotationsOnNode(node)).length,
+      sourceType,
+      bounds,
+    };
+  }
+
+  function getSelectedRoots() {
+    const selection = Array.from(figma.currentPage.selection || []).filter((node) => isSelectableNode(node));
+    if (!selection.length) {
+      return [];
+    }
+
+    const selectedIds = new Set(selection.map((node) => node.id));
+    const roots = selection.filter((node) => !hasSelectedAncestor(node, selectedIds));
+    try {
+      return roots.sort(compareNodeOrder);
+    } catch (error) {
+      return roots;
+    }
+  }
+
+  function isSelectableNode(node) {
+    return !!node && node.removed !== true && typeof node.id === "string" && typeof node.type === "string";
+  }
+
+  function canExportNode(node) {
+    return isSelectableNode(node) && typeof node.exportAsync === "function";
+  }
+
+  function hasSelectedAncestor(node, selectedIds) {
+    let current = node ? node.parent : null;
+    while (current && current.type !== "PAGE" && current.type !== "DOCUMENT") {
+      if (selectedIds.has(current.id)) {
+        return true;
+      }
+      current = current.parent;
+    }
+    return false;
+  }
+
+  function compareNodeOrder(left, right) {
+    const leftPath = getNodeIndexPath(left);
+    const rightPath = getNodeIndexPath(right);
+    const length = Math.max(leftPath.length, rightPath.length);
+    for (let index = 0; index < length; index += 1) {
+      const leftValue = index < leftPath.length ? leftPath[index] : -1;
+      const rightValue = index < rightPath.length ? rightPath[index] : -1;
+      if (leftValue !== rightValue) {
+        return leftValue - rightValue;
+      }
+    }
+    return safeName(left).localeCompare(safeName(right));
+  }
+
+  function getNodeIndexPath(node) {
+    const path = [];
+    let current = node;
+    while (current && current.parent && Array.isArray(current.parent.children)) {
+      path.unshift(current.parent.children.indexOf(current));
+      current = current.parent;
+      if (current.type === "PAGE") {
+        break;
+      }
+    }
+    return path;
+  }
+
+  function resolveSourceType(roots) {
+    const items = Array.isArray(roots) ? roots : [];
+    if (!items.length) {
+      return "visual";
+    }
+    const allText = items.every((node) => getNodeTypeSafe(node) === "TEXT");
+    if (allText) {
+      return "text";
+    }
+    const hasText = items.some((node) => getNodeTypeSafe(node) === "TEXT");
+    return hasText ? "mixed" : "visual";
+  }
+
+  function collectTextPreview(roots, directOnly) {
+    return abbreviateMiddleText(collectTextContent(roots, directOnly), TEXT_PREVIEW_EDGE_LENGTH);
+  }
+
+  function collectTextContent(roots, directOnly) {
+    const snippets = [];
+    let totalLength = 0;
+    const queue = Array.isArray(roots) ? roots.slice() : [];
+
+    while (queue.length > 0 && totalLength < TEXT_CONTENT_LIMIT) {
+      const node = queue.shift();
+      if (!node || node.visible === false) {
+        continue;
+      }
+
+      if (getNodeTypeSafe(node) === "TEXT" && typeof node.characters === "string") {
+        const snippet = compactText(node.characters);
+        if (snippet) {
+          snippets.push(snippet);
+          totalLength += snippet.length;
+        }
+      }
+
+      const children = getNodeChildrenSafe(node);
+      if (!directOnly && children.length) {
+        for (const child of children) {
+          queue.push(child);
+        }
+      }
+    }
+
+    return clipText(snippets.join(" · "), TEXT_CONTENT_LIMIT);
+  }
+
+  async function exportSingleRoot(root, selection) {
+    const exportOptions = {
+      format: "PNG",
+      useAbsoluteBounds: true,
+    };
+    const constraint = buildExportConstraint(selection.width, selection.height);
+    if (constraint) {
+      exportOptions.constraint = constraint;
+    }
+    return await root.exportAsync(exportOptions);
+  }
+
+  async function exportCombinedRoots(roots, bounds, width, height) {
+    const tempFrame = figma.createFrame();
+    tempFrame.name = "__Pigma Design Chat Capture__";
+    tempFrame.x = roundPixel(bounds.x + width + 4000);
+    tempFrame.y = roundPixel(bounds.y);
+    tempFrame.resize(Math.max(1, roundPixel(width)), Math.max(1, roundPixel(height)));
+    tempFrame.fills = [];
+    tempFrame.strokes = [];
+    tempFrame.clipsContent = true;
+    figma.currentPage.appendChild(tempFrame);
+
+    let placedCount = 0;
+
+    try {
+      for (const node of roots) {
+        const nodeBounds = getNodeBounds(node);
+        if (!nodeBounds) {
+          continue;
+        }
+        const bytes = await node.exportAsync({
+          format: "PNG",
+          useAbsoluteBounds: true,
+        });
+        if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
+          continue;
+        }
+        const image = figma.createImage(bytes);
+        const rect = figma.createRectangle();
+        rect.name = safeName(node);
+        rect.x = nodeBounds.x - bounds.x;
+        rect.y = nodeBounds.y - bounds.y;
+        rect.resize(Math.max(1, nodeBounds.width), Math.max(1, nodeBounds.height));
+        rect.strokes = [];
+        rect.fills = [
+          {
+            type: "IMAGE",
+            scaleMode: "FILL",
+            imageHash: image.hash,
+          },
+        ];
+        tempFrame.appendChild(rect);
+        placedCount += 1;
+      }
+
+      if (!placedCount) {
+        throw new Error("통합 캡처에 사용할 선택 레이어를 찾지 못했습니다.");
+      }
+
+      const exportOptions = {
+        format: "PNG",
+        useAbsoluteBounds: false,
+      };
+      const constraint = buildExportConstraint(width, height);
+      if (constraint) {
+        exportOptions.constraint = constraint;
+      }
+      return await tempFrame.exportAsync(exportOptions);
+    } finally {
+      tempFrame.remove();
+    }
+  }
+
+  function buildExportConstraint(width, height) {
+    const maxEdge = Math.max(Number(width) || 0, Number(height) || 0);
+    if (!(maxEdge > SOURCE_EXPORT_EDGE)) {
+      return null;
+    }
+    if ((Number(width) || 0) >= (Number(height) || 0)) {
+      return {
+        type: "WIDTH",
+        value: SOURCE_EXPORT_EDGE,
+      };
+    }
+    return {
+      type: "HEIGHT",
+      value: SOURCE_EXPORT_EDGE,
+    };
+  }
+
+  function getSelectionSignature(selection, textContent) {
+    const items = Array.from(selection || [])
+      .map((node) => {
+        const bounds = getNodeBoundsSafe(node);
+        const boundsKey = bounds
+          ? [
+              roundSignatureNumber(bounds.x),
+              roundSignatureNumber(bounds.y),
+              roundSignatureNumber(bounds.width),
+              roundSignatureNumber(bounds.height),
+            ].join(":")
+          : "";
+        return [node.id, getNodeTypeSafe(node), hashSignatureText(safeName(node)), boundsKey, getNodeChildrenSafe(node).length].join("@");
+      })
+      .sort();
+    const text = sanitizeText(textContent);
+    return `${figma.currentPage.id}:${hashSignatureText(items.join("|"))}:${text.length}:${hashSignatureText(text)}`;
+  }
+
+  function roundSignatureNumber(value) {
+    return Math.round((Number(value) || 0) * 100) / 100;
+  }
+
+  function hashSignatureText(value) {
+    const text = String(value || "");
+    let hash = 2166136261;
+    for (let index = 0; index < text.length; index += 1) {
+      hash ^= text.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(36);
+  }
+
+  function getNodeBounds(node) {
+    if (node && node.absoluteRenderBounds) {
+      return cloneBounds(node.absoluteRenderBounds);
+    }
+    if (node && node.absoluteBoundingBox) {
+      return cloneBounds(node.absoluteBoundingBox);
+    }
+    if (
+      node &&
+      typeof node.x === "number" &&
+      typeof node.y === "number" &&
+      typeof node.width === "number" &&
+      typeof node.height === "number"
+    ) {
+      return {
+        x: node.x,
+        y: node.y,
+        width: Math.max(1, node.width),
+        height: Math.max(1, node.height),
+      };
+    }
+    return null;
+  }
+
+  function getNodeBoundsSafe(node) {
+    try {
+      return getNodeBounds(node);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function cloneBounds(bounds) {
+    return {
+      x: Number(bounds.x) || 0,
+      y: Number(bounds.y) || 0,
+      width: Math.max(1, Number(bounds.width) || 1),
+      height: Math.max(1, Number(bounds.height) || 1),
+    };
+  }
+
+  function combineBounds(boundsList) {
+    if (!Array.isArray(boundsList) || !boundsList.length) {
+      return null;
+    }
+    let left = boundsList[0].x;
+    let top = boundsList[0].y;
+    let right = boundsList[0].x + boundsList[0].width;
+    let bottom = boundsList[0].y + boundsList[0].height;
+
+    for (let index = 1; index < boundsList.length; index += 1) {
+      const bounds = boundsList[index];
+      left = Math.min(left, bounds.x);
+      top = Math.min(top, bounds.y);
+      right = Math.max(right, bounds.x + bounds.width);
+      bottom = Math.max(bottom, bounds.y + bounds.height);
+    }
+
+    return {
+      x: left,
+      y: top,
+      width: Math.max(1, right - left),
+      height: Math.max(1, bottom - top),
+    };
+  }
+
+  async function ensureAnnotationCategory(requestedColor) {
+    if (!figma.annotations || typeof figma.annotations.getAnnotationCategoriesAsync !== "function") {
+      return null;
+    }
+
+    try {
+      const categories = await figma.annotations.getAnnotationCategoriesAsync();
+      const existing = Array.isArray(categories)
+        ? categories.find((category) => category && category.label === ANNOTATION_CATEGORY_LABEL)
+        : null;
+      const color = typeof requestedColor === "string" && requestedColor.trim() ? requestedColor.trim().toLowerCase() : ANNOTATION_CATEGORY_COLOR;
+
+      if (existing) {
+        if (typeof existing.setColor === "function" && existing.color !== color) {
+          existing.setColor(color);
+        }
+        return existing;
+      }
+
+      if (typeof figma.annotations.addAnnotationCategoryAsync !== "function") {
+        return null;
+      }
+
+      return await figma.annotations.addAnnotationCategoryAsync({
+        label: ANNOTATION_CATEGORY_LABEL,
+        color,
+      });
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function buildAnnotation(text, category) {
+    const annotation = {
+      label: `${ANNOTATION_LABEL_PREFIX} ${clipText(text, 120)}`,
+    };
+    if (category && category.id) {
+      annotation.categoryId = category.id;
+    }
+    return annotation;
+  }
+
+  function isManagedAnnotation(annotation, category) {
+    if (!annotation || typeof annotation !== "object") {
+      return false;
+    }
+    if (category && category.id && annotation.categoryId === category.id) {
+      return true;
+    }
+    const label =
+      typeof annotation.label === "string" ? annotation.label : typeof annotation.labelMarkdown === "string" ? annotation.labelMarkdown : "";
+    return typeof label === "string" && label.startsWith(ANNOTATION_LABEL_PREFIX);
+  }
+
+  function supportsAnnotationsOnNode(node) {
+    try {
+      return !!node && Array.isArray(node.annotations);
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function formatSelectionLabel(roots, textContent) {
+    if (!Array.isArray(roots) || !roots.length) {
+      return "";
+    }
+    const textPreview = abbreviateMiddleText(textContent, TEXT_PREVIEW_EDGE_LENGTH);
+    if (textPreview && roots.every((node) => getNodeTypeSafe(node) === "TEXT")) {
+      return textPreview;
+    }
+    if (roots.length === 1) {
+      return safeName(roots[0]);
+    }
+    return `${safeName(roots[0])} 외 ${roots.length - 1}개`;
+  }
+
+  function formatNodeType(type) {
+    switch (String(type || "").toUpperCase()) {
+      case "FRAME":
+        return "프레임";
+      case "GROUP":
+        return "그룹";
+      case "TEXT":
+        return "텍스트";
+      case "SECTION":
+        return "섹션";
+      case "COMPONENT":
+        return "컴포넌트";
+      case "COMPONENT_SET":
+        return "컴포넌트 세트";
+      case "INSTANCE":
+        return "인스턴스";
+      case "VECTOR":
+        return "벡터";
+      case "RECTANGLE":
+        return "사각형";
+      case "ELLIPSE":
+        return "원형";
+      default:
+        return String(type || "레이어");
+    }
+  }
+
+  function uniqueStrings(values, limit) {
+    const seen = new Set();
+    const result = [];
+    for (const value of Array.isArray(values) ? values : []) {
+      const text = typeof value === "string" ? value.trim() : "";
+      if (!text || seen.has(text)) {
+        continue;
+      }
+      seen.add(text);
+      result.push(text);
+      if (limit && result.length >= limit) {
+        break;
+      }
+    }
+    return result;
+  }
+
+  function safeName(node) {
+    try {
+      if (node && typeof node.name === "string" && node.name.trim()) {
+        return node.name.trim();
+      }
+    } catch (error) {}
+    try {
+      return String((node && node.type) || "Layer");
+    } catch (error) {
+      return "Layer";
+    }
+  }
+
+  function getNodeTypeSafe(node) {
+    try {
+      return String((node && node.type) || "UNKNOWN");
+    } catch (error) {
+      return "UNKNOWN";
+    }
+  }
+
+  function getNodeChildrenSafe(node) {
+    try {
+      return Array.isArray(node && node.children) ? node.children : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function buildSelectionFallbackState() {
+    const roots = Array.from(figma.currentPage.selection || []).filter((node) => isSelectableNode(node));
+    return buildSelectionStateFromRoots(roots);
+  }
+
+  function buildFileName(value) {
+    const source = sanitizeText(value) || "design-chat";
+    return source.replace(/[<>:"/\\|?*\u0000-\u001f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80) || "design-chat";
+  }
+
+  function clipText(value, maxLength) {
+    const text = sanitizeText(value);
+    if (!text) {
+      return "";
+    }
+    const limit = Math.max(1, Number(maxLength) || 0);
+    if (!limit || text.length <= limit) {
+      return text;
+    }
+    return `${text.slice(0, Math.max(1, limit - 1)).trim()}...`;
+  }
+
+  function abbreviateMiddleText(value, edgeLength) {
+    const text = sanitizeText(value);
+    if (!text) {
+      return "";
+    }
+    const edge = Math.max(1, Number(edgeLength) || TEXT_PREVIEW_EDGE_LENGTH);
+    if (text.length <= edge * 2 + 4) {
+      return text;
+    }
+    return `${text.slice(0, edge).trim()}....${text.slice(-edge).trim()}`;
+  }
+
+  function sanitizeText(value) {
+    return String(value || "").replace(/\s+/g, " ").trim();
+  }
+
+  function compactText(value) {
+    return String(value || "").replace(/\s+/g, " ").trim();
+  }
+
+  function roundPixel(value) {
+    return Math.max(1, Math.round(Number(value) || 0));
+  }
+
+  function normalizeErrorMessage(error, fallback) {
+    if (error && typeof error === "object" && typeof error.message === "string" && error.message.trim()) {
+      return error.message.trim();
+    }
+    if (typeof error === "string" && error.trim()) {
+      return error.trim();
+    }
     return fallback;
   }
 })();

@@ -7,12 +7,14 @@ $aiResponsiveMemoryPatch = Join-Path $root "ai-responsive-memory.js"
 $aiResponsivePairAnalyzerPatch = Join-Path $root "ai-responsive-pair-analyzer.js"
 $aiLlmClientPatch = Join-Path $root "ai-llm-client.js"
 $aiDesignReadPatch = Join-Path $root "ai-design-read.js"
+$aiDesignChatPatch = Join-Path $root "ai-design-chat.js"
 $aiAccessibilityDiagnosisPatch = Join-Path $root "ai-accessibility-diagnosis.js"
 $aiDesignConsistencyPatch = Join-Path $root "ai-design-consistency.js"
 $aiRegroupRenamePatch = Join-Path $root "ai-regroup-rename.js"
 $aiTypoAuditPatch = Join-Path $root "ai-typo-audit.js"
 $aiPixelPerfectPatch = Join-Path $root "ai-pixel-perfect.js"
 $deleteHiddenLayersPatch = Join-Path $root "delete-hidden-layers.js"
+$aiUrlShortenerPatch = Join-Path $root "ai-url-shortener.js"
 $aiColorExtractPatch = Join-Path $root "ai-color-extract.js"
 $originalImageDownloadPatch = Join-Path $root "original-image-download.js"
 $aiImageUpscalePatch = Join-Path $root "ai-image-upscale.js"
@@ -65,6 +67,10 @@ if (-not (Test-Path $aiDesignReadPatch)) {
   throw "Missing AI design read patch: $aiDesignReadPatch"
 }
 
+if (-not (Test-Path $aiDesignChatPatch)) {
+  throw "Missing AI design chat patch: $aiDesignChatPatch"
+}
+
 if (-not (Test-Path $aiAccessibilityDiagnosisPatch)) {
   throw "Missing AI accessibility diagnosis patch: $aiAccessibilityDiagnosisPatch"
 }
@@ -87,6 +93,10 @@ if (-not (Test-Path $aiPixelPerfectPatch)) {
 
 if (-not (Test-Path $deleteHiddenLayersPatch)) {
   throw "Missing hidden layer delete patch: $deleteHiddenLayersPatch"
+}
+
+if (-not (Test-Path $aiUrlShortenerPatch)) {
+  throw "Missing AI URL shortener patch: $aiUrlShortenerPatch"
 }
 
 if (-not (Test-Path $aiColorExtractPatch)) {
@@ -198,12 +208,14 @@ $runtimeSyntaxSourceFiles = @(
   $aiResponsivePairAnalyzerPatch,
   $aiLlmClientPatch,
   $aiDesignReadPatch,
+  $aiDesignChatPatch,
   $aiAccessibilityDiagnosisPatch,
   $aiDesignConsistencyPatch,
   $aiRegroupRenamePatch,
   $aiTypoAuditPatch,
   $aiPixelPerfectPatch,
   $deleteHiddenLayersPatch,
+  $aiUrlShortenerPatch,
   $aiColorExtractPatch,
   $aiImageUpscalePatch
 )
@@ -1141,12 +1153,14 @@ $aiSettingsPatchContent = [System.IO.File]::ReadAllText($aiSettingsPatch, [Syste
 $aiResponsiveMemoryPatchContent = [System.IO.File]::ReadAllText($aiResponsiveMemoryPatch, [System.Text.Encoding]::UTF8)
 $aiResponsivePairAnalyzerPatchContent = [System.IO.File]::ReadAllText($aiResponsivePairAnalyzerPatch, [System.Text.Encoding]::UTF8)
 $aiLlmClientPatchContent = [System.IO.File]::ReadAllText($aiLlmClientPatch, [System.Text.Encoding]::UTF8)
+$aiDesignChatPatchContent = [System.IO.File]::ReadAllText($aiDesignChatPatch, [System.Text.Encoding]::UTF8)
 $aiAccessibilityDiagnosisPatchContent = [System.IO.File]::ReadAllText($aiAccessibilityDiagnosisPatch, [System.Text.Encoding]::UTF8)
 $aiDesignConsistencyPatchContent = [System.IO.File]::ReadAllText($aiDesignConsistencyPatch, [System.Text.Encoding]::UTF8)
 $aiRegroupRenamePatchContent = [System.IO.File]::ReadAllText($aiRegroupRenamePatch, [System.Text.Encoding]::UTF8)
 $aiTypoAuditPatchContent = [System.IO.File]::ReadAllText($aiTypoAuditPatch, [System.Text.Encoding]::UTF8)
 $aiPixelPerfectPatchContent = [System.IO.File]::ReadAllText($aiPixelPerfectPatch, [System.Text.Encoding]::UTF8)
 $deleteHiddenLayersPatchContent = [System.IO.File]::ReadAllText($deleteHiddenLayersPatch, [System.Text.Encoding]::UTF8)
+$aiUrlShortenerPatchContent = [System.IO.File]::ReadAllText($aiUrlShortenerPatch, [System.Text.Encoding]::UTF8)
 $aiColorExtractPatchContent = [System.IO.File]::ReadAllText($aiColorExtractPatch, [System.Text.Encoding]::UTF8)
 $aiImageUpscalePatchContent = [System.IO.File]::ReadAllText($aiImageUpscalePatch, [System.Text.Encoding]::UTF8)
 $originalImageDownloadPatchContent = ""
@@ -1167,6 +1181,7 @@ $patchedRuntimeParts = @(
   $aiTypoAuditPatchContent,
   $aiPixelPerfectPatchContent,
   $deleteHiddenLayersPatchContent,
+  $aiUrlShortenerPatchContent,
   $aiColorExtractPatchContent,
   $aiImageUpscalePatchContent
 )
@@ -1174,6 +1189,8 @@ $patchedRuntimeParts = @(
 if ($hasOriginalImageDownloadPatch -and $originalImageDownloadPatchContent.Trim().Length -gt 0) {
   $patchedRuntimeParts += $originalImageDownloadPatchContent
 }
+
+$patchedRuntimeParts += $aiDesignChatPatchContent
 
 [System.IO.File]::WriteAllText($destination, [string]::Join("`r`n", $patchedRuntimeParts), $utf8NoBom)
 

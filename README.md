@@ -25,11 +25,11 @@ Execution README for the next internal-app flow:
 
 Phase 1 currently fixes these decisions:
 
-- UI entry lives in `Settings > 학습 메모리`, not in the `AI 보정` tab.
+- UI entry lives in `Settings > 학습 메모리`, not in the `편집하기` tab.
 - The canonical memory format is `JSONL`.
 - `clientStorage` is cache-only, not the canonical source of truth.
 - Node-level plugin data stores only lightweight anchors such as ids, roles, and fingerprints.
-- Existing `AI 보정` runtime flows stay untouched until memory import/export and dry-run analysis are stable.
+- Existing `편집하기` runtime flows stay untouched until memory import/export and dry-run analysis are stable.
 
 Safe implementation order:
 
@@ -41,7 +41,7 @@ Safe implementation order:
 6. Append dry-run pair, match, and rule records into memory.
 7. Add lightweight node anchors.
 8. Add internal app sync.
-9. Only then retrieve memory inside `AI 보정`.
+9. Only then retrieve memory inside `편집하기`.
 
 ## Plugin Manifest
 
@@ -96,7 +96,7 @@ Safe implementation order:
   - Source of truth for the original-image download button's plugin-side image-hash collection and byte export pipeline.
   - In the externalized UI, 1-2 images download individually and 3 or more are packaged into a ZIP automatically.
 - `ui-ai-correction.js`
-  - Source of truth for `Ai 보정` feature logic and AI-only behavior. The `Ai 보정` UI itself lives in `ui.html`.
+  - Source of truth for `편집하기` feature logic and AI-only behavior. The `편집하기` UI itself lives in `ui.html`.
 - `externalize-embedded-ui.js`
   - Replaces embedded `figma.showUI(...)` HTML with `__html__`.
 - `sync-pdfjs-inline-assets.js`
@@ -151,8 +151,8 @@ Runtime note: the active AI correction UI logic currently lives inline in `ui.ht
   - keep button-state syncing one-way instead of observing your own writes
 
 1. Edit `ui.html` for UI-only changes.
-   - Keep `Ai 보정` screen markup and styles in `ui.html`.
-   - Keep `Ai 보정` feature logic in `ui-ai-correction.js` so Make/Import behavior stays isolated.
+   - Keep `편집하기` screen markup and styles in `ui.html`.
+   - Keep `편집하기` feature logic in `ui-ai-correction.js` so Make/Import behavior stays isolated.
 2. Edit `code.js` or a source-of-truth patch file only when main/plugin behavior changes.
    - Export-only routing/normalization changes should go to `psd-export-boundary.js`.
    - SVG import runtime changes should go to `psd-import-text-fix.js`.
@@ -261,6 +261,105 @@ When adding or regenerating plugin-side code in files such as `ai-*.js`, `delete
 5. Reload the local plugin in Figma and test the exact button/flow that changed.
 
 If a future generated patch needs a newer syntax feature, assume it is unsafe until it has been verified in the local Figma runtime, not just in Node.
+
+## 2026-04-24 Text Highlight Work Log
+
+오늘 작업의 중심은 `텍스트 하이라이트` 기능이었다. 목표는 드래그한 텍스트 범위만 정확히 하이라이트하고, Figma 오토레이아웃 안에서도 두 번째 적용부터 레이아웃이 깨지지 않게 만드는 것이다.
+
+### Main Files
+
+- `ai-typo-audit.js`
+  - Plugin runtime source of truth for text highlight measurement, shape creation, grouping, and auto-layout container handling.
+- `ui.html`
+  - Text highlight modal UI, preview, saved settings, color/number inputs, and UI-side PNG alpha measurement.
+- `code.patched.js`
+  - Generated runtime bundle used by `manifest.json`.
+  - Do not edit this directly for permanent fixes. Rebuild from source files.
+
+### UI Changes
+
+- Simplified the text highlight modal so the selected text preview shows only the applied preview chip.
+- Changed the visible `취소선형` label to `박스형`.
+  - Internally this still uses highlight mode `strike`.
+- Added local setting persistence through `localStorage`.
+  - Storage key: `pigma:ai-text-highlight-settings:v1`
+  - Saved fields:
+    - `highlightColorHex`
+    - `textColorHex`
+    - `highlightMode`
+    - `cornerRadius`
+    - `decorationScale`
+    - `lineDecorationScale`
+    - `strikeCapRadius`
+- Color inputs now accept hex values with or without `#`.
+  - `F5FF74` becomes `#F5FF74`
+  - `000000` becomes `#000000`
+  - `FFF` becomes `#FFFFFF`
+- Box/line thickness labels were clarified.
+  - The visible label is `두께`.
+  - Round/cap control defaults to `0`.
+  - Box mode now shows a computed pixel hint next to thickness, for example `5(18PX)`, so the multiplier and actual generated shape height are not confused.
+
+### Text Bounds And Glyph Fixes
+
+- The selected text width is measured from Figma text underline geometry instead of the full text layout width.
+- The plugin reads underline path data from text `fillGeometry` on a temporary clone.
+  - This gives more reliable selected-range X bounds than relying on the text layer's full layout box.
+- `setRangeTextDecorationSkipInk(..., false)` is used when measuring underline geometry so glyph descenders such as `p`, `q`, `j`, and `g` do not create skipped gaps.
+- Box mode now combines underline-derived X bounds with glyph-aware Y bounds.
+  - This keeps accurate selected text width while including descenders in the highlight height.
+- The automatic box thickness recommendation was reduced from `fontSize * 1.08` to `fontSize`.
+  - This keeps the box thinner while still covering glyph height.
+- Y placement was adjusted to use the glyph/bottom target instead of pulling the box upward from the underline-derived top.
+
+### Highlight Shape Behavior
+
+- Line mode stays visually distinct from box mode.
+  - Line thickness defaults thinner.
+  - Line growth is anchored so it grows upward from the text baseline area rather than only downward.
+- Box mode keeps the stronger filled-marker look.
+- Generated highlight heights are rounded to integer pixels.
+  - Example: a calculated `17.6` height becomes `18`.
+
+### Grouping And Auto Layout
+
+- Text highlights are grouped under `#high-light-text`.
+- The group/container is marked with plugin data:
+  - `pigma:text-highlight-group`
+  - `pigma:text-highlight-text-node-id`
+- In auto-layout parents, the text node is wrapped in a fixed-size frame named `#high-light-text`.
+  - The frame uses `layoutMode = "NONE"`.
+  - The frame has no fills or strokes.
+  - Highlight rectangles are inserted behind the text.
+- The first auto-layout wrap stores the container size in plugin data:
+  - `pigma:text-highlight-container-width`
+  - `pigma:text-highlight-container-height`
+- On later highlight applications, the plugin reuses the stored container size instead of recomputing from `node.width` / `node.height`.
+  - This is meant to prevent the second highlight from stretching the auto-layout frame to huge widths or near-zero widths.
+- Existing broken `#high-light-text` containers may need to be deleted once before retesting, because old containers can already contain bad dimensions.
+
+### Verification Commands Used
+
+Run these after changing this feature:
+
+```powershell
+node --check ai-typo-audit.js
+.\build-patched-main.ps1
+node verify-figma-runtime-syntax.js ai-typo-audit.js code.patched.js
+node verify-externalized-ui.js code.patched.js
+```
+
+When UI behavior changes, reload the local plugin in Figma after rebuilding.
+
+### Current Watch Points
+
+- Re-test repeated highlights inside Figma auto-layout frames.
+  - First apply should create the `#high-light-text` frame.
+  - Second and later applies should reuse the stored frame size and should not resize to an extreme width/height.
+- If layout still breaks, inspect the existing `#high-light-text` frame first.
+  - Delete old broken containers before testing the latest build.
+  - Check whether stored plugin data width/height is sane.
+- Keep the selected-width logic based on underline `fillGeometry`; avoid returning to full text-layout width calculations.
 
 ## PSD Preview Compatibility
 

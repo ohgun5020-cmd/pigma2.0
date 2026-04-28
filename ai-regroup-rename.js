@@ -27,7 +27,7 @@
       runningDescription: "하이브리드 구조형 이름을 정리하고 적극적인 리그룹핑 후보를 확인하고 있습니다.",
       aggressiveRegroup: true,
       aiInstructions:
-        "You improve Figma layer names for design handoff. Return Korean reasons, but every suggestedName must be ASCII slash notation in readable Title Case like Button/Primary/Sign In, Text/Hero/Title, Group/Navbar/Item/Profile. Use only letters, numbers, spaces, hyphens, and slashes. Do not use Korean, dots, or underscores in suggestedName. Reflect a clear topic when supported by text or metadata, for example Soccer, Sports, Finance, Food, Travel, Beauty, or Education. For image layers, prefer semantic roles like Hero, Banner, Thumbnail, Avatar, Photo, Poster, Cover, or Illustration when supported by the hints. Only include a color token when it clearly disambiguates a badge, chip, pill, or status-like visual; do not add colors to every layer. Do not invent a topic or color that is not supported by the payload. If uncertain, keep the provided localName.",
+        "You improve Figma layer names for design handoff. Return Korean reasons. When candidate.nameMode is 'structured', suggestedName should be short readable ASCII labels in Title Case, using slashes only for meaningful block hierarchy such as Hero/Copy, Hero/Media, Feature/List, Navbar/Item, CTA Primary, Title, Body, Thumbnail, Price, or Badge. Do not prefix every structured name with generic words like Group, Text, Frame, Container, or Layer. Use only letters, numbers, spaces, hyphens, and slashes. Do not use Korean or dots. When candidate.nameMode is 'display', suggestedName must be a human-readable section or repeat-card label like 01_Key Visual, 02_Introduction, 03_Features, 04_Product 01, 05_Product 02, 06_FAQ, 07_Outro, Product Card 01, Product Card 02, Coupon + Product Card, Awards, FAQ, or Archiving Page. For display names, first infer the section role from narrative context, visual hierarchy, section order, surrounding sections, and what the block is trying to communicate. Only after that decide the final label. Use heading/body/action text, sibling order, visual composition, nearby section context, and repeated card patterns together. Do not rely on file names, document titles, or shallow keywords alone. A word like monthly by itself does not mean Pricing. Avoid labels like Sports, Finance, Food, or other broad topic words as top-level section names unless the block is literally a named category section. Prefix 01_, 02_ only when candidate.needsIndex is true. For repeated cards, prefer 2-digit numbering like 01 and 02. Avoid repeating the same broad label for parent and child. If localName looks heuristic or weak, replace it with a better role-based label instead of preserving it. When candidate.aiOnlySectionName is true and candidate.currentNameLooksWeak or candidate.localNameLooksWeak is true, ignore those weak names and infer a new section label from the content. Prefer candidate.sectionRoleHint and candidate.sectionNarrative when they are supported by the rest of the payload.",
       aiReasonFallback: "AI 하이브리드 네이밍 기준",
     },
   };
@@ -99,6 +99,12 @@
     ["modal", ["modal", "dialog", "confirm", "cancel", "닫기", "취소", "확인"]],
     ["dashboard", ["dashboard", "analytics", "report", "metric", "chart", "data", "대시보드", "분석", "리포트", "지표", "차트"]],
     ["content", ["content", "body", "copy", "section", "콘텐츠", "본문", "섹션"]],
+  ];
+  const CONTENT_ROLE_TOKEN_ENTRIES = [
+    ["introduction", ["introduction", "intro", "opening", "overview", "about", "hi i am", "hi i'm", "reviewer", "reviewed", "real use", "story"]],
+    ["summary", ["summary", "conclusion", "closing", "wrap up", "takeaway"]],
+    ["faq", ["faq", "frequently asked", "questions"]],
+    ["archive", ["archive", "archiving", "history", "behind the scenes"]],
   ];
   const TOPIC_TOKEN_ENTRIES = [
     [
@@ -289,7 +295,7 @@
 
     try {
       const designReadResult = await readDesignReadCache();
-      const result = await applyRegroupRename(designReadResult, { namingMode });
+      const result = sanitizeRegroupRenameResult(await applyRegroupRename(designReadResult, { namingMode }));
       await writeRegroupRenameCache(result);
 
       figma.ui.postMessage({
@@ -298,7 +304,7 @@
         matchesCurrentSelection: matchesSelectionSignature(result.selectionSignature || runSelectionSignature),
       });
 
-      figma.notify(`리그룹핑/리네이밍 완료 (${result.summary.renameCount}개 이름 정리)`, { timeout: 1800 });
+      figma.notify(buildRegroupRenameToast(result), { timeout: 2200 });
     } catch (error) {
       const message = normalizeErrorMessage(error, "리그룹핑/리네이밍에 실패했습니다.");
 
@@ -313,7 +319,7 @@
   }
 
   async function postCachedRegroupRenameResult() {
-    const result = await readRegroupRenameCache();
+    const result = sanitizeRegroupRenameResult(await readRegroupRenameCache());
 
     figma.ui.postMessage({
       type: "ai-regroup-rename-cache",
@@ -361,6 +367,117 @@
     return result;
   }
 
+  function sanitizeRegroupRenameResult(result) {
+    if (!result || typeof result !== "object") {
+      return null;
+    }
+
+    const summary = result.summary && typeof result.summary === "object" ? result.summary : {};
+    return {
+      version: typeof result.version === "number" ? result.version : PATCH_VERSION,
+      source: typeof result.source === "string" ? result.source : "local-heuristic",
+      namingMode: typeof result.namingMode === "string" ? result.namingMode : resolveNamingMode(activeNamingMode),
+      namingModeLabel: typeof result.namingModeLabel === "string" ? result.namingModeLabel : "",
+      selectionSignature: typeof result.selectionSignature === "string" ? result.selectionSignature : "",
+      processedAt: typeof result.processedAt === "string" ? result.processedAt : new Date().toISOString(),
+      summary: {
+        selectionLabel: typeof summary.selectionLabel === "string" ? summary.selectionLabel : "",
+        contextLabel: typeof summary.contextLabel === "string" ? summary.contextLabel : "",
+        topicLabel: typeof summary.topicLabel === "string" ? summary.topicLabel : "",
+        namingMode: typeof summary.namingMode === "string" ? summary.namingMode : "",
+        namingModeLabel: typeof summary.namingModeLabel === "string" ? summary.namingModeLabel : "",
+        renameCount: Math.max(0, Number(summary.renameCount) || 0),
+        aiRenameCount: Math.max(0, Number(summary.aiRenameCount) || 0),
+        localRenameCount: Math.max(0, Number(summary.localRenameCount) || 0),
+        aiConfigured: summary.aiConfigured === true,
+        aiHelperAvailable: summary.aiHelperAvailable === true,
+        aiCandidateCount: Math.max(0, Number(summary.aiCandidateCount) || 0),
+        aiSuggestionCount: Math.max(0, Number(summary.aiSuggestionCount) || 0),
+        aiFailed: summary.aiFailed === true,
+        aiErrorMessage: typeof summary.aiErrorMessage === "string" ? summary.aiErrorMessage : "",
+        aiFailureType: typeof summary.aiFailureType === "string" ? summary.aiFailureType : "",
+        aiStatusLabel: typeof summary.aiStatusLabel === "string" ? summary.aiStatusLabel : "",
+        regroupCount: Math.max(0, Number(summary.regroupCount) || 0),
+        suggestionCount: Math.max(0, Number(summary.suggestionCount) || 0),
+        skippedCount: Math.max(0, Number(summary.skippedCount) || 0),
+        aiOnlySkippedCount: Math.max(0, Number(summary.aiOnlySkippedCount) || 0),
+      },
+      renamed: sanitizeRegroupRenameEntryList(result.renamed, ["id", "from", "to", "reason", "nameSource"], 24),
+      regrouped: sanitizeRegroupRenameEntryList(result.regrouped, ["id", "name", "parentName", "nodes", "reason"], 12),
+      suggestions: sanitizeRegroupRenameEntryList(result.suggestions, ["name", "parentName", "nodes", "reason"], 12),
+      skipped: sanitizeRegroupRenameEntryList(result.skipped, ["label", "reason", "nameSource"], 12),
+      insights: sanitizeStringList(result.insights, 6),
+    };
+  }
+
+  function sanitizeRegroupRenameEntryList(rows, allowedKeys, limit) {
+    const values = Array.isArray(rows) ? rows : [];
+    const max = typeof limit === "number" && limit > 0 ? limit : values.length;
+    const entries = [];
+    for (const row of values) {
+      if (!row || typeof row !== "object") {
+        continue;
+      }
+
+      const next = {};
+      for (const key of allowedKeys) {
+        if (key === "nodes") {
+          if (Array.isArray(row.nodes)) {
+            next.nodes = row.nodes
+              .map((entry) => {
+                if (entry && typeof entry === "object") {
+                  return {
+                    id: typeof entry.id === "string" ? entry.id : "",
+                    name: typeof entry.name === "string" ? entry.name : "",
+                  };
+                }
+
+                return typeof entry === "string" ? entry : "";
+              })
+              .filter((entry) => {
+                if (typeof entry === "string") {
+                  return !!entry;
+                }
+
+                return !!(entry && (entry.id || entry.name));
+              })
+              .slice(0, 6);
+          }
+          continue;
+        }
+
+        if (typeof row[key] === "string") {
+          next[key] = row[key];
+        }
+      }
+
+      entries.push(next);
+      if (entries.length >= max) {
+        break;
+      }
+    }
+
+    return entries;
+  }
+
+  function sanitizeStringList(values, limit) {
+    const rows = Array.isArray(values) ? values : [];
+    const max = typeof limit === "number" && limit > 0 ? limit : rows.length;
+    const items = [];
+    for (const value of rows) {
+      if (typeof value !== "string" || !value) {
+        continue;
+      }
+
+      items.push(value);
+      if (items.length >= max) {
+        break;
+      }
+    }
+
+    return items;
+  }
+
   function matchesCurrentSelection(result) {
     return !!result && result.selectionSignature === getSelectionSignature(figma.currentPage.selection);
   }
@@ -375,16 +492,21 @@
       throw new Error("프레임, 그룹, 레이어를 먼저 선택하세요.");
     }
 
+    const selectionIds = selection.map((node) => node.id);
     const context = buildSelectionContext(selection, designReadResult, options);
     const renameResult = await applyRenamePlan(selection, context);
-    const regroupResult = applyRegroupPlan(selection, context);
-    const suggestionResult = buildRegroupSuggestions(selection, regroupResult.usedNodeIds, context);
+    const refreshedSelection = resolveNodeListByIds(selectionIds);
+    const regroupResult = applyRegroupPlan(refreshedSelection, context);
+    const suggestionResult = buildRegroupSuggestions(refreshedSelection, regroupResult.usedNodeIds, context);
     const skippedCount = renameResult.skipped.length + regroupResult.skipped.length;
     const insights = buildInsights(context, renameResult, regroupResult, suggestionResult);
+    const aiRenameCount = renameResult.aiAppliedCount || 0;
+    const localRenameCount = renameResult.localAppliedCount || 0;
+    const aiStatusLabel = buildAiRenameStatusLabel(renameResult);
 
     return {
       version: PATCH_VERSION,
-      source: "local-heuristic",
+      source: aiRenameCount > 0 ? (localRenameCount > 0 ? "mixed" : "ai") : "local-heuristic",
       namingMode: context.namingMode,
       namingModeLabel: context.namingModeLabel,
       selectionSignature: getSelectionSignature(selection),
@@ -396,9 +518,20 @@
         namingMode: context.namingMode,
         namingModeLabel: context.namingModeLabel,
         renameCount: renameResult.applied.length,
+        aiRenameCount,
+        localRenameCount,
+        aiConfigured: renameResult.aiConfigured === true,
+        aiHelperAvailable: renameResult.aiHelperAvailable === true,
+        aiCandidateCount: renameResult.aiCandidateCount || 0,
+        aiSuggestionCount: renameResult.aiSuggestionCount || 0,
+        aiFailed: renameResult.aiFailed === true,
+        aiErrorMessage: renameResult.aiErrorMessage || "",
+        aiFailureType: renameResult.aiFailureType || "",
+        aiStatusLabel,
         regroupCount: regroupResult.applied.length,
         suggestionCount: suggestionResult.length,
         skippedCount,
+        aiOnlySkippedCount: renameResult.aiOnlySkippedCount || 0,
       },
       renamed: renameResult.applied.slice(0, 24),
       regrouped: regroupResult.applied.slice(0, 12),
@@ -441,9 +574,12 @@
         contextLabel,
         contextSlug: deriveContextSlug(contextLabel),
         contentSummary,
+        selectionTextSamples: textSamples.slice(0, 16),
         topicSlug,
         topicLabel,
         paletteHints,
+        selectedRootIds: selection.map((node) => node.id),
+        selectedRootCount: selection.length,
         preservedRootId: preservedRoot ? preservedRoot.id : "",
         preservedRootName: preservedRoot ? safeName(preservedRoot) : "",
         namingMode,
@@ -459,9 +595,12 @@
       contextLabel,
       contextSlug: deriveContextSlug(contextLabel),
       contentSummary,
+      selectionTextSamples: textSamples.slice(0, 16),
       topicSlug,
       topicLabel,
       paletteHints,
+      selectedRootIds: selection.map((node) => node.id),
+      selectedRootCount: selection.length,
       preservedRootId: preservedRoot ? preservedRoot.id : "",
       preservedRootName: preservedRoot ? safeName(preservedRoot) : "",
       namingMode,
@@ -594,6 +733,16 @@
     const parentNameCounts = new Map();
     const applied = [];
     const skipped = [];
+    let aiAppliedCount = 0;
+    let localAppliedCount = 0;
+    let aiOnlySkippedCount = 0;
+    let aiHelperAvailable = false;
+    let aiConfigured = false;
+    let aiCandidateCount = 0;
+    let aiSuggestionCount = 0;
+    let aiFailed = false;
+    let aiErrorMessage = "";
+    let aiFailureType = "";
     const parentGroups = [];
 
     for (const node of allNodes) {
@@ -623,14 +772,50 @@
       for (const node of nodes) {
         const currentName = safeName(node);
         const currentKey = canonicalizeName(currentName);
+        const useHybridDisplayName = shouldUseHybridDisplayName(node, context);
+        const majorSection = isMajorHybridSection(node, context);
         const textHint = getPrimaryTextHint(node);
-        const baseName = proposeNodeName(node, context);
+        const sectionSlug = detectSectionSlug(node, context);
+        const contentSlug = resolveContentSlug(node, textHint, context);
+        const topicSlug = detectTopicSlug(node, context, textHint);
+        const semanticSlug = contentSlug || topicSlug || sectionSlug || context.contextSlug || "content";
+        const groupRole = hasChildren(node) ? inferGroupRole(node, semanticSlug) : "";
+        const repeatRole = describeRepeatableRole(node, context, {
+          textHint: textHint,
+          sectionSlug: sectionSlug,
+          contentSlug: contentSlug,
+          topicSlug: topicSlug,
+          groupRole: groupRole,
+          majorSection: majorSection,
+        });
+        const candidateNameMode = resolveCandidateNameMode(context, useHybridDisplayName, majorSection, repeatRole);
+        const baseName = proposeNodeName(node, context, {
+          textHint: textHint,
+          sectionSlug: sectionSlug,
+          contentSlug: contentSlug,
+          topicSlug: topicSlug,
+          groupRole: groupRole,
+          repeatRole: repeatRole,
+          majorSection: majorSection,
+        });
         const duplicateCount = counts.get(currentKey) || 0;
+        const currentNameSafeDisplay = candidateNameMode === "display" ? isSafeLocalDisplayFallback(currentName, node, context) : false;
+        const baseNameSafeDisplay = candidateNameMode === "display" ? isSafeLocalDisplayFallback(baseName, node, context) : false;
+        const baseNameSemanticallyWeak = baseName ? isSemanticallyWeakCurrentName(baseName, node, context) : true;
+        const forceAiRename = shouldAlwaysEvaluateHybridDisplayName(node, context, useHybridDisplayName, majorSection);
+        const weakHybridDisplayName =
+          resolveNamingMode(context.namingMode) === "hybrid" &&
+          candidateNameMode === "display" &&
+          (!currentNameSafeDisplay || hasRedundantHybridParentLabel(currentName, safeName(node.parent)));
+        const semanticWeakCurrentName = isSemanticallyWeakCurrentName(currentName, node, context);
         const shouldRename =
+          forceAiRename ||
           isSuspiciousName(currentName, node.type) ||
           duplicateCount > 1 ||
-          !isStructuredNameForMode(currentName, context.namingMode);
-        const preserveRootName = context.preservedRootId && node.id === context.preservedRootId;
+          semanticWeakCurrentName ||
+          !isStructuredNameForMode(currentName, context.namingMode) ||
+          weakHybridDisplayName;
+        const preserveRootName = shouldPreserveRootName(node, context, currentName);
 
         if (preserveRootName) {
           usedNames.add(currentKey);
@@ -648,21 +833,62 @@
           continue;
         }
 
+        const majorSectionSiblings = majorSection ? getMajorHybridSectionSiblings(node, context) : [];
+        const majorSectionOrder = majorSection ? majorSectionSiblings.findIndex((entry) => entry && entry.id === node.id) + 1 : 0;
+        const deepTextSamples = collectNodeTexts(node, 8, 4).slice(0, 8);
+        const aiOnlySectionName = useHybridDisplayName && majorSection;
+        const sectionRoleAnalysis =
+          useHybridDisplayName && hasChildren(node)
+            ? analyzeSectionRole(node, context, {
+                textHint,
+              })
+            : null;
         candidates.push({
-          node,
+          nodeId: node.id,
           currentName,
           baseName,
           reason: buildRenameReason(node, context),
           parentName: safeName(node.parent),
           type: String(node.type || "UNKNOWN"),
+          namingMode: context.namingMode,
           textHint,
-          textSamples: collectNodeTexts(node, 3, 2).slice(0, 3),
+          textSamples: deepTextSamples.slice(0, 3),
+          deepTextSamples,
+          headingTexts: collectProminentTexts(node, 3),
+          actionTexts: collectActionTexts(node, 3),
+          contentDigest: buildNodeContentDigest(node, context),
+          sectionNarrative: sectionRoleAnalysis ? sectionRoleAnalysis.summary : "",
+          sectionRoleHint: sectionRoleAnalysis ? sectionRoleAnalysis.role : "",
+          sectionRoleReason: sectionRoleAnalysis ? sectionRoleAnalysis.reason : "",
           topicHint: formatTopicLabel(detectTopicSlug(node, context, textHint)),
           colorHint: getNodeColorHint(node),
           imageRole: isImageLikeNode(node) ? detectImageRole(node) : "",
           hasImageFill: hasImageFill(node),
+          allowAiOverride: true,
+          nameMode: candidateNameMode,
+          aiOnlySectionName,
+          localFallbackAllowed: !aiOnlySectionName || isSafeLocalDisplayFallback(baseName, node, context),
+          majorSection: majorSection,
+          majorSectionOrder: majorSectionOrder,
+          majorSectionCount: majorSectionSiblings.length,
+          needsIndex: shouldPrefixHybridDisplayOrdinal(node, context),
+          positionHint: describeNodeSectionPosition(node, context),
+          siblingContext: buildSiblingContentContext(node, context),
+          currentNameSafeDisplay: currentNameSafeDisplay,
+          baseNameSafeDisplay: baseNameSafeDisplay,
+          currentNameSemanticallyWeak: semanticWeakCurrentName,
+          baseNameSemanticallyWeak: baseNameSemanticallyWeak,
+          looksLikePricing: looksLikePricingSection(node),
+          bounds: snapshotNodeBounds(node),
+          sectionSlug: sectionSlug,
+          contentSlug: contentSlug,
+          topicSlug: topicSlug,
+          groupRole: groupRole,
+          repeatRole: repeatRole,
         });
       }
+
+      applySiblingClusterNaming(candidates);
 
       parentGroups.push({
         usedNames,
@@ -670,28 +896,65 @@
       });
     }
 
-    const aiRenameMap = await requestAiRenameSuggestions(parentGroups, context);
+    const aiRenameResult = await requestAiRenameSuggestions(parentGroups, context);
+    const aiRenameMap = aiRenameResult && aiRenameResult.map instanceof Map ? aiRenameResult.map : new Map();
+    aiHelperAvailable = !!(aiRenameResult && aiRenameResult.helperAvailable);
+    aiConfigured = !!(aiRenameResult && aiRenameResult.configured);
+    aiCandidateCount = Math.max(0, Number(aiRenameResult && aiRenameResult.candidateCount) || 0);
+    aiSuggestionCount = Math.max(0, Number(aiRenameResult && aiRenameResult.suggestionCount) || 0);
+    aiFailed = !!(aiRenameResult && aiRenameResult.failed);
+    aiErrorMessage = typeof (aiRenameResult && aiRenameResult.errorMessage) === "string" ? aiRenameResult.errorMessage.trim() : "";
+    aiFailureType = typeof (aiRenameResult && aiRenameResult.failureType) === "string" ? aiRenameResult.failureType.trim() : "";
 
     for (const group of parentGroups) {
       const usedNames = group.usedNames;
       const candidates = group.candidates;
       for (const candidate of candidates) {
-        const aiSuggestion = aiRenameMap.get(candidate.node.id);
-        const nextBaseName = aiSuggestion && aiSuggestion.name ? aiSuggestion.name : candidate.baseName;
-        const nextReason = aiSuggestion && aiSuggestion.reason ? aiSuggestion.reason : candidate.reason;
+        const aiSuggestion = candidate.allowAiOverride ? aiRenameMap.get(candidate.nodeId) : null;
+        const renameDecision = resolveRenameDecision(candidate, aiSuggestion, aiRenameResult);
+        if (!renameDecision) {
+          usedNames.add(canonicalizeName(candidate.currentName));
+          if (candidate.aiOnlySectionName) {
+            aiOnlySkippedCount += 1;
+            skipped.push({
+              label: candidate.currentName,
+              reason: "AI 대분류 네이밍 결과가 없어 기존 이름을 유지했습니다.",
+              nameSource: "kept",
+            });
+          }
+          continue;
+        }
+        const nextBaseName = renameDecision.name;
+        const nextReason = renameDecision.reason;
         const uniqueName = ensureUniqueName(nextBaseName, usedNames);
         if (!uniqueName || canonicalizeName(uniqueName) === canonicalizeName(candidate.currentName)) {
           continue;
         }
 
         try {
-          candidate.node.name = uniqueName;
+          const liveNode = getNodeByIdSafe(candidate.nodeId);
+          if (!liveNode || !canRenameNode(liveNode)) {
+            skipped.push({
+              label: candidate.currentName,
+              reason: "변경 대상 레이어를 다시 찾지 못해 이름 변경을 건너뛰었습니다.",
+            });
+            usedNames.add(canonicalizeName(candidate.currentName));
+            continue;
+          }
+
+          liveNode.name = uniqueName;
           applied.push({
-            id: candidate.node.id,
+            id: candidate.nodeId,
             from: candidate.currentName,
             to: uniqueName,
             reason: nextReason,
+            nameSource: renameDecision.source,
           });
+          if (renameDecision.source === "ai") {
+            aiAppliedCount += 1;
+          } else {
+            localAppliedCount += 1;
+          }
           usedNames.add(canonicalizeName(uniqueName));
         } catch (error) {
           skipped.push({
@@ -706,13 +969,32 @@
     return {
       applied,
       skipped,
+      aiAppliedCount,
+      localAppliedCount,
+      aiOnlySkippedCount,
+      aiHelperAvailable,
+      aiConfigured,
+      aiCandidateCount,
+      aiSuggestionCount,
+      aiFailed,
+      aiErrorMessage,
+      aiFailureType,
     };
   }
 
   async function requestAiRenameSuggestions(parentGroups, context) {
     const ai = getAiHelper();
     if (!ai) {
-      return new Map();
+      return {
+        map: new Map(),
+        helperAvailable: false,
+        configured: false,
+        candidateCount: 0,
+        suggestionCount: 0,
+        failed: false,
+        errorMessage: "",
+        failureType: "",
+      };
     }
 
     let configured = false;
@@ -723,31 +1005,70 @@
     }
 
     if (!configured) {
-      return new Map();
+      return {
+        map: new Map(),
+        helperAvailable: true,
+        configured: false,
+        candidateCount: 0,
+        suggestionCount: 0,
+        failed: false,
+        errorMessage: "",
+        failureType: "",
+      };
     }
 
     const candidates = [];
     for (const group of parentGroups) {
       const items = group && Array.isArray(group.candidates) ? group.candidates : [];
       for (const candidate of items) {
+        if (candidate.allowAiOverride === false) {
+          continue;
+        }
+
         candidates.push({
-          id: candidate.node.id,
-          currentName: candidate.currentName,
-          localName: candidate.baseName,
+          id: candidate.nodeId,
+          currentName: candidate.aiOnlySectionName && candidate.currentNameSafeDisplay !== true ? "" : candidate.currentName,
+          localName: candidate.aiOnlySectionName && candidate.baseNameSafeDisplay !== true ? "" : candidate.baseName,
           nodeType: candidate.type,
           parentName: candidate.parentName,
+          currentNameLooksWeak: candidate.aiOnlySectionName ? candidate.currentNameSafeDisplay !== true || candidate.currentNameSemanticallyWeak === true : false,
+          localNameLooksWeak: candidate.aiOnlySectionName ? candidate.baseNameSafeDisplay !== true || candidate.baseNameSemanticallyWeak === true : false,
           textHint: candidate.textHint,
           textSamples: candidate.textSamples,
+          deepTextSamples: Array.isArray(candidate.deepTextSamples) ? candidate.deepTextSamples.slice(0, 4) : [],
+          headingTexts: Array.isArray(candidate.headingTexts) ? candidate.headingTexts.slice(0, 2) : [],
+          actionTexts: Array.isArray(candidate.actionTexts) ? candidate.actionTexts.slice(0, 2) : [],
+          contentDigest: candidate.contentDigest,
+          sectionNarrative: candidate.sectionNarrative,
+          sectionRoleHint: candidate.sectionRoleHint,
+          sectionRoleReason: candidate.sectionRoleReason,
           topicHint: candidate.topicHint,
           colorHint: candidate.colorHint,
           imageRole: candidate.imageRole,
           hasImageFill: candidate.hasImageFill,
+          nameMode: candidate.nameMode,
+          aiOnlySectionName: candidate.aiOnlySectionName,
+          majorSection: candidate.majorSection,
+          majorSectionOrder: candidate.majorSectionOrder,
+          majorSectionCount: candidate.majorSectionCount,
+          needsIndex: candidate.needsIndex,
+          positionHint: candidate.positionHint,
+          siblingContext: candidate.siblingContext,
         });
       }
     }
 
     if (!candidates.length) {
-      return new Map();
+      return {
+        map: new Map(),
+        helperAvailable: true,
+        configured: true,
+        candidateCount: 0,
+        suggestionCount: 0,
+        failed: false,
+        errorMessage: "",
+        failureType: "",
+      };
     }
 
     const schema = {
@@ -778,8 +1099,9 @@
           contextSlug: context.contextSlug,
           topicLabel: context.topicLabel,
           contentSummary: context.contentSummary,
+          selectionTextSamples: context.selectionTextSamples,
           paletteHints: context.paletteHints,
-          candidates: candidates.slice(0, 36),
+          candidates: candidates.slice(0, 24),
         },
       });
       const map = new Map();
@@ -800,10 +1122,101 @@
         });
       }
 
-      return map;
+      return {
+        map,
+        helperAvailable: true,
+        configured: true,
+        candidateCount: candidates.length,
+        suggestionCount: map.size,
+        failed: false,
+        errorMessage: "",
+        failureType: "",
+      };
     } catch (error) {
-      return new Map();
+      const errorMessage = normalizeAiRequestError(ai, error, "AI 대분류 네이밍 호출에 실패했습니다.");
+      const failureType =
+        error && typeof error === "object" && typeof error.pigmaAiFailureType === "string"
+          ? String(error.pigmaAiFailureType).trim()
+          : "";
+      return {
+        map: new Map(),
+        helperAvailable: true,
+        configured: true,
+        candidateCount: candidates.length,
+        suggestionCount: 0,
+        failed: true,
+        errorMessage,
+        failureType,
+      };
     }
+  }
+
+  function buildAiRenameStatusLabel(renameResult) {
+    if (!renameResult || typeof renameResult !== "object") {
+      return "AI 상태 알 수 없음";
+    }
+
+    if (renameResult.aiFailed === true) {
+      return "AI 오류";
+    }
+
+    if (renameResult.aiHelperAvailable !== true) {
+      return "AI helper 없음";
+    }
+
+    if (renameResult.aiConfigured !== true) {
+      return "AI 비활성";
+    }
+
+    if ((renameResult.aiCandidateCount || 0) <= 0) {
+      return "AI 후보 없음";
+    }
+
+    if ((renameResult.aiSuggestionCount || 0) <= 0) {
+      return "AI 응답 없음";
+    }
+
+    if ((renameResult.aiAppliedCount || 0) <= 0) {
+      return "AI 미적용";
+    }
+
+    return "AI 적용";
+  }
+
+  function normalizeAiRequestError(ai, error, fallback) {
+    if (ai && typeof ai.normalizeErrorMessage === "function") {
+      const normalized = ai.normalizeErrorMessage(error, fallback);
+      if (typeof normalized === "string" && normalized.trim()) {
+        return normalized.trim();
+      }
+    }
+
+    return normalizeErrorMessage(error, fallback);
+  }
+
+  function compactAiErrorMessage(message, limit) {
+    const normalized = String(message || "").replace(/\s+/g, " ").trim();
+    if (!normalized) {
+      return "";
+    }
+
+    const max = typeof limit === "number" && limit > 0 ? limit : 48;
+    return normalized.length > max ? `${normalized.slice(0, max - 3)}...` : normalized;
+  }
+
+  function buildRegroupRenameToast(result) {
+    const summary = (result && result.summary) || {};
+    const parts = [`${summary.renameCount || 0}개 이름 정리`, `AI ${summary.aiRenameCount || 0}`, `Local ${summary.localRenameCount || 0}`];
+    if (summary.aiStatusLabel) {
+      parts.push(summary.aiStatusLabel);
+    }
+    if (summary.aiFailed === true) {
+      const errorLabel = compactAiErrorMessage(summary.aiErrorMessage || summary.aiFailureType || "", 34);
+      if (errorLabel) {
+        parts.push(errorLabel);
+      }
+    }
+    return `리그룹핑/리네이밍 완료 (${parts.join(" · ")})`;
   }
 
   function applySafeRegroup(selection, context) {
@@ -818,7 +1231,7 @@
         try {
           const group = figma.group([pair.icon, pair.label], parent);
           const groupName = ensureUniqueName(
-            buildGroupName(pair.label, context),
+            buildGroupName(group, pair.label, context),
             collectSiblingNameSet(parent, group)
           );
           group.name = groupName;
@@ -880,7 +1293,7 @@
 
         try {
           const group = figma.group(nodes, parent);
-          const groupName = ensureUniqueName(suggestion.name, collectSiblingNameSet(parent, group));
+          const groupName = ensureUniqueName(buildSuggestedTextBlockName(group, nodes[0], nodes[1], context), collectSiblingNameSet(parent, group));
           group.name = groupName;
           applied.push({
             id: group.id,
@@ -1046,22 +1459,294 @@
     return typeof node.name === "string";
   }
 
-  function proposeNodeName(node, context) {
+  function shouldPreserveRootName(node, context, currentName) {
+    if (!context || !context.preservedRootId || !node || node.id !== context.preservedRootId) {
+      return false;
+    }
+
+    if (shouldAlwaysEvaluateHybridDisplayName(node, context)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  function shouldAlwaysEvaluateHybridDisplayName(node, context, knownUseHybridDisplayName, knownMajorSection) {
+    if (resolveNamingMode(context && context.namingMode) !== "hybrid") {
+      return false;
+    }
+
+    if (!node || !context) {
+      return false;
+    }
+
+    const useHybridDisplayName =
+      typeof knownUseHybridDisplayName === "boolean"
+        ? knownUseHybridDisplayName
+        : shouldUseHybridDisplayName(node, context);
+    if (!useHybridDisplayName) {
+      return false;
+    }
+
+    const majorSection =
+      typeof knownMajorSection === "boolean" ? knownMajorSection : isMajorHybridSection(node, context);
+    return !!majorSection;
+  }
+
+  function resolveRenameDecision(candidate, aiSuggestion, aiResult) {
+    const hasAiSuggestion =
+      !!(aiSuggestion && aiSuggestion.name) && !isInvalidAiDisplaySuggestion(aiSuggestion.name, candidate);
+    if (hasAiSuggestion) {
+      return {
+        name: aiSuggestion.name,
+        reason: aiSuggestion.reason || candidate.reason,
+        source: "ai",
+      };
+    }
+
+    if (candidate && candidate.aiOnlySectionName) {
+      const safeCurrentName = candidate.currentName && candidate.currentNameSafeDisplay === true && candidate.currentNameSemanticallyWeak !== true;
+      const safeLocalBaseName = candidate.baseName && candidate.baseNameSafeDisplay === true && candidate.baseNameSemanticallyWeak !== true;
+
+      if (
+        safeLocalBaseName &&
+        canonicalizeName(candidate.baseName) !== canonicalizeName(candidate.currentName)
+      ) {
+        return {
+          name: candidate.baseName,
+          reason: buildAiSectionFallbackReason(aiResult),
+          source: "local",
+        };
+      }
+
+      if (safeCurrentName) {
+        return null;
+      }
+
+      const safeSectionName = buildSafeAiSectionFallbackName(candidate);
+      if (!safeSectionName) {
+        return null;
+      }
+
+      return {
+        name: safeSectionName,
+        reason: buildAiSectionFallbackReason(aiResult),
+        source: "local",
+      };
+    }
+
+    if (!candidate || !candidate.baseName) {
+      return null;
+    }
+
+    return {
+      name: candidate.baseName,
+      reason: candidate.reason,
+      source: "local",
+    };
+  }
+
+  function buildSafeAiSectionFallbackName(candidate) {
+    if (!candidate || !candidate.aiOnlySectionName) {
+      return candidate && candidate.baseName ? candidate.baseName : "";
+    }
+
+    if (candidate.baseName && candidate.baseNameSafeDisplay === true && candidate.baseNameSemanticallyWeak !== true) {
+      return candidate.baseName;
+    }
+
+    const ordinal =
+      candidate.needsIndex && Number(candidate.majorSectionOrder) > 0
+        ? String(candidate.majorSectionOrder).padStart(2, "0") + "_"
+        : "";
+    return `${ordinal}Content`;
+  }
+
+  function buildAiSectionFallbackReason(aiResult) {
+    if (aiResult && aiResult.failed) {
+      return "AI 오류로 안전한 번호형 대분류 기본값을 사용했습니다.";
+    }
+
+    if (aiResult && aiResult.configured !== true) {
+      return "AI 비활성 상태라 안전한 번호형 대분류 기본값을 사용했습니다.";
+    }
+
+    return "AI 대분류 네이밍 응답이 없어 안전한 번호형 기본값을 사용했습니다.";
+  }
+
+  function isInvalidAiDisplaySuggestion(name, candidate) {
+    if (!candidate || !candidate.aiOnlySectionName) {
+      return false;
+    }
+
+    const normalized = String(name || "").trim().replace(/^\d{2}_/, "");
+    const slug = slugifyAsciiToken(normalized);
+    if (!slug) {
+      return true;
+    }
+
+    if (isWeakHybridDisplayName(normalized)) {
+      return true;
+    }
+
+    if (slug === "pricing" && candidate.looksLikePricing !== true) {
+      return true;
+    }
+
+    return false;
+  }
+
+  function isSafeLocalDisplayFallback(name, node, context) {
+    const normalized = String(name || "").trim();
+    if (!normalized) {
+      return false;
+    }
+
+    if (normalized.includes("/")) {
+      return false;
+    }
+
+    if (isWeakHybridDisplayName(normalized)) {
+      return false;
+    }
+
+    const slug = slugifyAsciiToken(normalized.replace(/^\d{2}_/, "").trim());
+    if (!slug) {
+      return false;
+    }
+
+    if (slug === "pricing" && node && !looksLikePricingSection(node)) {
+      return false;
+    }
+
+    if (slug === "navigation" && node && !looksLikeNavigationBar(node)) {
+      return false;
+    }
+
+    if ((slug === "outro" || looksLikeClosingDisplaySlug(slug)) && node && !looksLikeOutroSection(node)) {
+      return false;
+    }
+
+    if (slug === "key-visual" && node && !looksLikeKeyVisualSection(node, context)) {
+      return false;
+    }
+
+    if (slug === "introduction" && node && looksLikeCompositeContentWrapper(node)) {
+      return false;
+    }
+
+    if (
+      slug === "introduction" &&
+      node &&
+      isMajorHybridSection(node, context) &&
+      getHybridDisplayOrdinal(node, context) === "01" &&
+      looksLikeKeyVisualSection(node, context)
+    ) {
+      return false;
+    }
+
+    return true;
+  }
+
+  function looksLikeClosingDisplaySlug(slug) {
+    return /(?:^|-)closing(?:-|$)|(?:^|-)summary(?:-|$)|(?:^|-)conclusion(?:-|$)|(?:^|-)takeaway(?:-|$)/.test(
+      String(slug || "")
+    );
+  }
+
+  function isSemanticallyWeakCurrentName(name, node, context) {
+    const normalized = String(name || "").trim();
+    if (!normalized) {
+      return true;
+    }
+
+    const slug = slugifyAsciiToken(normalized.replace(/^\d{2}_/, "").replace(/[/.]+/g, " "));
+    const segments = normalized
+      .replace(/^\d{2}_/, "")
+      .split(/[/.]+/)
+      .map((segment) => slugifyAsciiToken(segment))
+      .filter(Boolean);
+
+    if (segments.some((segment) => segment === "field" || segment === "input" || segment === "field-label")) {
+      return !isFieldSemanticNode(node);
+    }
+
+    if (segments.some((segment) => segment === "button" || segment === "cta" || segment === "button-label")) {
+      return !isButtonSemanticNode(node);
+    }
+
+    if (segments.some((segment) => segment === "navbar" || segment === "navigation" || segment === "menu")) {
+      return !looksLikeNavigationBar(node);
+    }
+
+    if (
+      segments.some((segment) => segment === "outro" || segment === "footer" || segment === "closing" || segment === "summary") ||
+      looksLikeClosingDisplaySlug(slug)
+    ) {
+      return !looksLikeOutroSection(node);
+    }
+
+    if (segments.some((segment) => segment === "hero" || segment === "key-visual" || segment === "kv") || slug === "key-visual") {
+      return !looksLikeKeyVisualSection(node, context);
+    }
+
+    if (
+      slug === "introduction" &&
+      isMajorHybridSection(node, context) &&
+      getHybridDisplayOrdinal(node, context) === "01" &&
+      looksLikeKeyVisualSection(node, context)
+    ) {
+      return true;
+    }
+
+    return false;
+  }
+
+  function proposeNodeName(node, context, hints) {
     const type = String(node.type || "UNKNOWN");
-    const textHint = getPrimaryTextHint(node);
-    const sectionSlug = detectSectionSlug(node, context);
-    const contentSlug = resolveContentSlug(node, textHint, context);
-    const topicSlug = detectTopicSlug(node, context, textHint);
+    const textHint = hints && typeof hints.textHint === "string" ? hints.textHint : getPrimaryTextHint(node);
+    const sectionSlug = hints && hints.sectionSlug ? hints.sectionSlug : detectSectionSlug(node, context);
+    const contentSlug = hints && hints.contentSlug ? hints.contentSlug : resolveContentSlug(node, textHint, context);
+    const topicSlug = hints && hints.topicSlug ? hints.topicSlug : detectTopicSlug(node, context, textHint);
+    const semanticSlug = contentSlug || topicSlug || sectionSlug || (context && context.contextSlug) || "content";
+    const groupRole = hints && hints.groupRole ? hints.groupRole : (hasChildren(node) ? inferGroupRole(node, semanticSlug) : "");
+    const repeatRole =
+      hints && hints.repeatRole
+        ? hints.repeatRole
+        : describeRepeatableRole(node, context, {
+            textHint: textHint,
+            sectionSlug: sectionSlug,
+            contentSlug: contentSlug,
+            topicSlug: topicSlug,
+            groupRole: groupRole,
+          });
+
+    if (resolveNamingMode(context.namingMode) === "hybrid" && hints && hints.majorSection === true) {
+      return buildHybridDisplayName(node, context, {
+        textHint,
+        sectionSlug,
+        contentSlug,
+        topicSlug,
+        groupRole,
+        repeatRole,
+      });
+    }
 
     if (type === "TEXT") {
       return buildTextNodeName(node, textHint, sectionSlug, contentSlug, topicSlug, context);
     }
 
     if (isButtonContainer(node)) {
+      if (resolveNamingMode(context.namingMode) === "hybrid") {
+        return `CTA ${humanizeHybridSegment(detectButtonVariant(node) || "primary")}`;
+      }
       return buildStructuredName(context.namingMode, "button", detectButtonVariant(node), findActionSlug(node) || contentSlug || "action");
     }
 
     if (isFieldContainer(node)) {
+      if (resolveNamingMode(context.namingMode) === "hybrid") {
+        return "Input";
+      }
       return buildStructuredName(context.namingMode, "field", findFieldLabel(node) || contentSlug || "input", "input");
     }
 
@@ -1070,15 +1755,28 @@
     }
 
     if (isIconLikeNode(node)) {
+      if (resolveNamingMode(context.namingMode) === "hybrid") {
+        return "Icon";
+      }
       return buildStructuredName(context.namingMode, "icon", findActionSlug(node) || contentSlug || sectionSlug || "glyph");
     }
 
     if (hasChildren(node)) {
-      return buildContainerName(node, context, sectionSlug, contentSlug, topicSlug);
+      return buildContainerName(node, context, sectionSlug, contentSlug, topicSlug, {
+        groupRole: groupRole,
+        repeatRole: repeatRole,
+      });
     }
 
     if (VECTOR_TYPES.has(type)) {
+      if (resolveNamingMode(context.namingMode) === "hybrid") {
+        return "Shape";
+      }
       return buildStructuredName(context.namingMode, "shape", contentSlug || topicSlug || "vector");
+    }
+
+    if (resolveNamingMode(context.namingMode) === "hybrid") {
+      return "Layer";
     }
 
     return buildStructuredName(context.namingMode, "layer", typePrefix(type), contentSlug || topicSlug || sectionSlug || "item");
@@ -1087,6 +1785,10 @@
   function buildTextNodeName(node, textHint, sectionSlug, contentSlug, topicSlug, context) {
     const text = textHint || getTextValue(node);
     const semanticSlug = contentSlug || topicSlug || sectionSlug || context.contextSlug || "content";
+    if (resolveNamingMode(context.namingMode) === "hybrid") {
+      return buildHybridTextAtomName(node, text, sectionSlug, contentSlug, topicSlug, context);
+    }
+
     if (!text) {
       return buildStructuredName(context.namingMode, "text", "body", sectionSlug || topicSlug || "content", "copy");
     }
@@ -1118,6 +1820,10 @@
   }
 
   function buildRenameReason(node, context) {
+    if (shouldUseHybridDisplayName(node, context)) {
+      return "디자인 영역 역할 기준";
+    }
+
     if (String(node.type || "") === "TEXT") {
       return "웹 구조형 텍스트 역할 기준";
     }
@@ -1137,10 +1843,30 @@
     return "웹 호환 구조형 네이밍 기준";
   }
 
-  function buildContainerName(node, context, sectionSlug, contentSlug, topicSlug) {
+  function buildContainerName(node, context, sectionSlug, contentSlug, topicSlug, hints) {
     const resolvedSection = sectionSlug || context.contextSlug || topicSlug || "content";
     const semanticSlug = contentSlug || topicSlug || "item";
-    const groupRole = inferGroupRole(node, semanticSlug);
+    const groupRole = hints && hints.groupRole ? hints.groupRole : inferGroupRole(node, semanticSlug);
+    const repeatRole =
+      hints && hints.repeatRole
+        ? hints.repeatRole
+        : describeRepeatableRole(node, context, {
+            sectionSlug: sectionSlug,
+            contentSlug: contentSlug,
+            topicSlug: topicSlug,
+            groupRole: groupRole,
+          });
+
+    if (repeatRole && Array.isArray(repeatRole.webSegments) && repeatRole.webSegments.length > 0) {
+      return resolveNamingMode(context.namingMode) === "hybrid" ? repeatRole.hybridLabel : buildStructuredNameFromSegments(context.namingMode, repeatRole.webSegments);
+    }
+
+    if (resolveNamingMode(context.namingMode) === "hybrid") {
+      const hybridScopeName = buildHybridScopeContainerName(sectionSlug, contentSlug, topicSlug, groupRole);
+      if (hybridScopeName) {
+        return hybridScopeName;
+      }
+    }
 
     if (isCardLikeNode(node)) {
       return buildStructuredName(context.namingMode, "card", resolvedSection, semanticSlug);
@@ -1157,9 +1883,1216 @@
     return buildStructuredName(context.namingMode, "container", resolvedSection, groupRole, topicSlug || "");
   }
 
+  function buildHybridScopeContainerName(sectionSlug, contentSlug, topicSlug, groupRole) {
+    const scopeSlug = slugifyAsciiToken(sectionSlug || contentSlug || topicSlug);
+    const roleSlug = slugifyAsciiToken(groupRole);
+    if (!scopeSlug || !roleSlug) {
+      return "";
+    }
+
+    if (GENERIC_TOKEN_SET.has(scopeSlug) && GENERIC_TOKEN_SET.has(roleSlug)) {
+      return "";
+    }
+
+    if (roleSlug === "copy" || roleSlug === "media" || roleSlug === "list" || roleSlug === "actions" || roleSlug === "item") {
+      return buildStructuredName("hybrid", scopeSlug, roleSlug === "actions" ? "actions" : roleSlug);
+    }
+
+    if (scopeSlug === "hero" && roleSlug === "content") {
+      return "Hero/Copy";
+    }
+
+    return "";
+  }
+
+  function buildHybridTextAtomName(node, text, sectionSlug, contentSlug, topicSlug, context) {
+    const normalizedText = compactText(text);
+    if (!normalizedText) {
+      return "Body";
+    }
+
+    if (looksLikePriceText(normalizedText)) {
+      return "Price";
+    }
+
+    if (looksLikeBadgeTextNode(node, normalizedText)) {
+      return "Badge";
+    }
+
+    const actionSlug = findActionSlugFromText(normalizedText);
+    if (actionSlug) {
+      return "Label";
+    }
+
+    const fieldLabel = matchFieldLabel(normalizedText);
+    if (fieldLabel) {
+      return "Label";
+    }
+
+    const textRole = detectTextRole(node, normalizedText);
+    if (textRole === "heading" || textRole === "title") {
+      return "Title";
+    }
+
+    if (textRole === "meta") {
+      return "Meta";
+    }
+
+    if (textRole === "label") {
+      if (sectionSlug === "pricing" || contentSlug === "pricing" || topicSlug === "shopping") {
+        return "Price";
+      }
+      return "Label";
+    }
+
+    if (context && context.contextSlug === "hero" && normalizedText.length <= 60) {
+      return "Body";
+    }
+
+    return "Body";
+  }
+
+  function describeRepeatableRole(node, context, hints) {
+    if (!node || !context) {
+      return null;
+    }
+
+    if (hints && hints.majorSection) {
+      return null;
+    }
+
+    if (String(node.type || "") === "TEXT" || isButtonContainer(node) || isFieldContainer(node) || isIconLikeNode(node)) {
+      return null;
+    }
+
+    const textHint = hints && typeof hints.textHint === "string" ? hints.textHint : getPrimaryTextHint(node);
+    const sectionSlug = hints && hints.sectionSlug ? hints.sectionSlug : detectSectionSlug(node, context);
+    const contentSlug = hints && hints.contentSlug ? hints.contentSlug : resolveContentSlug(node, textHint, context);
+    const topicSlug = hints && hints.topicSlug ? hints.topicSlug : detectTopicSlug(node, context, textHint);
+    const semanticSlug = contentSlug || topicSlug || sectionSlug || context.contextSlug || "content";
+    const groupRole = hints && hints.groupRole ? hints.groupRole : (hasChildren(node) ? inferGroupRole(node, semanticSlug) : "");
+    const parent = node.parent;
+
+    if (parent && looksLikeNavigationBar(parent)) {
+      return buildRepeatRole("menu-item", "Menu Item", "Menu", ["group", "navbar", "item"]);
+    }
+
+    if (looksLikeFaqItemNode(node, context, sectionSlug, contentSlug) || (parent && looksLikeFaqSectionNode(parent, context))) {
+      return buildRepeatRole("faq-item", "FAQ Item", "FAQ", ["group", "faq", "item"]);
+    }
+
+    if ((sectionSlug === "pricing" || looksLikePricingCardNode(node, context, sectionSlug, contentSlug)) && (isCardLikeNode(node) || groupRole === "item" || groupRole === "list")) {
+      return buildRepeatRole("pricing-card", "Pricing Card", "Plan", ["card", "pricing"], "display");
+    }
+
+    if (looksLikeProductCardNode(node, context, sectionSlug, contentSlug, topicSlug) && (isCardLikeNode(node) || groupRole === "item" || groupRole === "list")) {
+      return buildRepeatRole("product-card", "Product Card", "Product", ["card", "product"], "display", true);
+    }
+
+    if (sectionSlug === "feature" && (isCardLikeNode(node) || groupRole === "item" || groupRole === "list")) {
+      return buildRepeatRole("feature-card", "Feature Card", "Feature", ["card", "feature"], "display", true);
+    }
+
+    if (sectionSlug === "dashboard" && (isCardLikeNode(node) || groupRole === "item" || groupRole === "list")) {
+      return buildRepeatRole("metric-card", "Metric Card", "Metric", ["card", "metric"], "display", true);
+    }
+
+    if ((contentSlug === "archive" || sectionSlug === "archive") && (isCardLikeNode(node) || groupRole === "item")) {
+      return buildRepeatRole("archive-card", "Archive Card", "Archive", ["card", "archive"], "display", true);
+    }
+
+    if (sectionSlug === "hero" && isCardLikeNode(node)) {
+      return buildRepeatRole("highlight-card", "Highlight Card", "Card", ["card", "highlight"], "display", true);
+    }
+
+    if (isCardLikeNode(node)) {
+      const contextualCardSlug = selectRepeatableContextSlug(sectionSlug, contentSlug, topicSlug, context);
+      if (contextualCardSlug) {
+        return buildRepeatRole(
+          "card:" + contextualCardSlug,
+          joinHybridDisplayParts(buildHybridRoleLabel(contextualCardSlug), "Card"),
+          "Card",
+          ["card", contextualCardSlug],
+          "display"
+        );
+      }
+    }
+
+    if (groupRole === "item" || groupRole === "list") {
+      const contextualItemSlug = selectRepeatableContextSlug(sectionSlug, contentSlug, topicSlug, context);
+      if (contextualItemSlug) {
+        return buildRepeatRole(
+          "item:" + contextualItemSlug,
+          joinHybridDisplayParts(buildHybridRoleLabel(contextualItemSlug), "Item"),
+          contextualItemSlug === "navbar" ? "Menu" : "Item",
+          ["group", contextualItemSlug, "item"]
+        );
+      }
+    }
+
+    return null;
+  }
+
+  function resolveCandidateNameMode(context, useHybridDisplayName, majorSection, repeatRole) {
+    if (resolveNamingMode(context && context.namingMode) !== "hybrid") {
+      return "structured";
+    }
+
+    if (!useHybridDisplayName) {
+      return "structured";
+    }
+
+    if (majorSection) {
+      return "display";
+    }
+
+    if (repeatRole && repeatRole.preferredMode === "display") {
+      return "display";
+    }
+
+    return "structured";
+  }
+
+  function buildRepeatRole(familyKey, hybridLabel, hybridSuffix, webSegments, preferredMode, preferIndex) {
+    return {
+      familyKey: familyKey,
+      hybridLabel: hybridLabel,
+      hybridSuffix: hybridSuffix || "",
+      webSegments: Array.isArray(webSegments) ? webSegments.slice(0, 6) : [],
+      preferredMode: preferredMode === "display" ? "display" : "structured",
+      preferIndex: preferIndex === true,
+    };
+  }
+
+  function selectRepeatableContextSlug(sectionSlug, contentSlug, topicSlug, context) {
+    const values = [contentSlug, sectionSlug, topicSlug, context && context.contextSlug ? context.contextSlug : "", context && context.topicSlug ? context.topicSlug : ""];
+    for (const value of values) {
+      const slug = slugifyAsciiToken(value);
+      if (slug && !GENERIC_TOKEN_SET.has(slug)) {
+        return slug;
+      }
+    }
+
+    return "";
+  }
+
+  function looksLikeFaqSectionNode(node, context) {
+    if (!node || !hasChildren(node)) {
+      return false;
+    }
+
+    const values = collectNodeSemanticValues(node, "", 6, 2);
+    const corpus = values.join(" ").toLowerCase();
+    if (/faq|q&a|questions|question|answer/.test(corpus)) {
+      return true;
+    }
+
+    return !!(context && context.contextSlug === "faq");
+  }
+
+  function looksLikeFaqItemNode(node, context, knownSectionSlug, knownContentSlug) {
+    if (!node || !hasChildren(node)) {
+      return false;
+    }
+
+    if (knownSectionSlug === "faq" || knownContentSlug === "faq") {
+      return true;
+    }
+
+    if (node.parent && looksLikeFaqSectionNode(node.parent, context)) {
+      return true;
+    }
+
+    const texts = collectNodeTexts(node, 4, 2).map((text) => compactText(text)).filter(Boolean);
+    if (texts.length < 2) {
+      return false;
+    }
+
+    const first = texts[0].toLowerCase();
+    if (/^(q|faq|qna)\b/.test(first)) {
+      return true;
+    }
+
+    if (/\?$/.test(texts[0])) {
+      return true;
+    }
+
+    return /question|answer/.test(texts.join(" ").toLowerCase());
+  }
+
+  function looksLikePricingCardNode(node, context, knownSectionSlug, knownContentSlug) {
+    if (!node || !hasChildren(node)) {
+      return false;
+    }
+
+    if (knownSectionSlug === "pricing" || knownContentSlug === "pricing") {
+      return true;
+    }
+
+    if (context && context.contextSlug === "pricing") {
+      return true;
+    }
+
+    return looksLikePricingValueSet(collectNodeTexts(node, 8, 3));
+  }
+
+  function looksLikeProductCardNode(node, context, knownSectionSlug, knownContentSlug, knownTopicSlug) {
+    if (!node || !hasChildren(node)) {
+      return false;
+    }
+
+    if (knownSectionSlug === "shopping" || knownContentSlug === "shopping" || knownTopicSlug === "shopping") {
+      return true;
+    }
+
+    const values = collectNodeSemanticValues(node, "", 6, 2);
+    const corpus = values.join(" ").toLowerCase();
+    if (/product|sku|sale|buy|cart|checkout|shop|shopping|price/.test(corpus)) {
+      return true;
+    }
+
+    const imageCount = countDirectChildrenByPredicate(node, isImageLikeNode);
+    const textCount = countDirectChildrenByType(node, "TEXT");
+    return isCardLikeNode(node) && imageCount >= 1 && textCount >= 1 && !!(context && context.topicSlug === "shopping");
+  }
+
+  function shouldUseHybridDisplayName(node, context) {
+    if (resolveNamingMode(context && context.namingMode) !== "hybrid") {
+      return false;
+    }
+
+    if (!node || node.locked === true || node.visible === false || isInsideInstance(node)) {
+      return false;
+    }
+
+    const type = String(node.type || "");
+    if (type === "TEXT" || isIconLikeNode(node)) {
+      return false;
+    }
+
+    if (isButtonContainer(node) || isFieldContainer(node)) {
+      return true;
+    }
+
+    if (isImageLikeNode(node)) {
+      const bounds = getNodeBounds(node);
+      return !!bounds && (bounds.width >= 120 || bounds.height >= 120);
+    }
+
+    if (isSectionRootLike(node)) {
+      return true;
+    }
+
+    return hasChildren(node) && node.children.length >= 2;
+  }
+
+  function buildHybridDisplayName(node, context, hints) {
+    const label = buildHybridDisplayLabel(node, context, hints);
+    const ordinal = getHybridDisplayOrdinal(node, context);
+    return ordinal ? `${ordinal}_${label}` : label;
+  }
+
+  function buildHybridDisplayLabel(node, context, hints) {
+    const textHint = hints && typeof hints.textHint === "string" ? hints.textHint : getPrimaryTextHint(node);
+    const sectionSlug = hints && hints.sectionSlug ? hints.sectionSlug : detectSectionSlug(node, context);
+    const contentSlug = hints && hints.contentSlug ? hints.contentSlug : resolveContentSlug(node, textHint, context);
+    const topicSlug = hints && hints.topicSlug ? hints.topicSlug : detectTopicSlug(node, context, textHint);
+    const semanticSlug = contentSlug || topicSlug || sectionSlug || (context && context.contextSlug) || "content";
+    const groupRole = hints && hints.groupRole ? hints.groupRole : (hasChildren(node) ? inferGroupRole(node, semanticSlug) : "");
+    const actionSlug = isButtonContainer(node) ? findActionSlug(node) || contentSlug || "action" : "";
+    const fieldSlug = isFieldContainer(node) ? findFieldLabel(node) || contentSlug || "input" : "";
+    const imageRole = isImageLikeNode(node) ? detectImageRole(node) : "";
+    const repeatRole =
+      hints && hints.repeatRole
+        ? hints.repeatRole
+        : describeRepeatableRole(node, context, {
+            textHint: textHint,
+            sectionSlug: sectionSlug,
+            contentSlug: contentSlug,
+            topicSlug: topicSlug,
+            groupRole: groupRole,
+          });
+    const childNodes = hasChildren(node) ? node.children.filter(Boolean) : [];
+    const textCount = childNodes.filter((child) => child.type === "TEXT").length;
+    const imageCount = childNodes.filter((child) => isImageLikeNode(child)).length;
+
+    if (isButtonContainer(node)) {
+      return joinHybridDisplayParts(buildHybridRoleLabel(actionSlug || "action"), "CTA");
+    }
+
+    if (isFieldContainer(node)) {
+      return joinHybridDisplayParts(buildHybridRoleLabel(fieldSlug || "input"), "Input");
+    }
+
+    const explicitLabel = detectExplicitHybridDisplayLabel(node, textHint, sectionSlug, contentSlug, topicSlug, context);
+    if (explicitLabel) {
+      return explicitLabel;
+    }
+
+    if (isMajorHybridSection(node, context)) {
+      return buildMajorHybridSectionLabel(node, context, {
+        sectionSlug,
+        contentSlug,
+        topicSlug,
+        groupRole,
+        imageRole,
+        textCount,
+        imageCount,
+      });
+    }
+
+    if (repeatRole && repeatRole.hybridLabel) {
+      return repeatRole.hybridLabel;
+    }
+
+    if (imageRole === "hero" || sectionSlug === "hero") {
+      if (isImageLikeNode(node) || imageCount > textCount) {
+        return "Key Visual";
+      }
+
+      if (groupRole === "copy" || textCount >= 2) {
+        return "Introduction";
+      }
+    }
+
+    if (looksLikeCompositeContentWrapper(node)) {
+      return "Content";
+    }
+
+    if (sectionSlug === "navbar") {
+      if (!looksLikeNavigationBar(node)) {
+        return "Content";
+      }
+      if (groupRole === "item" && semanticSlug && semanticSlug !== "navbar") {
+        return joinHybridDisplayParts(buildHybridRoleLabel(semanticSlug), "Menu");
+      }
+      return "Navigation";
+    }
+
+    if (sectionSlug === "footer") {
+      return looksLikeOutroSection(node, sectionSlug) ? "Outro" : "Content";
+    }
+
+    if (sectionSlug === "sidebar") {
+      return "Sidebar";
+    }
+
+    if (sectionSlug === "feature") {
+      return groupRole === "list" ? "Feature List" : "Features";
+    }
+
+    if (sectionSlug === "pricing" && looksLikePricingSection(node)) {
+      return "Pricing";
+    }
+
+    if (sectionSlug === "modal") {
+      return "Dialog";
+    }
+
+    if (sectionSlug === "dashboard") {
+      return groupRole === "list" ? "Metric List" : "Metrics";
+    }
+
+    if (imageRole === "avatar") {
+      return "Profile Image";
+    }
+
+    if (imageRole === "thumbnail") {
+      return "Thumbnail";
+    }
+
+    if (imageRole === "poster") {
+      return "Poster";
+    }
+
+    if (imageRole === "illustration") {
+      return "Illustration";
+    }
+
+    if (imageRole === "logo") {
+      return "Logo";
+    }
+
+    if (imageRole === "photo") {
+      return "Photo";
+    }
+
+    if (groupRole === "copy") {
+      return sectionSlug === "hero" ? "Introduction" : joinHybridDisplayParts(buildHybridRoleLabel(semanticSlug), "Copy");
+    }
+
+    if (groupRole === "actions") {
+      return actionSlug ? joinHybridDisplayParts(buildHybridRoleLabel(actionSlug), "Actions") : "Actions";
+    }
+
+    if (groupRole === "list") {
+      return joinHybridDisplayParts(buildHybridRoleLabel(sectionSlug || semanticSlug), "List");
+    }
+
+    if (groupRole === "media") {
+      return "Media";
+    }
+
+    if (topicSlug) {
+      return buildHybridRoleLabel(topicSlug);
+    }
+
+    if (contentSlug && !GENERIC_TOKEN_SET.has(contentSlug)) {
+      return buildHybridRoleLabel(contentSlug);
+    }
+
+    if (sectionSlug && !GENERIC_TOKEN_SET.has(sectionSlug)) {
+      return buildHybridRoleLabel(sectionSlug);
+    }
+
+    return "Content";
+  }
+
+  function buildMajorHybridSectionLabel(node, context, hints) {
+    return mapSectionRoleToDisplayLabel(node, context, analyzeSectionRole(node, context, hints));
+  }
+
+  function analyzeSectionRole(node, context, hints) {
+    const majorSections = getMajorHybridSectionSiblings(node, context);
+    const orderIndex = majorSections.findIndex((entry) => entry && entry.id === node.id);
+    const sectionSlug = hints && hints.sectionSlug ? hints.sectionSlug : detectSectionSlug(node, context);
+    const textHint = hints && typeof hints.textHint === "string" ? hints.textHint : getPrimaryTextHint(node);
+    const contentSlug = hints && hints.contentSlug ? hints.contentSlug : resolveContentSlug(node, textHint, context);
+    const topicSlug = hints && hints.topicSlug ? hints.topicSlug : detectTopicSlug(node, context, textHint);
+    const groupRole = hints && hints.groupRole ? hints.groupRole : inferGroupRole(node, contentSlug || sectionSlug || "content");
+    const imageRole = hints && hints.imageRole ? hints.imageRole : (isImageLikeNode(node) ? detectImageRole(node) : "");
+    const textCount = hints && typeof hints.textCount === "number" ? hints.textCount : countDirectChildrenByType(node, "TEXT");
+    const imageCount =
+      hints && typeof hints.imageCount === "number" ? hints.imageCount : countDirectChildrenByPredicate(node, isImageLikeNode);
+    const headingTexts = hints && Array.isArray(hints.headingTexts) ? hints.headingTexts : collectProminentTexts(node, 3);
+    const actionTexts = hints && Array.isArray(hints.actionTexts) ? hints.actionTexts : collectActionTexts(node, 3);
+    const bodyTexts = collectNodeTexts(node, 6, 3).map((text) => compactText(text)).filter(Boolean);
+    const semanticValues = collectNodeSemanticValues(node, textHint, 8, 3);
+    const corpus = semanticValues.join(" ").toLowerCase();
+    const isFirst = orderIndex === 0;
+    const isLast = orderIndex >= 0 && orderIndex === majorSections.length - 1;
+    const hasKvStructure = looksLikeKeyVisualSection(node, context, sectionSlug);
+    const hasIntroNarrative =
+      contentSlug === "introduction" ||
+      sectionSlug === "hero" ||
+      /intro|introduction|opening|overview|about|story|reviewer|real use|experience/.test(corpus);
+    const hasClosingNarrative =
+      /outro|closing|final|wrap up|thank you|summary|conclusion|takeaway/.test(corpus);
+    const hasFaqNarrative = /faq|q&a|frequently asked|question/.test(corpus);
+    const hasAwardsNarrative = /award|awards|trophy|prize|certified|certification/.test(corpus);
+    const hasArchiveNarrative = /archive|archiving|collection|library|history/.test(corpus);
+
+    let role = "content-section";
+    let reason = "general section";
+
+    if (looksLikeCompositeContentWrapper(node)) {
+      role = "content-wrapper";
+      reason = "multiple large blocks in one wrapper";
+    } else if (looksLikeCouponProductSection(node)) {
+      role = "coupon-product";
+      reason = "coupon and product card appear together";
+    } else if (hasFaqNarrative) {
+      role = "faq";
+      reason = "question and answer narrative";
+    } else if (hasAwardsNarrative) {
+      role = "awards";
+      reason = "award or certification narrative";
+    } else if (hasArchiveNarrative) {
+      role = "archive";
+      reason = "archive or history narrative";
+    } else if (looksLikePricingSection(node)) {
+      role = "pricing";
+      reason = "explicit price or plan structure";
+    } else if (looksLikeProductSection(node)) {
+      role = "product";
+      reason = "product-like content card structure";
+    } else if (sectionSlug === "feature") {
+      role = "features";
+      reason = "feature-oriented section structure";
+    } else if (looksLikeOutroSection(node, sectionSlug, majorSections, orderIndex) || (isLast && hasClosingNarrative)) {
+      role = "outro";
+      reason = "last section or closing narrative";
+    } else if (hasKvStructure || (isFirst && hasProminentHeadingText(node))) {
+      role = "key-visual";
+      reason = "top section with hero hierarchy";
+    } else if (
+      hasIntroNarrative ||
+      groupRole === "copy" ||
+      ((isFirst || orderIndex === 1) && headingTexts.length > 0 && imageCount <= textCount + 1)
+    ) {
+      role = "introduction";
+      reason = "narrative copy-led introduction";
+    } else if (sectionSlug === "navbar" && looksLikeNavigationBar(node)) {
+      role = "navigation";
+      reason = "navigation bar structure";
+    } else if (isFirst) {
+      role = "key-visual";
+      reason = "first major section fallback";
+    } else if (orderIndex === 1) {
+      role = "introduction";
+      reason = "second major section fallback";
+    }
+
+    return {
+      role,
+      reason,
+      summary: buildSectionNarrativeSummary({
+        role,
+        reason,
+        orderIndex,
+        majorCount: majorSections.length,
+        sectionSlug,
+        contentSlug,
+        topicSlug,
+        groupRole,
+        imageRole,
+        headingTexts,
+        actionTexts,
+        bodyTexts,
+        hasKvStructure,
+      }),
+    };
+  }
+
+  function buildSectionNarrativeSummary(analysis) {
+    const orderText =
+      analysis.majorCount > 0 && analysis.orderIndex >= 0
+        ? `${analysis.orderIndex + 1}/${analysis.majorCount}`
+        : "single";
+    const headings = Array.isArray(analysis.headingTexts) ? analysis.headingTexts.slice(0, 2).join(" / ") : "";
+    const actions = Array.isArray(analysis.actionTexts) ? analysis.actionTexts.slice(0, 2).join(" / ") : "";
+    const bodies = Array.isArray(analysis.bodyTexts) ? analysis.bodyTexts.slice(0, 2).join(" / ") : "";
+    return [
+      `Role: ${analysis.role}`,
+      `Reason: ${analysis.reason}`,
+      `Order: ${orderText}`,
+      analysis.sectionSlug ? `Section: ${analysis.sectionSlug}` : "",
+      analysis.contentSlug ? `Content: ${analysis.contentSlug}` : "",
+      analysis.groupRole ? `Group: ${analysis.groupRole}` : "",
+      analysis.hasKvStructure ? "Visual: hero-like" : "",
+      headings ? `Headings: ${headings}` : "",
+      bodies ? `Bodies: ${bodies}` : "",
+      actions ? `Actions: ${actions}` : "",
+    ]
+      .filter(Boolean)
+      .join(" | ");
+  }
+
+  function mapSectionRoleToDisplayLabel(node, context, analysis) {
+    const role = analysis && analysis.role ? analysis.role : "content-section";
+    switch (role) {
+      case "coupon-product":
+        return "Coupon + Product Card";
+      case "faq":
+        return "FAQ";
+      case "awards":
+        return "Awards";
+      case "archive":
+        return "Archiving Page";
+      case "pricing":
+        return "Pricing";
+      case "product":
+        return buildProductSectionLabel(node, context);
+      case "features":
+        return "Features";
+      case "outro":
+        return "Outro";
+      case "key-visual":
+        return "Key Visual";
+      case "introduction":
+        return "Introduction";
+      case "navigation":
+        return "Navigation";
+      case "content-wrapper":
+        return "Content";
+      default:
+        return "Content Section";
+    }
+  }
+
+  function looksLikeCouponProductSection(node) {
+    const values = collectNodeSemanticValues(node, "", 6, 2);
+    const corpus = values.join(" ").toLowerCase();
+    return /coupon|promo|discount/.test(corpus) && /(product|card|item)/.test(corpus);
+  }
+
+  function looksLikePricingSection(node) {
+    return looksLikePricingValueSet(collectNodeTexts(node, 10, 4));
+  }
+
+  function looksLikeProductSection(node) {
+    if (!node || !hasChildren(node)) {
+      return false;
+    }
+
+    const cardCount = countDirectChildrenByPredicate(node, isCardLikeNode);
+    const imageCount = countDirectChildrenByPredicate(node, isImageLikeNode);
+    const textCount = countDirectChildrenByType(node, "TEXT");
+    return cardCount >= 1 && (imageCount >= 1 || textCount >= 2);
+  }
+
+  function buildProductSectionLabel(node, context) {
+    const siblings = getMajorHybridSectionSiblings(node, context).filter((entry) => looksLikeProductSection(entry));
+    if (siblings.length <= 1) {
+      return "Product";
+    }
+
+    const productIndex = siblings.findIndex((entry) => entry && entry.id === node.id) + 1;
+    return productIndex > 0 ? `Product ${formatRepeatIndex(productIndex)}` : "Product";
+  }
+
+  function hasProminentHeadingText(node) {
+    if (!node) {
+      return false;
+    }
+
+    const stack = [{ node, depth: 0 }];
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (!current) {
+        continue;
+      }
+
+      if (current.node.type === "TEXT") {
+        const text = compactText(getTextValue(current.node));
+        const fontSize = typeof current.node.fontSize === "number" ? current.node.fontSize : 0;
+        if (text && ((fontSize >= 24 && text.length >= 8) || fontSize >= 32)) {
+          return true;
+        }
+      }
+
+      if (current.depth >= 3 || !hasChildren(current.node)) {
+        continue;
+      }
+
+      for (let index = current.node.children.length - 1; index >= 0; index -= 1) {
+        stack.push({ node: current.node.children[index], depth: current.depth + 1 });
+      }
+    }
+
+    return false;
+  }
+
+  function looksLikeKeyVisualSection(node, context, knownSectionSlug) {
+    if (!node || looksLikeNavigationBar(node) || isFieldContainer(node) || isButtonContainer(node)) {
+      return false;
+    }
+
+    const sectionSlug = knownSectionSlug || detectSectionSlug(node, context || {});
+    if (sectionSlug === "hero") {
+      return true;
+    }
+
+    if (hasDominantVisualSection(node)) {
+      return true;
+    }
+
+    const bounds = getNodeBounds(node);
+    const parentBounds = node.parent ? getNodeBounds(node.parent) : null;
+    if (!bounds || !parentBounds || parentBounds.width <= 0 || parentBounds.height <= 0) {
+      return false;
+    }
+
+    const widthRatio = bounds.width / parentBounds.width;
+    const heightRatio = bounds.height / parentBounds.height;
+    const topOffset = bounds.y - parentBounds.y;
+    const majorSections = getMajorHybridSectionSiblings(node, context || {});
+    const orderIndex = majorSections.findIndex((entry) => entry && entry.id === node.id);
+
+    return (
+      orderIndex === 0 &&
+      widthRatio >= 0.72 &&
+      topOffset <= Math.max(140, parentBounds.height * 0.18) &&
+      (heightRatio >= 0.16 || bounds.height >= 280) &&
+      hasProminentHeadingText(node)
+    );
+  }
+
+  function hasDominantVisualSection(node) {
+    if (!node || !hasChildren(node)) {
+      return false;
+    }
+
+    const bounds = getNodeBounds(node);
+    if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
+      return false;
+    }
+
+    for (const child of node.children) {
+      if (!child || !isImageLikeNode(child)) {
+        continue;
+      }
+
+      const childBounds = getNodeBounds(child);
+      if (!childBounds) {
+        continue;
+      }
+
+      const widthRatio = childBounds.width / bounds.width;
+      const heightRatio = childBounds.height / bounds.height;
+      if (widthRatio >= 0.45 || heightRatio >= 0.35) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  function countLargeDirectChildBlocks(node) {
+    if (!node || !hasChildren(node)) {
+      return 0;
+    }
+
+    const bounds = getNodeBounds(node);
+    if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
+      return 0;
+    }
+
+    let count = 0;
+    for (const child of node.children) {
+      if (!child || child.locked === true || child.visible === false || child.type === "TEXT") {
+        continue;
+      }
+
+      const childBounds = getNodeBounds(child);
+      if (!childBounds) {
+        continue;
+      }
+
+      const widthRatio = childBounds.width / bounds.width;
+      const heightRatio = childBounds.height / bounds.height;
+      if (widthRatio >= 0.45 || heightRatio >= 0.14 || childBounds.height >= 160) {
+        count += 1;
+      }
+    }
+
+    return count;
+  }
+
+  function looksLikeCompositeContentWrapper(node) {
+    if (!node || !hasChildren(node)) {
+      return false;
+    }
+
+    const largeBlockCount = countLargeDirectChildBlocks(node);
+    if (largeBlockCount >= 2) {
+      return true;
+    }
+
+    return largeBlockCount >= 1 && countDirectChildrenByType(node, "TEXT") >= 3;
+  }
+
+  function looksLikeNavigationBar(node) {
+    if (!node || !hasChildren(node)) {
+      return false;
+    }
+
+    const bounds = getNodeBounds(node);
+    const parentBounds = node.parent ? getNodeBounds(node.parent) : null;
+    if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
+      return false;
+    }
+
+    const heightRatio = parentBounds && parentBounds.height > 0 ? bounds.height / parentBounds.height : 0;
+    const widthRatio = parentBounds && parentBounds.width > 0 ? bounds.width / parentBounds.width : 0;
+    const topOffset = parentBounds ? bounds.y - parentBounds.y : 0;
+    const directTextCount = countDirectChildrenByType(node, "TEXT");
+    const iconCount = countDirectChildrenByPredicate(node, isIconLikeNode);
+    const imageCount = countDirectChildrenByPredicate(node, isImageLikeNode);
+
+    return (
+      (bounds.height <= 220 || heightRatio <= 0.18) &&
+      (widthRatio === 0 || widthRatio >= 0.55) &&
+      topOffset <= Math.max(80, (parentBounds && parentBounds.height ? parentBounds.height * 0.12 : 80)) &&
+      imageCount === 0 &&
+      countLargeDirectChildBlocks(node) <= 1 &&
+      (directTextCount >= 1 || iconCount >= 1)
+    );
+  }
+
+  function looksLikeOutroSection(node, sectionSlug, majorSections, orderIndex) {
+    const values = collectNodeSemanticValues(node, "", 6, 2);
+    const corpus = values.join(" ").toLowerCase();
+    if (/outro|closing|final|wrap up|thank you/.test(corpus) || sectionSlug === "footer") {
+      return true;
+    }
+
+    if (!node || !node.parent) {
+      return false;
+    }
+
+    const bounds = getNodeBounds(node);
+    const parentBounds = getNodeBounds(node.parent);
+    if (!bounds || !parentBounds || parentBounds.height <= 0) {
+      return false;
+    }
+
+    const isLastSection =
+      Array.isArray(majorSections) && majorSections.length > 1 ? orderIndex === majorSections.length - 1 : false;
+    return isLastSection && bounds.height / parentBounds.height <= 0.24 && !looksLikeCompositeContentWrapper(node);
+  }
+
+  function countDirectChildrenByPredicate(node, predicate) {
+    if (!node || !hasChildren(node)) {
+      return 0;
+    }
+
+    let count = 0;
+    for (const child of node.children) {
+      if (child && typeof predicate === "function" && predicate(child)) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
+  function countDirectChildrenByType(node, type) {
+    if (!node || !hasChildren(node)) {
+      return 0;
+    }
+
+    let count = 0;
+    for (const child of node.children) {
+      if (child && String(child.type || "") === String(type || "")) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
+  function isMajorHybridSection(node, context) {
+    return getMajorHybridSectionSiblings(node, context).some((entry) => entry && entry.id === (node && node.id));
+  }
+
+  function getMajorHybridSectionContainer(context) {
+    if (!context) {
+      return null;
+    }
+
+    const selectedRoots = getContextSelectedRoots(context);
+    if (selectedRoots.length !== 1) {
+      return null;
+    }
+
+    const root = selectedRoots[0];
+    if (!root || root.id !== context.preservedRootId || !hasChildren(root)) {
+      return root || null;
+    }
+
+    const directMajorChildren = getPotentialMajorHybridChildren(root, context);
+    if (directMajorChildren.length >= 2) {
+      return root;
+    }
+
+    const rootBounds = getNodeBounds(root);
+    let bestWrapper = null;
+    let bestWrapperCount = 0;
+
+    for (const child of root.children) {
+      if (!child || !hasChildren(child) || child.locked === true || child.visible === false) {
+        continue;
+      }
+
+      if (isButtonContainer(child) || isFieldContainer(child) || isImageLikeNode(child) || looksLikeNavigationBar(child)) {
+        continue;
+      }
+
+      const childBounds = getNodeBounds(child);
+      if (!childBounds || !rootBounds || rootBounds.width <= 0 || rootBounds.height <= 0) {
+        continue;
+      }
+
+      const widthRatio = childBounds.width / rootBounds.width;
+      const heightRatio = childBounds.height / rootBounds.height;
+      if (widthRatio < 0.55 && heightRatio < 0.35) {
+        continue;
+      }
+
+      const nestedMajorChildren = getPotentialMajorHybridChildren(child, context);
+      if (nestedMajorChildren.length >= 2 && nestedMajorChildren.length > bestWrapperCount) {
+        bestWrapper = child;
+        bestWrapperCount = nestedMajorChildren.length;
+      }
+    }
+
+    return bestWrapper || root;
+  }
+
+  function getPotentialMajorHybridChildren(container, context) {
+    if (!container || !hasChildren(container)) {
+      return [];
+    }
+
+    return container.children.filter((child) => isPotentialMajorHybridSectionCandidate(child, context, container)).sort(compareBounds);
+  }
+
+  function getMajorHybridSectionSiblings(node, context) {
+    if (!node || !context) {
+      return [];
+    }
+
+    const selectedRoots = getContextSelectedRoots(context);
+    if (selectedRoots.length > 1 && selectedRoots.some((entry) => entry.id === node.id)) {
+      return selectedRoots.filter((entry) => isPotentialMajorHybridSection(entry, context)).sort(compareBounds);
+    }
+
+    const container = getMajorHybridSectionContainer(context);
+    if (container && node.parent && node.parent.id === container.id) {
+      return getPotentialMajorHybridChildren(container, context);
+    }
+
+    return [];
+  }
+
+  function isPotentialMajorHybridSection(node, context) {
+    const container = getMajorHybridSectionContainer(context);
+    if (container && node && node.parent && node.parent.id === container.id) {
+      return isPotentialMajorHybridSectionCandidate(node, context, container);
+    }
+
+    const selectedRoots = getContextSelectedRoots(context);
+    if (selectedRoots.length > 1) {
+      return selectedRoots.some((entry) => entry && entry.id === node.id) && isPotentialMajorHybridSectionCandidate(node, context, node.parent);
+    }
+
+    return false;
+  }
+
+  function isPotentialMajorHybridSectionCandidate(node, context, container) {
+    if (!shouldUseHybridDisplayName(node, context)) {
+      return false;
+    }
+
+    if (!node || !hasChildren(node) || isButtonContainer(node) || isFieldContainer(node) || isImageLikeNode(node)) {
+      return false;
+    }
+
+    const type = String(node.type || "");
+    if (type !== "FRAME" && type !== "SECTION" && type !== "GROUP") {
+      return false;
+    }
+
+    const bounds = getNodeBounds(node);
+    if (!bounds || bounds.width < 160 || bounds.height < 80) {
+      return false;
+    }
+
+    const childCount = Array.isArray(node.children) ? node.children.length : 0;
+    if (childCount < 2) {
+      return false;
+    }
+
+    if (container) {
+      const parentBounds = getNodeBounds(container);
+      const widthRatio = parentBounds && parentBounds.width > 0 ? bounds.width / parentBounds.width : 0;
+      return type !== "GROUP" || widthRatio >= 0.35 || bounds.height >= 180;
+    }
+
+    return true;
+  }
+
+  function detectExplicitHybridDisplayLabel(node, textHint, sectionSlug, contentSlug, topicSlug, context) {
+    const values = collectNodeSemanticValues(node, textHint, 4, 2);
+    const corpus = values.join(" ").toLowerCase();
+
+    const explicitProduct = findExplicitProductDisplayLabel(values);
+    if (explicitProduct) {
+      return explicitProduct;
+    }
+
+    if (/coupon|promo|discount/.test(corpus) && /(product|card|item)/.test(corpus)) {
+      return "Coupon + Product Card";
+    }
+
+    if (/faq|q&a|questions|frequently asked/.test(corpus)) {
+      return "FAQ";
+    }
+
+    if (/award|awards|trophy|prize|certified|certification/.test(corpus)) {
+      return "Awards";
+    }
+
+    if (/archive|archiving|collection|library|history/.test(corpus)) {
+      return "Archiving Page";
+    }
+
+    if ((/outro|closing|final|wrap up|thank you/.test(corpus) || sectionSlug === "footer") && looksLikeOutroSection(node, sectionSlug)) {
+      return "Outro";
+    }
+
+    if (/intro|introduction|opening|overview|about/.test(corpus) && !looksLikeCompositeContentWrapper(node)) {
+      return "Introduction";
+    }
+
+    if ((/hero|key visual|kv/.test(corpus) || sectionSlug === "hero") && (isImageLikeNode(node) || hasDominantVisualSection(node))) {
+      return "Key Visual";
+    }
+
+    if (contentSlug === "message") {
+      return "Inquiry";
+    }
+
+    if (context && context.contextSlug === "hero" && hasChildren(node) && inferGroupRole(node, contentSlug || topicSlug || "content") === "copy") {
+      return "Introduction";
+    }
+
+    return "";
+  }
+
+  function findExplicitProductDisplayLabel(values) {
+    const samples = Array.isArray(values) ? values : [];
+    for (const sample of samples) {
+      const normalized = compactText(sample);
+      if (!normalized) {
+        continue;
+      }
+
+      const match = normalized.match(/product\s*(\d+(?:-\d+)?)/i);
+      if (match) {
+        return `Product ${match[1]}`;
+      }
+
+      if (/^product$/i.test(normalized)) {
+        return "Product";
+      }
+    }
+
+    return "";
+  }
+
+  function buildHybridRoleLabel(value) {
+    const slug = slugifyAsciiToken(value);
+    if (!slug) {
+      return "";
+    }
+
+    switch (slug) {
+      case "hero":
+        return "Key Visual";
+      case "footer":
+        return "Outro";
+      case "navbar":
+        return "Navigation";
+      case "sidebar":
+        return "Sidebar";
+      case "feature":
+        return "Feature";
+      case "pricing":
+        return "Pricing";
+      case "modal":
+        return "Dialog";
+      case "dashboard":
+        return "Metrics";
+      case "message":
+        return "Inquiry";
+      case "email":
+        return "Email";
+      case "password":
+        return "Password";
+      case "search":
+        return "Search";
+      case "phone":
+        return "Phone";
+      case "name":
+        return "Name";
+      case "company":
+        return "Company";
+      case "address":
+        return "Address";
+      case "sign-in":
+        return "Sign In";
+      case "sign-up":
+        return "Sign Up";
+      case "contact":
+        return "Contact";
+      case "faq":
+        return "FAQ";
+      case "archive":
+      case "archiving":
+        return "Archiving";
+      default:
+        return humanizeHybridSegment(slug);
+    }
+  }
+
+  function joinHybridDisplayParts() {
+    const joined = [];
+    for (let index = 0; index < arguments.length; index += 1) {
+      const part = compactHybridDisplayText(arguments[index]);
+      if (!part) {
+        continue;
+      }
+
+      if (joined.length > 0 && canonicalizeName(joined[joined.length - 1]) === canonicalizeName(part)) {
+        continue;
+      }
+
+      joined.push(part);
+    }
+
+    return joined.length ? joined.join(" ") : "Content";
+  }
+
+  function compactHybridDisplayText(value) {
+    return String(value || "")
+      .replace(/\s+/g, " ")
+      .replace(/\s*\+\s*/g, " + ")
+      .trim();
+  }
+
+  function getHybridDisplayOrdinal(node, context) {
+    if (!shouldPrefixHybridDisplayOrdinal(node, context)) {
+      return "";
+    }
+
+    const candidates = getMajorHybridSectionSiblings(node, context);
+    if (candidates.length < 2) {
+      return "";
+    }
+
+    const ordinalIndex = candidates.findIndex((candidate) => candidate && candidate.id === node.id);
+    return formatRepeatIndex((ordinalIndex >= 0 ? ordinalIndex : candidates.length) + 1);
+  }
+
+  function shouldPrefixHybridDisplayOrdinal(node, context) {
+    return isMajorHybridSection(node, context);
+  }
+
+  function isHybridOrdinalSibling(node, context) {
+    return shouldUseHybridDisplayName(node, context) && shouldPrefixHybridDisplayOrdinal(node, context);
+  }
+
   function buildImageNodeName(node, sectionSlug, contentSlug, topicSlug, context) {
     const imageRole = detectImageRole(node);
     const semanticSlug = topicSlug || contentSlug || sectionSlug || context.contextSlug || "content";
+
+    if (resolveNamingMode(context.namingMode) === "hybrid") {
+      if (imageRole === "avatar") {
+        return "Avatar";
+      }
+
+      if (imageRole === "hero") {
+        return "Hero Image";
+      }
+
+      if (imageRole === "thumbnail") {
+        return "Thumbnail";
+      }
+
+      if (imageRole === "poster") {
+        return "Poster";
+      }
+
+      if (imageRole === "illustration") {
+        return "Illustration";
+      }
+
+      if (imageRole === "logo") {
+        return "Logo";
+      }
+
+      return "Image";
+    }
 
     if (imageRole === "avatar") {
       return buildStructuredName(context.namingMode, "image", "avatar", semanticSlug);
@@ -1212,7 +3145,7 @@
       }
     }
 
-    return texts.length > 0 ? compactText(texts[0]) : "";
+    return "";
   }
 
   function collectNodeTexts(node, limit, maxDepth) {
@@ -1244,6 +3177,111 @@
     return texts;
   }
 
+  function collectProminentTexts(node, limit) {
+    if (!node) {
+      return [];
+    }
+
+    const entries = [];
+    const stack = [{ node, depth: 0 }];
+    while (stack.length > 0 && entries.length < Math.max(limit * 3, 6)) {
+      const current = stack.pop();
+      if (!current) {
+        continue;
+      }
+
+      if (current.node.type === "TEXT") {
+        const value = compactText(getTextValue(current.node));
+        if (value) {
+          entries.push({
+            text: value,
+            fontSize: typeof current.node.fontSize === "number" ? current.node.fontSize : 0,
+          });
+        }
+      }
+
+      if (current.depth >= 3 || !hasChildren(current.node)) {
+        continue;
+      }
+
+      for (let index = current.node.children.length - 1; index >= 0; index -= 1) {
+        stack.push({ node: current.node.children[index], depth: current.depth + 1 });
+      }
+    }
+
+    return entries
+      .sort((left, right) => right.fontSize - left.fontSize)
+      .map((entry) => entry.text)
+      .filter((value, index, array) => array.indexOf(value) === index)
+      .slice(0, limit);
+  }
+
+  function collectActionTexts(node, limit) {
+    return collectNodeTexts(node, 10, 3)
+      .filter((text) => findActionSlugFromText(text) || looksLikeButtonText(text))
+      .map((text) => compactText(text))
+      .filter((value, index, array) => value && array.indexOf(value) === index)
+      .slice(0, limit);
+  }
+
+  function buildNodeContentDigest(node, context) {
+    const headings = collectProminentTexts(node, 2);
+    const texts = collectNodeTexts(node, 6, 3)
+      .map((text) => compactText(text))
+      .filter(Boolean);
+    const actions = collectActionTexts(node, 2);
+    const sectionPosition = describeNodeSectionPosition(node, context);
+    const summary = [];
+    if (sectionPosition) {
+      summary.push(sectionPosition);
+    }
+    if (headings.length) {
+      summary.push(`Headings: ${headings.join(" / ")}`);
+    }
+    if (texts.length) {
+      summary.push(`Texts: ${texts.slice(0, 3).join(" / ")}`);
+    }
+    if (actions.length) {
+      summary.push(`Actions: ${actions.join(" / ")}`);
+    }
+    return summary.join(" | ");
+  }
+
+  function describeNodeSectionPosition(node, context) {
+    const majorSections = getMajorHybridSectionSiblings(node, context);
+    const index = majorSections.findIndex((entry) => entry && entry.id === (node && node.id));
+    if (index < 0 || majorSections.length <= 1) {
+      return "";
+    }
+
+    if (index === 0) {
+      return `first of ${majorSections.length}`;
+    }
+    if (index === majorSections.length - 1) {
+      return `last of ${majorSections.length}`;
+    }
+    return `${index + 1} of ${majorSections.length}`;
+  }
+
+  function buildSiblingContentContext(node, context) {
+    const majorSections = getMajorHybridSectionSiblings(node, context);
+    const index = majorSections.findIndex((entry) => entry && entry.id === (node && node.id));
+    if (index < 0) {
+      return "";
+    }
+
+    const prev = index > 0 ? majorSections[index - 1] : null;
+    const next = index < majorSections.length - 1 ? majorSections[index + 1] : null;
+    const parts = [];
+    if (prev) {
+      parts.push(`Prev: ${safeName(prev)} | ${collectNodeTexts(prev, 2, 2).join(" / ")}`);
+    }
+    if (next) {
+      parts.push(`Next: ${safeName(next)} | ${collectNodeTexts(next, 2, 2).join(" / ")}`);
+    }
+    return parts.join(" || ");
+  }
+
   function getPrimaryTextHint(node) {
     if (!node) {
       return "";
@@ -1273,13 +3311,97 @@
     return normalized.length > 28 ? `${normalized.slice(0, 25)}...` : normalized;
   }
 
+  function looksLikePriceText(text) {
+    const normalized = compactText(text);
+    if (!normalized) {
+      return false;
+    }
+
+    return /\$\s*\d|\d[\d,.\s]*(?:원|krw|usd|eur)|(?:price|pricing|monthly|yearly|month|year)/i.test(normalized);
+  }
+
+  function looksLikeBadgeTextNode(node, text) {
+    const normalized = compactText(text);
+    if (!normalized || normalized.length > 18) {
+      return false;
+    }
+
+    if (/(new|hot|sale|best|event|live|pro|beta|%\s*off)/i.test(normalized)) {
+      return true;
+    }
+
+    const bounds = getNodeBounds(node);
+    if (bounds && bounds.width <= 160 && bounds.height <= 48) {
+      const colorHint = getNodeColorHint(node) || getNodeColorHint(node && node.parent);
+      if (colorHint && colorHint !== "black" && colorHint !== "white" && colorHint !== "gray" && colorHint !== "silver") {
+        return true;
+      }
+    }
+
+    return /^[A-Z0-9\s+-]{2,18}$/.test(normalized);
+  }
+
   function looksLikeButtonText(text) {
     const normalized = compactText(text).toLowerCase();
     return normalized.length > 0 && normalized.length <= 24 && BUTTON_TEXT_PATTERN.test(normalized);
   }
 
   function matchFieldLabel(text) {
-    return findBestToken([text], FIELD_KEYWORD_ENTRIES, "");
+    const normalized = compactFieldCandidateText(text);
+    if (!normalized || !looksLikeFieldLabelText(normalized)) {
+      return "";
+    }
+
+    return findBestToken([normalized], FIELD_KEYWORD_ENTRIES, "");
+  }
+
+  function compactFieldCandidateText(text) {
+    return String(text || "")
+      .replace(/\s+/g, " ")
+      .replace(/[“”"']/g, "")
+      .trim();
+  }
+
+  function looksLikeFieldLabelText(text) {
+    const normalized = compactFieldCandidateText(text);
+    if (!normalized) {
+      return false;
+    }
+
+    if (normalized.length > 40) {
+      return false;
+    }
+
+    if (/[.!?]|:\s|\n/.test(normalized)) {
+      return false;
+    }
+
+    const words = normalized.split(/\s+/).filter(Boolean);
+    if (words.length > 4) {
+      return false;
+    }
+
+    const lower = normalized.toLowerCase();
+    if (/(smartphone|smartphones|laptops|reviewed everything|does it really feel different)/.test(lower)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  function findFieldSlugFromValues(values) {
+    const items = Array.isArray(values) ? values : [];
+    const candidates = [];
+
+    for (const value of items) {
+      const normalized = compactFieldCandidateText(value);
+      if (!looksLikeFieldLabelText(normalized)) {
+        continue;
+      }
+      candidates.push(normalized);
+    }
+
+    return findBestToken(candidates, FIELD_KEYWORD_ENTRIES, "");
   }
 
   function findActionSlug(node) {
@@ -1345,14 +3467,18 @@
   }
 
   function detectSectionSlug(node, context) {
-    const values = [safeName(node)];
+    const values = [];
+    appendSemanticNameValue(values, node);
     const parent = node && node.parent;
     if (parent) {
-      values.push(safeName(parent));
+      appendSemanticNameValue(values, parent);
     }
 
     values.push(...collectNodeTexts(node, 3, 2));
     const sectionSlug = findBestToken(values, SECTION_TOKEN_ENTRIES, "");
+    if (sectionSlug === "pricing" && !looksLikePricingValueSet(values)) {
+      return context.contextSlug || context.topicSlug || "content";
+    }
     return sectionSlug || context.contextSlug || context.topicSlug || "content";
   }
 
@@ -1363,7 +3489,12 @@
       return actionSlug;
     }
 
-    const fieldSlug = findBestToken(values, FIELD_KEYWORD_ENTRIES, "");
+    const contentRoleSlug = findBestToken(values, CONTENT_ROLE_TOKEN_ENTRIES, "");
+    if (contentRoleSlug) {
+      return contentRoleSlug;
+    }
+
+    const fieldSlug = findFieldSlugFromValues(values);
     if (fieldSlug) {
       return fieldSlug;
     }
@@ -1389,13 +3520,75 @@
       values.push(preferredText);
     }
 
-    values.push(safeName(node));
+    appendSemanticNameValue(values, node);
     if (node && node.parent) {
-      values.push(safeName(node.parent));
+      appendSemanticNameValue(values, node.parent);
     }
 
     values.push(...collectNodeTexts(node, textLimit, textDepth));
     return values;
+  }
+
+  function appendSemanticNameValue(values, node) {
+    const name = safeName(node);
+    if (!name || isDocumentStyleName(name)) {
+      return;
+    }
+
+    values.push(name);
+  }
+
+  function isDocumentStyleName(name) {
+    const normalized = String(name || "").trim();
+    if (!normalized) {
+      return true;
+    }
+
+    if (normalized.length >= 24 && /[_]/.test(normalized)) {
+      return true;
+    }
+
+    if (/[A-Z]{3,}/.test(normalized) && /\d/.test(normalized)) {
+      return true;
+    }
+
+    if (/ver\s*\d|v\d|\d{6,}/i.test(normalized)) {
+      return true;
+    }
+
+    return /^[A-Za-z0-9_.-]+$/.test(normalized) && normalized.split(/[_-]/).length >= 4;
+  }
+
+  function looksLikePricingValueSet(values) {
+    const corpus = (Array.isArray(values) ? values : [])
+      .filter((value) => typeof value === "string" && value.trim())
+      .join(" ")
+      .toLowerCase();
+    if (!corpus) {
+      return false;
+    }
+
+    const explicitCount = [
+      "pricing",
+      "price",
+      "prices",
+      "plan",
+      "plans",
+      "billing",
+      "subscription",
+      "subscribe",
+      "cost",
+      "fee",
+      "$",
+      "usd",
+      "krw",
+      "￦",
+      "원",
+      "요금",
+      "가격",
+      "플랜",
+    ].filter((token) => corpus.includes(token)).length;
+    return explicitCount >= 2 || /\$\s*\d|￦\s*\d|\d+\s*(usd|krw|원)/i.test(corpus);
   }
 
   function detectTopicSlug(node, context, preferredText) {
@@ -1478,6 +3671,11 @@
     return resolveNamingMode(mode) === "hybrid" ? buildHybridName(...segments) : buildWebName(...segments);
   }
 
+  function buildStructuredNameFromSegments(mode, segments) {
+    const values = Array.isArray(segments) ? segments : [];
+    return buildStructuredName(mode, values[0], values[1], values[2], values[3], values[4], values[5]);
+  }
+
   function buildWebName(...segments) {
     const normalized = [];
     for (const segment of segments) {
@@ -1520,6 +3718,53 @@
     }
 
     return normalized.join("/");
+  }
+
+  function formatRepeatIndex(index) {
+    const numeric = Number(index);
+    if (!(numeric > 0)) {
+      return "01";
+    }
+
+    return String(Math.round(numeric)).padStart(2, "0");
+  }
+
+  function appendHumanIndexSuffix(label, index) {
+    const trimmed = String(label || "").trim();
+    if (!trimmed) {
+      return "";
+    }
+
+    const suffix = formatRepeatIndex(index);
+    if (new RegExp("(?:^|\\s)" + suffix + "$").test(trimmed)) {
+      return trimmed;
+    }
+
+    return `${trimmed} ${suffix}`;
+  }
+
+  function appendStructuredOrdinal(name, index) {
+    const trimmed = String(name || "").trim();
+    if (!trimmed) {
+      return "";
+    }
+
+    const suffix = formatRepeatIndex(index);
+    if (isWebCompatibleStructuredName(trimmed)) {
+      return `${trimmed}.${suffix}`;
+    }
+
+    return `${trimmed} ${suffix}`;
+  }
+
+  function endsWithDisplaySuffix(label, suffix) {
+    const left = slugifyAsciiToken(label);
+    const right = slugifyAsciiToken(suffix);
+    if (!left || !right) {
+      return false;
+    }
+
+    return left === right || left.endsWith("-" + right);
   }
 
   function humanizeHybridSegment(value) {
@@ -1579,7 +3824,49 @@
 
   function isHybridStructuredName(name) {
     const normalized = String(name || "").trim();
-    return /^[A-Z][A-Za-z0-9]*(?:[ -][A-Za-z0-9]+)*(?:\/[A-Z][A-Za-z0-9]*(?:[ -][A-Za-z0-9]+)*)+$/.test(normalized);
+    return (
+      /^[A-Z][A-Za-z0-9]*(?:[ -][A-Za-z0-9]+)*(?:\/[A-Z][A-Za-z0-9]*(?:[ -][A-Za-z0-9]+)*)+$/.test(normalized) ||
+      /^(?:\d{2}_)?[A-Z][A-Za-z0-9]*(?: (?:\+ )?[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)*$/.test(normalized)
+    );
+  }
+
+  function isWeakHybridDisplayName(name) {
+    const normalized = String(name || "").trim();
+    if (!normalized) {
+      return true;
+    }
+
+    const label = normalized.replace(/^\d{2}_/, "").trim();
+    const slug = slugifyAsciiToken(label);
+    if (!slug) {
+      return true;
+    }
+
+    if (GENERIC_TOKEN_SET.has(slug)) {
+      return true;
+    }
+
+    if (TOPIC_TOKEN_ENTRIES.some((entry) => entry && entry[0] === slug)) {
+      return true;
+    }
+
+    return (
+      slug === "section" ||
+      slug === "content-section" ||
+      slug === "visual-section" ||
+      slug === "content" ||
+      slug === "group" ||
+      slug === "container" ||
+      slug === "item" ||
+      slug === "list" ||
+      slug === "media"
+    );
+  }
+
+  function hasRedundantHybridParentLabel(name, parentName) {
+    const childSlug = slugifyAsciiToken(String(name || "").replace(/^\d{2}_/, "").trim());
+    const parentSlug = slugifyAsciiToken(String(parentName || "").replace(/^\d{2}_/, "").trim());
+    return !!childSlug && !!parentSlug && childSlug === parentSlug;
   }
 
   function isStructuredNameForMode(name, mode) {
@@ -1770,6 +4057,38 @@
     return value;
   }
 
+  function isButtonSemanticNode(node) {
+    if (!node) {
+      return false;
+    }
+
+    if (isButtonContainer(node)) {
+      return true;
+    }
+
+    if (node.type === "TEXT") {
+      return looksLikeButtonText(getTextValue(node));
+    }
+
+    return false;
+  }
+
+  function isFieldSemanticNode(node) {
+    if (!node) {
+      return false;
+    }
+
+    if (isFieldContainer(node)) {
+      return true;
+    }
+
+    if (node.type === "TEXT") {
+      return !!matchFieldLabel(getTextValue(node));
+    }
+
+    return false;
+  }
+
   function isButtonContainer(node) {
     if (!node || !hasChildren(node)) {
       return false;
@@ -1795,11 +4114,17 @@
     }
 
     const bounds = getNodeBounds(node);
-    if (!bounds || bounds.width < 120 || bounds.height < 32) {
+    if (!bounds || bounds.width < 120 || bounds.height < 32 || bounds.height > 160) {
       return false;
     }
 
-    return !!findFieldLabel(node);
+    const texts = collectNodeTexts(node, 4, 2);
+    const shortFieldTexts = texts.filter((text) => !!matchFieldLabel(text));
+    if (!shortFieldTexts.length) {
+      return false;
+    }
+
+    return texts.length <= 3;
   }
 
   function isCardLikeNode(node) {
@@ -1896,7 +4221,7 @@
       }
 
       suggestions.push({
-        name: buildSuggestedTextBlockName(title, body, context),
+        name: buildSuggestedTextBlockName(null, title, body, context),
         parentName: safeName(title.parent),
         nodes: [
           { id: title.id, name: safeName(title) },
@@ -1909,10 +4234,11 @@
     return suggestions;
   }
 
-  function buildGroupName(labelNode, context) {
-    const label = getPrimaryTextHint(labelNode);
-    const itemSlug = resolveContentSlug(labelNode, label, context) || context.topicSlug || "item";
-    const sectionSlug = detectSectionSlug(labelNode, context);
+  function buildGroupName(groupNode, labelNode, context) {
+    const label = getPrimaryTextHint(labelNode || groupNode);
+    const sourceNode = labelNode || groupNode;
+    const itemSlug = resolveContentSlug(sourceNode, label, context) || context.topicSlug || "item";
+    const sectionSlug = detectSectionSlug(sourceNode, context);
     if (context.contextSlug === "navbar" || sectionSlug === "navbar") {
       return buildStructuredName(context.namingMode, "group", "navbar", "item", itemSlug);
     }
@@ -1920,16 +4246,230 @@
     return buildStructuredName(context.namingMode, "group", sectionSlug || context.contextSlug || "content", "item", itemSlug);
   }
 
-  function buildSuggestedTextBlockName(titleNode, bodyNode, context) {
-    const titleLabel = getPrimaryTextHint(titleNode);
-    const bodyLabel = getPrimaryTextHint(bodyNode);
+  function buildSuggestedTextBlockName(groupNode, titleNode, bodyNode, context) {
+    const primaryNode = titleNode || groupNode;
+    const secondaryNode = bodyNode || groupNode;
+    const titleLabel = getPrimaryTextHint(primaryNode);
+    const bodyLabel = getPrimaryTextHint(secondaryNode);
     const itemSlug =
-      resolveContentSlug(titleNode, titleLabel, context) ||
-      resolveContentSlug(bodyNode, bodyLabel, context) ||
+      resolveContentSlug(primaryNode, titleLabel, context) ||
+      resolveContentSlug(secondaryNode, bodyLabel, context) ||
       context.topicSlug ||
       "copy";
-    const sectionSlug = detectSectionSlug(titleNode, context);
+    const sectionSlug = detectSectionSlug(primaryNode, context);
     return buildStructuredName(context.namingMode, "group", sectionSlug || context.contextSlug || "content", "copy", itemSlug);
+  }
+
+  function applySiblingClusterNaming(candidates) {
+    if (!Array.isArray(candidates) || candidates.length < 2) {
+      return;
+    }
+
+    const clusters = new Map();
+    for (const candidate of candidates) {
+      if (!candidate || !candidate.repeatRole || !candidate.repeatRole.familyKey) {
+        continue;
+      }
+
+      const key = candidate.repeatRole.familyKey;
+      const bucket = clusters.get(key) || [];
+      bucket.push(candidate);
+      clusters.set(key, bucket);
+    }
+
+    for (const bucket of clusters.values()) {
+      if (!bucket || bucket.length < 2) {
+        continue;
+      }
+
+      bucket.sort((left, right) => compareStoredBounds(left.bounds, right.bounds));
+      const titleMap = collectClusterTitleMap(bucket);
+      const useDistinctTitles =
+        titleMap && titleMap.useDistinctTitles === true && !(bucket[0] && bucket[0].repeatRole && bucket[0].repeatRole.preferIndex === true);
+      for (let index = 0; index < bucket.length; index += 1) {
+        const candidate = bucket[index];
+        if (!candidate) {
+          continue;
+        }
+
+        const titleInfo = useDistinctTitles ? titleMap.byNodeId.get(candidate.nodeId) : null;
+        const nextBaseName = titleInfo ? buildClusterTitleDrivenName(candidate, titleInfo) : buildClusterIndexedName(candidate, index + 1);
+        if (!nextBaseName) {
+          continue;
+        }
+
+        candidate.baseName = nextBaseName;
+        candidate.repeatIndex = index + 1;
+        candidate.repeatCount = bucket.length;
+      }
+    }
+  }
+
+  function collectClusterTitleMap(bucket) {
+    const byNodeId = new Map();
+    const usedSlugs = new Set();
+    for (const candidate of bucket) {
+      const titleInfo = extractClusterTitleInfo(candidate);
+      if (!titleInfo || usedSlugs.has(titleInfo.slug)) {
+        return {
+          useDistinctTitles: false,
+          byNodeId: new Map(),
+        };
+      }
+
+      usedSlugs.add(titleInfo.slug);
+      byNodeId.set(candidate.nodeId, titleInfo);
+    }
+
+    return {
+      useDistinctTitles: byNodeId.size >= 2 && byNodeId.size === bucket.length,
+      byNodeId: byNodeId,
+    };
+  }
+
+  function extractClusterTitleInfo(candidate) {
+    if (!candidate) {
+      return null;
+    }
+
+    const samples = [];
+    appendCandidateTitleSamples(samples, candidate.headingTexts, 2);
+    appendCandidateTitleSamples(samples, [candidate.textHint], 1);
+    appendCandidateTitleSamples(samples, candidate.textSamples, 2);
+    appendCandidateTitleSamples(samples, candidate.deepTextSamples, 4);
+    for (const sample of samples) {
+      const titleInfo = normalizeClusterTitleInfo(sample, candidate.repeatRole);
+      if (titleInfo) {
+        return titleInfo;
+      }
+    }
+
+    return null;
+  }
+
+  function appendCandidateTitleSamples(target, values, limit) {
+    if (!Array.isArray(target) || !Array.isArray(values)) {
+      return;
+    }
+
+    let count = 0;
+    for (const value of values) {
+      if (!(count < limit)) {
+        break;
+      }
+
+      const normalized = compactText(value);
+      if (!normalized || target.includes(normalized)) {
+        continue;
+      }
+
+      target.push(normalized);
+      count += 1;
+    }
+  }
+
+  function normalizeClusterTitleInfo(value, repeatRole) {
+    const normalized = compactText(value);
+    if (!normalized || normalized.length < 2 || normalized.length > 32) {
+      return null;
+    }
+
+    if (looksLikeButtonText(normalized) || matchFieldLabel(normalized)) {
+      return null;
+    }
+
+    const slug = slugifyAsciiToken(normalized);
+    if (!slug) {
+      return null;
+    }
+
+    const tokenCount = slug.split("-").filter(Boolean).length;
+    if (tokenCount <= 0 || tokenCount > 4) {
+      return null;
+    }
+
+    if (isGenericClusterTitleSlug(slug, repeatRole)) {
+      return null;
+    }
+
+    return {
+      slug: slug,
+      label: humanizeHybridSegment(slug),
+    };
+  }
+
+  function isGenericClusterTitleSlug(slug, repeatRole) {
+    if (!slug || GENERIC_TOKEN_SET.has(slug)) {
+      return true;
+    }
+
+    if (
+      slug === "faq" ||
+      slug === "menu" ||
+      slug === "product" ||
+      slug === "pricing" ||
+      slug === "plan" ||
+      slug === "feature" ||
+      slug === "card" ||
+      slug === "item" ||
+      slug === "metric"
+    ) {
+      return true;
+    }
+
+    if (repeatRole) {
+      const familySlug = slugifyAsciiToken(repeatRole.familyKey);
+      const labelSlug = slugifyAsciiToken(repeatRole.hybridLabel);
+      const suffixSlug = slugifyAsciiToken(repeatRole.hybridSuffix);
+      if (slug === labelSlug || slug === suffixSlug) {
+        return true;
+      }
+
+      if (familySlug && (familySlug === slug || familySlug.split("-").indexOf(slug) >= 0)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  function buildClusterTitleDrivenName(candidate, titleInfo) {
+    if (!candidate || !candidate.repeatRole || !titleInfo) {
+      return "";
+    }
+
+    if (candidate.nameMode === "display") {
+      let label = titleInfo.label;
+      const suffix = candidate.repeatRole.hybridSuffix;
+      if (suffix && !endsWithDisplaySuffix(label, suffix)) {
+        label = joinHybridDisplayParts(label, suffix);
+      }
+      return label;
+    }
+
+    const segments = Array.isArray(candidate.repeatRole.webSegments) ? candidate.repeatRole.webSegments.slice(0, 6) : [];
+    segments.push(titleInfo.slug);
+    return buildStructuredNameFromSegments(candidate.namingMode, segments);
+  }
+
+  function buildClusterIndexedName(candidate, index) {
+    if (!candidate) {
+      return "";
+    }
+
+    if (candidate.nameMode === "display") {
+      const baseLabel =
+        candidate.repeatRole && candidate.repeatRole.hybridLabel ? candidate.repeatRole.hybridLabel : candidate.baseName;
+      return appendHumanIndexSuffix(baseLabel, index);
+    }
+
+    if (candidate.repeatRole && Array.isArray(candidate.repeatRole.webSegments) && candidate.repeatRole.webSegments.length > 0) {
+      const segments = candidate.repeatRole.webSegments.slice(0, 6);
+      segments.push(formatRepeatIndex(index));
+      return buildStructuredNameFromSegments(candidate.namingMode, segments);
+    }
+
+    return appendStructuredOrdinal(candidate.baseName, index);
   }
 
   function isLabelTextNode(node) {
@@ -1992,6 +4532,10 @@
   function compareBounds(leftNode, rightNode) {
     const left = getNodeBounds(leftNode);
     const right = getNodeBounds(rightNode);
+    return compareStoredBounds(left, right);
+  }
+
+  function compareStoredBounds(left, right) {
     if (!left || !right) {
       return 0;
     }
@@ -2018,7 +4562,7 @@
     const structured = isWebCompatibleStructuredName(trimmed);
     const hybridStructured = isHybridStructuredName(trimmed);
     while (usedNames.has(canonicalizeName(candidate))) {
-      const suffix = String(index).padStart(2, "0");
+      const suffix = formatRepeatIndex(index);
       candidate = structured ? `${trimmed}-${suffix}` : hybridStructured ? `${trimmed} ${suffix}` : `${trimmed} ${suffix}`;
       index += 1;
     }
@@ -2097,6 +4641,53 @@
     }
 
     return null;
+  }
+
+  function snapshotNodeBounds(node) {
+    const bounds = getNodeBounds(node);
+    if (!bounds) {
+      return null;
+    }
+
+    return {
+      x: bounds.x,
+      y: bounds.y,
+      width: bounds.width,
+      height: bounds.height,
+    };
+  }
+
+  function getNodeByIdSafe(nodeId) {
+    if (typeof nodeId !== "string" || !nodeId) {
+      return null;
+    }
+
+    try {
+      return typeof figma.getNodeById === "function" ? figma.getNodeById(nodeId) : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function resolveNodeListByIds(nodeIds) {
+    const values = Array.isArray(nodeIds) ? nodeIds : [];
+    const nodes = [];
+    for (const nodeId of values) {
+      const node = getNodeByIdSafe(nodeId);
+      if (node) {
+        nodes.push(node);
+      }
+    }
+
+    return nodes;
+  }
+
+  function getContextSelectedRoots(context) {
+    if (!context) {
+      return [];
+    }
+
+    return resolveNodeListByIds(context.selectedRootIds);
   }
 
   function findLargestSelectedRoot(selection) {

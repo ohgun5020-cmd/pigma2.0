@@ -23,6 +23,11 @@
     openai: "gpt-5-mini",
     gemini: "gemini-2.5-flash",
   });
+  const FALLBACK_MODELS_BY_PROVIDER = Object.freeze({
+    openai: ["gpt-5-mini", "gpt-4.1-mini"],
+    gemini: ["gemini-2.5-flash"],
+  });
+  const TEXT_AI_PROVIDERS = Object.freeze(["openai", "gemini"]);
   const pendingUiRequests = new Map();
 
   globalScope.__PIGMA_AI_LLM__ = {
@@ -68,74 +73,111 @@
 
   async function requestJsonTask(options) {
     const settings = await getAiSettingsAsync();
-    const runInfo = getResolvedRunInfo(settings, options);
-    if (settings.enabled !== true || !runInfo.apiKey) {
+    if (settings.enabled !== true) {
       return null;
     }
-    const provider = runInfo.provider;
-    const model = runInfo.model;
-    const requestMeta = buildRequestMeta(options, runInfo);
-    const prompt = buildPrompt(options, requestMeta);
-    const startedAt = Date.now();
-
-    try {
-      let result = null;
-      result = await requestJsonTaskViaUiBridge({
-        provider,
-        model,
-        apiKey: runInfo.apiKey,
-        prompt,
-        meta: requestMeta,
-      });
-      const durationMs = Math.max(0, Date.now() - startedAt);
-      const quality = summarizeJsonResponseQuality(result, options && options.schema);
-
-      if (result && typeof result === "object") {
-        result._provider = provider;
-        result._model = model;
-        result._taskType = requestMeta.taskType;
-        result._taskContext = requestMeta.taskContext;
-        result._plannerVersion = requestMeta.plannerVersion;
-        result._providerProfile = requestMeta.providerProfile;
-        result._durationMs = durationMs;
-        result._responseQualityScore = quality.score;
-        result._responseQualityLabel = quality.label;
-        result._responseQualityNotes = quality.notes.slice(0, 4);
-      }
-
-      await appendAiRunLogAsync({
-        ok: true,
-        provider: provider,
-        model: model,
-        taskType: requestMeta.taskType,
-        taskContext: requestMeta.taskContext,
-        plannerVersion: requestMeta.plannerVersion,
-        providerProfile: requestMeta.providerProfile,
-        durationMs: durationMs,
-        qualityScore: quality.score,
-        qualityLabel: quality.label,
-        notes: quality.notes.slice(0, 4),
-      });
-
-      return result;
-    } catch (error) {
-      const durationMs = Math.max(0, Date.now() - startedAt);
-      const failureType = classifyAiFailureType(error);
-      const message = normalizeErrorMessage(error, "AI 응답을 받지 못했습니다.");
-      await appendAiRunLogAsync({
-        ok: false,
-        provider: provider,
-        model: model,
-        taskType: requestMeta.taskType,
-        taskContext: requestMeta.taskContext,
-        plannerVersion: requestMeta.plannerVersion,
-        providerProfile: requestMeta.providerProfile,
-        durationMs: durationMs,
-        failureType: failureType,
-        message: message,
-      });
-      throw createAiClientError(error, message, requestMeta, runInfo, durationMs, failureType);
+    const attemptRunInfos = buildTextTaskRunInfos(settings, options);
+    if (!attemptRunInfos.length) {
+      return null;
     }
+
+    let lastFailure = null;
+
+    for (let index = 0; index < attemptRunInfos.length; index += 1) {
+      const runInfo = attemptRunInfos[index];
+      const provider = runInfo.provider;
+      const model = runInfo.model;
+      const requestMeta = buildRequestMeta(options, runInfo);
+      const prompt = buildPrompt(options, requestMeta);
+      const startedAt = Date.now();
+
+      try {
+        let result = null;
+        result = await requestJsonTaskViaUiBridge({
+          provider,
+          model,
+          apiKey: runInfo.apiKey,
+          prompt,
+          meta: requestMeta,
+        });
+        const durationMs = Math.max(0, Date.now() - startedAt);
+        const quality = summarizeJsonResponseQuality(result, options && options.schema);
+
+        if (result && typeof result === "object") {
+          result._provider = provider;
+          result._model = model;
+          result._taskType = requestMeta.taskType;
+          result._taskContext = requestMeta.taskContext;
+          result._plannerVersion = requestMeta.plannerVersion;
+          result._providerProfile = requestMeta.providerProfile;
+          result._durationMs = durationMs;
+          result._responseQualityScore = quality.score;
+          result._responseQualityLabel = quality.label;
+          result._responseQualityNotes = quality.notes.slice(0, 4);
+        }
+
+        const notes = quality.notes.slice(0, 4);
+        if (index > 0) {
+          notes.push(`fallback after ${attemptRunInfos[index - 1].provider}`);
+        }
+
+        await appendAiRunLogAsync({
+          ok: true,
+          provider: provider,
+          model: model,
+          taskType: requestMeta.taskType,
+          taskContext: requestMeta.taskContext,
+          plannerVersion: requestMeta.plannerVersion,
+          providerProfile: requestMeta.providerProfile,
+          durationMs: durationMs,
+          qualityScore: quality.score,
+          qualityLabel: quality.label,
+          notes,
+        });
+
+        return result;
+      } catch (error) {
+        const durationMs = Math.max(0, Date.now() - startedAt);
+        const failureType = classifyAiFailureType(error);
+        const message = normalizeErrorMessage(error, "AI 응답을 받지 못했습니다.");
+        const notes = index + 1 < attemptRunInfos.length ? [`retrying with ${attemptRunInfos[index + 1].provider}`] : [];
+        await appendAiRunLogAsync({
+          ok: false,
+          provider: provider,
+          model: model,
+          taskType: requestMeta.taskType,
+          taskContext: requestMeta.taskContext,
+          plannerVersion: requestMeta.plannerVersion,
+          providerProfile: requestMeta.providerProfile,
+          durationMs: durationMs,
+          failureType: failureType,
+          message: message,
+          notes,
+        });
+
+        lastFailure = {
+          error,
+          message,
+          requestMeta,
+          runInfo,
+          durationMs,
+          failureType,
+        };
+      }
+    }
+
+    if (lastFailure) {
+      throw createAiClientError(
+        lastFailure.error,
+        lastFailure.message,
+        lastFailure.requestMeta,
+        lastFailure.runInfo,
+        lastFailure.durationMs,
+        lastFailure.failureType
+      );
+    }
+
+    return null;
   }
 
   async function getAiRunLogAsync() {
@@ -177,6 +219,55 @@
       model,
       providerProfile: buildProviderProfile("", provider, model, "", ""),
     };
+  }
+
+  function buildTextTaskRunInfos(settings, options) {
+    const source = settings && typeof settings === "object" ? settings : {};
+    const preferredProvider = resolveTextTaskProvider(source);
+    const providers = [];
+
+    if (preferredProvider) {
+      providers.push(preferredProvider);
+    }
+
+    for (const provider of TEXT_AI_PROVIDERS) {
+      if (providers.indexOf(provider) >= 0) {
+        continue;
+      }
+      if (!getApiKeyForProvider(source, provider)) {
+        continue;
+      }
+      providers.push(provider);
+    }
+
+    const runInfos = [];
+
+    for (const provider of providers) {
+      const apiKey = getApiKeyForProvider(source, provider);
+      if (!apiKey) {
+        continue;
+      }
+
+      const preferredModel =
+        options && typeof options.modelByProvider === "object" && options.modelByProvider && options.modelByProvider[provider]
+          ? options.modelByProvider[provider]
+          : DEFAULT_MODEL_BY_PROVIDER[provider];
+      const modelCandidates = uniqueStrings(
+        [preferredModel].concat(Array.isArray(FALLBACK_MODELS_BY_PROVIDER[provider]) ? FALLBACK_MODELS_BY_PROVIDER[provider] : []),
+        4
+      );
+
+      for (const model of modelCandidates) {
+        runInfos.push({
+          provider,
+          apiKey,
+          model,
+          providerProfile: buildProviderProfile("", provider, model, "", ""),
+        });
+      }
+    }
+
+    return runInfos;
   }
 
   function normalizeAiSettings(value) {
@@ -221,13 +312,15 @@
 
   function resolveTextTaskProvider(settings) {
     const source = settings && typeof settings === "object" ? settings : {};
-    if (getApiKeyForProvider(source, "openai")) {
-      return "openai";
+    const preferred = source.provider === "gemini" ? "gemini" : "openai";
+    if (getApiKeyForProvider(source, preferred)) {
+      return preferred;
     }
-    if (getApiKeyForProvider(source, "gemini")) {
-      return "gemini";
+    const fallback = preferred === "gemini" ? "openai" : "gemini";
+    if (getApiKeyForProvider(source, fallback)) {
+      return fallback;
     }
-    return source.provider === "gemini" ? "gemini" : "openai";
+    return preferred;
   }
 
   function buildPrompt(options, requestMeta) {

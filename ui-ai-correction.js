@@ -1076,6 +1076,23 @@
     element.textContent = String(value);
   };
 
+  const isDebugModeEnabled = () =>
+    window.__PIGMA_AI_CORRECTION_DEBUG_MODE__ === true ||
+    document.documentElement.dataset.aiCorrectionDebugMode === "true";
+
+  const syncDeveloperOnlyVisibility = () => {
+    const shouldShow = isDebugModeEnabled();
+    [elements.readButton, elements.button, elements.clearButton].forEach((button) => {
+      button.hidden = !shouldShow;
+      button.setAttribute("aria-hidden", shouldShow ? "false" : "true");
+      if (shouldShow) {
+        button.removeAttribute("tabindex");
+      } else {
+        button.tabIndex = -1;
+      }
+    });
+  };
+
   const formatAnalyzedAt = (isoString) => {
     if (typeof isoString !== "string" || !isoString) {
       return "마지막 읽기 없음";
@@ -2036,6 +2053,7 @@
   elements.readButton.addEventListener("click", applyAccessibilityLabels);
   elements.button.addEventListener("click", runDiagnosis);
   elements.clearButton.addEventListener("click", runClearAnnotations);
+  window.addEventListener("pigma:debug-mode-changed", syncDeveloperOnlyVisibility);
 
   elements.insightList.addEventListener("click", (event) => {
     const button = event.target instanceof Element ? event.target.closest("button[data-consistency-issue-id]") : null;
@@ -2140,6 +2158,7 @@
   }
 });
 
+  syncDeveloperOnlyVisibility();
   syncButtonState();
 
   window.__PIGMA_AI_DESIGN_CONSISTENCY_UI__ = {
@@ -2264,14 +2283,28 @@
     return normalized.length > limit ? `${normalized.slice(0, limit - 3)}...` : normalized;
   };
 
+  const renderNameSourceLabel = (source) => {
+    if (source === "ai") {
+      return "AI";
+    }
+    if (source === "local") {
+      return "Local";
+    }
+    if (source === "kept") {
+      return "Kept";
+    }
+    return "";
+  };
+
   const renderChangeList = (result) => {
     elements.changeList.replaceChildren();
 
     const rows = [];
     (Array.isArray(result?.renamed) ? result.renamed : []).slice(0, 3).forEach((entry) => {
+      const sourceLabel = renderNameSourceLabel(entry?.nameSource);
       rows.push({
         title: "이름 변경",
-        detail: `${entry.from} -> ${entry.to} · ${entry.reason}`,
+        detail: `${sourceLabel ? `[${sourceLabel}] ` : ""}${entry.from} -> ${entry.to} · ${entry.reason}`,
       });
     });
     (Array.isArray(result?.regrouped) ? result.regrouped : []).slice(0, 2).forEach((entry) => {
@@ -2326,7 +2359,7 @@
     elements.panelTitle.textContent = "그룹과 이름 수정 준비";
     elements.panelCopy.textContent = "웹용 구조 기준으로 그룹과 이름을 정리하고, 안전한 그룹만 제한적으로 적용합니다.";
     elements.processedAt.textContent = "마지막 실행 없음";
-    elements.selectionSummary.textContent = "웹 접근성 진단 후 실행하면 결과가 여기에 표시됩니다.";
+    elements.selectionSummary.textContent = "그룹과 이름 수정을 실행하면 결과가 여기에 표시됩니다.";
     elements.selectionNote.textContent = "웹용은 안전한 조합 위주로 그룹과 이름을 정리합니다.";
     fillMetric(elements.renameCount, 0);
     fillMetric(elements.groupCount, 0);
@@ -2390,7 +2423,10 @@
     fillMetric(elements.skippedCount, summary.skippedCount || 0);
     elements.contextValue.textContent = summary.contextLabel || "일반 UI 화면";
     elements.renamePreview.textContent = renamed.length
-      ? truncateText(`${renamed[0].from} -> ${renamed[0].to}`, 60)
+      ? truncateText(
+          `${renderNameSourceLabel(renamed[0].nameSource) ? `[${renderNameSourceLabel(renamed[0].nameSource)}] ` : ""}${renamed[0].from} -> ${renamed[0].to}`,
+          60
+        )
       : "적용 없음";
     elements.regroupPreview.textContent = regrouped.length
       ? truncateText(regrouped[0].name, 60)
@@ -2398,9 +2434,26 @@
         ? truncateText(`후보: ${suggestions[0].name}`, 60)
         : "적용 없음";
     const appliedCount = (summary.renameCount || 0) + (summary.regroupCount || 0);
-    elements.changeMeta.textContent = matchesCurrentSelection
-      ? `현재 선택 기준 · 적용 ${appliedCount}건`
-      : `최근 캐시 · 적용 ${appliedCount}건`;
+    const aiRenameCount = summary.aiRenameCount || 0;
+    const localRenameCount = summary.localRenameCount || 0;
+    const aiOnlySkippedCount = summary.aiOnlySkippedCount || 0;
+    const aiStatusLabel = typeof summary.aiStatusLabel === "string" ? summary.aiStatusLabel.trim() : "";
+    const aiErrorMessage = typeof summary.aiErrorMessage === "string" ? summary.aiErrorMessage.trim() : "";
+    const metaParts = ["적용 결과", `적용 ${appliedCount}건`];
+    if ((summary.renameCount || 0) > 0 || aiRenameCount > 0 || localRenameCount > 0) {
+      metaParts.push(`AI ${aiRenameCount}건`);
+      metaParts.push(`Local ${localRenameCount}건`);
+    }
+    if (aiStatusLabel) {
+      metaParts.push(aiStatusLabel);
+    }
+    if (summary.aiFailed === true && aiErrorMessage) {
+      metaParts.push(truncateText(aiErrorMessage, 42));
+    }
+    if (aiOnlySkippedCount > 0) {
+      metaParts.push(`AI 보류 ${aiOnlySkippedCount}건`);
+    }
+    elements.changeMeta.textContent = metaParts.join(" · ");
     renderChangeList(result);
   };
 
@@ -2413,7 +2466,7 @@
     setStatus("running", "적용 중");
     elements.panelTitle.textContent = "그룹과 이름 수정 진행 중";
     elements.panelCopy.textContent = "웹용 구조 기준으로 그룹과 이름을 정리하고 안전한 그룹 후보를 확인하고 있습니다.";
-    postPluginMessage({ type: "run-ai-regroup-rename" });
+    postPluginMessage({ type: "run-ai-regroup-rename", namingMode: "hybrid" });
   });
 
   window.addEventListener("message", (event) => {
@@ -2473,7 +2526,10 @@ window.__PIGMA_AI_CORRECTION_REGROUP_RENAME__ = {
 })();
 
 (() => {
-  if (window.__PIGMA_AI_CORRECTION_TYPO_AUDIT__) {
+  if (
+    window.__PIGMA_AI_CORRECTION_TYPO_AUDIT__ &&
+    window.__PIGMA_AI_CORRECTION_TYPO_AUDIT__.profileModal === true
+  ) {
     return;
   }
 
@@ -2501,6 +2557,10 @@ window.__PIGMA_AI_CORRECTION_REGROUP_RENAME__ = {
     changeMeta: document.getElementById("aiTypoAuditChangeMeta"),
     changeList: document.getElementById("aiTypoAuditChangeList"),
     button: document.getElementById("aiTypoAuditButton"),
+    modal: document.getElementById("aiTypoAuditModal"),
+    modalClose: document.getElementById("aiTypoAuditModalClose"),
+    speedButton: document.getElementById("aiTypoAuditSpeedButton"),
+    qualityButton: document.getElementById("aiTypoAuditQualityButton"),
   };
 
   if (
@@ -2521,13 +2581,18 @@ window.__PIGMA_AI_CORRECTION_REGROUP_RENAME__ = {
     !(elements.previewValue instanceof HTMLElement) ||
     !(elements.changeMeta instanceof HTMLElement) ||
     !(elements.changeList instanceof HTMLElement) ||
-    !(elements.button instanceof HTMLButtonElement)
+    !(elements.button instanceof HTMLButtonElement) ||
+    !(elements.modal instanceof HTMLElement) ||
+    !(elements.modalClose instanceof HTMLButtonElement) ||
+    !(elements.speedButton instanceof HTMLButtonElement) ||
+    !(elements.qualityButton instanceof HTMLButtonElement)
   ) {
     return;
   }
 
   let isApplying = false;
   let lastRenderedResult = null;
+  let modalOpen = false;
 
   const requestCachedResult = () => {
     postPluginMessage({ type: "request-ai-typo-audit-cache" });
@@ -2545,6 +2610,30 @@ window.__PIGMA_AI_CORRECTION_REGROUP_RENAME__ = {
     try {
       window.localStorage.setItem(PANEL_STATE_KEY, elements.panel.open ? "true" : "false");
     } catch (error) {}
+  };
+
+  const getAuditProfileLabel = (profile) => (profile === "speed" ? "속도용" : "품질용");
+
+  const openAuditModal = () => {
+    if (isApplying) {
+      return;
+    }
+
+    modalOpen = true;
+    elements.modal.hidden = false;
+    requestAnimationFrame(() => {
+      elements.speedButton.focus();
+    });
+  };
+
+  const closeAuditModal = () => {
+    if (!modalOpen) {
+      return;
+    }
+
+    modalOpen = false;
+    elements.modal.hidden = true;
+    elements.button.focus();
   };
 
   const setButtonBusy = (busy) => {
@@ -2641,7 +2730,7 @@ window.__PIGMA_AI_CORRECTION_REGROUP_RENAME__ = {
           elements.panelTitle.textContent = "오타 검수 준비";
           elements.panelCopy.textContent = "직접 수정하지 않고 오타 후보를 Figma Dev Mode 주석 또는 결과 패널로 남깁니다.";
           elements.processedAt.textContent = "마지막 실행 없음";
-          elements.selectionSummary.textContent = "웹 접근성 진단 후 실행하면 결과가 여기에 표시됩니다.";
+          elements.selectionSummary.textContent = "오타 검수를 실행하면 결과가 여기에 표시됩니다.";
           elements.selectionNote.textContent =
             "주석은 Dev Mode에서 보입니다. 현재 환경에서 주석을 쓸 수 없으면 결과 패널에만 표시합니다.";
           fillMetric(elements.issueCount, 0);
@@ -2728,17 +2817,48 @@ window.__PIGMA_AI_CORRECTION_REGROUP_RENAME__ = {
           renderChangeList(result);
         };
 
-  elements.button.addEventListener("click", () => {
+  const startAudit = (auditProfile) => {
     if (isApplying) {
       return;
     }
 
-          setButtonBusy(true);
-          setStatus("running", "검수 중");
-          elements.panelTitle.textContent = "오타 검수 진행 중";
-          elements.panelCopy.textContent = "현재 선택의 텍스트를 검사하고 직접 수정 없이 Dev Mode 주석 또는 결과 패널로 반영하고 있습니다.";
-          postPluginMessage({ type: "run-ai-typo-audit" });
-        });
+    closeAuditModal();
+    const profile = auditProfile === "speed" ? "speed" : "quality";
+    const profileLabel = getAuditProfileLabel(profile);
+    window.__PIGMA_AI_CORRECTION_PANEL_VISIBILITY__?.revealAndFocusPanel(elements.panel);
+    setButtonBusy(true);
+    setStatus("running", "검수 중");
+    elements.panelTitle.textContent = `${profileLabel} 오타 검수 진행 중`;
+    elements.panelCopy.textContent =
+      profile === "speed"
+        ? "현재 선택의 텍스트를 로컬 규칙 중심으로 빠르게 검사하고 있습니다."
+        : "현재 선택의 텍스트를 AI 우선으로 정밀 검사하고 있습니다.";
+    postPluginMessage({ type: "run-ai-typo-audit", auditProfile: profile });
+  };
+
+  elements.button.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    openAuditModal();
+  }, { capture: true });
+
+  elements.modalClose.addEventListener("click", closeAuditModal);
+  elements.modal.addEventListener("click", (event) => {
+    if (event.target === elements.modal) {
+      closeAuditModal();
+    }
+  });
+  elements.speedButton.addEventListener("click", () => {
+    startAudit("speed");
+  });
+  elements.qualityButton.addEventListener("click", () => {
+    startAudit("quality");
+  });
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && modalOpen) {
+      closeAuditModal();
+    }
+  });
 
   window.addEventListener("message", (event) => {
     const message = event.data?.pluginMessage;
@@ -2793,6 +2913,7 @@ window.__PIGMA_AI_CORRECTION_REGROUP_RENAME__ = {
 
   window.__PIGMA_AI_CORRECTION_TYPO_AUDIT__ = {
     requestCachedResult,
+    profileModal: true,
   };
 })();
 
@@ -2961,7 +3082,7 @@ window.__PIGMA_AI_CORRECTION_REGROUP_RENAME__ = {
     elements.panelTitle.textContent = "오타 자동 수정 준비";
     elements.panelCopy.textContent = "오타 후보를 찾은 뒤 현재 선택의 텍스트를 직접 수정하고, 고친 부분에는 Dev Mode 주석도 남깁니다.";
     elements.processedAt.textContent = "마지막 실행 없음";
-    elements.selectionSummary.textContent = "웹 접근성 진단 후 실행하면 결과가 여기에 표시됩니다.";
+    elements.selectionSummary.textContent = "오타 자동 수정을 실행하면 결과가 여기에 표시됩니다.";
     elements.selectionNote.textContent =
       "직접 수정이 가능한 텍스트만 반영합니다. 수정된 텍스트에는 Dev Mode 주석을 남기고, 구조 제한이 있으면 건너뛴 이유를 결과 패널에 남깁니다.";
     fillMetric(elements.issueCount, 0);
@@ -3290,7 +3411,7 @@ window.__PIGMA_AI_CORRECTION_TYPO_FIX__ = {
     elements.panelCopy.textContent =
       "0.5 단위 stroke/blur 예외값은 유지하고, 나머지 소수점 보정 대상은 AI 판독 후 정수 스냅으로 적용합니다.";
     elements.processedAt.textContent = "마지막 실행 없음";
-    elements.selectionSummary.textContent = "웹 접근성 진단 이후 결과가 여기에 표시됩니다.";
+    elements.selectionSummary.textContent = "픽셀 교정을 실행하면 결과가 여기에 표시됩니다.";
     elements.selectionNote.textContent =
       "후보를 찾은 뒤 AI가 올림/내림 방향을 판독하고, 적용 불가 항목과 0.5 예외값은 결과 패널에 함께 남깁니다.";
     fillMetric(elements.candidateCount, 0);

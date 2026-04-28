@@ -130,7 +130,9 @@
     const svgText = payload && typeof payload.svgText === "string" ? payload.svgText.trim() : "";
     const svgTextFallback =
       payload && typeof payload.svgTextFallback === "string" ? payload.svgTextFallback.trim() : "";
-    const hasBitmapBackground = getByteLength(payload && payload.backgroundPngBytes) > 0;
+    const bitmapBackgroundTiles = getBitmapBackgroundTiles(payload);
+    const hasBitmapBackground =
+      getByteLength(payload && payload.backgroundPngBytes) > 0 || bitmapBackgroundTiles.length > 0;
     if (!svgText && !hasBitmapBackground) {
       const fileLabel = payload && typeof payload.fileName === "string" && payload.fileName.trim().length > 0
         ? payload.fileName.trim()
@@ -139,7 +141,7 @@
     }
 
     const importedNode = hasBitmapBackground
-      ? createBitmapSvgImportNode(payload)
+      ? createBitmapSvgImportNode(payload, bitmapBackgroundTiles)
       : figma.createNodeFromSvg(svgText);
     importedNode.name = normalizeSvgName(payload.rootName || payload.fileName || SVG_IMPORT_BATCH_ROOT_NAME);
     let textImportResult = null;
@@ -160,7 +162,7 @@
     return importedNode;
   }
 
-  function createBitmapSvgImportNode(payload) {
+  function createBitmapSvgImportNode(payload, bitmapBackgroundTiles) {
     const frame = figma.createFrame();
     const width = Math.max(1, roundNumber(payload && payload.documentWidth));
     const height = Math.max(1, roundNumber(payload && payload.documentHeight));
@@ -169,6 +171,22 @@
     frame.clipsContent = true;
     frame.strokes = [];
     frame.fills = [];
+
+    if (Array.isArray(bitmapBackgroundTiles) && bitmapBackgroundTiles.length > 0) {
+      for (let index = 0; index < bitmapBackgroundTiles.length; index += 1) {
+        const tile = bitmapBackgroundTiles[index];
+        const background = figma.createRectangle();
+        background.name = normalizeSvgName(tile.name || `Background Tile ${index + 1}`);
+        background.resize(Math.max(1, roundNumber(tile.width)), Math.max(1, roundNumber(tile.height)));
+        background.x = roundNumber(tile.x);
+        background.y = roundNumber(tile.y);
+        background.strokes = [];
+        background.fills = [createBitmapFillFromBytes(tile.pngBytes)];
+        frame.appendChild(background);
+      }
+
+      return frame;
+    }
 
     const background = figma.createRectangle();
     background.name = "Background PNG";
@@ -205,6 +223,29 @@
       return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     }
     throw new Error("The bitmap import payload did not include valid image bytes.");
+  }
+
+  function getBitmapBackgroundTiles(payload) {
+    if (!payload || !Array.isArray(payload.backgroundTiles)) {
+      return [];
+    }
+
+    return payload.backgroundTiles
+      .map(tile => {
+        if (!tile || getByteLength(tile.pngBytes) <= 0) {
+          return null;
+        }
+
+        return {
+          name: typeof tile.name === "string" && tile.name.trim().length > 0 ? tile.name.trim() : "",
+          x: roundNumber(tile.x),
+          y: roundNumber(tile.y),
+          width: Math.max(1, roundNumber(tile.width)),
+          height: Math.max(1, roundNumber(tile.height)),
+          pngBytes: tile.pngBytes,
+        };
+      })
+      .filter(Boolean);
   }
 
   async function appendEditableTextRuns(importedNode, payload) {

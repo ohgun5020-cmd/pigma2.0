@@ -86,10 +86,10 @@
   }
 
   button.title =
-    "\uC120\uD0DD\uD55C \uC774\uBBF8\uC9C0\uB098 \uD14D\uC2A4\uD2B8\uB97C \uBC14\uD0D5\uC73C\uB85C AI\uAC00 \uC5C5\uC885, \uBE0C\uB79C\uB4DC, \uC6A9\uB3C4\uB97C \uC790\uB3D9 \uAC10\uC9C0\uD574 3x5 \uD314\uB808\uD2B8\uC640 \uADF8\uB77C\uB370\uC774\uC158 \uC2A4\uC640\uCE58\uB97C \uB9CC\uB4ED\uB2C8\uB2E4.";
+    "\uC120\uD0DD\uD55C \uC774\uBBF8\uC9C0\uB098 \uD14D\uC2A4\uD2B8\uB97C \uBC14\uD0D5\uC73C\uB85C AI\uAC00 \uC5C5\uC885, \uBE0C\uB79C\uB4DC, \uC6A9\uB3C4\uB97C \uC790\uB3D9 \uAC10\uC9C0\uD574 \uC5B4\uB3C4\uBE44/\uD2B8\uB80C\uB514 \uCD94\uCC9C\uC0C9\uC744 \uD3EC\uD568\uD55C 3x7 \uD314\uB808\uD2B8\uC640 \uADF8\uB77C\uB370\uC774\uC158 \uC2A4\uC640\uCE58\uB97C \uB9CC\uB4ED\uB2C8\uB2E4.";
   button.setAttribute(
     "aria-label",
-    "\uC0C9\uC0C1 \uCD94\uCD9C. \uC120\uD0DD\uD55C \uC774\uBBF8\uC9C0\uB098 \uD14D\uC2A4\uD2B8\uB97C \uBC14\uD0D5\uC73C\uB85C AI\uAC00 \uC5C5\uC885, \uBE0C\uB79C\uB4DC, \uC6A9\uB3C4\uB97C \uC790\uB3D9 \uAC10\uC9C0\uD574 3x5 \uD314\uB808\uD2B8\uC640 \uADF8\uB77C\uB370\uC774\uC158 \uC2A4\uC640\uCE58\uB97C \uB9CC\uB4ED\uB2C8\uB2E4."
+    "\uC0C9\uC0C1 \uCD94\uCD9C. \uC120\uD0DD\uD55C \uC774\uBBF8\uC9C0\uB098 \uD14D\uC2A4\uD2B8\uB97C \uBC14\uD0D5\uC73C\uB85C AI\uAC00 \uC5C5\uC885, \uBE0C\uB79C\uB4DC, \uC6A9\uB3C4\uB97C \uC790\uB3D9 \uAC10\uC9C0\uD574 \uC5B4\uB3C4\uBE44/\uD2B8\uB80C\uB514 \uCD94\uCC9C\uC0C9\uC744 \uD3EC\uD568\uD55C 3x7 \uD314\uB808\uD2B8\uC640 \uADF8\uB77C\uB370\uC774\uC158 \uC2A4\uC640\uCE58\uB97C \uB9CC\uB4ED\uB2C8\uB2E4."
   );
 
   const defaultLabel = String(button.textContent || "\uC0C9\uC0C1 \uCD94\uCD9C").trim() || "\uC0C9\uC0C1 \uCD94\uCD9C";
@@ -2745,6 +2745,8 @@
       localContext && Array.isArray(localContext.accentCandidates) ? localContext.accentCandidates : [],
       normalized.analysis
     );
+    const accentCandidates = localContext && Array.isArray(localContext.accentCandidates) ? localContext.accentCandidates : [];
+    const surfaceCandidates = localContext && Array.isArray(localContext.surfaceCandidates) ? localContext.surfaceCandidates : [];
     const colorHuntGuide = buildColorHuntGuide(
       payload && payload.colorHuntPalettes,
       payload && payload.summary,
@@ -2752,14 +2754,6 @@
       normalized.representative,
       normalized.companions
     );
-    if (colorHuntGuide && Array.isArray(colorHuntGuide.companions) && colorHuntGuide.companions.length >= 3) {
-      normalized.companions = normalizeCompanionPalette(
-        colorHuntGuide.companions,
-        normalized.representative,
-        localContext && Array.isArray(localContext.accentCandidates) ? localContext.accentCandidates : [],
-        normalized.analysis
-      );
-    }
     const adobeTrendGuide = await buildAdobeTrendGuide(
       payload && payload.adobeTrends,
       payload && payload.summary,
@@ -2774,22 +2768,35 @@
       localContext && Array.isArray(localContext.accents) && localContext.accents.length >= 3 ? localContext.accents : normalized.accents;
     const localSurfaceRow =
       localContext && Array.isArray(localContext.surfaces) && localContext.surfaces.length >= 3 ? localContext.surfaces : normalized.surfaces;
-    const accentSource =
-      adobeTrendGuide && Array.isArray(adobeTrendGuide.accents) && adobeTrendGuide.accents.length >= 3
-        ? adobeTrendGuide.accents
-        : localAccentRow;
-    normalized.accents = normalizeAccentPalette(
-      accentSource,
+    const adobeSource =
+      adobeTrendGuide && Array.isArray(adobeTrendGuide.accents) && adobeTrendGuide.accents.length >= 3 ? adobeTrendGuide.accents : [];
+    const trendySource =
+      colorHuntGuide && Array.isArray(colorHuntGuide.companions) && colorHuntGuide.companions.length >= 3 ? colorHuntGuide.companions : [];
+    normalized.adobe = normalizeAccentPalette(
+      adobeSource,
       normalized.representative,
       normalized.companions,
-      localContext && Array.isArray(localContext.accentCandidates) ? localContext.accentCandidates : [],
+      accentCandidates,
+      normalized.analysis
+    );
+    normalized.trendy = normalizeCompanionPalette(
+      trendySource,
+      normalized.representative,
+      accentCandidates,
+      normalized.analysis
+    );
+    normalized.accents = normalizeAccentPalette(
+      localAccentRow,
+      normalized.representative,
+      normalized.companions,
+      accentCandidates,
       normalized.analysis
     );
     normalized.text = normalizeSemanticTextPalette(
       normalized.text,
       normalized.representative,
       normalized.companions,
-      localContext && Array.isArray(localContext.accentCandidates) ? localContext.accentCandidates : [],
+      accentCandidates,
       textHintColors
     );
     const colorHuntSurfaceRow =
@@ -2815,7 +2822,7 @@
       normalized.companions,
       normalized.accents,
       normalized.analysis,
-      localContext && Array.isArray(localContext.surfaceCandidates) ? localContext.surfaceCandidates : []
+      surfaceCandidates
     );
     if (adobeTrendGuide) {
       normalized.analysis.adobeTrendCategories = adobeTrendGuide.categoryLabels;
@@ -2841,6 +2848,8 @@
       clientRequestId: requestId,
       palette: {
         representative: result.representative,
+        adobe: result.adobe,
+        trendy: result.trendy,
         companions: result.companions,
         accents: result.accents,
         text: result.text,

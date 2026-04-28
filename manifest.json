@@ -14,7 +14,10 @@
   "networkAccess": {
     "allowedDomains": [
       "https://api.openai.com",
-      "https://generativelanguage.googleapis.com"
+      "https://generativelanguage.googleapis.com",
+      "https://api.dub.co",
+      "https://is.gd",
+      "https://tinyurl.com"
     ],
     "reasoning": "Calls user-configured AI APIs for image and video generation workflows."
   }

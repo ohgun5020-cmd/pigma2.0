@@ -10,15 +10,34 @@
   const AI_TYPO_FIX_CACHE_KEY = "pigma:ai-typo-fix-cache:v2";
   const AI_TYPO_CLEAR_CACHE_KEY = "pigma:ai-typo-clear-cache:v1";
   const AI_TRANSLATE_CACHE_KEY = "pigma:ai-translate-cache:v1";
-  const PATCH_VERSION = 9;
+  const AI_TRANSLATE_MEMORY_KEY = "pigma:ai-translate-memory:v1";
+  const AI_TEXT_HIGHLIGHT_DEFAULT_COLOR = "#F5FF74";
+  const AI_TEXT_HIGHLIGHT_DEFAULT_TEXT_COLOR = "#111111";
+  const AI_TEXT_HIGHLIGHT_DEFAULT_RADIUS = 0;
+  const AI_TEXT_HIGHLIGHT_DEFAULT_DECORATION_SCALE = 3;
+  const AI_TEXT_HIGHLIGHT_DEFAULT_BOX_PADDING_PX = 0;
+  const AI_TEXT_HIGHLIGHT_DEFAULT_STRIKE_RADIUS = 0;
+  const AI_TEXT_HIGHLIGHT_MEASURE_COLOR = "#FF00FF";
+  const AI_TEXT_HIGHLIGHT_GROUP_NAME = "#high-light-text";
+  const AI_TEXT_HIGHLIGHT_GROUP_PLUGIN_KEY = "pigma:text-highlight-group";
+  const AI_TEXT_HIGHLIGHT_GROUP_TEXT_NODE_KEY = "pigma:text-highlight-text-node-id";
+  const AI_TEXT_HIGHLIGHT_GROUP_WIDTH_KEY = "pigma:text-highlight-container-width";
+  const AI_TEXT_HIGHLIGHT_GROUP_HEIGHT_KEY = "pigma:text-highlight-container-height";
+  const PATCH_VERSION = 13;
   const TYPO_AUDIT_MODEL_BY_PROVIDER = Object.freeze({
     openai: "gpt-5-mini",
     gemini: "gemini-2.5-pro",
   });
   const AI_TRANSLATE_MODEL_BY_PROVIDER = Object.freeze({
-    openai: "gpt-5.4",
-    gemini: "gemini-2.5-pro",
+    openai: "gpt-4.1-mini",
+    gemini: "gemini-2.5-flash-lite",
   });
+  const AI_TRANSLATE_MAX_CHUNK_ITEMS = 24;
+  const AI_TRANSLATE_MAX_CHUNK_CHARS = 3600;
+  const AI_TRANSLATE_MEMORY_LIMIT = 400;
+  const loadedFontPromiseCache = new Map();
+  const pendingTextHighlightMeasureRequests = new Map();
+  let textHighlightMeasureRequestSequence = 0;
   const ANNOTATION_PREFIX = "[Ai 판단]";
   const LEGACY_ANNOTATION_PREFIXES = ["[AI Typo]", ANNOTATION_PREFIX, "[Pigma Ai Audit]"];
   const ANNOTATION_CATEGORY_LABEL = "Pigma Ai Audit";
@@ -382,6 +401,16 @@
         return;
       }
 
+      if (message.type === "request-ai-text-highlight-source") {
+        await postTextHighlightSource(message);
+        return;
+      }
+
+      if (message.type === "measure-ai-text-highlight-alpha-bounds-result") {
+        resolveTextHighlightAlphaBounds(message);
+        return;
+      }
+
       if (message.type === "run-ai-typo-fix") {
         await withTypoTaskLock("fix", runTypoFix);
         return;
@@ -399,10 +428,22 @@
         return;
       }
 
-      await withTypoTaskLock("audit", runTypoAudit);
+      if (message.type === "apply-ai-text-highlight") {
+        await withTypoTaskLock("highlight", async () => {
+          await runTextHighlight(message);
+        });
+        return;
+      }
+
+      if (message.type === "run-ai-typo-audit") {
+        await withTypoTaskLock("audit", async () => {
+          await runTypoAudit(message);
+        });
+        return;
+      }
+
       return;
     }
-
     return originalOnMessage(message);
   };
 
@@ -418,7 +459,10 @@
         message.type === "request-ai-typo-clear-cache" ||
         message.type === "run-ai-typo-clear" ||
         message.type === "request-ai-translate-cache" ||
-        message.type === "run-ai-translate")
+        message.type === "run-ai-translate" ||
+        message.type === "request-ai-text-highlight-source" ||
+        message.type === "apply-ai-text-highlight" ||
+        message.type === "measure-ai-text-highlight-alpha-bounds-result")
     );
   }
 
@@ -442,6 +486,9 @@
   }
 
   function getTypoTaskRunningMessage(task) {
+    if (task === "highlight") {
+      return "선택한 텍스트에 하이라이트를 적용하는 중입니다.";
+    }
     if (task === "fix") {
       return "오타 후보를 찾아 현재 선택의 텍스트를 직접 수정하고, 고친 부분에는 주석을 남기는 중입니다.";
     }
@@ -455,6 +502,10 @@
   }
 
   function postTypoTaskStatus(task, status, message) {
+    if (task === "highlight") {
+      postTextHighlightStatus(status, message);
+      return;
+    }
     if (task === "fix") {
       postFixStatus(status, message);
       return;
@@ -471,6 +522,13 @@
   }
 
   function postTypoTaskError(task, message) {
+    if (task === "highlight") {
+      figma.ui.postMessage({
+        type: "ai-text-highlight-error",
+        message,
+      });
+      return;
+    }
     if (task === "fix") {
       figma.ui.postMessage({
         type: "ai-typo-fix-error",
@@ -498,13 +556,33 @@
     });
   }
 
-  async function runTypoAudit() {
+  function normalizeTypoAuditProfile(value) {
+    return value === "speed" || value === "quality" ? value : "quality";
+  }
+
+  function getTypoAuditProfileLabel(profile) {
+    return normalizeTypoAuditProfile(profile) === "speed" ? "속도용" : "품질용";
+  }
+
+  function getTypoAuditProfileStrategyLabel(profile, strategy) {
+    const normalizedProfile = normalizeTypoAuditProfile(profile);
+    if (normalizedProfile === "speed") {
+      return "속도용 로컬 검수";
+    }
+    return strategy === "ai-primary" ? "품질용 AI 우선 + 로컬 보완" : "품질용 로컬 fallback";
+  }
+
+  async function runTypoAudit(options) {
+    const auditProfile = normalizeTypoAuditProfile(options && options.auditProfile);
     const runSelectionSignature = getSelectionSignature(figma.currentPage.selection);
-    postStatus("running", "오타 후보를 찾고 Dev Mode 주석 또는 결과 패널로 정리하는 중입니다.");
+    postStatus(
+      "running",
+      `${getTypoAuditProfileLabel(auditProfile)} 오타 후보를 찾고 Dev Mode 주석 또는 결과 패널로 정리하는 중입니다.`
+    );
 
     try {
       const designReadResult = await readDesignReadCache();
-      const result = await applyTypoAudit(designReadResult);
+      const result = await applyTypoAudit(designReadResult, { auditProfile });
       await writeTypoAuditCache(result);
 
       figma.ui.postMessage({
@@ -624,6 +702,506 @@
     }
   }
 
+  async function postTextHighlightSource(message) {
+    const requestId = message && typeof message.requestId === "string" ? message.requestId : "";
+    try {
+      const source = prepareTextHighlightSource();
+      figma.ui.postMessage({
+        type: "ai-text-highlight-source-ready",
+        requestId,
+        source,
+      });
+    } catch (error) {
+      figma.ui.postMessage({
+        type: "ai-text-highlight-source-error",
+        requestId,
+        message: normalizeErrorMessage(error, "드래그한 텍스트 범위를 먼저 선택해 주세요."),
+      });
+    }
+  }
+
+  function resolveTextHighlightMode(message) {
+    const rawMode = message && typeof message.highlightMode === "string" ? message.highlightMode.trim().toLowerCase() : "";
+    if (rawMode === "line" || rawMode === "strike") {
+      return rawMode;
+    }
+    return "box";
+  }
+
+  async function runTextHighlight(message) {
+    const highlightMode = resolveTextHighlightMode(message);
+    if (highlightMode === "line") {
+      await runTextHighlightLine(message);
+      return;
+    }
+    if (highlightMode === "strike") {
+      await runTextHighlightStrike(message);
+      return;
+    }
+    await runTextHighlightBox(message);
+  }
+
+  async function runTextHighlightBox(message) {
+    try {
+      const range = await resolveTextHighlightRange(message);
+      const parent = range.node.parent;
+      const colorSnapshot = extractTextRangeColorSnapshot(range.node, range.start, range.end);
+      const highlightColorHex = sanitizeHexColor(message && message.highlightColorHex, AI_TEXT_HIGHLIGHT_DEFAULT_COLOR);
+      const textColorHex = sanitizeHexColor(message && message.textColorHex, colorSnapshot.hex);
+      const cornerRadius = sanitizeTextHighlightRadius(
+        message && message.cornerRadius,
+        AI_TEXT_HIGHLIGHT_DEFAULT_RADIUS
+      );
+      const boxPaddingPx = sanitizeTextHighlightBoxPaddingPx(
+        message && message.decorationScale,
+        AI_TEXT_HIGHLIGHT_DEFAULT_BOX_PADDING_PX
+      );
+
+      if (!parent) {
+        throw new Error("하이라이트를 만들 부모 레이어를 찾지 못했습니다.");
+      }
+
+      postTextHighlightStatus("running", "텍스트 하이라이트 도형을 만드는 중입니다.");
+
+      const measurement = await measureTextHighlightBounds(range.node, range.start, range.end, textColorHex);
+      let boundsList = getTextHighlightMeasurementBoundsList(measurement);
+      if (!boundsList.length) {
+        throw new Error("선택한 텍스트 범위를 정확히 측정하지 못했습니다. 다시 드래그한 뒤 시도해 주세요.");
+      }
+      if (hasMergedTextHighlightBlockBounds(boundsList, measurement.fontSize)) {
+        boundsList = splitMergedTextHighlightBlockBounds(
+          boundsList,
+          measurement.fontSize,
+          measurement.lineHeight
+        );
+      }
+      boundsList = normalizeTextHighlightBoundsListForApply(
+        range.node,
+        range.start,
+        range.end,
+        boundsList,
+        measurement.fontSize,
+        measurement.lineHeight
+      );
+      if (!boundsList.length) {
+        throw new Error("선택한 텍스트 범위의 위치를 안전하게 계산하지 못했습니다. 다시 드래그한 뒤 시도해 주세요.");
+      }
+
+      await applyTextHighlightColor(range.node, range.start, range.end, textColorHex);
+
+      const container = prepareTextHighlightLayerContainer(parent, range.node);
+      const highlightParent = container.parent;
+      const nodeIndex = container.nodeIndex;
+      const anchorNodeId = container.anchorNodeId || range.node.id;
+      const rects = [];
+      for (let index = 0; index < boundsList.length; index += 1) {
+        const rect = createTextHighlightRect(
+          range.node,
+          highlightParent,
+          boundsList[index],
+          measurement.fontSize,
+          highlightColorHex,
+          cornerRadius,
+          boxPaddingPx
+        );
+        rect.name = boundsList.length > 1 ? `Highlight ${index + 1}` : "Highlight";
+        placeTextHighlightRectBehindNode(highlightParent, rect, anchorNodeId, nodeIndex >= 0 ? nodeIndex + index : -1);
+        rects.push(rect);
+      }
+      finalizeTextHighlightLayerContainer(highlightParent, range.node, container);
+
+      const group = groupTextHighlightSelection(highlightParent, range.node, rects, nodeIndex, container);
+
+      figma.ui.postMessage({
+        type: "ai-text-highlight-result",
+        result: {
+          groupId: group.id,
+          groupName: group.name,
+          nodeId: range.node.id,
+          selectionLabel: safeName(range.node),
+          textPreview: compactText(range.text) || previewText(range.text, 72),
+          highlightColorHex,
+          textColorHex,
+          rectCount: rects.length,
+          mode: "box",
+        },
+      });
+      figma.notify("박스형 텍스트 하이라이트를 만들었습니다.", { timeout: 2200 });
+    } catch (error) {
+      const messageText = normalizeErrorMessage(error, "텍스트 하이라이트를 적용하지 못했습니다.");
+      figma.ui.postMessage({
+        type: "ai-text-highlight-error",
+        message: messageText,
+      });
+      figma.notify(messageText, { error: true, timeout: 2200 });
+    }
+  }
+
+  async function runTextHighlightLine(message) {
+    try {
+      const range = await resolveTextHighlightRange(message);
+      const parent = range.node.parent;
+      const colorSnapshot = extractTextRangeColorSnapshot(range.node, range.start, range.end);
+      const fontSize = getTextRangeFontSize(range.node, range.start, range.end);
+      const lineHeight = getTextRangeLineHeight(range.node, range.start, range.end, fontSize);
+      const highlightColorHex = sanitizeHexColor(message && message.highlightColorHex, AI_TEXT_HIGHLIGHT_DEFAULT_COLOR);
+      const textColorHex = sanitizeHexColor(message && message.textColorHex, colorSnapshot.hex);
+      const decorationScale = sanitizeTextHighlightDecorationScale(
+        message && message.decorationScale,
+        buildTextHighlightAutoDecorationScale(fontSize, "line", lineHeight)
+      );
+      const lineCapRadius = sanitizeTextHighlightRadius(
+        message && message.strikeCapRadius,
+        AI_TEXT_HIGHLIGHT_DEFAULT_STRIKE_RADIUS
+      );
+
+      if (!parent) {
+        throw new Error("하이라이트를 만들 부모 레이어를 찾지 못했습니다.");
+      }
+
+      postTextHighlightStatus("running", "라인형 하이라이트를 만드는 중입니다.");
+
+      const measurement = await measureTextHighlightBounds(range.node, range.start, range.end, textColorHex);
+      let boundsList = getTextHighlightMeasurementBoundsList(measurement);
+      if (!boundsList.length) {
+        throw new Error("선택한 텍스트 범위를 정확히 측정하지 못했습니다. 다시 드래그한 뒤 시도해 주세요.");
+      }
+      if (hasMergedTextHighlightBlockBounds(boundsList, measurement.fontSize)) {
+        boundsList = splitMergedTextHighlightBlockBounds(
+          boundsList,
+          measurement.fontSize,
+          measurement.lineHeight
+        );
+      }
+      boundsList = normalizeTextHighlightBoundsListForApply(
+        range.node,
+        range.start,
+        range.end,
+        boundsList,
+        measurement.fontSize,
+        measurement.lineHeight
+      );
+      if (!boundsList.length) {
+        throw new Error("선택한 텍스트 범위의 위치를 안전하게 계산하지 못했습니다. 다시 드래그한 뒤 시도해 주세요.");
+      }
+
+      clearTextHighlightDecoration(range.node, range.start, range.end);
+      await applyTextHighlightColor(range.node, range.start, range.end, textColorHex);
+
+      const container = prepareTextHighlightLayerContainer(parent, range.node);
+      const highlightParent = container.parent;
+      const nodeIndex = container.nodeIndex;
+      const anchorNodeId = container.anchorNodeId || range.node.id;
+      const rects = [];
+      const thickness = buildTextHighlightDecorationThickness(measurement.fontSize, "line", decorationScale);
+      for (let index = 0; index < boundsList.length; index += 1) {
+        const rect = createTextHighlightLineRect(
+          range.node,
+          highlightParent,
+          boundsList[index],
+          measurement.fontSize,
+          thickness,
+          highlightColorHex,
+          lineCapRadius
+        );
+        rect.name = boundsList.length > 1 ? `Line Highlight ${index + 1}` : "Line Highlight";
+        placeTextHighlightRectBehindNode(highlightParent, rect, anchorNodeId, nodeIndex >= 0 ? nodeIndex + index : -1);
+        rects.push(rect);
+      }
+      finalizeTextHighlightLayerContainer(highlightParent, range.node, container);
+
+      const group = groupTextHighlightSelection(highlightParent, range.node, rects, nodeIndex, container);
+
+      figma.ui.postMessage({
+        type: "ai-text-highlight-result",
+        result: {
+          groupId: group.id,
+          groupName: group.name,
+          nodeId: range.node.id,
+          selectionLabel: safeName(range.node),
+          textPreview: compactText(range.text) || previewText(range.text, 72),
+          highlightColorHex,
+          textColorHex,
+          rectCount: rects.length,
+          mode: "line",
+        },
+      });
+      figma.notify("라인형 텍스트 하이라이트를 만들었습니다.", { timeout: 2200 });
+    } catch (error) {
+      const messageText = normalizeErrorMessage(error, "텍스트 하이라이트를 적용하지 못했습니다.");
+      figma.ui.postMessage({
+        type: "ai-text-highlight-error",
+        message: messageText,
+      });
+      figma.notify(messageText, { error: true, timeout: 2200 });
+    }
+  }
+
+  async function runTextHighlightStrike(message) {
+    try {
+      const range = await resolveTextHighlightRange(message);
+      const parent = range.node.parent;
+      const colorSnapshot = extractTextRangeColorSnapshot(range.node, range.start, range.end);
+      const fontSize = getTextRangeFontSize(range.node, range.start, range.end);
+      const lineHeight = getTextRangeLineHeight(range.node, range.start, range.end, fontSize);
+      const highlightColorHex = sanitizeHexColor(message && message.highlightColorHex, AI_TEXT_HIGHLIGHT_DEFAULT_COLOR);
+      const textColorHex = sanitizeHexColor(message && message.textColorHex, colorSnapshot.hex);
+      const decorationScale = sanitizeTextHighlightDecorationScale(
+        message && message.decorationScale,
+        buildTextHighlightAutoDecorationScale(fontSize, "strike", lineHeight)
+      );
+      const strikeCapRadius = sanitizeTextHighlightRadius(
+        message && message.strikeCapRadius,
+        AI_TEXT_HIGHLIGHT_DEFAULT_STRIKE_RADIUS
+      );
+
+      if (!parent) {
+        throw new Error("하이라이트를 만들 부모 레이어를 찾지 못했습니다.");
+      }
+
+      postTextHighlightStatus("running", "취소선형 하이라이트 라인을 만드는 중입니다.");
+
+      const measurement = await measureTextHighlightBounds(range.node, range.start, range.end, textColorHex);
+      let boundsList = getTextHighlightMeasurementBoundsList(measurement);
+      if (!boundsList.length) {
+        throw new Error("선택한 텍스트 범위를 정확히 측정하지 못했습니다. 다시 드래그한 뒤 시도해 주세요.");
+      }
+      if (hasMergedTextHighlightBlockBounds(boundsList, measurement.fontSize)) {
+        boundsList = splitMergedTextHighlightBlockBounds(
+          boundsList,
+          measurement.fontSize,
+          measurement.lineHeight
+        );
+      }
+      boundsList = normalizeTextHighlightBoundsListForApply(
+        range.node,
+        range.start,
+        range.end,
+        boundsList,
+        measurement.fontSize,
+        measurement.lineHeight
+      );
+      if (!boundsList.length) {
+        throw new Error("선택한 텍스트 범위의 위치를 안전하게 계산하지 못했습니다. 다시 드래그한 뒤 시도해 주세요.");
+      }
+
+      clearTextHighlightDecoration(range.node, range.start, range.end);
+      await applyTextHighlightColor(range.node, range.start, range.end, textColorHex);
+
+      const container = prepareTextHighlightLayerContainer(parent, range.node);
+      const highlightParent = container.parent;
+      const nodeIndex = container.nodeIndex;
+      const anchorNodeId = container.anchorNodeId || range.node.id;
+      const rects = [];
+      const thickness = buildTextHighlightDecorationThickness(measurement.fontSize, "strike", decorationScale);
+      for (let index = 0; index < boundsList.length; index += 1) {
+        const rect = createTextHighlightStrikeRect(
+          range.node,
+          highlightParent,
+          boundsList[index],
+          measurement.fontSize,
+          thickness,
+          highlightColorHex,
+          strikeCapRadius
+        );
+        rect.name = boundsList.length > 1 ? `Strike Highlight ${index + 1}` : "Strike Highlight";
+        placeTextHighlightRectBehindNode(highlightParent, rect, anchorNodeId, nodeIndex >= 0 ? nodeIndex + index : -1);
+        rects.push(rect);
+      }
+      finalizeTextHighlightLayerContainer(highlightParent, range.node, container);
+
+      const group = groupTextHighlightSelection(highlightParent, range.node, rects, nodeIndex, container);
+
+      figma.ui.postMessage({
+        type: "ai-text-highlight-result",
+        result: {
+          groupId: group.id,
+          groupName: group.name,
+          nodeId: range.node.id,
+          selectionLabel: safeName(range.node),
+          textPreview: compactText(range.text) || previewText(range.text, 72),
+          highlightColorHex,
+          textColorHex,
+          rectCount: rects.length,
+          mode: "strike",
+        },
+      });
+      figma.notify("취소선형 텍스트 하이라이트를 만들었습니다.", { timeout: 2200 });
+    } catch (error) {
+      const messageText = normalizeErrorMessage(error, "텍스트 하이라이트를 적용하지 못했습니다.");
+      figma.ui.postMessage({
+        type: "ai-text-highlight-error",
+        message: messageText,
+      });
+      figma.notify(messageText, { error: true, timeout: 2200 });
+    }
+  }
+
+  async function runTextHighlightNative(message, highlightMode) {
+    try {
+      const resolvedMode = highlightMode === "strike" ? "strike" : "line";
+      const range = await resolveTextHighlightRange(message);
+      const colorSnapshot = extractTextRangeColorSnapshot(range.node, range.start, range.end);
+      const highlightColorHex = sanitizeHexColor(message && message.highlightColorHex, AI_TEXT_HIGHLIGHT_DEFAULT_COLOR);
+      const textColorHex = sanitizeHexColor(message && message.textColorHex, colorSnapshot.hex);
+      const decorationScale = sanitizeTextHighlightDecorationScale(
+        message && message.decorationScale,
+        AI_TEXT_HIGHLIGHT_DEFAULT_DECORATION_SCALE
+      );
+
+      postTextHighlightStatus("running", "텍스트 하이라이트를 적용하는 중입니다.");
+      await applyTextHighlightDecoration(range.node, range.start, range.end, highlightColorHex, resolvedMode, decorationScale);
+      await applyTextHighlightColor(range.node, range.start, range.end, textColorHex);
+      figma.currentPage.selection = [range.node];
+      figma.viewport.scrollAndZoomIntoView([range.node]);
+
+      figma.ui.postMessage({
+        type: "ai-text-highlight-result",
+        result: {
+          groupId: "",
+          groupName: "",
+          nodeId: range.node.id,
+          selectionLabel: safeName(range.node),
+          textPreview: compactText(range.text) || previewText(range.text, 72),
+          highlightColorHex,
+          textColorHex,
+          mode: resolvedMode,
+        },
+      });
+      figma.notify(
+        resolvedMode === "strike" ? "취소선형 텍스트 하이라이트를 적용했습니다." : "라인형 텍스트 하이라이트를 적용했습니다.",
+        { timeout: 2200 }
+      );
+    } catch (error) {
+      const messageText = normalizeErrorMessage(error, "텍스트 하이라이트를 적용하지 못했습니다.");
+      figma.ui.postMessage({
+        type: "ai-text-highlight-error",
+        message: messageText,
+      });
+      figma.notify(messageText, { error: true, timeout: 2200 });
+    }
+  }
+
+  function clearTextHighlightDecoration(node, start, end) {
+    if (!node || typeof node.setRangeTextDecoration !== "function") {
+      return;
+    }
+
+    try {
+      node.setRangeTextDecoration(start, end, "NONE");
+    } catch (error) {}
+  }
+
+  async function applyTextHighlightDecoration(node, start, end, highlightColorHex, highlightMode, decorationScale) {
+    if (!node || node.type !== "TEXT") {
+      throw new Error("텍스트 하이라이트를 적용할 텍스트 레이어를 찾지 못했습니다.");
+    }
+
+    if (typeof node.setRangeTextDecoration !== "function") {
+      throw new Error("현재 Figma 버전에서는 텍스트 데코 하이라이트를 지원하지 않습니다.");
+    }
+
+    try {
+      await loadFontsForTextNode(node);
+    } catch (error) {}
+
+    const fontSize = getTextRangeFontSize(node, start, end);
+    const resolvedMode = highlightMode === "strike" ? "strike" : "line";
+    const resolvedScale = sanitizeTextHighlightDecorationScale(decorationScale, AI_TEXT_HIGHLIGHT_DEFAULT_DECORATION_SCALE);
+    const thicknessValue = buildTextHighlightDecorationThickness(fontSize, resolvedMode, resolvedScale);
+    const offsetValue = buildTextHighlightDecorationOffset(fontSize, resolvedMode, resolvedScale, thicknessValue);
+    const decorationKind = resolvedMode === "strike" ? "STRIKETHROUGH" : "UNDERLINE";
+
+    node.setRangeTextDecoration(start, end, decorationKind);
+
+    if (typeof node.setRangeTextDecorationStyle === "function") {
+      try {
+        node.setRangeTextDecorationStyle(start, end, "SOLID");
+      } catch (error) {}
+    }
+
+    if (typeof node.setRangeTextDecorationColor === "function") {
+      try {
+        node.setRangeTextDecorationColor(start, end, {
+          value: createSolidPaint(highlightColorHex),
+        });
+      } catch (error) {}
+    }
+
+    if (typeof node.setRangeTextDecorationSkipInk === "function") {
+      try {
+        node.setRangeTextDecorationSkipInk(start, end, false);
+      } catch (error) {}
+    }
+
+    if (typeof node.setRangeTextDecorationThickness === "function") {
+      try {
+        node.setRangeTextDecorationThickness(start, end, {
+          unit: "PIXELS",
+          value: thicknessValue,
+        });
+      } catch (error) {}
+    }
+
+    if (typeof node.setRangeTextDecorationOffset === "function") {
+      try {
+        node.setRangeTextDecorationOffset(start, end, {
+          unit: "PIXELS",
+          value: offsetValue,
+        });
+      } catch (error) {}
+    }
+  }
+
+  function buildTextHighlightDecorationThickness(fontSize, highlightMode, decorationScale) {
+    const size = Math.max(12, Number(fontSize) || 16);
+    const scale = sanitizeTextHighlightDecorationScale(decorationScale, AI_TEXT_HIGHLIGHT_DEFAULT_DECORATION_SCALE);
+    if (highlightMode === "strike") {
+      return roundTextHighlightThickness(Math.max(3, Math.min(size * 1.45, size * 0.22 * scale)));
+    }
+    return roundTextHighlightThickness(Math.max(2, Math.min(36, size * 0.1 * scale)));
+  }
+
+  function buildTextHighlightAutoDecorationScale(fontSize, highlightMode, lineHeight) {
+    const size = Math.max(12, Number(fontSize) || 16);
+    const mode = highlightMode === "line" ? "line" : "strike";
+    const baseThickness = buildTextHighlightDecorationThickness(size, mode, 1);
+    if (mode === "strike") {
+      const targetThickness = buildTextHighlightMinimumBoxThickness(size, lineHeight);
+      return Math.max(1, Math.min(10, Math.ceil(targetThickness / Math.max(1, baseThickness))));
+    }
+
+    const targetThickness = Math.max(2, Math.min(14, size * 0.1));
+    return sanitizeTextHighlightDecorationScale(
+      targetThickness / Math.max(1, baseThickness),
+      AI_TEXT_HIGHLIGHT_DEFAULT_DECORATION_SCALE
+    );
+  }
+
+  function buildTextHighlightMinimumBoxThickness(fontSize, lineHeight) {
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    return ceilTextHighlightThickness(Math.max(size * 0.78, Math.min(resolvedLineHeight, size)));
+  }
+
+  function buildTextHighlightDecorationOffset(fontSize, highlightMode, decorationScale, thicknessValue) {
+    const size = Math.max(12, Number(fontSize) || 16);
+    if (highlightMode === "strike") {
+      return roundTextHighlightMetric(0);
+    }
+
+    const scale = sanitizeTextHighlightDecorationScale(decorationScale, AI_TEXT_HIGHLIGHT_DEFAULT_DECORATION_SCALE);
+    const thickness =
+      Number(thicknessValue) > 0
+        ? Number(thicknessValue)
+        : buildTextHighlightDecorationThickness(size, highlightMode, scale);
+    const baseThickness = buildTextHighlightDecorationThickness(size, highlightMode, 1);
+    const baseCenterOffset = Math.max(3, Math.min(14, size * 0.2));
+    const fixedBottomOffset = baseCenterOffset + baseThickness / 2;
+    const centeredOffset = fixedBottomOffset - thickness / 2;
+    return roundTextHighlightMetric(Math.max(-size * 0.35, Math.min(baseCenterOffset, centeredOffset)));
+  }
+
   function getManagedAnnotationCategoryColor() {
     return ANNOTATION_CATEGORY_COLOR;
   }
@@ -696,6 +1274,14 @@
     });
   }
 
+  function postTextHighlightStatus(status, message) {
+    figma.ui.postMessage({
+      type: "ai-text-highlight-status",
+      status,
+      message,
+    });
+  }
+
   async function readDesignReadCache() {
     try {
       const value = await figma.clientStorage.getAsync(AI_DESIGN_READ_CACHE_KEY);
@@ -738,6 +1324,14 @@
       return value && typeof value === "object" ? value : null;
     } catch (error) {
       return null;
+    }
+  }
+
+  async function readTranslateMemory() {
+    try {
+      return normalizeTranslateMemory(await figma.clientStorage.getAsync(AI_TRANSLATE_MEMORY_KEY));
+    } catch (error) {
+      return [];
     }
   }
 
@@ -787,6 +1381,14 @@
     } catch (error) {}
 
     return result;
+  }
+
+  async function writeTranslateMemory(entries) {
+    const normalized = normalizeTranslateMemory(entries);
+    try {
+      await figma.clientStorage.setAsync(AI_TRANSLATE_MEMORY_KEY, normalized);
+    } catch (error) {}
+    return normalized;
   }
 
   function matchesCurrentSelection(result) {
@@ -1401,12 +2003,13 @@
     return count;
   }
 
-  async function applyTypoAudit(designReadResult) {
+  async function applyTypoAudit(designReadResult, options) {
     const selection = Array.from(figma.currentPage.selection || []);
     if (!selection.length) {
       throw new Error("프레임, 그룹, 레이어를 먼저 선택하세요.");
     }
 
+    const auditProfile = normalizeTypoAuditProfile(options && options.auditProfile);
     const proofingSettings = await readProofingSettings();
     const context = buildSelectionContext(selection, designReadResult, proofingSettings);
     const textNodes = collectTextNodes(selection);
@@ -1414,7 +2017,7 @@
       throw new Error("텍스트 레이어가 포함된 선택을 먼저 선택하세요.");
     }
 
-    const issueResult = await buildTypoIssues(textNodes, context, proofingSettings);
+    const issueResult = await buildTypoIssues(textNodes, context, proofingSettings, { auditProfile });
     const issues = issueResult.issues.slice(0, 24);
     const annotationNodes = getAnnotatableTextNodes(textNodes);
     const annotationSupported = annotationNodes.length > 0;
@@ -1436,7 +2039,12 @@
 
     return {
       version: PATCH_VERSION,
-      source: issueResult.strategy === "ai-primary" ? "ai-primary-annotation" : "local-fallback-annotation",
+      source:
+        issueResult.strategy === "ai-primary"
+          ? "ai-primary-annotation"
+          : issueResult.strategy === "speed-local"
+            ? "speed-local-annotation"
+            : "local-fallback-annotation",
       mode: auditUsesAnnotations ? "figma-dev-annotation" : "result-only",
       selectionSignature: getSelectionSignature(selection),
       processedAt: new Date().toISOString(),
@@ -1451,7 +2059,9 @@
         skippedCount: applied.skipped.length,
         mode: auditUsesAnnotations ? "figma-dev-annotation" : "result-only",
         modeLabel: auditUsesAnnotations ? "Figma Dev Mode 주석" : "결과 패널만",
-        reviewStrategy: issueResult.strategy === "ai-primary" ? "AI 우선 + 로컬 보완" : "로컬 fallback",
+        auditProfile,
+        auditProfileLabel: getTypoAuditProfileLabel(auditProfile),
+        reviewStrategy: getTypoAuditProfileStrategyLabel(auditProfile, issueResult.strategy),
         aiStatusLabel: issueResult.aiMeta ? issueResult.aiMeta.statusLabel : "AI 상태 미확인",
         aiProviderLabel: issueResult.aiMeta ? issueResult.aiMeta.providerLabel : "",
         aiModelLabel: issueResult.aiMeta ? issueResult.aiMeta.modelLabel : "",
@@ -1557,7 +2167,14 @@
     const applied = await applyTranslatedText(textNodes, translationResult.issues, proofingSettings, targetLanguage);
     const sourceLanguageLabel =
       context.languageHintLabel || context.detectedLanguageLabel || context.languageLabel || "자동 감지";
-    const insights = buildTranslateInsights(context, textNodes, applied, translationResult.aiMeta, targetLanguage);
+    const insights = buildTranslateInsights(
+      context,
+      textNodes,
+      applied,
+      translationResult.aiMeta,
+      targetLanguage,
+      translationResult.cacheStats
+    );
 
     return {
       version: PATCH_VERSION,
@@ -1572,6 +2189,9 @@
         translatedCount: applied.appliedCount,
         unchangedCount: applied.unchangedCount,
         skippedCount: applied.skipped.length,
+        reusedCount: translationResult.cacheStats ? translationResult.cacheStats.reusedCount : 0,
+        requestedTextCount: translationResult.cacheStats ? translationResult.cacheStats.requestedCount : textNodes.length,
+        uniqueRequestedTextCount: translationResult.cacheStats ? translationResult.cacheStats.uniqueRequestedCount : textNodes.length,
         sourceLanguageLabel,
         targetLanguageCode: targetLanguage.code,
         targetLanguageLabel: targetLanguage.label,
@@ -1617,6 +2237,70 @@
       };
     }
 
+    const translationMemoryMap = buildTranslateMemoryMap(await readTranslateMemory());
+    const pendingCandidateMap = new Map();
+    const pendingCandidates = [];
+    const issues = [];
+    let cachedCount = 0;
+    let requestedCount = 0;
+    let translationMemoryDirty = false;
+
+    for (const candidate of candidates) {
+      const currentText = normalizeLineEndings(candidate.currentText || "");
+      const memoryKey = buildTranslateMemoryKey(targetLanguage.code, currentText);
+      const cachedEntry = translationMemoryMap.get(memoryKey);
+      if (cachedEntry && cachedEntry.translatedText) {
+        const cachedSuggestion = normalizeLineEndings(cachedEntry.translatedText);
+        if (
+          cachedSuggestion &&
+          compactText(currentText) !== compactText(cachedSuggestion) &&
+          issueRespectsProofingTerms(currentText, cachedSuggestion, proofingSettings) &&
+          translationPreservesCriticalTokens(currentText, cachedSuggestion)
+        ) {
+          issues.push(
+            createIssue(
+              candidate.node,
+              currentText,
+              cachedSuggestion,
+              "번역",
+              cachedEntry.reason || "이전 AI 번역 결과를 다시 사용했습니다.",
+              "ai"
+            )
+          );
+          cachedCount += 1;
+          continue;
+        }
+      }
+
+      requestedCount += 1;
+      let bucket = pendingCandidateMap.get(memoryKey);
+      if (!bucket) {
+        bucket = {
+          id: candidate.id,
+          memoryKey,
+          node: candidate.node,
+          currentText,
+          text: currentText,
+          members: [],
+        };
+        pendingCandidateMap.set(memoryKey, bucket);
+        pendingCandidates.push(bucket);
+      }
+      bucket.members.push(candidate);
+    }
+
+    if (!pendingCandidates.length) {
+      return {
+        issues,
+        aiMeta: createAiMeta("success", runInfo.provider, runInfo.model, ""),
+        cacheStats: {
+          reusedCount: cachedCount,
+          requestedCount,
+          uniqueRequestedCount: 0,
+        },
+      };
+    }
+
     const schema = {
       type: "object",
       properties: {
@@ -1636,17 +2320,15 @@
       required: ["translations"],
     };
     const instructions =
-      "You translate UI copy for a Figma plugin screen. Translate each text node from the detected source language into the requested target language. Preserve product names, brand names, protectedTerms, URLs, emails, placeholders such as {{name}}, ${name}, {name}, printf tokens such as %s or %1$d, numbers, HTML-like tags, slash commands, and code-like identifiers exactly as they appear. Keep punctuation and line breaks whenever possible. Do not summarize, censor, add explanations, or rewrite the content beyond what is needed for a faithful UI translation. If a string is already in the target language or should stay unchanged, omit it. Return the full translated string in text. Return concise reasons in Korean when possible.";
-    const chunkSize = 24;
-    const chunkCount = Math.max(1, Math.ceil(candidates.length / chunkSize));
-    const issues = [];
+      "Translate each text node into the requested target language. Preserve product names, brand names, protectedTerms, URLs, emails, placeholders such as {{name}}, ${name}, {name}, printf tokens such as %s or %1$d, numbers, HTML-like tags, slash commands, and code-like identifiers exactly. Keep punctuation and line breaks whenever possible. Do not summarize, censor, or add explanations. Omit entries that should stay unchanged. Return short reasons in Korean when possible.";
+    const candidateChunks = buildTranslateChunks(pendingCandidates);
+    const chunkCount = Math.max(1, candidateChunks.length);
     let resolvedProvider = runInfo.provider;
     let resolvedModel = runInfo.model;
 
-    for (let start = 0; start < candidates.length; start += chunkSize) {
-      const chunk = candidates.slice(start, start + chunkSize);
-      const chunkIndex = Math.floor(start / chunkSize) + 1;
-      postTranslateStatus("running", `${targetLanguage.label}로 번역하는 중입니다. (${chunkIndex}/${chunkCount})`);
+    for (let chunkIndex = 0; chunkIndex < candidateChunks.length; chunkIndex += 1) {
+      const chunk = candidateChunks[chunkIndex];
+      postTranslateStatus("running", `${targetLanguage.label}로 번역하는 중입니다. (${chunkIndex + 1}/${chunkCount})`);
 
       const payload = {
         selectionLabel: context.selectionLabel,
@@ -1660,11 +2342,7 @@
         userDictionary: proofingSettings ? proofingSettings.userDictionary : [],
         textNodes: chunk.map((entry) => ({
           id: entry.id,
-          name: entry.name,
           text: entry.text,
-          lineCount: countTextLines(entry.text),
-          lines: String(entry.text || "").split(/\r?\n/),
-          scriptFamilies: getActiveScriptFamilies(entry.text),
         })),
       };
 
@@ -1711,7 +2389,7 @@
         }
 
         const candidate = candidateMap.get(row.id);
-        if (!candidate || !candidate.node) {
+        if (!candidate || !Array.isArray(candidate.members) || !candidate.members.length) {
           continue;
         }
 
@@ -1742,10 +2420,203 @@
       }
     }
 
+    for (const issue of issues) {
+      if (!issue) {
+        continue;
+      }
+      upsertTranslateMemoryEntry(
+        translationMemoryMap,
+        targetLanguage.code,
+        normalizeLineEndings(issue.currentText || ""),
+        normalizeLineEndings(issue.suggestion || ""),
+        typeof issue.reason === "string" ? issue.reason : ""
+      );
+      translationMemoryDirty = true;
+    }
+
+    if (translationMemoryDirty) {
+      await writeTranslateMemory(collectTranslateMemoryEntries(translationMemoryMap));
+    }
+
     return {
-      issues,
+      issues: expandTranslateIssuesForDuplicateCandidates(issues, pendingCandidates),
       aiMeta: createAiMeta("success", resolvedProvider, resolvedModel, ""),
+      cacheStats: {
+        reusedCount: cachedCount,
+        requestedCount,
+        uniqueRequestedCount: pendingCandidates.length,
+      },
     };
+  }
+
+  function buildTranslateChunks(candidates) {
+    const chunks = [];
+    let currentChunk = [];
+    let currentChars = 0;
+
+    for (const candidate of Array.isArray(candidates) ? candidates : []) {
+      if (!candidate) {
+        continue;
+      }
+
+      const nextChars = currentChars + String(candidate.text || "").length;
+      const exceedsItemLimit = currentChunk.length >= AI_TRANSLATE_MAX_CHUNK_ITEMS;
+      const exceedsCharLimit = currentChunk.length > 0 && nextChars > AI_TRANSLATE_MAX_CHUNK_CHARS;
+
+      if (exceedsItemLimit || exceedsCharLimit) {
+        chunks.push(currentChunk);
+        currentChunk = [];
+        currentChars = 0;
+      }
+
+      currentChunk.push(candidate);
+      currentChars += String(candidate.text || "").length;
+    }
+
+    if (currentChunk.length > 0) {
+      chunks.push(currentChunk);
+    }
+
+    return chunks;
+  }
+
+  function buildTranslateMemoryMap(entries) {
+    const map = new Map();
+    for (const entry of normalizeTranslateMemory(entries)) {
+      map.set(entry.key, entry);
+    }
+    return map;
+  }
+
+  function collectTranslateMemoryEntries(memoryMap) {
+    const entries = [];
+    if (!memoryMap || typeof memoryMap.values !== "function") {
+      return entries;
+    }
+
+    for (const entry of memoryMap.values()) {
+      entries.push(entry);
+    }
+
+    return normalizeTranslateMemory(entries);
+  }
+
+  function normalizeTranslateMemory(entries) {
+    const source =
+      Array.isArray(entries)
+        ? entries
+        : entries && typeof entries === "object" && Array.isArray(entries.entries)
+          ? entries.entries
+          : [];
+    const normalized = [];
+    const seen = new Set();
+
+    for (const item of source) {
+      const entry = normalizeTranslateMemoryEntry(item);
+      if (!entry || seen.has(entry.key)) {
+        continue;
+      }
+      seen.add(entry.key);
+      normalized.push(entry);
+      if (normalized.length >= AI_TRANSLATE_MEMORY_LIMIT) {
+        break;
+      }
+    }
+
+    return normalized;
+  }
+
+  function normalizeTranslateMemoryEntry(value) {
+    const source = value && typeof value === "object" ? value : null;
+    if (!source) {
+      return null;
+    }
+
+    const targetLanguageCode = String(source.targetLanguageCode || "").trim();
+    const sourceText = normalizeLineEndings(source.sourceText || "");
+    const translatedText = normalizeLineEndings(source.translatedText || "");
+    if (!targetLanguageCode || !sourceText || !translatedText) {
+      return null;
+    }
+
+    return {
+      key: buildTranslateMemoryKey(targetLanguageCode, sourceText),
+      targetLanguageCode,
+      sourceText,
+      translatedText,
+      reason: typeof source.reason === "string" ? source.reason.trim() : "",
+      updatedAt:
+        typeof source.updatedAt === "string" && source.updatedAt.trim() ? source.updatedAt.trim() : new Date().toISOString(),
+    };
+  }
+
+  function buildTranslateMemoryKey(targetLanguageCode, sourceText) {
+    return `${String(targetLanguageCode || "").trim().toLowerCase()}::${normalizeLineEndings(sourceText || "")}`;
+  }
+
+  function upsertTranslateMemoryEntry(memoryMap, targetLanguageCode, sourceText, translatedText, reason) {
+    if (!memoryMap || typeof memoryMap.set !== "function") {
+      return;
+    }
+
+    const entry = normalizeTranslateMemoryEntry({
+      targetLanguageCode,
+      sourceText,
+      translatedText,
+      reason,
+      updatedAt: new Date().toISOString(),
+    });
+    if (!entry) {
+      return;
+    }
+
+    if (memoryMap.has(entry.key)) {
+      memoryMap.delete(entry.key);
+    }
+    memoryMap.set(entry.key, entry);
+  }
+
+  function expandTranslateIssuesForDuplicateCandidates(issues, pendingCandidates) {
+    const expanded = [];
+    const pendingByNodeId = new Map();
+
+    for (const candidate of Array.isArray(pendingCandidates) ? pendingCandidates : []) {
+      if (!candidate || !candidate.node || !candidate.node.id) {
+        continue;
+      }
+      pendingByNodeId.set(candidate.node.id, candidate);
+    }
+
+    for (const issue of Array.isArray(issues) ? issues : []) {
+      if (!issue || !issue.node || !issue.node.id) {
+        continue;
+      }
+
+      const candidate = pendingByNodeId.get(issue.node.id);
+      const members = candidate && Array.isArray(candidate.members) ? candidate.members : [];
+      if (!members.length) {
+        expanded.push(issue);
+        continue;
+      }
+
+      for (const member of members) {
+        if (!member || !member.node) {
+          continue;
+        }
+        expanded.push(
+          createIssue(
+            member.node,
+            issue.currentText,
+            issue.suggestion,
+            issue.kind || "번역",
+            issue.reason || "",
+            issue.source || "ai"
+          )
+        );
+      }
+    }
+
+    return expanded;
   }
 
   function buildAiTranslateCandidates(textNodes, proofingSettings) {
@@ -1810,6 +2681,8 @@
 
       issuesByNode.set(issue.node.id, issue);
     }
+
+    await preloadFontsForTextNodes(textNodes, issuesByNode);
 
     for (const node of textNodes) {
       const currentText = getTextValue(node);
@@ -1945,7 +2818,7 @@
     return normalizeTermList(tokens);
   }
 
-  function buildTranslateInsights(context, textNodes, applied, aiMeta, targetLanguage) {
+  function buildTranslateInsights(context, textNodes, applied, aiMeta, targetLanguage, cacheStats) {
     const sourceLanguageLabel =
       context.languageHintLabel || context.detectedLanguageLabel || context.languageLabel || "자동 감지";
     const insights = [
@@ -1962,6 +2835,14 @@
 
     if (applied.skipped.length > 0) {
       insights.push(`안전 검사로 건너뜀 ${applied.skipped.length}개`);
+    }
+
+    if (cacheStats && cacheStats.reusedCount > 0) {
+      insights.push(`재사용 캐시 ${cacheStats.reusedCount}개`);
+    }
+
+    if (cacheStats && cacheStats.requestedCount > 0 && cacheStats.uniqueRequestedCount > 0) {
+      insights.push(`AI 요청 ${cacheStats.requestedCount}개 -> 중복 제거 후 ${cacheStats.uniqueRequestedCount}개`);
     }
 
     if (aiMeta && aiMeta.statusLabel) {
@@ -2579,7 +3460,72 @@
 
     const fontNames = collectEditableFontNames(node);
     for (const fontName of fontNames) {
-      await figma.loadFontAsync(fontName);
+      await loadFontWithCache(fontName);
+    }
+  }
+
+  async function preloadFontsForTextNodes(textNodes, issuesByNode) {
+    const fontNames = [];
+    const seen = new Set();
+
+    for (const node of Array.isArray(textNodes) ? textNodes : []) {
+      if (!node || !node.id) {
+        continue;
+      }
+      if (issuesByNode && !issuesByNode.has(node.id)) {
+        continue;
+      }
+
+      const editableFontNames = collectEditableFontNames(node);
+      for (const fontName of editableFontNames) {
+        const key = getFontCacheKey(fontName);
+        if (!key || seen.has(key)) {
+          continue;
+        }
+
+        seen.add(key);
+        fontNames.push({
+          family: fontName.family,
+          style: fontName.style,
+        });
+      }
+    }
+
+    for (const fontName of fontNames) {
+      await loadFontWithCache(fontName);
+    }
+  }
+
+  function getFontCacheKey(fontName) {
+    if (!fontName || typeof fontName !== "object") {
+      return "";
+    }
+    if (typeof fontName.family !== "string" || typeof fontName.style !== "string") {
+      return "";
+    }
+    return `${fontName.family}::${fontName.style}`;
+  }
+
+  async function loadFontWithCache(fontName) {
+    const key = getFontCacheKey(fontName);
+    if (!key) {
+      return;
+    }
+
+    let pending = loadedFontPromiseCache.get(key);
+    if (!pending) {
+      pending = figma.loadFontAsync({
+        family: fontName.family,
+        style: fontName.style,
+      });
+      loadedFontPromiseCache.set(key, pending);
+    }
+
+    try {
+      await pending;
+    } catch (error) {
+      loadedFontPromiseCache.delete(key);
+      throw error;
     }
   }
 
@@ -3186,11 +4132,13 @@
     return String(value || "").replace(/\s+/g, "");
   }
 
-  async function buildTypoIssues(textNodes, context, proofingSettings) {
+  async function buildTypoIssues(textNodes, context, proofingSettings, options) {
     const issues = [];
     const seen = new Set();
     let aiError = "";
-    const aiPromise = requestAiTypoIssues(textNodes, context, proofingSettings);
+    const auditProfile = normalizeTypoAuditProfile(options && options.auditProfile);
+    const useSpeedProfile = auditProfile === "speed";
+    const aiPromise = useSpeedProfile ? null : requestAiTypoIssues(textNodes, context, proofingSettings);
     const localIssues = [];
 
     for (const node of textNodes) {
@@ -3213,10 +4161,16 @@
       }
     }
 
-    const aiResult = await aiPromise;
+    const aiResult = aiPromise
+      ? await aiPromise
+      : {
+          issues: [],
+          aiError: "",
+          aiMeta: createAiMeta("local-only", "", "", "속도용 검수는 AI 호출 없이 로컬 규칙만 사용합니다."),
+        };
     aiResult.issues = filterIssuesForProofing(aiResult.issues, proofingSettings);
     aiError = aiResult.aiError || "";
-    const useAiPrimary = Array.isArray(aiResult.issues) && aiResult.issues.length > 0;
+    const useAiPrimary = !useSpeedProfile && Array.isArray(aiResult.issues) && aiResult.issues.length > 0;
     const primaryIssues = useAiPrimary ? aiResult.issues : localIssues;
     const secondaryIssues = useAiPrimary ? localIssues : [];
 
@@ -3231,7 +4185,7 @@
     return {
       issues: mergeIssuesByNode(issues),
       aiError,
-      strategy: useAiPrimary ? "ai-primary" : "local-fallback",
+      strategy: useSpeedProfile ? "speed-local" : useAiPrimary ? "ai-primary" : "local-fallback",
       aiMeta: aiResult.aiMeta || createAiMeta("unknown", "", "", ""),
     };
   }
@@ -3668,6 +4622,8 @@
       statusLabel = "AI 설정 없음";
     } else if (normalizedStatus === "skipped") {
       statusLabel = "AI 호출 건너뜀";
+    } else if (normalizedStatus === "local-only") {
+      statusLabel = "AI 호출 안 함";
     } else if (normalizedStatus === "unavailable") {
       statusLabel = "AI helper 없음";
     }
@@ -4775,6 +5731,3207 @@
       default:
         return String(type || "레이어");
     }
+  }
+
+  function prepareTextHighlightSource() {
+    const range = resolveSelectedTextHighlightRange();
+    const colorSnapshot = extractTextRangeColorSnapshot(range.node, range.start, range.end);
+    const fontSize = getTextRangeFontSize(range.node, range.start, range.end);
+    const lineHeight = getTextRangeLineHeight(range.node, range.start, range.end, fontSize);
+
+    return {
+      nodeId: range.node.id,
+      nodeName: safeName(range.node),
+      selectionLabel: safeName(range.node),
+      start: range.start,
+      end: range.end,
+      text: range.text,
+      textPreview: compactText(range.text) || previewText(range.text, 72),
+      fontSize,
+      lineHeight,
+      textColorHex: colorSnapshot.hex,
+      highlightColorHex: AI_TEXT_HIGHLIGHT_DEFAULT_COLOR,
+      cornerRadius: sanitizeTextHighlightRadius(
+        AI_TEXT_HIGHLIGHT_DEFAULT_RADIUS,
+        AI_TEXT_HIGHLIGHT_DEFAULT_RADIUS
+      ),
+      decorationScale: AI_TEXT_HIGHLIGHT_DEFAULT_BOX_PADDING_PX,
+      lineDecorationScale: buildTextHighlightAutoDecorationScale(fontSize, "line", lineHeight),
+      strikeCapRadius: sanitizeTextHighlightRadius(
+        AI_TEXT_HIGHLIGHT_DEFAULT_STRIKE_RADIUS,
+        AI_TEXT_HIGHLIGHT_DEFAULT_STRIKE_RADIUS
+      ),
+      hasMixedTextColor: colorSnapshot.mixed === true,
+    };
+  }
+
+  function requestTextHighlightAlphaBounds(payload) {
+    return new Promise((resolve, reject) => {
+      const requestId = `text-highlight-alpha-${Date.now()}-${(textHighlightMeasureRequestSequence += 1)}`;
+      const timeoutId = setTimeout(() => {
+        pendingTextHighlightMeasureRequests.delete(requestId);
+        reject(new Error("Text highlight measurement timed out."));
+      }, 15000);
+
+      pendingTextHighlightMeasureRequests.set(requestId, {
+        resolve,
+        reject,
+        timeoutId,
+      });
+
+      figma.ui.postMessage({
+        type: "measure-ai-text-highlight-alpha-bounds",
+        requestId,
+        payload,
+      });
+    });
+  }
+
+  function resolveTextHighlightAlphaBounds(message) {
+    const requestId = message && typeof message.requestId === "string" ? message.requestId : "";
+    if (!requestId || !pendingTextHighlightMeasureRequests.has(requestId)) {
+      return;
+    }
+
+    const pending = pendingTextHighlightMeasureRequests.get(requestId);
+    pendingTextHighlightMeasureRequests.delete(requestId);
+    if (pending && pending.timeoutId) {
+      clearTimeout(pending.timeoutId);
+    }
+
+    if (!pending) {
+      return;
+    }
+
+    if (message && typeof message.error === "string" && message.error) {
+      pending.reject(new Error(message.error));
+      return;
+    }
+
+    const bounds = message && message.bounds && typeof message.bounds === "object" ? message.bounds : null;
+    const segments = message && Array.isArray(message.segments) ? message.segments : [];
+    if (!bounds && !segments.length) {
+      pending.resolve(null);
+      return;
+    }
+
+    pending.resolve({
+      bounds,
+      segments,
+    });
+  }
+
+  async function resolveTextHighlightRange(message) {
+    const hasExplicitRange =
+      message &&
+      typeof message.nodeId === "string" &&
+      message.nodeId &&
+      Number.isFinite(Number(message.start)) &&
+      Number.isFinite(Number(message.end));
+
+    if (!hasExplicitRange) {
+      const liveRange = tryResolveLiveSelectedTextHighlightRange(message);
+      if (liveRange) {
+        return liveRange;
+      }
+      return resolveSelectedTextHighlightRange();
+    }
+
+    const node =
+      typeof figma.getNodeByIdAsync === "function"
+        ? await figma.getNodeByIdAsync(message.nodeId)
+        : typeof figma.getNodeById === "function"
+          ? figma.getNodeById(message.nodeId)
+          : null;
+    if (!node || node.removed || node.type !== "TEXT") {
+      throw new Error("선택한 텍스트 레이어를 다시 찾지 못했습니다. 다시 드래그한 뒤 시도해 주세요.");
+    }
+
+    const characters = typeof node.characters === "string" ? node.characters : "";
+    const start = Math.max(0, Math.floor(Number(message.start) || 0));
+    const end = Math.max(start, Math.min(characters.length, Math.floor(Number(message.end) || 0)));
+    const text = normalizeLineEndings(characters.slice(start, end));
+    const sourceText = normalizeLineEndings(message && typeof message.sourceText === "string" ? message.sourceText : "");
+    if (end <= start || !compactText(text)) {
+      throw new Error("하이라이트할 텍스트 범위를 먼저 드래그해 주세요.");
+    }
+
+    if (sourceText && compactText(sourceText) && text !== sourceText) {
+      const liveRange = tryResolveLiveSelectedTextHighlightRange(message);
+      if (liveRange && liveRange.text === sourceText) {
+        return liveRange;
+      }
+    }
+
+    return {
+      node,
+      start,
+      end,
+      text,
+    };
+  }
+
+  function tryResolveLiveSelectedTextHighlightRange(message) {
+    const page = figma.currentPage;
+    const selectedTextRange = page && "selectedTextRange" in page ? page.selectedTextRange : null;
+    if (!selectedTextRange || !selectedTextRange.node || selectedTextRange.node.removed || selectedTextRange.node.type !== "TEXT") {
+      return null;
+    }
+
+    const characters = typeof selectedTextRange.node.characters === "string" ? selectedTextRange.node.characters : "";
+    const start = Math.max(0, Math.floor(Number(selectedTextRange.start) || 0));
+    const end = Math.max(start, Math.min(characters.length, Math.floor(Number(selectedTextRange.end) || 0)));
+    const text = normalizeLineEndings(characters.slice(start, end));
+    if (end <= start || !compactText(text)) {
+      return null;
+    }
+
+    if (message && typeof message.nodeId === "string" && message.nodeId && message.nodeId !== selectedTextRange.node.id) {
+      return null;
+    }
+
+    return {
+      node: selectedTextRange.node,
+      start,
+      end,
+      text,
+    };
+  }
+
+  function resolveSelectedTextHighlightRange() {
+    const page = figma.currentPage;
+    const selectedTextRange = page && "selectedTextRange" in page ? page.selectedTextRange : null;
+    if (!selectedTextRange || !selectedTextRange.node || selectedTextRange.node.removed || selectedTextRange.node.type !== "TEXT") {
+      throw new Error("하이라이트할 텍스트를 Figma에서 드래그한 뒤 다시 시도해 주세요.");
+    }
+
+    const characters = typeof selectedTextRange.node.characters === "string" ? selectedTextRange.node.characters : "";
+    const start = Math.max(0, Math.floor(Number(selectedTextRange.start) || 0));
+    const end = Math.max(start, Math.min(characters.length, Math.floor(Number(selectedTextRange.end) || 0)));
+    const text = normalizeLineEndings(characters.slice(start, end));
+    if (end <= start || !compactText(text)) {
+      throw new Error("하이라이트할 텍스트 범위를 먼저 드래그해 주세요.");
+    }
+
+    return {
+      node: selectedTextRange.node,
+      start,
+      end,
+      text,
+    };
+  }
+
+  function isWholeTextHighlightRange(node, start, end) {
+    const characters = node && typeof node.characters === "string" ? node.characters : "";
+    const characterCount = characters.length;
+    if (!(characterCount > 0)) {
+      return false;
+    }
+
+    const rangeStart = Math.max(0, Math.floor(Number(start) || 0));
+    const rangeEnd = Math.max(rangeStart, Math.min(characterCount, Math.floor(Number(end) || 0)));
+    return rangeStart <= 0 && rangeEnd >= characterCount;
+  }
+
+  function extractTextRangeColorSnapshot(node, start, end) {
+    const fallbackHex = AI_TEXT_HIGHLIGHT_DEFAULT_TEXT_COLOR;
+    const segments = getTextHighlightStyledSegments(node, start, end, ["fills"]);
+    const seen = {};
+    let firstHex = "";
+    let uniqueCount = 0;
+
+    for (const segment of segments) {
+      const hex = extractVisibleSolidPaintHex(segment && segment.fills);
+      if (!hex) {
+        continue;
+      }
+
+      if (!firstHex) {
+        firstHex = hex;
+      }
+      if (!seen[hex]) {
+        seen[hex] = true;
+        uniqueCount += 1;
+      }
+    }
+
+    if (firstHex) {
+      return {
+        hex: firstHex,
+        mixed: uniqueCount > 1,
+      };
+    }
+
+    const rangeHex = extractVisibleSolidPaintHex(getTextHighlightPaints(node, start, end));
+    if (rangeHex) {
+      return {
+        hex: rangeHex,
+        mixed: false,
+      };
+    }
+
+    const singleCharHex = extractVisibleSolidPaintHex(getTextHighlightPaints(node, start, Math.min(end, start + 1)));
+    if (singleCharHex) {
+      return {
+        hex: singleCharHex,
+        mixed: false,
+      };
+    }
+
+    const nodeHex = extractVisibleSolidPaintHex(node && node.fills);
+    return {
+      hex: nodeHex || fallbackHex,
+      mixed: false,
+    };
+  }
+
+  async function measureTextHighlightBounds(node, start, end, textColorHex) {
+    const characters = node && typeof node.characters === "string" ? node.characters : "";
+    const characterCount = characters.length;
+    const rangeStart = Math.max(0, Math.min(characterCount, Math.floor(Number(start) || 0)));
+    const rangeEnd = Math.max(rangeStart, Math.min(characterCount, Math.floor(Number(end) || 0)));
+    const fontSize = getTextRangeFontSize(node, rangeStart, rangeEnd);
+    const lineHeight = getTextRangeLineHeight(node, rangeStart, rangeEnd, fontSize);
+    const selectedText = characters.slice(rangeStart, rangeEnd);
+    const isPartialSingleLineSelection =
+      !!selectedText &&
+      !/[\r\n]/.test(selectedText) &&
+      !isWholeTextHighlightRange(node, rangeStart, rangeEnd);
+    const directMeasurement = await measureExactTextHighlightBounds(
+      node,
+      rangeStart,
+      rangeEnd,
+      textColorHex,
+      fontSize,
+      lineHeight
+    );
+    const directBoundsList = getTextHighlightMeasurementBoundsList(directMeasurement);
+    if (
+      directBoundsList.length &&
+      !hasSuspiciousTextHighlightDirectBounds(node, directBoundsList, rangeStart, rangeEnd, fontSize, lineHeight)
+    ) {
+      return {
+        bounds: mergeTextHighlightBoundsList(directBoundsList),
+        boundsList: directBoundsList,
+        segments: directBoundsList.slice(),
+        fontSize,
+        lineHeight,
+      };
+    }
+
+    const underlineGeometryMeasurement = await measureTextHighlightUnderlineGeometryBounds(
+      node,
+      rangeStart,
+      rangeEnd,
+      fontSize,
+      lineHeight
+    );
+    const underlineGeometryBoundsList = getTextHighlightMeasurementBoundsList(underlineGeometryMeasurement);
+    if (underlineGeometryBoundsList.length) {
+      const glyphAwareBoundsList = await refineTextHighlightBoundsWithGlyphBounds(
+        node,
+        rangeStart,
+        rangeEnd,
+        textColorHex,
+        fontSize,
+        lineHeight,
+        underlineGeometryBoundsList
+      );
+      if (glyphAwareBoundsList.length) {
+        return {
+          bounds: mergeTextHighlightBoundsList(glyphAwareBoundsList),
+          boundsList: glyphAwareBoundsList,
+          segments: glyphAwareBoundsList.slice(),
+          fontSize,
+          lineHeight,
+        };
+      }
+    }
+
+    const endMeasurement = await measureTextHighlightPrefixBounds(node, rangeEnd, textColorHex, fontSize, lineHeight);
+    const endBoundsList = Array.isArray(endMeasurement && endMeasurement.boundsList) ? endMeasurement.boundsList : [];
+    let boundsList = rangeStart > 0 ? [] : endBoundsList.slice();
+    let startMeasurement = null;
+
+    if (endBoundsList.length && rangeStart > 0) {
+      startMeasurement = await measureTextHighlightPrefixBounds(
+        node,
+        rangeStart,
+        textColorHex,
+        fontSize,
+        lineHeight
+      );
+      const startBoundsList = Array.isArray(startMeasurement && startMeasurement.boundsList)
+        ? startMeasurement.boundsList
+        : [];
+      if (startBoundsList.length) {
+        if (isPartialSingleLineSelection) {
+          boundsList = await buildTextHighlightSelectionRowsFromPrefixStart(
+            node,
+            rangeStart,
+            rangeEnd,
+            textColorHex,
+            fontSize,
+            lineHeight,
+            endBoundsList,
+            startBoundsList,
+            selectedText
+          );
+        }
+        if (!boundsList.length) {
+          boundsList = subtractTextHighlightPrefixBounds(endBoundsList, startBoundsList, fontSize, lineHeight);
+        }
+        if (!boundsList.length) {
+          boundsList = extractTrailingTextHighlightBounds(endBoundsList, startBoundsList, fontSize, lineHeight);
+        }
+      }
+    }
+
+    if (!boundsList.length) {
+      if (directBoundsList.length && !hasSuspiciousTextHighlightDirectBounds(node, directBoundsList, rangeStart, rangeEnd, fontSize, lineHeight)) {
+        boundsList = directBoundsList;
+      }
+    }
+
+    if (!boundsList.length && isPartialSingleLineSelection) {
+      throw new Error("Could not safely measure the selected text highlight range.");
+    }
+
+    if (!boundsList.length) {
+      boundsList = buildConservativeTextHighlightBounds(
+        node,
+        rangeStart,
+        rangeEnd,
+        fontSize,
+        lineHeight,
+        startMeasurement && startMeasurement.fallbackBounds,
+        endMeasurement && endMeasurement.fallbackBounds
+      );
+    }
+
+    if (!boundsList.length) {
+      boundsList = buildEmergencyTextHighlightBounds(node, rangeStart, rangeEnd, fontSize, lineHeight);
+    }
+
+    if (!boundsList.length) {
+      throw new Error("선택한 텍스트 범위의 렌더 영역을 찾지 못했습니다.");
+    }
+
+    boundsList = await constrainTextHighlightBoundsListToExactSelection(
+      node,
+      rangeStart,
+      rangeEnd,
+      textColorHex,
+      fontSize,
+      lineHeight,
+      boundsList,
+      endBoundsList
+    );
+    if (!boundsList.length) {
+      throw new Error("\uc120\ud0dd \ud14d\uc2a4\ud2b8 \ubc94\uc704\ub97c \uc548\uc804\ud558\uac8c \uce21\uc815\ud558\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4.");
+    }
+    if (isPartialSingleLineSelection && sortTextHighlightBoundsList(boundsList).length !== 1) {
+      throw new Error("Could not safely measure the selected text highlight range.");
+    }
+    if (hasOverwideTextHighlightSelectionRows(boundsList, selectedText, fontSize, lineHeight)) {
+      throw new Error("Could not safely measure the selected text highlight range.");
+    }
+
+    return {
+      bounds: mergeTextHighlightBoundsList(boundsList),
+      boundsList,
+      segments: boundsList.slice(),
+      fontSize,
+      lineHeight,
+    };
+  }
+
+  async function measureTextHighlightUnderlineGeometryBounds(node, start, end, fontSize, lineHeight) {
+    const characterCount = node && typeof node.characters === "string" ? node.characters.length : 0;
+    const rangeStart = Math.max(0, Math.min(characterCount, Math.floor(Number(start) || 0)));
+    const rangeEnd = Math.max(rangeStart, Math.min(characterCount, Math.floor(Number(end) || 0)));
+    if (!(rangeEnd > rangeStart) || !node || typeof node.clone !== "function" || typeof node.setRangeTextDecoration !== "function") {
+      return {
+        bounds: null,
+        boundsList: [],
+        segments: [],
+        fontSize,
+        lineHeight,
+      };
+    }
+
+    const clone = node.clone();
+    try {
+      if ("effects" in clone && Array.isArray(clone.effects)) {
+        clone.effects = [];
+      }
+      if ("strokes" in clone && Array.isArray(clone.strokes)) {
+        clone.strokes = [];
+      }
+      if ("opacity" in clone && typeof clone.opacity === "number") {
+        clone.opacity = 1;
+      }
+      if ("blendMode" in clone) {
+        clone.blendMode = "NORMAL";
+      }
+
+      try {
+        await loadFontsForTextNode(clone);
+      } catch (error) {}
+
+      clearTextHighlightDecoration(clone, 0, characterCount);
+      if (typeof clone.setRangeFills === "function") {
+        try {
+          clone.setRangeFills(0, characterCount, [createTransparentPaint()]);
+        } catch (error) {}
+      }
+      clone.setRangeTextDecoration(rangeStart, rangeEnd, "UNDERLINE");
+      if (typeof clone.setRangeTextDecorationStyle === "function") {
+        try {
+          clone.setRangeTextDecorationStyle(rangeStart, rangeEnd, "SOLID");
+        } catch (error) {}
+      }
+      if (typeof clone.setRangeTextDecorationColor === "function") {
+        try {
+          clone.setRangeTextDecorationColor(rangeStart, rangeEnd, {
+            value: createSolidPaint(AI_TEXT_HIGHLIGHT_MEASURE_COLOR),
+          });
+        } catch (error) {}
+      }
+      if (typeof clone.setRangeTextDecorationSkipInk === "function") {
+        try {
+          clone.setRangeTextDecorationSkipInk(rangeStart, rangeEnd, false);
+        } catch (error) {}
+      }
+
+      const underlineLocalBoundsList = await waitForTextHighlightUnderlineGeometryBounds(clone, fontSize, lineHeight);
+      const boundsList = underlineLocalBoundsList
+        .map((localBounds) => buildTextHighlightBoundsFromUnderlineLocalBounds(node, localBounds, fontSize, lineHeight))
+        .filter(Boolean);
+
+      return {
+        bounds: mergeTextHighlightBoundsList(boundsList),
+        boundsList,
+        segments: boundsList.slice(),
+        fontSize,
+        lineHeight,
+      };
+    } catch (error) {
+      return {
+        bounds: null,
+        boundsList: [],
+        segments: [],
+        fontSize,
+        lineHeight,
+      };
+    } finally {
+      if (clone && !clone.removed) {
+        clone.remove();
+      }
+    }
+  }
+
+  async function waitForTextHighlightUnderlineGeometryBounds(node, fontSize, lineHeight) {
+    const attempts = 10;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      const boundsList = getTextHighlightUnderlineGeometryLocalBounds(node, fontSize, lineHeight);
+      if (boundsList.length) {
+        return boundsList;
+      }
+      await waitForTextHighlightGeometryTick(attempt < 2 ? 1 : 16);
+    }
+
+    return [];
+  }
+
+  function waitForTextHighlightGeometryTick(ms) {
+    return new Promise((resolve) => {
+      setTimeout(resolve, Math.max(1, Math.floor(Number(ms) || 1)));
+    });
+  }
+
+  function getTextHighlightUnderlineGeometryLocalBounds(node, fontSize, lineHeight) {
+    const geometry = node && Array.isArray(node.fillGeometry) ? node.fillGeometry : [];
+    if (!geometry.length) {
+      return [];
+    }
+
+    const boundsList = [];
+    for (let index = 0; index < geometry.length; index += 1) {
+      const path = geometry[index];
+      const pathBoundsList = parseTextHighlightSvgPathBoundsList(path && path.data, fontSize, lineHeight);
+      for (const pathBounds of pathBoundsList) {
+        boundsList.push(pathBounds);
+      }
+    }
+
+    return mergeTextHighlightLocalBoundsByRows(boundsList, fontSize, lineHeight);
+  }
+
+  function mergeTextHighlightLocalBoundsByRows(boundsList, fontSize, lineHeight) {
+    const sortedBoundsList = sortTextHighlightBoundsList(boundsList);
+    if (sortedBoundsList.length < 2) {
+      return sortedBoundsList;
+    }
+
+    const rowTolerance = getTextHighlightRowTolerance(fontSize, lineHeight);
+    const rows = [];
+    for (const bounds of sortedBoundsList) {
+      const normalizedBounds = normalizeTextHighlightWorldBounds(bounds);
+      if (!normalizedBounds) {
+        continue;
+      }
+
+      let matchedRow = null;
+      for (const row of rows) {
+        if (doTextHighlightBoundsShareRow(row, normalizedBounds, rowTolerance)) {
+          matchedRow = row;
+          break;
+        }
+      }
+
+      if (!matchedRow) {
+        rows.push({
+          x: normalizedBounds.x,
+          y: normalizedBounds.y,
+          width: normalizedBounds.width,
+          height: normalizedBounds.height,
+        });
+        continue;
+      }
+
+      const minX = Math.min(matchedRow.x, normalizedBounds.x);
+      const minY = Math.min(matchedRow.y, normalizedBounds.y);
+      const maxX = Math.max(matchedRow.x + matchedRow.width, normalizedBounds.x + normalizedBounds.width);
+      const maxY = Math.max(matchedRow.y + matchedRow.height, normalizedBounds.y + normalizedBounds.height);
+      matchedRow.x = roundTextHighlightMetric(minX);
+      matchedRow.y = roundTextHighlightMetric(minY);
+      matchedRow.width = roundTextHighlightMetric(Math.max(1, maxX - minX));
+      matchedRow.height = roundTextHighlightMetric(Math.max(0.5, maxY - minY));
+    }
+
+    return sortTextHighlightBoundsList(rows);
+  }
+
+  function parseTextHighlightSvgPathBoundsList(pathData, fontSize, lineHeight) {
+    if (typeof pathData !== "string" || !pathData.trim()) {
+      return [];
+    }
+
+    const chunks = pathData
+      .split(/[zZ]/)
+      .map((chunk) => chunk.trim())
+      .filter(Boolean);
+    const boundsList = [];
+    for (const chunk of chunks) {
+      const bounds = parseTextHighlightSvgPathChunkBounds(chunk);
+      if (!bounds) {
+        continue;
+      }
+
+      const minimumWidth = getTextHighlightMinimumWidth(fontSize);
+      const minimumHeight = Math.max(0.5, Math.min(Math.max(1, Number(lineHeight) || 1), Math.max(1, Number(fontSize) || 12) * 0.2));
+      if (bounds.width < minimumWidth || bounds.height < minimumHeight * 0.05) {
+        continue;
+      }
+
+      boundsList.push(bounds);
+    }
+
+    return boundsList;
+  }
+
+  function parseTextHighlightSvgPathChunkBounds(pathChunk) {
+    const matches = String(pathChunk || "").match(/[-+]?(?:\d*\.\d+|\d+)(?:e[-+]?\d+)?/gi);
+    if (!matches || matches.length < 4) {
+      return null;
+    }
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (let index = 0; index + 1 < matches.length; index += 2) {
+      const x = Number(matches[index]);
+      const y = Number(matches[index + 1]);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        continue;
+      }
+
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+    }
+
+    if (!Number.isFinite(minX) || !Number.isFinite(minY) || maxX <= minX || maxY < minY) {
+      return null;
+    }
+
+    return {
+      x: roundTextHighlightMetric(minX),
+      y: roundTextHighlightMetric(minY),
+      width: roundTextHighlightMetric(Math.max(1, maxX - minX)),
+      height: roundTextHighlightMetric(Math.max(0.5, maxY - minY)),
+    };
+  }
+
+  function buildTextHighlightBoundsFromUnderlineLocalBounds(node, underlineLocalBounds, fontSize, lineHeight) {
+    const localBounds = normalizeTextHighlightWorldBounds(underlineLocalBounds);
+    if (!localBounds) {
+      return null;
+    }
+
+    const metrics = buildTextHighlightBoxGlyphMetrics(fontSize, lineHeight);
+    const underlineTop = localBounds.y;
+    const textTop = roundTextHighlightMetric(underlineTop - metrics.ascent);
+    const highlightLocalBounds = {
+      x: localBounds.x,
+      y: textTop,
+      width: localBounds.width,
+      height: metrics.height,
+    };
+
+    return getTextHighlightWorldBoundsFromLocalBounds(node, highlightLocalBounds);
+  }
+
+  function buildTextHighlightBoxGlyphMetrics(fontSize, lineHeight) {
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const ascent = Math.max(size * 0.82, Math.min(resolvedLineHeight * 0.74, size * 0.92));
+    const descent = Math.max(size * 0.14, Math.min(resolvedLineHeight * 0.18, size * 0.22));
+    return {
+      ascent: roundTextHighlightMetric(ascent),
+      descent: roundTextHighlightMetric(descent),
+      height: roundTextHighlightMetric(Math.max(1, ascent + descent)),
+    };
+  }
+
+  async function refineTextHighlightBoundsWithGlyphBounds(
+    node,
+    start,
+    end,
+    textColorHex,
+    fontSize,
+    lineHeight,
+    boundsList
+  ) {
+    const baseRows = sortTextHighlightBoundsList(boundsList);
+    if (!baseRows.length) {
+      return [];
+    }
+
+    let glyphMeasurement = null;
+    try {
+      glyphMeasurement = await measureExactTextHighlightBounds(node, start, end, textColorHex, fontSize, lineHeight);
+    } catch (error) {}
+
+    let glyphRows = getTextHighlightMeasurementBoundsList(glyphMeasurement);
+    if (hasMergedTextHighlightBlockBounds(glyphRows, fontSize)) {
+      glyphRows = splitMergedTextHighlightBlockBounds(glyphRows, fontSize, lineHeight);
+    }
+    glyphRows = filterTextHighlightGlyphBoundsRows(glyphRows, fontSize, lineHeight);
+    if (!glyphRows.length) {
+      return [];
+    }
+
+    const refinedRows = [];
+    const usedGlyphRows = {};
+    for (const baseRow of baseRows) {
+      const glyphRow = findTextHighlightGlyphBoundsForBaseRow(
+        baseRow,
+        glyphRows,
+        usedGlyphRows,
+        fontSize,
+        lineHeight
+      );
+      if (!glyphRow) {
+        continue;
+      }
+
+      const constrainedBaseRow = constrainTextHighlightBaseRowToGlyphRow(baseRow, glyphRow, fontSize);
+      refinedRows.push(expandTextHighlightBoundsToGlyphHeight(constrainedBaseRow, glyphRow, fontSize, lineHeight));
+    }
+
+    return refinedRows;
+  }
+
+  async function constrainTextHighlightBoundsListToExactSelection(
+    node,
+    start,
+    end,
+    textColorHex,
+    fontSize,
+    lineHeight,
+    boundsList,
+    endBoundsList
+  ) {
+    const rows = sortTextHighlightBoundsList(boundsList);
+    if (!rows.length || isWholeTextHighlightRange(node, start, end)) {
+      return rows;
+    }
+
+    const characters = node && typeof node.characters === "string" ? node.characters : "";
+    const characterCount = characters.length;
+    const rangeStart = Math.max(0, Math.min(characterCount, Math.floor(Number(start) || 0)));
+    const rangeEnd = Math.max(rangeStart, Math.min(characterCount, Math.floor(Number(end) || 0)));
+    const selectedText = characters.slice(rangeStart, rangeEnd);
+    if (!selectedText || /[\r\n]/.test(selectedText)) {
+      return rows;
+    }
+
+    let exactMeasurement = null;
+    try {
+      exactMeasurement = await measureExactTextHighlightBounds(
+        node,
+        rangeStart,
+        rangeEnd,
+        textColorHex,
+        fontSize,
+        lineHeight
+      );
+    } catch (error) {}
+
+    let exactRows = getTextHighlightMeasurementBoundsList(exactMeasurement);
+    if (hasMergedTextHighlightBlockBounds(exactRows, fontSize)) {
+      exactRows = splitMergedTextHighlightBlockBounds(exactRows, fontSize, lineHeight);
+    }
+    exactRows = filterTextHighlightGlyphBoundsRows(exactRows, fontSize, lineHeight).filter((row) =>
+      isReasonableTextHighlightSelectionRow(row, selectedText, fontSize)
+    );
+    if (!exactRows.length) {
+      return rows;
+    }
+
+    const refinedRows = [];
+    const usedExactRows = {};
+    for (const row of rows) {
+      const exactRow = findTextHighlightGlyphBoundsForBaseRow(
+        row,
+        exactRows,
+        usedExactRows,
+        fontSize,
+        lineHeight
+      );
+      if (!exactRow) {
+        continue;
+      }
+
+      const constrainedRow = constrainTextHighlightBaseRowToGlyphRow(row, exactRow, fontSize);
+      refinedRows.push(expandTextHighlightBoundsToGlyphHeight(constrainedRow, exactRow, fontSize, lineHeight));
+    }
+
+    if (refinedRows.length) {
+      return refinedRows;
+    }
+
+    return exactRows;
+  }
+
+  async function buildTextHighlightSelectionRowsFromPrefixEnd(
+    node,
+    start,
+    end,
+    textColorHex,
+    fontSize,
+    lineHeight,
+    rows,
+    endBoundsList,
+    selectedText
+  ) {
+    const candidateRows = sortTextHighlightBoundsList(rows);
+    if (!candidateRows.length) {
+      return [];
+    }
+
+    const referenceRows = sortTextHighlightBoundsList(endBoundsList && endBoundsList.length ? endBoundsList : candidateRows);
+    const targetRow = candidateRows[candidateRows.length - 1];
+    const referenceRow = findTextHighlightReferenceRowForTarget(targetRow, referenceRows, fontSize, lineHeight) || targetRow;
+    const selectedWidth = await measureTextHighlightSelectedWidth(
+      node,
+      start,
+      end,
+      textColorHex,
+      fontSize,
+      lineHeight,
+      selectedText,
+      referenceRow.width
+    );
+
+    if (!(selectedWidth > 0)) {
+      return [];
+    }
+
+    const minimumWidth = getTextHighlightMinimumWidth(fontSize);
+    const endRight = referenceRow.x + referenceRow.width;
+    const nextWidth = roundTextHighlightMetric(
+      Math.max(minimumWidth, Math.min(referenceRow.width, selectedWidth))
+    );
+    const nextX = roundTextHighlightMetric(Math.max(referenceRow.x, endRight - nextWidth));
+
+    return [
+      {
+        x: nextX,
+        y: targetRow.y,
+        width: nextWidth,
+        height: targetRow.height,
+      },
+    ];
+  }
+
+  async function buildTextHighlightSelectionRowsFromPrefixStart(
+    node,
+    start,
+    end,
+    textColorHex,
+    fontSize,
+    lineHeight,
+    endBoundsList,
+    startBoundsList,
+    selectedText
+  ) {
+    if (!selectedText || /[\r\n]/.test(selectedText)) {
+      return [];
+    }
+
+    const endRows = sortTextHighlightBoundsList(endBoundsList);
+    if (!endRows.length) {
+      return [];
+    }
+
+    const startRows = sortTextHighlightBoundsList(startBoundsList);
+    const targetRowIndex = endRows.length - 1;
+    const targetRow = endRows[targetRowIndex];
+    if (!targetRow) {
+      return [];
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const rowTolerance = getTextHighlightRowTolerance(fontSize, lineHeight);
+    const minimumWidth = getTextHighlightMinimumWidth(fontSize);
+    const endRight = targetRow.x + targetRow.width;
+    let startRight = -Infinity;
+
+    if ((Number(start) || 0) <= 0) {
+      startRight = targetRow.x;
+    } else if (startRows.length === endRows.length) {
+      startRight = findTextHighlightMatchedStartRight(
+        targetRow,
+        startRows,
+        rowTolerance,
+        fontSize,
+        lineHeight
+      );
+      if (!Number.isFinite(startRight)) {
+        startRight = findTextHighlightIndexMatchedStartRight(
+          targetRow,
+          startRows,
+          targetRowIndex,
+          fontSize,
+          lineHeight
+        );
+      }
+      if (Number.isFinite(startRight)) {
+        startRight += getTextHighlightWhitespaceAdvanceBeforeSelection(node, start, fontSize);
+      }
+    } else if (endRows.length === startRows.length + 1) {
+      startRight = targetRow.x;
+    }
+
+    if (!Number.isFinite(startRight)) {
+      return [];
+    }
+
+    const nodeBounds = normalizeTextHighlightWorldBounds(getNodeRenderBounds(node));
+    const maximumWidth =
+      nodeBounds && Number.isFinite(nodeBounds.width)
+        ? Math.max(targetRow.width, nodeBounds.width)
+        : Math.max(targetRow.width, endRight - startRight);
+    const selectedWidth = await measureTextHighlightSelectedWidth(
+      node,
+      start,
+      end,
+      textColorHex,
+      fontSize,
+      lineHeight,
+      selectedText,
+      maximumWidth
+    );
+    if (!(selectedWidth > 0)) {
+      return [];
+    }
+
+    const prefixWidth = endRight - startRight;
+    const trustPrefixWidth =
+      prefixWidth >= minimumWidth &&
+      prefixWidth <= Math.max(selectedWidth * 1.28, selectedWidth + size * 0.65);
+    const nextX = roundTextHighlightMetric(Math.max(targetRow.x, Math.min(startRight, endRight - minimumWidth)));
+    let nextWidth = trustPrefixWidth ? prefixWidth : selectedWidth;
+    if (nodeBounds) {
+      const maxRight = nodeBounds.x + nodeBounds.width + Math.max(1, size * 0.2);
+      nextWidth = Math.min(nextWidth, Math.max(minimumWidth, maxRight - nextX));
+    }
+    nextWidth = roundTextHighlightMetric(Math.max(minimumWidth, nextWidth));
+
+    const row = {
+      x: nextX,
+      y: targetRow.y,
+      width: nextWidth,
+      height: targetRow.height,
+    };
+
+    if (hasOverwideTextHighlightSelectionRows([row], selectedText, fontSize, lineHeight)) {
+      return [];
+    }
+
+    return [row];
+  }
+
+  function getTextHighlightWhitespaceAdvanceBeforeSelection(node, start, fontSize) {
+    const characters = node && typeof node.characters === "string" ? node.characters : "";
+    const rangeStart = Math.max(0, Math.min(characters.length, Math.floor(Number(start) || 0)));
+    if (rangeStart <= 0) {
+      return 0;
+    }
+
+    let whitespaceCount = 0;
+    for (let index = rangeStart - 1; index >= 0; index -= 1) {
+      const character = characters[index];
+      if (character === "\n" || character === "\r") {
+        break;
+      }
+      if (!/\s/.test(character)) {
+        break;
+      }
+      whitespaceCount += 1;
+    }
+
+    if (!whitespaceCount) {
+      return 0;
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    return roundTextHighlightMetric(whitespaceCount * size * 0.28);
+  }
+
+  function findTextHighlightReferenceRowForTarget(targetRow, referenceRows, fontSize, lineHeight) {
+    const target = normalizeTextHighlightWorldBounds(targetRow);
+    const rows = sortTextHighlightBoundsList(referenceRows);
+    if (!target || !rows.length) {
+      return null;
+    }
+
+    const rowTolerance = Math.max(getTextHighlightRowTolerance(fontSize, lineHeight), Math.max(12, Number(fontSize) || 16) * 0.28);
+    let bestRow = null;
+    let bestDistance = Infinity;
+    for (const row of rows) {
+      if (!doTextHighlightBoundsShareRow(target, row, rowTolerance)) {
+        continue;
+      }
+
+      const targetCenter = target.y + target.height / 2;
+      const rowCenter = row.y + row.height / 2;
+      const distance = Math.abs(targetCenter - rowCenter);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestRow = row;
+      }
+    }
+
+    return bestRow || rows[rows.length - 1];
+  }
+
+  async function measureTextHighlightSelectedWidth(
+    node,
+    start,
+    end,
+    textColorHex,
+    fontSize,
+    lineHeight,
+    selectedText,
+    maximumWidth
+  ) {
+    try {
+      const measurement = await measureTextHighlightSelectedOnlyBounds(
+        node,
+        start,
+        end,
+        textColorHex,
+        fontSize,
+        lineHeight
+      );
+      const measuredBounds = normalizeTextHighlightWorldBounds(
+        mergeTextHighlightBoundsList(getTextHighlightMeasurementBoundsList(measurement))
+      );
+      if (measuredBounds && measuredBounds.width > 0 && measuredBounds.width <= Math.max(1, Number(maximumWidth) || Infinity)) {
+        return measuredBounds.width;
+      }
+    } catch (error) {}
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const selectedLength = Math.max(1, compactText(selectedText).length);
+    const estimatedWidth = selectedLength * size * 0.56;
+    return roundTextHighlightMetric(Math.max(getTextHighlightMinimumWidth(fontSize), Math.min(Number(maximumWidth) || estimatedWidth, estimatedWidth)));
+  }
+
+  function hasOverwideTextHighlightSelectionRows(boundsList, selectedText, fontSize, lineHeight) {
+    const rows = sortTextHighlightBoundsList(boundsList);
+    if (!rows.length || !selectedText || /[\r\n]/.test(selectedText)) {
+      return false;
+    }
+    if (rows.length > 1) {
+      return true;
+    }
+
+    const mergedBounds = normalizeTextHighlightWorldBounds(mergeTextHighlightBoundsList(rows));
+    if (!mergedBounds) {
+      return false;
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const selectedLength = Math.max(1, compactText(selectedText).length);
+    const maxExpectedWidth = Math.max(size * 2.8, selectedLength * size * 1.65);
+    const maxExpectedHeight = Math.max(resolvedLineHeight * 1.6, size * 2);
+    return mergedBounds.width > maxExpectedWidth && mergedBounds.height <= maxExpectedHeight;
+  }
+
+  function isReasonableTextHighlightSelectionRow(row, selectedText, fontSize) {
+    const bounds = normalizeTextHighlightWorldBounds(row);
+    if (!bounds) {
+      return false;
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const selectedLength = Math.max(1, compactText(selectedText).length);
+    const maxExpectedWidth = Math.max(size * 2.2, selectedLength * size * 1.25);
+    return bounds.width <= maxExpectedWidth;
+  }
+
+  function constrainTextHighlightBaseRowToGlyphRow(baseRow, glyphRow, fontSize) {
+    const base = normalizeTextHighlightWorldBounds(baseRow);
+    const glyph = normalizeTextHighlightWorldBounds(glyphRow);
+    if (!base || !glyph) {
+      return base;
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const baseRight = base.x + base.width;
+    const glyphRight = glyph.x + glyph.width;
+    const allowedOverflow = Math.max(2, Math.min(size * 0.5, 18));
+    const widthTooWide = base.width > Math.max(glyph.width + size * 1.2, glyph.width * 1.35);
+    const leaksOutsideGlyph =
+      base.x < glyph.x - allowedOverflow ||
+      baseRight > glyphRight + allowedOverflow;
+
+    if (!widthTooWide && !leaksOutsideGlyph) {
+      return base;
+    }
+
+    return {
+      x: glyph.x,
+      y: base.y,
+      width: glyph.width,
+      height: base.height,
+    };
+  }
+
+  function filterTextHighlightGlyphBoundsRows(boundsList, fontSize, lineHeight) {
+    const rows = sortTextHighlightBoundsList(boundsList);
+    if (!rows.length) {
+      return [];
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const maxGlyphRowHeight = Math.max(size * 1.75, resolvedLineHeight * 1.35);
+    return rows.filter((row) => row.height <= maxGlyphRowHeight);
+  }
+
+  function findTextHighlightGlyphBoundsForBaseRow(
+    baseRow,
+    glyphRows,
+    usedGlyphRows,
+    fontSize,
+    lineHeight
+  ) {
+    const base = normalizeTextHighlightWorldBounds(baseRow);
+    if (!base || !Array.isArray(glyphRows) || !glyphRows.length) {
+      return null;
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const rowTolerance = Math.max(getTextHighlightRowTolerance(fontSize, lineHeight), resolvedLineHeight * 0.32);
+    const baseCenterY = base.y + base.height / 2;
+    const baseRight = base.x + base.width;
+    let bestIndex = -1;
+    let bestScore = Infinity;
+
+    for (let index = 0; index < glyphRows.length; index += 1) {
+      if (usedGlyphRows[index]) {
+        continue;
+      }
+
+      const glyph = normalizeTextHighlightWorldBounds(glyphRows[index]);
+      if (!glyph) {
+        continue;
+      }
+
+      const glyphRight = glyph.x + glyph.width;
+      const glyphCenterY = glyph.y + glyph.height / 2;
+      const verticalDistance = Math.abs(baseCenterY - glyphCenterY);
+      const horizontalGap = Math.max(0, Math.max(base.x - glyphRight, glyph.x - baseRight));
+      const sharesRow = doTextHighlightBoundsShareRow(base, glyph, rowTolerance) || verticalDistance <= rowTolerance;
+      const isNearX = horizontalGap <= size;
+      if (!sharesRow || !isNearX) {
+        continue;
+      }
+
+      const score = verticalDistance + horizontalGap * 0.2;
+      if (score < bestScore) {
+        bestScore = score;
+        bestIndex = index;
+      }
+    }
+
+    if (bestIndex < 0) {
+      return null;
+    }
+
+    usedGlyphRows[bestIndex] = true;
+    return glyphRows[bestIndex];
+  }
+
+  function expandTextHighlightBoundsToGlyphHeight(baseRow, glyphRow, fontSize, lineHeight) {
+    const base = normalizeTextHighlightWorldBounds(baseRow);
+    const glyph = normalizeTextHighlightWorldBounds(glyphRow);
+    if (!base || !glyph) {
+      return base;
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const targetTop = Math.min(base.y, glyph.y);
+    const targetBottom = Math.max(base.y + base.height, glyph.y + glyph.height);
+    const maxHeight = Math.max(size * 0.95, Math.min(size * 1.22, resolvedLineHeight * 1.05));
+    const nextHeight = Math.min(maxHeight, Math.max(base.height, glyph.height, targetBottom - targetTop));
+    let nextY = targetTop;
+    if (nextY + nextHeight < glyph.y + glyph.height) {
+      nextY = Math.min(base.y, glyph.y + glyph.height - nextHeight);
+    }
+
+    return {
+      x: base.x,
+      y: roundTextHighlightMetric(nextY),
+      width: base.width,
+      height: roundTextHighlightMetric(Math.max(1, nextHeight)),
+    };
+  }
+
+  async function measureExactTextHighlightBounds(node, start, end, textColorHex, fontSize, lineHeight) {
+    const characterCount = node && typeof node.characters === "string" ? node.characters.length : 0;
+    const rangeStart = Math.max(0, Math.min(characterCount, Math.floor(Number(start) || 0)));
+    const rangeEnd = Math.max(rangeStart, Math.min(characterCount, Math.floor(Number(end) || 0)));
+    if (!(rangeEnd > rangeStart)) {
+      return {
+        bounds: null,
+        boundsList: [],
+        segments: [],
+        fontSize,
+        lineHeight,
+      };
+    }
+
+    try {
+      const clone = await createTextHighlightSelectionMeasurementClone(node, rangeStart, rangeEnd);
+      const measurement = await measureTextHighlightCloneBounds(node, clone, fontSize, lineHeight, {
+        targetColorHex: AI_TEXT_HIGHLIGHT_MEASURE_COLOR,
+      });
+      const boundsList = getTextHighlightMeasurementBoundsList(measurement);
+      if (boundsList.length) {
+        return measurement;
+      }
+
+      const fallbackBounds = normalizeTextHighlightWorldBounds(measurement && measurement.fallbackBounds);
+      if (isPlausibleExactTextHighlightFallbackBounds(node, fallbackBounds, rangeStart, rangeEnd, fontSize, lineHeight)) {
+        return {
+          bounds: fallbackBounds,
+          boundsList: [fallbackBounds],
+          segments: [fallbackBounds],
+          fallbackBounds,
+          fontSize,
+          lineHeight,
+        };
+      }
+
+      return measurement;
+    } catch (error) {
+      return {
+        bounds: null,
+        boundsList: [],
+        segments: [],
+        fontSize,
+        lineHeight,
+      };
+    }
+  }
+
+  async function measureTextHighlightPrefixBounds(node, end, textColorHex, fontSize, lineHeight) {
+    const characterCount = node && typeof node.characters === "string" ? node.characters.length : 0;
+    const prefixEnd = Math.max(
+      0,
+      Math.min(characterCount, Math.floor(Number(end) || 0))
+    );
+    if (!(prefixEnd > 0)) {
+      return {
+        bounds: null,
+        boundsList: [],
+        segments: [],
+        fontSize,
+        lineHeight,
+      };
+    }
+
+    const clone = await createTextHighlightMeasurementClone(node, prefixEnd, textColorHex);
+    try {
+      const geometryMeasurement = await measureTextHighlightCloneGeometryBounds(node, clone, fontSize, lineHeight);
+      if (getTextHighlightMeasurementBoundsList(geometryMeasurement).length) {
+        return geometryMeasurement;
+      }
+
+      return await measureTextHighlightCloneBounds(node, clone, fontSize, lineHeight);
+    } finally {
+      if (clone && !clone.removed) {
+        clone.remove();
+      }
+    }
+  }
+
+  async function measureTextHighlightCloneBounds(node, clone, fontSize, lineHeight, options) {
+    const probeBounds = getNodeRenderBounds(node);
+    const probe = figma.createFrame();
+    let boundsList = [];
+    let flattenedNode = null;
+
+    try {
+      probe.resize(
+        Math.max(1, roundTextHighlightMetric(probeBounds ? probeBounds.width : Number(node && node.width) || 1)),
+        Math.max(1, roundTextHighlightMetric(probeBounds ? probeBounds.height : Number(node && node.height) || 1))
+      );
+      probe.clipsContent = false;
+      probe.fills = [];
+      probe.strokes = [];
+      probe.name = "__pigma_text_highlight_measure__";
+      probe.x = roundTextHighlightMetric(probeBounds ? probeBounds.x : 0);
+      probe.y = roundTextHighlightMetric(probeBounds ? probeBounds.y : 0);
+      figma.currentPage.appendChild(probe);
+
+      moveTextHighlightMeasureClone(node, clone, probe, probe.x, probe.y);
+      boundsList = await measureTextHighlightProbeAlphaBounds(probe, fontSize, lineHeight, options);
+      if (!boundsList.length && clone && typeof figma.flatten === "function") {
+        try {
+          flattenedNode = figma.flatten([clone], probe);
+        } catch (error) {}
+        boundsList = await measureTextHighlightProbeAlphaBounds(probe, fontSize, lineHeight, options);
+      }
+
+      const fallbackBounds =
+        getVisibleTextHighlightBounds(flattenedNode && !flattenedNode.removed ? flattenedNode : clone) ||
+        getVisibleTextHighlightBounds(probe);
+
+      return {
+        bounds: mergeTextHighlightBoundsList(boundsList),
+        boundsList,
+        segments: boundsList.slice(),
+        fallbackBounds,
+        fontSize,
+        lineHeight,
+      };
+    } finally {
+      if (flattenedNode && !flattenedNode.removed) {
+        flattenedNode.remove();
+      }
+      if (probe && !probe.removed) {
+        probe.remove();
+      }
+    }
+  }
+
+  async function measureTextHighlightCloneGeometryBounds(sourceNode, clone, fontSize, lineHeight) {
+    const localBoundsList = await waitForTextHighlightFillGeometryBounds(clone, fontSize, lineHeight);
+    const boundsList = localBoundsList
+      .map((localBounds) => getTextHighlightWorldBoundsFromLocalBounds(sourceNode, localBounds))
+      .filter(Boolean);
+
+    return {
+      bounds: mergeTextHighlightBoundsList(boundsList),
+      boundsList,
+      segments: boundsList.slice(),
+      fontSize,
+      lineHeight,
+    };
+  }
+
+  async function waitForTextHighlightFillGeometryBounds(node, fontSize, lineHeight) {
+    const attempts = 8;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      const boundsList = getTextHighlightFillGeometryLocalBounds(node, fontSize, lineHeight);
+      if (boundsList.length) {
+        return boundsList;
+      }
+      await waitForTextHighlightGeometryTick(attempt < 2 ? 1 : 16);
+    }
+
+    return [];
+  }
+
+  function getTextHighlightFillGeometryLocalBounds(node, fontSize, lineHeight) {
+    const geometry = node && Array.isArray(node.fillGeometry) ? node.fillGeometry : [];
+    if (!geometry.length) {
+      return [];
+    }
+
+    const boundsList = [];
+    for (let index = 0; index < geometry.length; index += 1) {
+      const path = geometry[index];
+      const pathBoundsList = parseTextHighlightSvgPathBoundsList(path && path.data, fontSize, lineHeight);
+      for (const pathBounds of pathBoundsList) {
+        boundsList.push(pathBounds);
+      }
+    }
+
+    return mergeTextHighlightLocalBoundsByRows(boundsList, fontSize, lineHeight);
+  }
+
+  async function measureTextHighlightProbeAlphaBounds(probe, fontSize, lineHeight, options) {
+    let alphaMeasurement = null;
+
+    try {
+      const pngBytes = await probe.exportAsync({
+        format: "PNG",
+        useAbsoluteBounds: false,
+      });
+      alphaMeasurement = await requestTextHighlightAlphaBounds({
+        pngBytes,
+        probeX: probe.x,
+        probeY: probe.y,
+        probeWidth: probe.width,
+        probeHeight: probe.height,
+        fontSize,
+        lineHeight,
+        targetColor: buildTextHighlightMeasureTargetColor(options && options.targetColorHex),
+      });
+    } catch (error) {}
+
+    return getTextHighlightMeasurementBoundsList(alphaMeasurement);
+  }
+
+  function buildTextHighlightMeasureTargetColor(hexColor) {
+    const hex = sanitizeHexColor(hexColor, "");
+    if (!hex) {
+      return null;
+    }
+
+    const rgb = hexToFigmaRgb(hex);
+    return {
+      r: Math.round(rgb.r * 255),
+      g: Math.round(rgb.g * 255),
+      b: Math.round(rgb.b * 255),
+    };
+  }
+
+  async function createTextHighlightMeasurementClone(node, end, textColorHex) {
+    if (!node || typeof node.clone !== "function") {
+      throw new Error("텍스트 범위를 측정할 복제 레이어를 만들지 못했습니다.");
+    }
+
+    const clone = node.clone();
+
+    if ("effects" in clone && Array.isArray(clone.effects)) {
+      clone.effects = [];
+    }
+    if ("strokes" in clone && Array.isArray(clone.strokes)) {
+      clone.strokes = [];
+    }
+    if ("opacity" in clone && typeof clone.opacity === "number") {
+      clone.opacity = 1;
+    }
+    if ("blendMode" in clone) {
+      clone.blendMode = "NORMAL";
+    }
+    if (typeof clone.setRangeFills !== "function") {
+      throw new Error("선택 텍스트의 하이라이트 측정을 지원하지 않는 텍스트 레이어입니다.");
+    }
+
+    try {
+      await loadFontsForTextNode(clone);
+    } catch (error) {}
+
+    const characterCount = typeof clone.characters === "string" ? clone.characters.length : 0;
+    if (characterCount > 0) {
+      truncateTextHighlightMeasurementClone(clone, end);
+      const nextCharacterCount = typeof clone.characters === "string" ? clone.characters.length : 0;
+      if (nextCharacterCount > 0) {
+        clone.setRangeFills(0, nextCharacterCount, [createSolidPaint(textColorHex)]);
+      }
+    }
+    return clone;
+  }
+
+  async function createTextHighlightSelectionMeasurementClone(node, start, end) {
+    if (!node || typeof node.clone !== "function") {
+      throw new Error("선택한 텍스트 범위를 측정할 복제 레이어를 만들지 못했습니다.");
+    }
+
+    const clone = node.clone();
+
+    if ("effects" in clone && Array.isArray(clone.effects)) {
+      clone.effects = [];
+    }
+    if ("strokes" in clone && Array.isArray(clone.strokes)) {
+      clone.strokes = [];
+    }
+    if ("opacity" in clone && typeof clone.opacity === "number") {
+      clone.opacity = 1;
+    }
+    if ("blendMode" in clone) {
+      clone.blendMode = "NORMAL";
+    }
+    if (typeof clone.setRangeFills !== "function") {
+      throw new Error("선택 텍스트의 하이라이트 측정을 지원하지 않는 텍스트 레이어입니다.");
+    }
+
+    try {
+      await loadFontsForTextNode(clone);
+    } catch (error) {}
+
+    const characterCount = typeof clone.characters === "string" ? clone.characters.length : 0;
+    if (characterCount > 0) {
+      const rangeStart = Math.max(0, Math.min(characterCount, Math.floor(Number(start) || 0)));
+      const rangeEnd = Math.max(rangeStart, Math.min(characterCount, Math.floor(Number(end) || 0)));
+      clearTextHighlightDecoration(clone, 0, characterCount);
+      clone.setRangeFills(0, characterCount, [createTransparentPaint()]);
+      if (rangeEnd > rangeStart) {
+        clone.setRangeFills(rangeStart, rangeEnd, [createSolidPaint(AI_TEXT_HIGHLIGHT_MEASURE_COLOR)]);
+      }
+    }
+
+    return clone;
+  }
+
+  async function refineSingleLineTextHighlightBoundsWithSelectedWidth(
+    node,
+    start,
+    end,
+    textColorHex,
+    fontSize,
+    lineHeight,
+    boundsList,
+    endBoundsList
+  ) {
+    const characters = node && typeof node.characters === "string" ? node.characters : "";
+    const characterCount = characters.length;
+    const rangeStart = Math.max(0, Math.min(characterCount, Math.floor(Number(start) || 0)));
+    const rangeEnd = Math.max(rangeStart, Math.min(characterCount, Math.floor(Number(end) || 0)));
+    const selectedText = characters.slice(rangeStart, rangeEnd);
+    if (!selectedText || /[\r\n]/.test(selectedText)) {
+      return boundsList;
+    }
+
+    const sortedEndBoundsList = sortTextHighlightBoundsList(endBoundsList);
+    const endRowBounds = sortedEndBoundsList.length ? sortedEndBoundsList[sortedEndBoundsList.length - 1] : null;
+    if (!endRowBounds) {
+      return boundsList;
+    }
+
+    const selectedOnlyMeasurement = await measureTextHighlightSelectedOnlyBounds(
+      node,
+      rangeStart,
+      rangeEnd,
+      textColorHex,
+      fontSize,
+      lineHeight
+    );
+    const selectedOnlyBounds = mergeTextHighlightBoundsList(
+      getTextHighlightMeasurementBoundsList(selectedOnlyMeasurement)
+    );
+    const normalizedSelectedBounds = normalizeTextHighlightWorldBounds(selectedOnlyBounds);
+    if (!normalizedSelectedBounds) {
+      return boundsList;
+    }
+
+    const minimumWidth = getTextHighlightMinimumWidth(fontSize);
+    const selectedWidth = roundTextHighlightMetric(
+      Math.max(minimumWidth, Math.min(endRowBounds.width, normalizedSelectedBounds.width))
+    );
+    const endRight = endRowBounds.x + endRowBounds.width;
+    const nextX = roundTextHighlightMetric(Math.max(endRowBounds.x, endRight - selectedWidth));
+    const nextWidth = roundTextHighlightMetric(Math.max(minimumWidth, endRight - nextX));
+
+    return [
+      {
+        x: nextX,
+        y: endRowBounds.y,
+        width: nextWidth,
+        height: endRowBounds.height,
+      },
+    ];
+  }
+
+  async function measureTextHighlightSelectedOnlyBounds(node, start, end, textColorHex, fontSize, lineHeight) {
+    const clone = await createTextHighlightSelectedOnlyMeasurementClone(node, start, end, textColorHex);
+    try {
+      const geometryMeasurement = await measureTextHighlightCloneGeometryBounds(node, clone, fontSize, lineHeight);
+      if (getTextHighlightMeasurementBoundsList(geometryMeasurement).length) {
+        return geometryMeasurement;
+      }
+
+      return await measureTextHighlightCloneBounds(node, clone, fontSize, lineHeight);
+    } finally {
+      if (clone && !clone.removed) {
+        clone.remove();
+      }
+    }
+  }
+
+  async function createTextHighlightSelectedOnlyMeasurementClone(node, start, end, textColorHex) {
+    if (!node || typeof node.clone !== "function") {
+      throw new Error("선택 텍스트의 폭을 측정할 복제 레이어를 만들지 못했습니다.");
+    }
+
+    const clone = node.clone();
+
+    if ("effects" in clone && Array.isArray(clone.effects)) {
+      clone.effects = [];
+    }
+    if ("strokes" in clone && Array.isArray(clone.strokes)) {
+      clone.strokes = [];
+    }
+    if ("opacity" in clone && typeof clone.opacity === "number") {
+      clone.opacity = 1;
+    }
+    if ("blendMode" in clone) {
+      clone.blendMode = "NORMAL";
+    }
+    if (typeof clone.setRangeFills !== "function") {
+      throw new Error("선택 텍스트의 폭 측정을 지원하지 않는 텍스트 레이어입니다.");
+    }
+
+    try {
+      await loadFontsForTextNode(clone);
+    } catch (error) {}
+
+    const characterCount = typeof clone.characters === "string" ? clone.characters.length : 0;
+    const rangeStart = Math.max(0, Math.min(characterCount, Math.floor(Number(start) || 0)));
+    const rangeEnd = Math.max(rangeStart, Math.min(characterCount, Math.floor(Number(end) || 0)));
+    if (rangeEnd < characterCount) {
+      deleteTextHighlightMeasurementCloneRange(clone, rangeEnd, characterCount);
+    }
+    if (rangeStart > 0) {
+      deleteTextHighlightMeasurementCloneRange(clone, 0, rangeStart);
+    }
+
+    const nextCharacterCount = typeof clone.characters === "string" ? clone.characters.length : 0;
+    if (nextCharacterCount > 0) {
+      clearTextHighlightDecoration(clone, 0, nextCharacterCount);
+      clone.setRangeFills(0, nextCharacterCount, [createSolidPaint(textColorHex)]);
+    }
+
+    return clone;
+  }
+
+  function deleteTextHighlightMeasurementCloneRange(node, start, end) {
+    if (!node || typeof node.characters !== "string") {
+      return;
+    }
+
+    const characterCount = node.characters.length;
+    const rangeStart = Math.max(0, Math.min(characterCount, Math.floor(Number(start) || 0)));
+    const rangeEnd = Math.max(rangeStart, Math.min(characterCount, Math.floor(Number(end) || 0)));
+    if (rangeEnd <= rangeStart) {
+      return;
+    }
+
+    if (typeof node.deleteCharacters === "function") {
+      try {
+        node.deleteCharacters(rangeStart, rangeEnd);
+        return;
+      } catch (error) {}
+    }
+
+    try {
+      node.characters = node.characters.slice(0, rangeStart) + node.characters.slice(rangeEnd);
+    } catch (error) {}
+  }
+
+  function isPlausibleExactTextHighlightFallbackBounds(node, bounds, start, end, fontSize, lineHeight) {
+    const fallbackBounds = normalizeTextHighlightWorldBounds(bounds);
+    if (!fallbackBounds) {
+      return false;
+    }
+
+    if (isWholeTextHighlightRange(node, start, end)) {
+      return true;
+    }
+
+    const nodeBounds = normalizeTextHighlightWorldBounds(getNodeRenderBounds(node));
+    if (!nodeBounds) {
+      return true;
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const nearFullWidth = fallbackBounds.width >= nodeBounds.width * 0.96;
+    const nearFullHeight = fallbackBounds.height >= nodeBounds.height * 0.9;
+    const looksLikeSingleTextRow = fallbackBounds.height <= Math.max(resolvedLineHeight * 1.35, size * 1.7);
+    const characters = node && typeof node.characters === "string" ? node.characters : "";
+    const selectedText = characters.slice(
+      Math.max(0, Math.min(characters.length, Math.floor(Number(start) || 0))),
+      Math.max(0, Math.min(characters.length, Math.floor(Number(end) || 0)))
+    );
+    if (selectedText && !/[\r\n]/.test(selectedText) && looksLikeSingleTextRow) {
+      const selectedLength = Math.max(1, compactText(selectedText).length);
+      const maxExpectedWidth = Math.max(size * 2.6, selectedLength * size * 1.45);
+      if (fallbackBounds.width > maxExpectedWidth) {
+        return false;
+      }
+    }
+
+    return !nearFullHeight || (!nearFullWidth && looksLikeSingleTextRow);
+  }
+
+  function hasSuspiciousTextHighlightDirectBounds(node, boundsList, start, end, fontSize, lineHeight) {
+    const normalizedBoundsList = sortTextHighlightBoundsList(boundsList);
+    if (!normalizedBoundsList.length || isWholeTextHighlightRange(node, start, end)) {
+      return false;
+    }
+
+    const characters = node && typeof node.characters === "string" ? node.characters : "";
+    const selectedText = characters.slice(
+      Math.max(0, Math.min(characters.length, Math.floor(Number(start) || 0))),
+      Math.max(0, Math.min(characters.length, Math.floor(Number(end) || 0)))
+    );
+    if (/[\r\n]/.test(selectedText)) {
+      return false;
+    }
+    if (normalizedBoundsList.length > 1) {
+      return true;
+    }
+
+    const nodeBounds = normalizeTextHighlightWorldBounds(getNodeRenderBounds(node));
+    if (!nodeBounds) {
+      return false;
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const mergedBounds = mergeTextHighlightBoundsList(normalizedBoundsList);
+    const bounds = normalizeTextHighlightWorldBounds(mergedBounds);
+    if (!bounds) {
+      return false;
+    }
+
+    const selectedLength = compactText(selectedText).length;
+    const estimatedMaxWidth = Math.max(size * 2, selectedLength * size * 0.95);
+    const looksLikeWholeRow = bounds.height <= resolvedLineHeight * 1.35 && bounds.width >= nodeBounds.width * 0.72;
+    return looksLikeWholeRow && bounds.width > estimatedMaxWidth;
+  }
+
+  function subtractTextHighlightPrefixBounds(endBoundsList, startBoundsList, fontSize, lineHeight) {
+    const normalizedEndBoundsList = sortTextHighlightBoundsList(endBoundsList);
+    const normalizedStartBoundsList = sortTextHighlightBoundsList(startBoundsList);
+    if (!normalizedEndBoundsList.length) {
+      return [];
+    }
+    if (!normalizedStartBoundsList.length) {
+      return normalizedEndBoundsList;
+    }
+
+    const rowTolerance = getTextHighlightRowTolerance(fontSize, lineHeight);
+    const minimumWidth = getTextHighlightMinimumWidth(fontSize);
+    const nextBoundsList = [];
+
+    for (let index = 0; index < normalizedEndBoundsList.length; index += 1) {
+      const endBounds = normalizedEndBoundsList[index];
+      const endRight = endBounds.x + endBounds.width;
+      let matchedStartRight = findTextHighlightMatchedStartRight(
+        endBounds,
+        normalizedStartBoundsList,
+        rowTolerance,
+        fontSize,
+        lineHeight
+      );
+      if (!Number.isFinite(matchedStartRight)) {
+        matchedStartRight = findTextHighlightIndexMatchedStartRight(
+          endBounds,
+          normalizedStartBoundsList,
+          index,
+          fontSize,
+          lineHeight
+        );
+      }
+      if (!Number.isFinite(matchedStartRight)) {
+        continue;
+      }
+
+      const nextX = Math.max(endBounds.x, Math.min(endRight, matchedStartRight));
+      const nextWidth = endRight - nextX;
+      if (nextWidth < minimumWidth) {
+        continue;
+      }
+
+      nextBoundsList.push({
+        x: roundTextHighlightMetric(nextX),
+        y: endBounds.y,
+        width: roundTextHighlightMetric(nextWidth),
+        height: endBounds.height,
+      });
+    }
+
+    return nextBoundsList;
+  }
+
+  function extractTrailingTextHighlightBounds(endBoundsList, startBoundsList, fontSize, lineHeight) {
+    const normalizedEndBoundsList = sortTextHighlightBoundsList(endBoundsList);
+    const normalizedStartBoundsList = sortTextHighlightBoundsList(startBoundsList);
+    if (!normalizedEndBoundsList.length) {
+      return [];
+    }
+    if (!normalizedStartBoundsList.length) {
+      return normalizedEndBoundsList.slice(-1);
+    }
+
+    const rowTolerance = getTextHighlightRowTolerance(fontSize, lineHeight);
+    const minimumWidth = getTextHighlightMinimumWidth(fontSize);
+
+    for (let index = normalizedEndBoundsList.length - 1; index >= 0; index -= 1) {
+      const endBounds = normalizedEndBoundsList[index];
+      const endRight = endBounds.x + endBounds.width;
+      let matchedStartRight = findTextHighlightMatchedStartRight(
+        endBounds,
+        normalizedStartBoundsList,
+        rowTolerance,
+        fontSize,
+        lineHeight
+      );
+      if (!Number.isFinite(matchedStartRight)) {
+        matchedStartRight = findTextHighlightIndexMatchedStartRight(
+          endBounds,
+          normalizedStartBoundsList,
+          index,
+          fontSize,
+          lineHeight
+        );
+      }
+
+      if (!Number.isFinite(matchedStartRight)) {
+        continue;
+      }
+
+      const nextX = Math.max(endBounds.x, Math.min(endRight, matchedStartRight));
+      const nextWidth = endRight - nextX;
+      if (nextWidth >= minimumWidth) {
+        return [
+          {
+            x: roundTextHighlightMetric(nextX),
+            y: endBounds.y,
+            width: roundTextHighlightMetric(nextWidth),
+            height: endBounds.height,
+          },
+        ];
+      }
+    }
+
+    return [];
+  }
+
+  function findTextHighlightMatchedStartRight(endBounds, startBoundsList, rowTolerance, fontSize, lineHeight) {
+    const normalizedEndBounds = normalizeTextHighlightWorldBounds(endBounds);
+    if (!normalizedEndBounds || !Array.isArray(startBoundsList) || !startBoundsList.length) {
+      return -Infinity;
+    }
+
+    let matchedStartRight = -Infinity;
+    for (const startBounds of startBoundsList) {
+      if (!doTextHighlightBoundsShareRow(normalizedEndBounds, startBounds, rowTolerance)) {
+        continue;
+      }
+      matchedStartRight = Math.max(matchedStartRight, startBounds.x + startBounds.width);
+    }
+
+    if (Number.isFinite(matchedStartRight)) {
+      return matchedStartRight;
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const relaxedTolerance = Math.max(rowTolerance * 2.5, Math.min(resolvedLineHeight * 0.55, size * 0.9));
+    const endCenter = normalizedEndBounds.y + normalizedEndBounds.height / 2;
+    const endBottom = normalizedEndBounds.y + normalizedEndBounds.height;
+    let bestDistance = Infinity;
+    let bestRight = -Infinity;
+
+    for (const startBounds of startBoundsList) {
+      const normalizedStartBounds = normalizeTextHighlightWorldBounds(startBounds);
+      if (!normalizedStartBounds) {
+        continue;
+      }
+
+      const startCenter = normalizedStartBounds.y + normalizedStartBounds.height / 2;
+      const startBottom = normalizedStartBounds.y + normalizedStartBounds.height;
+      const distance = Math.min(Math.abs(startCenter - endCenter), Math.abs(startBottom - endBottom));
+      if (distance > relaxedTolerance || distance >= bestDistance) {
+        continue;
+      }
+
+      bestDistance = distance;
+      bestRight = normalizedStartBounds.x + normalizedStartBounds.width;
+    }
+
+    return bestRight;
+  }
+
+  function findTextHighlightIndexMatchedStartRight(endBounds, startBoundsList, index, fontSize, lineHeight) {
+    const normalizedEndBounds = normalizeTextHighlightWorldBounds(endBounds);
+    const normalizedStartBoundsList = sortTextHighlightBoundsList(startBoundsList);
+    if (!normalizedEndBounds || !normalizedStartBoundsList.length) {
+      return -Infinity;
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const relaxedTolerance = Math.max(resolvedLineHeight * 0.65, size);
+    const endRight = normalizedEndBounds.x + normalizedEndBounds.width;
+    const endCenter = normalizedEndBounds.y + normalizedEndBounds.height / 2;
+    const candidateIndexes = [index, index - 1, index + 1, normalizedStartBoundsList.length - 1];
+    let bestRight = -Infinity;
+    let bestScore = Infinity;
+
+    for (const candidateIndex of candidateIndexes) {
+      if (candidateIndex < 0 || candidateIndex >= normalizedStartBoundsList.length) {
+        continue;
+      }
+
+      const candidate = normalizeTextHighlightWorldBounds(normalizedStartBoundsList[candidateIndex]);
+      if (!candidate) {
+        continue;
+      }
+
+      const candidateRight = candidate.x + candidate.width;
+      const verticalDistance = Math.abs(candidate.y + candidate.height / 2 - endCenter);
+      if (candidateRight <= normalizedEndBounds.x - size * 0.5 || candidateRight > endRight + size * 0.5) {
+        continue;
+      }
+      if (verticalDistance > relaxedTolerance) {
+        continue;
+      }
+
+      const score = verticalDistance + Math.abs(endRight - candidateRight) * 0.02;
+      if (score < bestScore) {
+        bestScore = score;
+        bestRight = candidateRight;
+      }
+    }
+
+    return bestRight;
+  }
+
+  function sortTextHighlightBoundsList(boundsList) {
+    if (!Array.isArray(boundsList) || !boundsList.length) {
+      return [];
+    }
+
+    return boundsList
+      .map((bounds) => normalizeTextHighlightWorldBounds(bounds))
+      .filter(Boolean)
+      .sort((left, right) => {
+        if (Math.abs(left.y - right.y) > 0.5) {
+          return left.y - right.y;
+        }
+        if (Math.abs(left.x - right.x) > 0.5) {
+          return left.x - right.x;
+        }
+        return left.width - right.width;
+      });
+  }
+
+  function getTextHighlightRowTolerance(fontSize, lineHeight) {
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    return roundTextHighlightMetric(Math.max(2, Math.min(12, resolvedLineHeight * 0.18)));
+  }
+
+  function getTextHighlightMinimumWidth(fontSize) {
+    const size = Math.max(12, Number(fontSize) || 16);
+    return roundTextHighlightMetric(Math.max(1, Math.min(6, size * 0.08)));
+  }
+
+  function doTextHighlightBoundsShareRow(leftBounds, rightBounds, rowTolerance) {
+    const left = normalizeTextHighlightWorldBounds(leftBounds);
+    const right = normalizeTextHighlightWorldBounds(rightBounds);
+    if (!left || !right) {
+      return false;
+    }
+
+    const leftBottom = left.y + left.height;
+    const rightBottom = right.y + right.height;
+    const overlap = Math.min(leftBottom, rightBottom) - Math.max(left.y, right.y);
+    const minimumOverlap = Math.max(1, Math.min(left.height, right.height) * 0.25);
+    if (overlap >= minimumOverlap) {
+      return true;
+    }
+
+    const leftCenter = left.y + left.height / 2;
+    const rightCenter = right.y + right.height / 2;
+    return Math.abs(leftCenter - rightCenter) <= Math.max(1, Number(rowTolerance) || 0);
+  }
+
+  function buildConservativeTextHighlightBounds(node, start, end, fontSize, lineHeight, startBounds, endBounds) {
+    const resolvedEndBounds = normalizeTextHighlightWorldBounds(endBounds);
+    if (!resolvedEndBounds) {
+      return [];
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const minimumWidth = getTextHighlightMinimumWidth(size);
+    const approximateLineHeight = roundTextHighlightMetric(
+      Math.max(1, Math.min(resolvedEndBounds.height, resolvedLineHeight))
+    );
+    const endBottom = resolvedEndBounds.y + resolvedEndBounds.height;
+    const nextY = roundTextHighlightMetric(Math.max(resolvedEndBounds.y, endBottom - approximateLineHeight));
+    const endRight = resolvedEndBounds.x + resolvedEndBounds.width;
+    let nextX = resolvedEndBounds.x;
+
+    const resolvedStartBounds = normalizeTextHighlightWorldBounds(startBounds);
+    if (resolvedStartBounds) {
+      const startBottom = resolvedStartBounds.y + resolvedStartBounds.height;
+      if (Math.abs(startBottom - endBottom) <= Math.max(2, resolvedLineHeight * 0.75)) {
+        nextX = Math.max(resolvedEndBounds.x, Math.min(endRight, resolvedStartBounds.x + resolvedStartBounds.width));
+      }
+    } else if ((Number(start) || 0) <= 0) {
+      nextX = resolvedEndBounds.x;
+    }
+
+    let nextWidth = endRight - nextX;
+    if (nextWidth < minimumWidth) {
+      nextX = Math.max(resolvedEndBounds.x, endRight - Math.max(minimumWidth, resolvedEndBounds.width * 0.18));
+      nextWidth = endRight - nextX;
+    }
+
+    if (nextWidth < minimumWidth) {
+      return [];
+    }
+
+    return [
+      {
+        x: roundTextHighlightMetric(nextX),
+        y: nextY,
+        width: roundTextHighlightMetric(nextWidth),
+        height: approximateLineHeight,
+      },
+    ];
+  }
+
+  function buildEmergencyTextHighlightBounds(node, start, end, fontSize, lineHeight) {
+    const nodeBounds = getNodeRenderBounds(node);
+    const resolvedNodeBounds = normalizeTextHighlightWorldBounds(nodeBounds);
+    if (!resolvedNodeBounds) {
+      return [];
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const approximateLineHeight = roundTextHighlightMetric(
+      Math.max(1, Math.min(resolvedNodeBounds.height, resolvedLineHeight))
+    );
+    const selectionLength = Math.max(1, Math.floor(Number(end) || 0) - Math.floor(Number(start) || 0));
+    const estimatedWidth = roundTextHighlightMetric(
+      Math.max(
+        getTextHighlightMinimumWidth(size),
+        Math.min(resolvedNodeBounds.width, selectionLength * Math.max(4, size * 0.42))
+      )
+    );
+
+    return [
+      {
+        x: resolvedNodeBounds.x,
+        y: roundTextHighlightMetric(
+          Math.max(resolvedNodeBounds.y, resolvedNodeBounds.y + resolvedNodeBounds.height - approximateLineHeight)
+        ),
+        width: estimatedWidth,
+        height: approximateLineHeight,
+      },
+    ];
+  }
+
+  function truncateTextHighlightMeasurementClone(node, end) {
+    if (!node || typeof node.characters !== "string") {
+      return;
+    }
+
+    const characterCount = node.characters.length;
+    const truncateAt = Math.max(0, Math.min(characterCount, Math.floor(Number(end) || 0)));
+    if (truncateAt >= characterCount) {
+      return;
+    }
+
+    if (typeof node.deleteCharacters === "function") {
+      try {
+        node.deleteCharacters(truncateAt, characterCount);
+        return;
+      } catch (error) {}
+    }
+
+    try {
+      node.characters = node.characters.slice(0, truncateAt);
+    } catch (error) {}
+  }
+
+  function moveTextHighlightMeasureClone(sourceNode, cloneNode, parentNode, offsetX, offsetY) {
+    const targetParent = parentNode && !parentNode.removed ? parentNode : figma.currentPage;
+    if (cloneNode.parent !== targetParent) {
+      targetParent.appendChild(cloneNode);
+    }
+
+    if ("layoutPositioning" in cloneNode) {
+      try {
+        cloneNode.layoutPositioning = "ABSOLUTE";
+      } catch (error) {}
+    }
+
+    const sourceTransform = getAbsoluteTransformMatrix(sourceNode);
+    const xOffset = Number(offsetX) || 0;
+    const yOffset = Number(offsetY) || 0;
+    if ("relativeTransform" in cloneNode && Array.isArray(cloneNode.relativeTransform)) {
+      cloneNode.relativeTransform = [
+        [sourceTransform[0][0], sourceTransform[0][1], sourceTransform[0][2] - xOffset],
+        [sourceTransform[1][0], sourceTransform[1][1], sourceTransform[1][2] - yOffset],
+      ];
+      return;
+    }
+
+    if ("x" in cloneNode && typeof cloneNode.x === "number" && "y" in cloneNode && typeof cloneNode.y === "number") {
+      cloneNode.x = roundTextHighlightMetric(sourceTransform[0][2] - xOffset);
+      cloneNode.y = roundTextHighlightMetric(sourceTransform[1][2] - yOffset);
+    }
+  }
+
+  function getVisibleTextHighlightBounds(node) {
+    if (!node) {
+      return null;
+    }
+
+    const bounds = getNodeRenderBounds(node);
+    if (bounds) {
+      return bounds;
+    }
+
+    return null;
+  }
+
+  function getTextHighlightMeasurementBoundsList(measurement, fallbackNode) {
+    const boundsList = [];
+    const measurementSegments =
+      measurement && Array.isArray(measurement.boundsList)
+        ? measurement.boundsList
+        : measurement && Array.isArray(measurement.segments)
+          ? measurement.segments
+          : null;
+    if (measurementSegments) {
+      for (const segment of measurementSegments) {
+        const normalizedSegment = normalizeTextHighlightWorldBounds(segment);
+        if (normalizedSegment) {
+          boundsList.push(normalizedSegment);
+        }
+      }
+    }
+
+    if (!boundsList.length && measurement && measurement.bounds) {
+      const normalizedBounds = normalizeTextHighlightWorldBounds(measurement.bounds);
+      if (normalizedBounds) {
+        boundsList.push(normalizedBounds);
+      }
+    }
+
+    if (!boundsList.length && fallbackNode) {
+      const fallbackBounds = getVisibleTextHighlightBounds(fallbackNode);
+      if (fallbackBounds) {
+        boundsList.push(fallbackBounds);
+      }
+    }
+
+    return boundsList;
+  }
+
+  function normalizeTextHighlightWorldBounds(bounds) {
+    if (!bounds || typeof bounds !== "object") {
+      return null;
+    }
+
+    const x = Number(bounds.x);
+    const y = Number(bounds.y);
+    const width = Number(bounds.width);
+    const height = Number(bounds.height);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(width) || !Number.isFinite(height)) {
+      return null;
+    }
+
+    if (width <= 0 || height <= 0) {
+      return null;
+    }
+
+    return {
+      x: roundTextHighlightMetric(x),
+      y: roundTextHighlightMetric(y),
+      width: roundTextHighlightMetric(width),
+      height: roundTextHighlightMetric(height),
+    };
+  }
+
+  function mergeTextHighlightBoundsList(boundsList) {
+    if (!Array.isArray(boundsList) || !boundsList.length) {
+      return null;
+    }
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const bounds of boundsList) {
+      const normalizedBounds = normalizeTextHighlightWorldBounds(bounds);
+      if (!normalizedBounds) {
+        continue;
+      }
+
+      minX = Math.min(minX, normalizedBounds.x);
+      minY = Math.min(minY, normalizedBounds.y);
+      maxX = Math.max(maxX, normalizedBounds.x + normalizedBounds.width);
+      maxY = Math.max(maxY, normalizedBounds.y + normalizedBounds.height);
+    }
+
+    if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+      return null;
+    }
+
+    return {
+      x: roundTextHighlightMetric(minX),
+      y: roundTextHighlightMetric(minY),
+      width: roundTextHighlightMetric(Math.max(1, maxX - minX)),
+      height: roundTextHighlightMetric(Math.max(1, maxY - minY)),
+    };
+  }
+
+  function hasMergedTextHighlightBlockBounds(boundsList, fontSize) {
+    if (!Array.isArray(boundsList) || boundsList.length !== 1) {
+      return false;
+    }
+
+    const bounds = normalizeTextHighlightWorldBounds(boundsList[0]);
+    if (!bounds) {
+      return false;
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    return bounds.height > Math.max(size * 1.9, 30);
+  }
+
+  function splitMergedTextHighlightBlockBounds(boundsList, fontSize, lineHeight) {
+    const mergedBounds = mergeTextHighlightBoundsList(boundsList);
+    const bounds = normalizeTextHighlightWorldBounds(mergedBounds);
+    if (!bounds) {
+      return Array.isArray(boundsList) ? boundsList : [];
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const lineCount = Math.max(2, Math.min(80, Math.ceil(Math.max(0, bounds.height - size) / resolvedLineHeight) + 1));
+    if (lineCount <= 1) {
+      return [bounds];
+    }
+
+    const chunkHeight = bounds.height / lineCount;
+    const nextBoundsList = [];
+    for (let index = 0; index < lineCount; index += 1) {
+      const chunkY = bounds.y + chunkHeight * index;
+      const nextY = index === lineCount - 1 ? bounds.y + bounds.height : bounds.y + chunkHeight * (index + 1);
+      const nextHeight = Math.max(1, nextY - chunkY);
+      nextBoundsList.push({
+        x: bounds.x,
+        y: roundTextHighlightMetric(chunkY),
+        width: bounds.width,
+        height: roundTextHighlightMetric(nextHeight),
+      });
+    }
+
+    return nextBoundsList.length ? nextBoundsList : [bounds];
+  }
+
+  function normalizeTextHighlightBoundsListForApply(node, start, end, boundsList, fontSize, lineHeight) {
+    let rows = sortTextHighlightBoundsList(boundsList);
+    if (!rows.length) {
+      rows = buildConservativeTextHighlightBounds(node, start, end, fontSize, lineHeight, null, null);
+    }
+    if (!rows.length) {
+      rows = buildEmergencyTextHighlightBounds(node, start, end, fontSize, lineHeight);
+    }
+    if (!rows.length) {
+      return [];
+    }
+
+    const nodeBounds = normalizeTextHighlightWorldBounds(getNodeRenderBounds(node));
+    if (!nodeBounds) {
+      return rows;
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const padding = Math.max(120, size * 4, resolvedLineHeight * 3);
+    const expandedNodeBounds = {
+      x: nodeBounds.x - padding,
+      y: nodeBounds.y - padding,
+      width: nodeBounds.width + padding * 2,
+      height: nodeBounds.height + padding * 2,
+    };
+    const maximumRowHeight = Math.max(resolvedLineHeight * 2.6, size * 3.2);
+    const filteredRows = rows.filter((row) => {
+      const bounds = normalizeTextHighlightWorldBounds(row);
+      if (!bounds) {
+        return false;
+      }
+      if (bounds.height > maximumRowHeight && bounds.height > nodeBounds.height * 0.65) {
+        return false;
+      }
+      return doTextHighlightBoundsIntersect(bounds, expandedNodeBounds);
+    });
+
+    if (filteredRows.length) {
+      return filteredRows;
+    }
+
+    const conservativeRows = buildConservativeTextHighlightBounds(node, start, end, fontSize, lineHeight, null, null);
+    const safeConservativeRows = conservativeRows.filter((row) => {
+      const bounds = normalizeTextHighlightWorldBounds(row);
+      return !!bounds && doTextHighlightBoundsIntersect(bounds, expandedNodeBounds);
+    });
+    if (safeConservativeRows.length) {
+      return safeConservativeRows;
+    }
+
+    return buildEmergencyTextHighlightBounds(node, start, end, fontSize, lineHeight).filter((row) => {
+      const bounds = normalizeTextHighlightWorldBounds(row);
+      return !!bounds && doTextHighlightBoundsIntersect(bounds, expandedNodeBounds);
+    });
+  }
+
+  function doTextHighlightBoundsIntersect(left, right) {
+    const leftBounds = normalizeTextHighlightWorldBounds(left);
+    const rightBounds = normalizeTextHighlightWorldBounds(right);
+    if (!leftBounds || !rightBounds) {
+      return false;
+    }
+
+    return (
+      leftBounds.x < rightBounds.x + rightBounds.width &&
+      leftBounds.x + leftBounds.width > rightBounds.x &&
+      leftBounds.y < rightBounds.y + rightBounds.height &&
+      leftBounds.y + leftBounds.height > rightBounds.y
+    );
+  }
+
+  function getTextRangeFontSize(node, start, end) {
+    const segments = getTextHighlightStyledSegments(node, start, end, ["fontSize"]);
+    let maxSize = 0;
+
+    for (const segment of segments) {
+      const fontSize = segment && typeof segment.fontSize === "number" ? segment.fontSize : 0;
+      if (fontSize > maxSize) {
+        maxSize = fontSize;
+      }
+    }
+
+    if (maxSize > 0) {
+      return maxSize;
+    }
+
+    if (node && typeof node.getRangeFontSize === "function") {
+      try {
+        const rangeFontSize = node.getRangeFontSize(start, end);
+        if (typeof rangeFontSize === "number" && Number.isFinite(rangeFontSize) && rangeFontSize > 0) {
+          return rangeFontSize;
+        }
+      } catch (error) {}
+    }
+
+    if (node && typeof node.fontSize === "number" && Number.isFinite(node.fontSize) && node.fontSize > 0) {
+      return node.fontSize;
+    }
+
+    return 16;
+  }
+
+  function getTextRangeLineHeight(node, start, end, fontSize) {
+    const fallback = getFallbackTextHighlightLineHeight(fontSize);
+    const segments = getTextHighlightStyledSegments(node, start, end, ["fontSize", "lineHeight"]);
+    let maxLineHeight = 0;
+
+    for (const segment of segments) {
+      const segmentFontSize =
+        segment && typeof segment.fontSize === "number" && Number.isFinite(segment.fontSize)
+          ? segment.fontSize
+          : fontSize;
+      const nextLineHeight = resolveTextHighlightLineHeight(segment && segment.lineHeight, segmentFontSize);
+      if (nextLineHeight > maxLineHeight) {
+        maxLineHeight = nextLineHeight;
+      }
+    }
+
+    if (maxLineHeight > 0) {
+      return roundTextHighlightMetric(maxLineHeight);
+    }
+
+    if (node && typeof node.getRangeLineHeight === "function") {
+      try {
+        const rangeLineHeight = resolveTextHighlightLineHeight(node.getRangeLineHeight(start, end), fontSize);
+        if (rangeLineHeight > 0) {
+          return roundTextHighlightMetric(rangeLineHeight);
+        }
+      } catch (error) {}
+    }
+
+    return fallback;
+  }
+
+  function resolveTextHighlightLineHeight(lineHeight, fontSize) {
+    const size = Math.max(12, Number(fontSize) || 16);
+    if (!lineHeight || lineHeight === figma.mixed) {
+      return 0;
+    }
+
+    if (typeof lineHeight === "number" && Number.isFinite(lineHeight) && lineHeight > 0) {
+      return lineHeight;
+    }
+
+    if (typeof lineHeight !== "object") {
+      return 0;
+    }
+
+    const unit = typeof lineHeight.unit === "string" ? lineHeight.unit.toUpperCase() : "";
+    const value = Number(lineHeight.value);
+    if (unit === "PIXELS" && Number.isFinite(value) && value > 0) {
+      return value;
+    }
+    if (unit === "PERCENT" && Number.isFinite(value) && value > 0) {
+      return size * (value / 100);
+    }
+    if (unit === "AUTO") {
+      return getFallbackTextHighlightLineHeight(size);
+    }
+
+    return 0;
+  }
+
+  function getFallbackTextHighlightLineHeight(fontSize) {
+    const size = Math.max(12, Number(fontSize) || 16);
+    return roundTextHighlightMetric(size * 1.2);
+  }
+
+  function getTextHighlightStyledSegments(node, start, end, fields) {
+    if (!node || typeof node.getStyledTextSegments !== "function") {
+      return [];
+    }
+
+    try {
+      const segments = node.getStyledTextSegments(fields, start, end);
+      return Array.isArray(segments) ? segments : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function getTextHighlightPaints(node, start, end) {
+    if (!node || typeof node.getRangeFills !== "function") {
+      return null;
+    }
+
+    try {
+      const fills = node.getRangeFills(start, end);
+      return Array.isArray(fills) ? fills : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  async function applyTextHighlightColor(node, start, end, textColorHex) {
+    if (!node || typeof node.setRangeFills !== "function") {
+      throw new Error("선택한 텍스트 색상을 변경할 수 없습니다.");
+    }
+
+    try {
+      await loadFontsForTextNode(node);
+    } catch (error) {}
+
+    node.setRangeFills(start, end, [createSolidPaint(textColorHex)]);
+  }
+
+  function createTextHighlightRect(node, parent, worldBounds, fontSize, colorHex, cornerRadius, boxPaddingPx) {
+    const nodeTransform = getAbsoluteTransformMatrix(node);
+    const inverseNodeTransform = invertAffineTransform(nodeTransform);
+    if (!inverseNodeTransform) {
+      throw new Error("텍스트 하이라이트 위치를 계산하지 못했습니다.");
+    }
+
+    const localBounds = getTextHighlightLocalBounds(inverseNodeTransform, worldBounds);
+    const padding = buildTextHighlightBoxPixelPadding(fontSize, boxPaddingPx);
+    const localX = localBounds.x - padding.left;
+    const localY = localBounds.y - padding.top;
+    const localWidth = Math.max(1, localBounds.width + padding.left + padding.right);
+    const localHeight = ceilTextHighlightMetric(localBounds.height + padding.top + padding.bottom);
+    const clampedGeometry = clampTextHighlightLocalGeometryToParentBounds(node, parent, {
+      x: localX,
+      y: localY,
+      width: localWidth,
+      height: localHeight,
+    });
+    return createTextHighlightRectFromLocalGeometry(
+      node,
+      parent,
+      clampedGeometry.x,
+      clampedGeometry.y,
+      clampedGeometry.width,
+      clampedGeometry.height,
+      colorHex,
+      sanitizeTextHighlightRadius(cornerRadius, padding.radius)
+    );
+  }
+
+  function createTextHighlightLineRect(node, parent, worldBounds, fontSize, thickness, colorHex, cornerRadius) {
+    const nodeTransform = getAbsoluteTransformMatrix(node);
+    const inverseNodeTransform = invertAffineTransform(nodeTransform);
+    if (!inverseNodeTransform) {
+      throw new Error("라인형 하이라이트 위치를 계산하지 못했습니다.");
+    }
+
+    const localBounds = getTextHighlightLocalBounds(inverseNodeTransform, worldBounds);
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedThickness = roundTextHighlightThickness(
+      Math.max(2, Math.min(size * 1.35, Number(thickness) || size * 0.16))
+    );
+    const horizontalPadding = 0;
+    const lineBottomAnchor = roundTextHighlightMetric(localBounds.y + localBounds.height + Math.max(0.5, size * 0.02));
+    const localX = localBounds.x - horizontalPadding;
+    const localY = lineBottomAnchor - resolvedThickness;
+    const localWidth = Math.max(1, localBounds.width + horizontalPadding * 2);
+    const localHeight = Math.max(1, resolvedThickness);
+    const clampedGeometry = clampTextHighlightLocalGeometryToParentBounds(node, parent, {
+      x: localX,
+      y: localY,
+      width: localWidth,
+      height: localHeight,
+    });
+
+    return createTextHighlightRectFromLocalGeometry(
+      node,
+      parent,
+      clampedGeometry.x,
+      clampedGeometry.y,
+      clampedGeometry.width,
+      clampedGeometry.height,
+      colorHex,
+      sanitizeTextHighlightRadius(cornerRadius, AI_TEXT_HIGHLIGHT_DEFAULT_STRIKE_RADIUS)
+    );
+  }
+
+  function createTextHighlightStrikeRect(node, parent, worldBounds, fontSize, thickness, colorHex, cornerRadius) {
+    const nodeTransform = getAbsoluteTransformMatrix(node);
+    const inverseNodeTransform = invertAffineTransform(nodeTransform);
+    if (!inverseNodeTransform) {
+      throw new Error("취소선형 하이라이트 위치를 계산하지 못했습니다.");
+    }
+
+    const localBounds = getTextHighlightLocalBounds(inverseNodeTransform, worldBounds);
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedThickness = roundTextHighlightThickness(
+      Math.max(2, Math.min(size * 1.45, Number(thickness) || size * 0.22))
+    );
+    const horizontalPadding = 0;
+    const centerY = localBounds.y + localBounds.height * 0.5;
+    const localX = localBounds.x - horizontalPadding;
+    const localY = centerY - resolvedThickness / 2;
+    const localWidth = Math.max(1, localBounds.width + horizontalPadding * 2);
+    const localHeight = Math.max(1, resolvedThickness);
+    const clampedGeometry = clampTextHighlightLocalGeometryToParentBounds(node, parent, {
+      x: localX,
+      y: localY,
+      width: localWidth,
+      height: localHeight,
+    });
+
+    return createTextHighlightRectFromLocalGeometry(
+      node,
+      parent,
+      clampedGeometry.x,
+      clampedGeometry.y,
+      clampedGeometry.width,
+      clampedGeometry.height,
+      colorHex,
+      sanitizeTextHighlightRadius(cornerRadius, roundTextHighlightMetric(Math.max(0, Math.min(999, resolvedThickness / 2))))
+    );
+  }
+
+  function clampTextHighlightLocalGeometryToParentBounds(node, parent, geometry) {
+    return normalizeTextHighlightLocalGeometry(geometry);
+  }
+
+  function normalizeTextHighlightLocalGeometry(geometry) {
+    return {
+      x: roundTextHighlightMetric(Number(geometry && geometry.x) || 0),
+      y: roundTextHighlightMetric(Number(geometry && geometry.y) || 0),
+      width: roundTextHighlightMetric(Math.max(1, Number(geometry && geometry.width) || 1)),
+      height: ceilTextHighlightMetric(Math.max(1, Number(geometry && geometry.height) || 1)),
+    };
+  }
+
+  function createTextHighlightRectFromLocalGeometry(node, parent, localX, localY, localWidth, localHeight, colorHex, cornerRadius) {
+    const nodeTransform = getAbsoluteTransformMatrix(node);
+    const rect = figma.createRectangle();
+
+    rect.resize(Math.max(1, localWidth), Math.max(1, localHeight));
+    rect.cornerRadius = sanitizeTextHighlightRadius(cornerRadius, 0);
+    rect.fills = [createSolidPaint(colorHex)];
+    rect.strokes = [];
+
+    if ("layoutPositioning" in rect && (isAutoLayoutParent(parent) || isReusableTextHighlightContainer(parent))) {
+      setTextHighlightAbsoluteLayout(rect);
+    }
+
+    const absoluteOrigin = transformPointWithMatrix(nodeTransform, localX, localY);
+    const desiredAbsoluteTransform = [
+      [nodeTransform[0][0], nodeTransform[0][1], absoluteOrigin.x],
+      [nodeTransform[1][0], nodeTransform[1][1], absoluteOrigin.y],
+    ];
+    const parentTransform = getAbsoluteTransformMatrix(parent);
+    const inverseParentTransform = invertAffineTransform(parentTransform);
+    const relativeTransform = inverseParentTransform
+      ? multiplyAffineTransforms(inverseParentTransform, desiredAbsoluteTransform)
+      : desiredAbsoluteTransform;
+
+    if (rect.parent !== parent) {
+      if ("relativeTransform" in rect && Array.isArray(rect.relativeTransform)) {
+        rect.relativeTransform = relativeTransform;
+      } else if ("x" in rect && typeof rect.x === "number" && "y" in rect && typeof rect.y === "number") {
+        rect.x = roundTextHighlightMetric(relativeTransform[0][2]);
+        rect.y = roundTextHighlightMetric(relativeTransform[1][2]);
+      }
+      parent.appendChild(rect);
+      if (isAutoLayoutParent(parent)) {
+        setTextHighlightAbsoluteLayout(rect);
+      }
+    }
+
+    if ("relativeTransform" in rect && Array.isArray(rect.relativeTransform)) {
+      rect.relativeTransform = relativeTransform;
+    } else if ("x" in rect && typeof rect.x === "number" && "y" in rect && typeof rect.y === "number") {
+      rect.x = roundTextHighlightMetric(relativeTransform[0][2]);
+      rect.y = roundTextHighlightMetric(relativeTransform[1][2]);
+    }
+
+    return rect;
+  }
+
+  function setTextHighlightAbsoluteLayout(node) {
+    if (!node || !("layoutPositioning" in node)) {
+      return;
+    }
+
+    try {
+      node.layoutPositioning = "ABSOLUTE";
+    } catch (error) {}
+  }
+
+  function prepareTextHighlightLayerContainer(parent, node) {
+    const nodeIndex = findNodeChildIndex(parent, node && node.id);
+    const groupOverlayTarget = getTextHighlightGroupOverlayTarget(parent);
+    if (groupOverlayTarget) {
+      return {
+        parent: groupOverlayTarget.parent,
+        nodeIndex: findNodeChildIndex(groupOverlayTarget.parent, groupOverlayTarget.anchorNodeId),
+        anchorNodeId: groupOverlayTarget.anchorNodeId,
+        looseHighlights: true,
+        externalOverlay: true,
+      };
+    }
+
+    return {
+      parent,
+      nodeIndex,
+      looseHighlights: true,
+      anchorNodeId: node && node.id,
+    };
+  }
+
+  function getTextHighlightGroupOverlayTarget(parent) {
+    if (!parent || parent.type !== "GROUP") {
+      return null;
+    }
+
+    let anchor = parent;
+    let overlayParent = parent.parent;
+    while (overlayParent && overlayParent.type === "GROUP") {
+      anchor = overlayParent;
+      overlayParent = overlayParent.parent;
+    }
+
+    if (!anchor || !overlayParent || overlayParent.type === "DOCUMENT" || !("children" in overlayParent)) {
+      return null;
+    }
+
+    return {
+      parent: overlayParent,
+      anchorNodeId: anchor.id,
+    };
+  }
+
+  function finalizeTextHighlightLayerContainer(container, node, options) {
+    return;
+  }
+
+  function groupTextHighlightSelection(parent, node, rect, index, options) {
+    const rects = Array.isArray(rect) ? rect.filter(Boolean) : rect ? [rect] : [];
+    return groupLooseTextHighlightSelection(rects);
+  }
+
+  function groupLooseTextHighlightSelection(rects) {
+    const nodesToGroup = Array.isArray(rects) ? rects.filter(Boolean) : [];
+    if (!nodesToGroup.length) {
+      throw new Error("Could not prepare text highlight layers.");
+    }
+
+    for (let nodeIndex = 0; nodeIndex < nodesToGroup.length; nodeIndex += 1) {
+      const highlightNode = nodesToGroup[nodeIndex];
+      try {
+        highlightNode.name =
+          nodesToGroup.length > 1
+            ? `Text Highlight ${nodeIndex + 1}`
+            : "Text Highlight";
+      } catch (error) {}
+    }
+
+    return nodesToGroup[0];
+  }
+
+  function markTextHighlightGroup(group, node) {
+    if (!group) {
+      return;
+    }
+
+    try {
+      group.name = AI_TEXT_HIGHLIGHT_GROUP_NAME;
+    } catch (error) {}
+
+    if (typeof group.setPluginData === "function") {
+      try {
+        group.setPluginData(AI_TEXT_HIGHLIGHT_GROUP_PLUGIN_KEY, "1");
+        group.setPluginData(AI_TEXT_HIGHLIGHT_GROUP_TEXT_NODE_KEY, node && typeof node.id === "string" ? node.id : "");
+      } catch (error) {}
+    }
+  }
+
+  function isReusableTextHighlightGroup(group, node) {
+    if (!group || group.removed || (group.type !== "GROUP" && group.type !== "FRAME")) {
+      return false;
+    }
+
+    if (!node || node.removed || node.parent !== group) {
+      return false;
+    }
+
+    if (safeName(group) === AI_TEXT_HIGHLIGHT_GROUP_NAME || looksLikeLegacyTextHighlightGroup(group, node)) {
+      return true;
+    }
+
+    if (typeof group.getPluginData === "function") {
+      try {
+        return group.getPluginData(AI_TEXT_HIGHLIGHT_GROUP_PLUGIN_KEY) === "1";
+      } catch (error) {}
+    }
+
+    return false;
+  }
+
+  function isReusableTextHighlightContainer(group) {
+    if (!group || group.removed || (group.type !== "GROUP" && group.type !== "FRAME")) {
+      return false;
+    }
+
+    if (safeName(group) === AI_TEXT_HIGHLIGHT_GROUP_NAME) {
+      return true;
+    }
+
+    if (typeof group.getPluginData === "function") {
+      try {
+        return group.getPluginData(AI_TEXT_HIGHLIGHT_GROUP_PLUGIN_KEY) === "1";
+      } catch (error) {}
+    }
+
+    return false;
+  }
+
+  function looksLikeLegacyTextHighlightGroup(group, node) {
+    if (!group || group.type !== "GROUP" || !node || node.parent !== group) {
+      return false;
+    }
+    if (!("children" in group) || !Array.isArray(group.children)) {
+      return false;
+    }
+
+    let hasText = false;
+    let hasHighlightShape = false;
+    for (const child of group.children) {
+      if (!child || child.removed) {
+        continue;
+      }
+      if (child.id === node.id || child.type === "TEXT") {
+        hasText = true;
+      }
+      const childName = safeName(child);
+      if (
+        /highlight/i.test(childName) &&
+        (child.type === "RECTANGLE" || child.type === "VECTOR" || child.type === "LINE" || child.type === "BOOLEAN_OPERATION")
+      ) {
+        hasHighlightShape = true;
+      }
+    }
+
+    return hasText && hasHighlightShape && /highlight/i.test(safeName(group));
+  }
+
+  function placeTextHighlightRectBehindNode(parent, rect, nodeId, index) {
+    if (!parent || !rect || typeof parent.insertChild !== "function") {
+      return;
+    }
+
+    const targetIndex =
+      typeof index === "number" && index >= 0 ? index : findNodeChildIndex(parent, typeof nodeId === "string" ? nodeId : "");
+    if (targetIndex < 0) {
+      return;
+    }
+
+    try {
+      parent.insertChild(targetIndex, rect);
+      if (isAutoLayoutParent(parent)) {
+        setTextHighlightAbsoluteLayout(rect);
+      }
+    } catch (error) {}
+  }
+
+  function findNodeChildIndex(parent, nodeId) {
+    if (!parent || !("children" in parent) || !Array.isArray(parent.children)) {
+      return -1;
+    }
+
+    for (let index = 0; index < parent.children.length; index += 1) {
+      if (parent.children[index] && parent.children[index].id === nodeId) {
+        return index;
+      }
+    }
+
+    return -1;
+  }
+
+  function isAutoLayoutParent(node) {
+    return !!node && "layoutMode" in node && typeof node.layoutMode === "string" && node.layoutMode !== "NONE";
+  }
+
+  function shouldPreserveAbsoluteLayoutPositioning(node) {
+    return !!node && "layoutPositioning" in node && node.layoutPositioning === "ABSOLUTE";
+  }
+
+  function buildTextHighlightPadding(fontSize) {
+    const size = Math.max(12, Number(fontSize) || 16);
+    return {
+      left: roundTextHighlightMetric(Math.max(6, size * 0.18)),
+      right: roundTextHighlightMetric(Math.max(6, size * 0.18)),
+      top: roundTextHighlightMetric(Math.max(3, size * 0.08)),
+      bottom: roundTextHighlightMetric(Math.max(4, size * 0.12)),
+      radius: roundTextHighlightMetric(Math.max(4, Math.min(14, size * 0.16))),
+    };
+  }
+
+  function buildTextHighlightBoxPixelPadding(fontSize, boxPaddingPx) {
+    const size = Math.max(12, Number(fontSize) || 16);
+    const padding = sanitizeTextHighlightBoxPaddingPx(boxPaddingPx, AI_TEXT_HIGHLIGHT_DEFAULT_BOX_PADDING_PX);
+    return {
+      left: padding,
+      right: padding,
+      top: padding,
+      bottom: padding,
+      radius: roundTextHighlightMetric(Math.max(0, Math.min(14, size * 0.16))),
+    };
+  }
+
+  function getNodeRenderBounds(node) {
+    if (!node || node.removed) {
+      return null;
+    }
+
+    try {
+      const renderBounds = "absoluteRenderBounds" in node ? node.absoluteRenderBounds : null;
+      if (renderBounds && renderBounds.width > 0 && renderBounds.height > 0) {
+        return {
+          x: roundTextHighlightMetric(renderBounds.x),
+          y: roundTextHighlightMetric(renderBounds.y),
+          width: roundTextHighlightMetric(renderBounds.width),
+          height: roundTextHighlightMetric(renderBounds.height),
+        };
+      }
+    } catch (error) {}
+
+    try {
+      const absoluteBounds = "absoluteBoundingBox" in node ? node.absoluteBoundingBox : null;
+      if (absoluteBounds && absoluteBounds.width > 0 && absoluteBounds.height > 0) {
+        return {
+          x: roundTextHighlightMetric(absoluteBounds.x),
+          y: roundTextHighlightMetric(absoluteBounds.y),
+          width: roundTextHighlightMetric(absoluteBounds.width),
+          height: roundTextHighlightMetric(absoluteBounds.height),
+        };
+      }
+    } catch (error) {}
+
+    try {
+      if ("width" in node && "height" in node && Number(node.width) > 0 && Number(node.height) > 0) {
+        const matrix = getAbsoluteTransformMatrix(node);
+        const isAxisAligned =
+          Math.abs(Number(matrix[0][1]) || 0) <= 0.0001 &&
+          Math.abs(Number(matrix[1][0]) || 0) <= 0.0001;
+        if (isAxisAligned) {
+          return {
+            x: roundTextHighlightMetric(Number(matrix[0][2]) || 0),
+            y: roundTextHighlightMetric(Number(matrix[1][2]) || 0),
+            width: roundTextHighlightMetric(Number(node.width) || 0),
+            height: roundTextHighlightMetric(Number(node.height) || 0),
+          };
+        }
+      }
+    } catch (error) {}
+
+    return null;
+  }
+
+  function getAbsoluteTransformMatrix(node) {
+    if (node && Array.isArray(node.absoluteTransform) && node.absoluteTransform.length >= 2) {
+      const row0 = Array.isArray(node.absoluteTransform[0]) ? node.absoluteTransform[0] : [];
+      const row1 = Array.isArray(node.absoluteTransform[1]) ? node.absoluteTransform[1] : [];
+      const a = Number(row0[0]);
+      const c = Number(row0[1]);
+      const e = Number(row0[2]);
+      const b = Number(row1[0]);
+      const d = Number(row1[1]);
+      const f = Number(row1[2]);
+      return [
+        [Number.isFinite(a) ? a : 1, Number.isFinite(c) ? c : 0, Number.isFinite(e) ? e : 0],
+        [Number.isFinite(b) ? b : 0, Number.isFinite(d) ? d : 1, Number.isFinite(f) ? f : 0],
+      ];
+    }
+
+    if (node && "x" in node && typeof node.x === "number" && "y" in node && typeof node.y === "number") {
+      return [
+        [1, 0, Number(node.x) || 0],
+        [0, 1, Number(node.y) || 0],
+      ];
+    }
+
+    return createIdentityTransform();
+  }
+
+  function createIdentityTransform() {
+    return [
+      [1, 0, 0],
+      [0, 1, 0],
+    ];
+  }
+
+  function invertAffineTransform(matrix) {
+    if (!Array.isArray(matrix) || matrix.length < 2) {
+      return null;
+    }
+
+    const a = Number(matrix[0][0]) || 0;
+    const c = Number(matrix[0][1]) || 0;
+    const e = Number(matrix[0][2]) || 0;
+    const b = Number(matrix[1][0]) || 0;
+    const d = Number(matrix[1][1]) || 0;
+    const f = Number(matrix[1][2]) || 0;
+    const determinant = a * d - b * c;
+
+    if (!Number.isFinite(determinant) || Math.abs(determinant) < 1e-8) {
+      return null;
+    }
+
+    return [
+      [d / determinant, -c / determinant, (c * f - d * e) / determinant],
+      [-b / determinant, a / determinant, (b * e - a * f) / determinant],
+    ];
+  }
+
+  function multiplyAffineTransforms(left, right) {
+    return [
+      [
+        left[0][0] * right[0][0] + left[0][1] * right[1][0],
+        left[0][0] * right[0][1] + left[0][1] * right[1][1],
+        left[0][0] * right[0][2] + left[0][1] * right[1][2] + left[0][2],
+      ],
+      [
+        left[1][0] * right[0][0] + left[1][1] * right[1][0],
+        left[1][0] * right[0][1] + left[1][1] * right[1][1],
+        left[1][0] * right[0][2] + left[1][1] * right[1][2] + left[1][2],
+      ],
+    ];
+  }
+
+  function transformPointWithMatrix(matrix, x, y) {
+    return {
+      x: matrix[0][0] * x + matrix[0][1] * y + matrix[0][2],
+      y: matrix[1][0] * x + matrix[1][1] * y + matrix[1][2],
+    };
+  }
+
+  function getTextHighlightLocalBounds(inverseTransform, worldBounds) {
+    const corners = [
+      transformPointWithMatrix(inverseTransform, worldBounds.x, worldBounds.y),
+      transformPointWithMatrix(inverseTransform, worldBounds.x + worldBounds.width, worldBounds.y),
+      transformPointWithMatrix(inverseTransform, worldBounds.x, worldBounds.y + worldBounds.height),
+      transformPointWithMatrix(inverseTransform, worldBounds.x + worldBounds.width, worldBounds.y + worldBounds.height),
+    ];
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    for (const point of corners) {
+      minX = Math.min(minX, point.x);
+      minY = Math.min(minY, point.y);
+      maxX = Math.max(maxX, point.x);
+      maxY = Math.max(maxY, point.y);
+    }
+
+    return {
+      x: roundTextHighlightMetric(minX),
+      y: roundTextHighlightMetric(minY),
+      width: roundTextHighlightMetric(Math.max(1, maxX - minX)),
+      height: roundTextHighlightMetric(Math.max(1, maxY - minY)),
+    };
+  }
+
+  function getTextHighlightWorldBoundsFromLocalBounds(node, localBounds) {
+    const bounds = normalizeTextHighlightWorldBounds(localBounds);
+    if (!bounds) {
+      return null;
+    }
+
+    const matrix = getAbsoluteTransformMatrix(node);
+    const corners = [
+      transformPointWithMatrix(matrix, bounds.x, bounds.y),
+      transformPointWithMatrix(matrix, bounds.x + bounds.width, bounds.y),
+      transformPointWithMatrix(matrix, bounds.x, bounds.y + bounds.height),
+      transformPointWithMatrix(matrix, bounds.x + bounds.width, bounds.y + bounds.height),
+    ];
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    for (const point of corners) {
+      minX = Math.min(minX, point.x);
+      minY = Math.min(minY, point.y);
+      maxX = Math.max(maxX, point.x);
+      maxY = Math.max(maxY, point.y);
+    }
+
+    if (!Number.isFinite(minX) || !Number.isFinite(minY) || maxX <= minX || maxY <= minY) {
+      return null;
+    }
+
+    return {
+      x: roundTextHighlightMetric(minX),
+      y: roundTextHighlightMetric(minY),
+      width: roundTextHighlightMetric(Math.max(1, maxX - minX)),
+      height: roundTextHighlightMetric(Math.max(1, maxY - minY)),
+    };
+  }
+
+  function roundTextHighlightMetric(value) {
+    return Math.round((Number(value) || 0) * 1000) / 1000;
+  }
+
+  function ceilTextHighlightMetric(value) {
+    return Math.max(1, Math.ceil(Number(value) || 0));
+  }
+
+  function roundTextHighlightThickness(value) {
+    return Math.max(1, Math.round(Number(value) || 0));
+  }
+
+  function ceilTextHighlightThickness(value) {
+    return Math.max(1, Math.ceil(Number(value) || 0));
+  }
+
+  function sanitizeHexColor(value, fallback) {
+    const next = normalizeHexCandidate(value);
+    if (next) {
+      return next;
+    }
+
+    const fallbackValue = normalizeHexCandidate(fallback);
+    return fallbackValue || AI_TEXT_HIGHLIGHT_DEFAULT_TEXT_COLOR;
+  }
+
+  function sanitizeTextHighlightRadius(value, fallback) {
+    const next = parseTextHighlightRadius(value);
+    if (typeof next === "number") {
+      return next;
+    }
+
+    const fallbackValue = parseTextHighlightRadius(fallback);
+    return typeof fallbackValue === "number" ? fallbackValue : AI_TEXT_HIGHLIGHT_DEFAULT_RADIUS;
+  }
+
+  function sanitizeTextHighlightDecorationScale(value, fallback) {
+    const next = parseTextHighlightDecorationScale(value);
+    if (typeof next === "number") {
+      return next;
+    }
+
+    const fallbackValue = parseTextHighlightDecorationScale(fallback);
+    return typeof fallbackValue === "number" ? fallbackValue : AI_TEXT_HIGHLIGHT_DEFAULT_DECORATION_SCALE;
+  }
+
+  function sanitizeTextHighlightBoxPaddingPx(value, fallback) {
+    const numeric = parseFloat(typeof value === "number" ? String(value) : String(value || "").trim());
+    if (isFinite(numeric)) {
+      return roundTextHighlightMetric(Math.max(-999, Math.min(999, Math.round(numeric))));
+    }
+
+    const fallbackValue = parseFloat(typeof fallback === "number" ? String(fallback) : String(fallback || "").trim());
+    if (isFinite(fallbackValue)) {
+      return roundTextHighlightMetric(Math.max(-999, Math.min(999, Math.round(fallbackValue))));
+    }
+
+    return AI_TEXT_HIGHLIGHT_DEFAULT_BOX_PADDING_PX;
+  }
+
+  function parseTextHighlightRadius(value) {
+    const raw = typeof value === "number" ? String(value) : String(value || "").trim();
+    if (!raw) {
+      return null;
+    }
+
+    const numeric = parseFloat(raw);
+    if (!isFinite(numeric)) {
+      return null;
+    }
+
+    return roundTextHighlightMetric(Math.max(0, Math.min(999, Math.round(numeric))));
+  }
+
+  function parseTextHighlightDecorationScale(value) {
+    const raw = typeof value === "number" ? String(value) : String(value || "").trim();
+    if (!raw) {
+      return null;
+    }
+
+    const numeric = parseFloat(raw);
+    if (!isFinite(numeric)) {
+      return null;
+    }
+
+    return roundTextHighlightMetric(Math.max(1, Math.min(10, Math.round(numeric * 10) / 10)));
+  }
+
+  function normalizeHexCandidate(value) {
+    const raw = String(value || "")
+      .trim()
+      .replace(/^#+/, "")
+      .toUpperCase();
+
+    if (/^[0-9A-F]{6}$/.test(raw)) {
+      return `#${raw}`;
+    }
+
+    if (/^[0-9A-F]{3}$/.test(raw)) {
+      return `#${raw[0]}${raw[0]}${raw[1]}${raw[1]}${raw[2]}${raw[2]}`;
+    }
+
+    return "";
+  }
+
+  function hexToFigmaRgb(value) {
+    const hex = sanitizeHexColor(value, AI_TEXT_HIGHLIGHT_DEFAULT_TEXT_COLOR);
+    return {
+      r: parseInt(hex.slice(1, 3), 16) / 255,
+      g: parseInt(hex.slice(3, 5), 16) / 255,
+      b: parseInt(hex.slice(5, 7), 16) / 255,
+    };
+  }
+
+  function rgbToHex(color) {
+    if (!color || typeof color !== "object") {
+      return "";
+    }
+
+    const red = Math.max(0, Math.min(255, Math.round((Number(color.r) || 0) * 255)));
+    const green = Math.max(0, Math.min(255, Math.round((Number(color.g) || 0) * 255)));
+    const blue = Math.max(0, Math.min(255, Math.round((Number(color.b) || 0) * 255)));
+
+    return `#${red.toString(16).padStart(2, "0")}${green.toString(16).padStart(2, "0")}${blue
+      .toString(16)
+      .padStart(2, "0")}`.toUpperCase();
+  }
+
+  function extractVisibleSolidPaintHex(paints) {
+    if (!Array.isArray(paints)) {
+      return "";
+    }
+
+    for (const paint of paints) {
+      if (!paint || paint.type !== "SOLID" || paint.visible === false || !paint.color) {
+        continue;
+      }
+
+      const opacity = typeof paint.opacity === "number" ? paint.opacity : 1;
+      if (!Number.isFinite(opacity) || opacity <= 0) {
+        continue;
+      }
+
+      const hex = rgbToHex(paint.color);
+      if (hex) {
+        return hex;
+      }
+    }
+
+    return "";
+  }
+
+  function createSolidPaint(hexColor) {
+    return {
+      type: "SOLID",
+      visible: true,
+      opacity: 1,
+      blendMode: "NORMAL",
+      color: hexToFigmaRgb(hexColor),
+    };
+  }
+
+  function createTransparentPaint() {
+    return {
+      type: "SOLID",
+      visible: true,
+      opacity: 0,
+      blendMode: "NORMAL",
+      color: { r: 0, g: 0, b: 0 },
+    };
   }
 
   function normalizeErrorMessage(error, fallback) {

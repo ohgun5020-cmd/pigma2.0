@@ -170,7 +170,7 @@
           paletteName: created.group.name,
           swatchCount: created.swatches.length,
           columnCount: 3,
-          rowCount: 5,
+          rowCount: 7,
           domain: analysis.domain,
           brand: analysis.brand,
           intent: analysis.intent,
@@ -466,29 +466,12 @@
   function createPaletteNodes(palette, origin, selectionLabel, analysis) {
     const cellSize = 92;
     const gap = 12;
-    const rowLabels = [
-      "\uB300\uD45C\uC0C9",
-      "\uC5B4\uC6B8\uB9AC\uB294 \uC0C9",
-      "\uD3EC\uC778\uD2B8 \uC0C9",
-      "\uD14D\uC2A4\uD2B8 \uC5ED\uD560\uC0C9",
-      "\uADF8\uB77C\uB370\uC774\uC158 \uC0C9",
-    ];
-    const accentLabels = [
-      "\uD3EC\uC778\uD2B8 \uC0C9 1",
-      "\uD3EC\uC778\uD2B8 \uC0C9 2",
-      "\uD3EC\uC778\uD2B8 \uC0C9 3",
-    ];
-    const textRoleLabels = ["\uD14D\uC2A4\uD2B8 \uC8FC\uC870\uC0C9", "\uD14D\uC2A4\uD2B8 \uD558\uC774\uB77C\uC774\uD2B8", "\uD14D\uC2A4\uD2B8 \uC11C\uBE0C\uC0C9"];
-    const gradientLabels = [
-      "\uADF8\uB77C\uB370\uC774\uC158 \uC138\uD2B8 1",
-      "\uADF8\uB77C\uB370\uC774\uC158 \uC138\uD2B8 2",
-      "\uADF8\uB77C\uB370\uC774\uC158 \uC138\uD2B8 3",
-    ];
+    const rowDefinitions = buildPaletteRowDefinitions();
     const swatches = [];
-    const colors = [palette.representative, palette.companions, palette.accents, palette.text, palette.surfaces];
 
-    for (let rowIndex = 0; rowIndex < colors.length; rowIndex += 1) {
-      const row = colors[rowIndex];
+    for (let rowIndex = 0; rowIndex < rowDefinitions.length; rowIndex += 1) {
+      const rowDefinition = rowDefinitions[rowIndex];
+      const row = rowDefinition && palette && Array.isArray(palette[rowDefinition.key]) ? palette[rowDefinition.key] : [];
       for (let columnIndex = 0; columnIndex < row.length; columnIndex += 1) {
         const hex = row[columnIndex];
         const rectangle = figma.createRectangle();
@@ -496,10 +479,11 @@
         rectangle.y = origin.y + rowIndex * (cellSize + gap);
         rectangle.resize(cellSize, cellSize);
         rectangle.cornerRadius = 14;
-        const swatchLabel = getPaletteSwatchLabel(rowIndex, columnIndex, rowLabels, accentLabels, textRoleLabels, gradientLabels);
-        const swatchValue = getPaletteSwatchValue(rowIndex, columnIndex, palette);
+        const swatchLabel = getPaletteSwatchLabel(rowDefinition, columnIndex);
+        const swatchValue = getPaletteSwatchValue(rowDefinition, columnIndex, palette);
         rectangle.name = swatchLabel + " \u00B7 " + swatchValue;
-        rectangle.fills = rowIndex === 4 ? [buildGradientSwatchPaint(palette, columnIndex)] : [solidPaintFromHex(hex, 1)];
+        rectangle.fills =
+          rowDefinition && rowDefinition.gradient ? [buildGradientSwatchPaint(palette, columnIndex)] : [solidPaintFromHex(hex, 1)];
         rectangle.strokes = [solidPaintFromHex("#111827", 0.14)];
         rectangle.strokeWeight = 1;
         swatches.push(rectangle);
@@ -532,26 +516,62 @@
     };
   }
 
-  function getPaletteSwatchLabel(rowIndex, columnIndex, rowLabels, accentLabels, textRoleLabels, gradientLabels) {
-    if (rowIndex === 2) {
-      return accentLabels[columnIndex] || rowLabels[rowIndex] + " " + (columnIndex + 1);
-    }
-    if (rowIndex === 3) {
-      return textRoleLabels[columnIndex] || rowLabels[rowIndex] + " " + (columnIndex + 1);
-    }
-    if (rowIndex === 4) {
-      return gradientLabels[columnIndex] || rowLabels[rowIndex] + " " + (columnIndex + 1);
-    }
-    return rowLabels[rowIndex] + " " + (columnIndex + 1);
+  function buildPaletteRowDefinitions() {
+    return [
+      {
+        key: "representative",
+        label: "\uB300\uD45C\uC0C9",
+      },
+      {
+        key: "adobe",
+        label: "\uC5B4\uB3C4\uBE44 \uCD94\uCC9C\uC0C9",
+        columnLabels: ["\uC5B4\uB3C4\uBE44 \uCD94\uCC9C 1", "\uC5B4\uB3C4\uBE44 \uCD94\uCC9C 2", "\uC5B4\uB3C4\uBE44 \uCD94\uCC9C 3"],
+      },
+      {
+        key: "trendy",
+        label: "\uD2B8\uB80C\uB514 \uCEEC\uB7EC",
+        columnLabels: ["\uD2B8\uB80C\uB514 \uCEEC\uB7EC 1", "\uD2B8\uB80C\uB514 \uCEEC\uB7EC 2", "\uD2B8\uB80C\uB514 \uCEEC\uB7EC 3"],
+      },
+      {
+        key: "companions",
+        label: "\uC5B4\uC6B8\uB9AC\uB294 \uC0C9",
+      },
+      {
+        key: "accents",
+        label: "\uD3EC\uC778\uD2B8 \uC0C9",
+        columnLabels: ["\uD3EC\uC778\uD2B8 \uC0C9 1", "\uD3EC\uC778\uD2B8 \uC0C9 2", "\uD3EC\uC778\uD2B8 \uC0C9 3"],
+      },
+      {
+        key: "text",
+        label: "\uD14D\uC2A4\uD2B8 \uC5ED\uD560\uC0C9",
+        columnLabels: ["\uD14D\uC2A4\uD2B8 \uC8FC\uC870\uC0C9", "\uD14D\uC2A4\uD2B8 \uD558\uC774\uB77C\uC774\uD2B8", "\uD14D\uC2A4\uD2B8 \uC11C\uBE0C\uC0C9"],
+      },
+      {
+        key: "surfaces",
+        label: "\uADF8\uB77C\uB370\uC774\uC158 \uC0C9",
+        columnLabels: [
+          "\uADF8\uB77C\uB370\uC774\uC158 \uC138\uD2B8 1",
+          "\uADF8\uB77C\uB370\uC774\uC158 \uC138\uD2B8 2",
+          "\uADF8\uB77C\uB370\uC774\uC158 \uC138\uD2B8 3",
+        ],
+        gradient: true,
+      },
+    ];
   }
 
-  function getPaletteSwatchValue(rowIndex, columnIndex, palette) {
-    if (rowIndex === 4) {
+  function getPaletteSwatchLabel(rowDefinition, columnIndex) {
+    const rowLabel = rowDefinition && typeof rowDefinition.label === "string" ? rowDefinition.label : "\uC0C9";
+    const columnLabels = rowDefinition && Array.isArray(rowDefinition.columnLabels) ? rowDefinition.columnLabels : [];
+    return columnLabels[columnIndex] || rowLabel + " " + (columnIndex + 1);
+  }
+
+  function getPaletteSwatchValue(rowDefinition, columnIndex, palette) {
+    if (rowDefinition && rowDefinition.gradient) {
       return buildGradientSwatchColorLabel(palette, columnIndex);
     }
 
-    const rows = [palette.representative, palette.companions, palette.accents, palette.text, palette.surfaces];
-    const row = Array.isArray(rows[rowIndex]) ? rows[rowIndex] : [];
+    const key = rowDefinition && typeof rowDefinition.key === "string" ? rowDefinition.key : "";
+    const row = key && palette && Array.isArray(palette[key]) ? palette[key] : [];
     return row[columnIndex] || "#000000";
   }
 
@@ -622,12 +642,20 @@
     const accents = hasCompletePaletteRow(source.accents)
       ? normalizePaletteRow(source.accents, ["#EC4899", "#22C55E", "#FACC15"])
       : buildDerivedAccentRow(representative, companions);
+    const adobe = hasCompletePaletteRow(source.adobe)
+      ? normalizePaletteRow(source.adobe, buildDerivedAdobeRow(representative, companions, accents))
+      : buildDerivedAdobeRow(representative, companions, accents);
+    const trendy = hasCompletePaletteRow(source.trendy)
+      ? normalizePaletteRow(source.trendy, buildDerivedTrendyRow(representative, companions))
+      : buildDerivedTrendyRow(representative, companions);
     const text = normalizePaletteRow(source.text, ["#0F172A", "#2563EB", "#64748B"]);
     const surfaces = hasCompletePaletteRow(source.surfaces)
       ? normalizePaletteRow(source.surfaces, ["#E0F2FE", "#F5D0FE", "#FEF3C7"])
       : buildDerivedSurfaceRow(representative, companions, accents);
     return {
       representative: representative,
+      adobe: adobe,
+      trendy: trendy,
       companions: companions,
       accents: accents,
       text: text,
@@ -662,6 +690,40 @@
           normalizeHue(base.h + hueShifts[index % hueShifts.length]),
           clampNumber(base.s < 0.22 ? 0.62 : base.s * 0.82 + 0.12, 0.48, 0.88),
           clampNumber(base.l < 0.25 ? 0.52 : base.l > 0.72 ? 0.58 : base.l, 0.38, 0.68)
+        )
+      );
+    }
+    return row;
+  }
+
+  function buildDerivedAdobeRow(representative, companions, accents) {
+    const hueShifts = [24, -18, 34];
+    const row = [];
+    for (let index = 0; index < 3; index += 1) {
+      const baseHex = accents[index] || companions[index] || representative[index] || "#EC4899";
+      const base = rgbBytesToHsl(hexToRgb(baseHex));
+      row.push(
+        hslByteToHex(
+          normalizeHue(base.h + hueShifts[index % hueShifts.length]),
+          clampNumber(base.s < 0.28 ? 0.68 : base.s * 0.82 + 0.1, 0.54, 0.92),
+          clampNumber(base.l < 0.24 ? 0.56 : base.l > 0.72 ? 0.58 : base.l, 0.42, 0.72)
+        )
+      );
+    }
+    return row;
+  }
+
+  function buildDerivedTrendyRow(representative, companions) {
+    const hueShifts = [22, -34, 48];
+    const row = [];
+    for (let index = 0; index < 3; index += 1) {
+      const baseHex = companions[index] || representative[index] || "#0EA5E9";
+      const base = rgbBytesToHsl(hexToRgb(baseHex));
+      row.push(
+        hslByteToHex(
+          normalizeHue(base.h + hueShifts[index % hueShifts.length]),
+          clampNumber(base.s < 0.26 ? 0.62 : base.s * 0.88 + 0.08, 0.48, 0.9),
+          clampNumber(base.l < 0.22 ? 0.56 : base.l > 0.76 ? 0.62 : base.l + 0.04, 0.42, 0.74)
         )
       );
     }
