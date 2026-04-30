@@ -666,7 +666,7 @@ function pigmaNativeShadowStack(e){let t=e.map(n=>Ph(n)).filter(Boolean);return 
 function pigmaMergeNativeShadowStack(e){let t=0,n=0,r=0,i=0,a=0,o=0,s=0,u=0,l=0,c=0,f=e[0];for(let d of e){let p=ae(typeof d.opacity=="number"?d.opacity:1,0,1),h=pigmaEffectUnitValue(d.size,0),g=pigmaEffectUnitValue(d.distance,0),v=Math.max(.001,p*(1+h+g)),m=pigmaNativeShadowOffset(d),b=d.color||{r:0,g:0,b:0};t+=m.x*v,n+=m.y*v,r+=v,i=Math.max(i,h),a=Math.max(a,pigmaEffectUnitValue(d.choke,0)),c=Math.max(c,g),o+=p,s+=b.r*p,u+=b.g*p,l+=b.b*p}let d=ae(o/e.length,0,1),p=o>0?{r:jn(s/o),g:jn(u/o),b:jn(l/o)}:f.color,h=r>0?t/r:0,g=r>0?n/r:0,v=Math.hypot(h,g),m=c>0&&v<c*.35,b=m?0:v,y=m?Math.max(i,c+i):Math.max(i,v*.35);return Object.assign({},f,{color:p,opacity:d,angle:m?120:rw(h,g),distance:wn(b),size:wn(y),choke:wn(a),useGlobalLight:!1})}
 function pigmaNativeDropShadowList(e){return e?$1(e).dropShadow.map(t=>Ph(t)).filter(Boolean):[]}
 function pigmaRemoveDropShadowEffect(e){if(!e.effects||!e.effects.dropShadow)return;let t=Object.assign({},e.effects);delete t.dropShadow;let n=Object.keys(t).filter(r=>r!=="scale"&&t[r]!==void 0&&(!Array.isArray(t[r])||t[r].length>0));if(n.length===0){delete e.effects,delete e.effectsOpen;return}e.effects=t}
-function pigmaExplodeDropShadowLayer(e,t){let n=pigmaNativeDropShadowList(e.effects);if(n.length<2||!t.canvas)return null;let r=Object.assign({},t,{name:"Content"});pigmaRemoveDropShadowEffect(r);let i=n.map((a,o)=>Object.assign({},t,{name:"Drop Shadow ".concat(o+1),opacity:t.opacity,fillOpacity:0,blendMode:"normal",effects:{scale:100,dropShadow:[a]},effectsOpen:!0}));return{name:e.name,hidden:!e.visible,blendMode:"pass through",opened:!1,children:[r,...i]}}
+function pigmaExplodeDropShadowLayer(e,t){let n=pigmaNativeDropShadowList(e.effects);if(n.length<2)return null;let r=Object.assign({},t,{name:"Content"});pigmaRemoveDropShadowEffect(r);let i=n.map((a,o)=>Object.assign({},t,{name:"Drop Shadow ".concat(o+1),opacity:t.opacity,fillOpacity:0,blendMode:"normal",effects:{scale:100,dropShadow:[a]},effectsOpen:!0}));return{name:e.name,hidden:!e.visible,blendMode:"pass through",opened:!1,children:[r,...i]}}
 function V1(e,t){let n={scale:100},r=!1,i=e?$1(e):Tm(),a=H1(t),o=pigmaNativeShadowStack(i.dropShadow),s=pigmaNativeShadowStack(i.innerShadow),u=i.outerGlow.map(c=>tw(c)).filter(Boolean),l=i.innerGlow.map(c=>nw(c)).filter(Boolean);return o.length>0&&(n.dropShadow=o,r=!0),s.length>0&&(n.innerShadow=s,r=!0),u.length>0&&(n.outerGlow=u[0],r=!0),l.length>0&&(n.innerGlow=l[0],r=!0),a&&(n.stroke=[a],r=!0),r?n:null}
 function Tm()
 '@
@@ -681,13 +681,14 @@ $preserveMultiShadowReplace = 'function V1(e,t){let n={scale:100},r=!1,i=e?$1(e)
 $shadowMergeAntiCancelFind = 'function pigmaMergeNativeShadowStack(e){let t=0,n=0,r=0,i=0,a=0,o=0,s=0,u=0,l=0,c=e[0];for(let f of e){let d=ae(typeof f.opacity=="number"?f.opacity:1,0,1),p=pigmaEffectUnitValue(f.size,0),h=pigmaEffectUnitValue(f.distance,0),g=Math.max(.001,d*(1+p+h)),v=pigmaNativeShadowOffset(f),m=f.color||{r:0,g:0,b:0};t+=v.x*g,n+=v.y*g,r+=g,i=Math.max(i,p),a=Math.max(a,pigmaEffectUnitValue(f.choke,0)),o+=d,s+=m.r*d,u+=m.g*d,l+=m.b*d}let d=ae(o,0,1),p=o>0?{r:jn(s/o),g:jn(u/o),b:jn(l/o)}:c.color,h=r>0?t/r:0,g=r>0?n/r:0,v=Math.hypot(h,g);return Object.assign({},c,{color:p,opacity:d,angle:rw(h,g),distance:wn(v),size:wn(i),choke:wn(a),useGlobalLight:!1})}'
 $shadowMergeAntiCancelReplace = 'function pigmaMergeNativeShadowStack(e){let t=0,n=0,r=0,i=0,a=0,o=0,s=0,u=0,l=0,c=0,f=e[0];for(let d of e){let p=ae(typeof d.opacity=="number"?d.opacity:1,0,1),h=pigmaEffectUnitValue(d.size,0),g=pigmaEffectUnitValue(d.distance,0),v=Math.max(.001,p*(1+h+g)),m=pigmaNativeShadowOffset(d),b=d.color||{r:0,g:0,b:0};t+=m.x*v,n+=m.y*v,r+=v,i=Math.max(i,h),a=Math.max(a,pigmaEffectUnitValue(d.choke,0)),c=Math.max(c,g),o+=p,s+=b.r*p,u+=b.g*p,l+=b.b*p}let d=ae(o/e.length,0,1),p=o>0?{r:jn(s/o),g:jn(u/o),b:jn(l/o)}:f.color,h=r>0?t/r:0,g=r>0?n/r:0,v=Math.hypot(h,g),m=c>0&&v<c*.35,b=m?0:v,y=m?Math.max(i,c+i):Math.max(i,v*.35);return Object.assign({},f,{color:p,opacity:d,angle:m?120:rw(h,g),distance:wn(b),size:wn(y),choke:wn(a),useGlobalLight:!1})}'
 $shadowCarrierHelpersFind = $shadowMergeAntiCancelReplace + 'function V1(e,t){'
-$shadowCarrierHelpersReplace = $shadowMergeAntiCancelReplace + 'function pigmaNativeDropShadowList(e){return e?$1(e).dropShadow.map(t=>Ph(t)).filter(Boolean):[]}function pigmaRemoveDropShadowEffect(e){if(!e.effects||!e.effects.dropShadow)return;let t=Object.assign({},e.effects);delete t.dropShadow;let n=Object.keys(t).filter(r=>r!=="scale"&&t[r]!==void 0&&(!Array.isArray(t[r])||t[r].length>0));if(n.length===0){delete e.effects,delete e.effectsOpen;return}e.effects=t}function pigmaExplodeDropShadowLayer(e,t){let n=pigmaNativeDropShadowList(e.effects);if(n.length<2||!t.canvas)return null;let r=Object.assign({},t,{name:"Content"});pigmaRemoveDropShadowEffect(r);let i=n.map((a,o)=>Object.assign({},t,{name:"Drop Shadow ".concat(o+1),opacity:t.opacity,fillOpacity:0,blendMode:"normal",effects:{scale:100,dropShadow:[a]},effectsOpen:!0}));return{name:e.name,hidden:!e.visible,blendMode:"pass through",opened:!1,children:[r,...i]}}function V1(e,t){'
+$shadowCarrierHelpersReplace = $shadowMergeAntiCancelReplace + 'function pigmaNativeDropShadowList(e){return e?$1(e).dropShadow.map(t=>Ph(t)).filter(Boolean):[]}function pigmaRemoveDropShadowEffect(e){if(!e.effects||!e.effects.dropShadow)return;let t=Object.assign({},e.effects);delete t.dropShadow;let n=Object.keys(t).filter(r=>r!=="scale"&&t[r]!==void 0&&(!Array.isArray(t[r])||t[r].length>0));if(n.length===0){delete e.effects,delete e.effectsOpen;return}e.effects=t}function pigmaExplodeDropShadowLayer(e,t){let n=pigmaNativeDropShadowList(e.effects);if(n.length<2)return null;let r=Object.assign({},t,{name:"Content"});pigmaRemoveDropShadowEffect(r);let i=n.map((a,o)=>Object.assign({},t,{name:"Drop Shadow ".concat(o+1),opacity:t.opacity,fillOpacity:0,blendMode:"normal",effects:{scale:100,dropShadow:[a]},effectsOpen:!0}));return{name:e.name,hidden:!e.visible,blendMode:"pass through",opened:!1,children:[r,...i]}}function V1(e,t){'
 $shadowCarrierV1Marker = 'function V1(e,t){'
-$shadowCarrierHelperBlock = 'function pigmaNativeDropShadowList(e){return e?$1(e).dropShadow.map(t=>Ph(t)).filter(Boolean):[]}function pigmaRemoveDropShadowEffect(e){if(!e.effects||!e.effects.dropShadow)return;let t=Object.assign({},e.effects);delete t.dropShadow;let n=Object.keys(t).filter(r=>r!=="scale"&&t[r]!==void 0&&(!Array.isArray(t[r])||t[r].length>0));if(n.length===0){delete e.effects,delete e.effectsOpen;return}e.effects=t}function pigmaExplodeDropShadowLayer(e,t){let n=pigmaNativeDropShadowList(e.effects);if(n.length<2||!t.canvas)return null;let r=Object.assign({},t,{name:"Content"});pigmaRemoveDropShadowEffect(r);let i=n.map((a,o)=>Object.assign({},t,{name:"Drop Shadow ".concat(o+1),opacity:t.opacity,fillOpacity:0,blendMode:"normal",effects:{scale:100,dropShadow:[a]},effectsOpen:!0}));return{name:e.name,hidden:!e.visible,blendMode:"pass through",opened:!1,children:[r,...i]}}'
+$shadowCarrierHelperBlock = 'function pigmaNativeDropShadowList(e){return e?$1(e).dropShadow.map(t=>Ph(t)).filter(Boolean):[]}function pigmaRemoveDropShadowEffect(e){if(!e.effects||!e.effects.dropShadow)return;let t=Object.assign({},e.effects);delete t.dropShadow;let n=Object.keys(t).filter(r=>r!=="scale"&&t[r]!==void 0&&(!Array.isArray(t[r])||t[r].length>0));if(n.length===0){delete e.effects,delete e.effectsOpen;return}e.effects=t}function pigmaExplodeDropShadowLayer(e,t){let n=pigmaNativeDropShadowList(e.effects);if(n.length<2)return null;let r=Object.assign({},t,{name:"Content"});pigmaRemoveDropShadowEffect(r);let i=n.map((a,o)=>Object.assign({},t,{name:"Drop Shadow ".concat(o+1),opacity:t.opacity,fillOpacity:0,blendMode:"normal",effects:{scale:100,dropShadow:[a]},effectsOpen:!0}));return{name:e.name,hidden:!e.visible,blendMode:"pass through",opened:!1,children:[r,...i]}}'
 $nativeShadowStackMergedFunctionFind = 'function pigmaNativeShadowStack(e){let t=e.map(n=>Ph(n)).filter(Boolean);return t.length<=1?t:[pigmaMergeNativeShadowStack(t)]}'
 $nativeShadowStackUnmergedFunctionFind = 'function pigmaNativeShadowStack(e){let t=e.map(n=>Ph(n)).filter(Boolean);return t}'
 $nativeShadowStackPreserveFunctionReplace = 'function pigmaNativeShadowStack(e){let t=e.map(n=>Ph(n)).filter(Boolean);return t}'
-$shadowExplodeLayerFunctionFind = 'function pigmaExplodeDropShadowLayer(e,t){let n=pigmaNativeDropShadowList(e.effects);if(n.length<2||!t.canvas)return null;let r=Object.assign({},t,{name:"Content"});pigmaRemoveDropShadowEffect(r);let i=n.map((a,o)=>Object.assign({},t,{name:"Drop Shadow ".concat(o+1),opacity:t.opacity,fillOpacity:0,blendMode:"normal",effects:{scale:100,dropShadow:[a]},effectsOpen:!0}));return{name:e.name,hidden:!e.visible,blendMode:"pass through",opened:!1,children:[r,...i]}}'
+$shadowExplodeLayerFunctionFind = 'function pigmaExplodeDropShadowLayer(e,t){let n=pigmaNativeDropShadowList(e.effects);if(n.length<2)return null;let r=Object.assign({},t,{name:"Content"});pigmaRemoveDropShadowEffect(r);let i=n.map((a,o)=>Object.assign({},t,{name:"Drop Shadow ".concat(o+1),opacity:t.opacity,fillOpacity:0,blendMode:"normal",effects:{scale:100,dropShadow:[a]},effectsOpen:!0}));return{name:e.name,hidden:!e.visible,blendMode:"pass through",opened:!1,children:[r,...i]}}'
+$shadowExplodeLayerFunctionCanvasGuardFind = 'function pigmaExplodeDropShadowLayer(e,t){let n=pigmaNativeDropShadowList(e.effects);if(n.length<2||!t.canvas)return null;let r=Object.assign({},t,{name:"Content"});pigmaRemoveDropShadowEffect(r);let i=n.map((a,o)=>Object.assign({},t,{name:"Drop Shadow ".concat(o+1),opacity:t.opacity,fillOpacity:0,blendMode:"normal",effects:{scale:100,dropShadow:[a]},effectsOpen:!0}));return{name:e.name,hidden:!e.visible,blendMode:"pass through",opened:!1,children:[r,...i]}}'
 $shadowExplodeLayerFunctionDisable = 'function pigmaExplodeDropShadowLayer(e,t){return null}'
 $psdMultiEffectsLfx2Find = 'W("lfx2",function(e){return e.effects!==void 0&&!Ml(e.effects)},function(e,t,n){var r=(0,x.readUint32)(e);if(r!==0)throw new Error("Invalid lfx2 version");var i=(0,E.readVersionAndDescriptor)(e);t.effects=(0,E.parseEffects)(i,!!e.logMissingFeatures),(0,x.skipBytes)(e,n())},function(e,t,n,r){var i=(0,E.serializeEffects)(t.effects,!!r.logMissingFeatures,!0);(0,w.writeUint32)(e,0),(0,E.writeVersionAndDescriptor)(e,"","null",i)})'
 $psdMultiEffectsLfx2AlwaysFind = 'W("lfx2",function(e){return e.effects!==void 0},function(e,t,n){var r=(0,x.readUint32)(e);if(r!==0)throw new Error("Invalid lfx2 version");var i=(0,E.readVersionAndDescriptor)(e);t.effects=(0,E.parseEffects)(i,!!e.logMissingFeatures),(0,x.skipBytes)(e,n())},function(e,t,n,r){var i=(0,E.serializeEffects)(t.effects,!!r.logMissingFeatures,!0);(0,w.writeUint32)(e,0),(0,E.writeVersionAndDescriptor)(e,"","null",i)})'
@@ -706,6 +707,10 @@ $shadowCarrierBrokenPushFind = 's.push(T),m();continue}{let M=pigmaExplodeDropSh
 $shadowCarrierBrokenPushReplace = $shadowCarrierPushReplace
 $shadowCarrierMissingLoopCloseFind = '{let M=pigmaExplodeDropShadowLayer(v,T);s.push(M||T),m();continue}return{children:s,linkedFiles:u,backgroundDebug:l,warnings:c}}function editableTextParagraphRuns'
 $shadowCarrierMissingLoopCloseReplace = $shadowCarrierPushReplace
+$shadowCarrierVectorPushFind = 'if(v.kind==="vector"){let M=await aw(v,r,i,f.imageExportMode,d,o);s.push(M.layer),u.push(...M.linkedFiles),c.push(...M.warnings),m();continue}'
+$shadowCarrierVectorPushReplace = 'if(v.kind==="vector"){let M=await aw(v,r,i,f.imageExportMode,d,o),B=pigmaExplodeDropShadowLayer(v,M.layer);s.push(B||M.layer),u.push(...M.linkedFiles),c.push(...M.warnings),m();continue}'
+$shadowCarrierShapePushFind = 'let V=B1(v,r,i,N);if(N&&B){let A=await bt(v,V,N,d,o);s.push(A.layer),u.push(...A.linkedFiles),c.push(...A.warnings)}else s.push(V);m();continue'
+$shadowCarrierShapePushReplace = 'let V=B1(v,r,i,N);if(N&&B){let A=await bt(v,V,N,d,o),O=pigmaExplodeDropShadowLayer(v,A.layer);s.push(O||A.layer),u.push(...A.linkedFiles),c.push(...A.warnings)}else{let A=pigmaExplodeDropShadowLayer(v,V);s.push(A||V)}m();continue'
 $editableTextMissingCloseFind = 'if(!B)throw M;T.text=void 0,T.canvas=B,c.push("\"".concat(Su(v.name),"\" text metadata could not be encoded safely (").concat(M instanceof Error?M.message:String(M),"), so it fell back to a bitmap layer."))}Wn(T,v.effects,v.strokeEffect);if(P){'
 $editableTextMissingCloseReplace = 'if(!B)throw M;T.text=void 0,T.canvas=B,c.push("\"".concat(Su(v.name),"\" text metadata could not be encoded safely (").concat(M instanceof Error?M.message:String(M),"), so it fell back to a bitmap layer."))}}Wn(T,v.effects,v.strokeEffect);if(P){'
 if ($uiBundle.Contains('invalidateTextLayers:t&&e.hasEditableText')) {
@@ -897,6 +902,15 @@ if ($uiBundle.Contains($shadowExplodeLayerFunctionDisable)) {
     -Label 'ui enable bitmap shadow carrier split'
 }
 
+if ($uiBundle.Contains($shadowExplodeLayerFunctionCanvasGuardFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $shadowExplodeLayerFunctionCanvasGuardFind `
+    -Replace $shadowExplodeLayerFunctionFind `
+    -ExpectedCount 1 `
+    -Label 'ui allow vector shadow carrier split'
+}
+
 if ($uiBundle.Contains($preserveMultiShadowFind)) {
   $uiBundle = Replace-Exact `
     -Text $uiBundle `
@@ -958,6 +972,24 @@ if ($uiBundle.Contains($shadowCarrierPushFind)) {
     -Replace $shadowCarrierPushReplace `
     -ExpectedCount 1 `
     -Label 'ui bitmap native shadow carrier layers'
+}
+
+if ($uiBundle.Contains($shadowCarrierVectorPushFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $shadowCarrierVectorPushFind `
+    -Replace $shadowCarrierVectorPushReplace `
+    -ExpectedCount 1 `
+    -Label 'ui vector native shadow carrier layers'
+}
+
+if ($uiBundle.Contains($shadowCarrierShapePushFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $shadowCarrierShapePushFind `
+    -Replace $shadowCarrierShapePushReplace `
+    -ExpectedCount 1 `
+    -Label 'ui shape native shadow carrier layers'
 }
 
 if ($uiBundle.Contains($editableTextFallbackSummaryFind)) {
