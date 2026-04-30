@@ -692,7 +692,8 @@ $shadowExplodeLayerFunctionCanvasGuardFind = 'function pigmaExplodeDropShadowLay
 $shadowExplodeLayerFunctionDisable = 'function pigmaExplodeDropShadowLayer(e,t){return null}'
 $psdMultiEffectsLfx2Find = 'W("lfx2",function(e){return e.effects!==void 0&&!Ml(e.effects)},function(e,t,n){var r=(0,x.readUint32)(e);if(r!==0)throw new Error("Invalid lfx2 version");var i=(0,E.readVersionAndDescriptor)(e);t.effects=(0,E.parseEffects)(i,!!e.logMissingFeatures),(0,x.skipBytes)(e,n())},function(e,t,n,r){var i=(0,E.serializeEffects)(t.effects,!!r.logMissingFeatures,!0);(0,w.writeUint32)(e,0),(0,E.writeVersionAndDescriptor)(e,"","null",i)})'
 $psdMultiEffectsLfx2AlwaysFind = 'W("lfx2",function(e){return e.effects!==void 0},function(e,t,n){var r=(0,x.readUint32)(e);if(r!==0)throw new Error("Invalid lfx2 version");var i=(0,E.readVersionAndDescriptor)(e);t.effects=(0,E.parseEffects)(i,!!e.logMissingFeatures),(0,x.skipBytes)(e,n())},function(e,t,n,r){var i=(0,E.serializeEffects)(t.effects,!!r.logMissingFeatures,!0);(0,w.writeUint32)(e,0),(0,E.writeVersionAndDescriptor)(e,"","null",i)})'
-$psdMultiEffectsLfx2Replace = 'W("lfx2",function(e){return e.effects!==void 0&&!Ml(e.effects)},function(e,t,n){var r=(0,x.readUint32)(e);if(r!==0)throw new Error("Invalid lfx2 version");var i=(0,E.readVersionAndDescriptor)(e);t.effects=(0,E.parseEffects)(i,!!e.logMissingFeatures),(0,x.skipBytes)(e,n())},function(e,t,n,r){var i=(0,E.serializeEffects)(t.effects,!!r.logMissingFeatures,!0);(0,w.writeUint32)(e,0),(0,E.writeVersionAndDescriptor)(e,"","null",i)})'
+$psdMultiEffectsLfx2DisabledFind = 'W("lfx2",function(e){return!1},function(e,t,n){var r=(0,x.readUint32)(e);if(r!==0)throw new Error("Invalid lfx2 version");var i=(0,E.readVersionAndDescriptor)(e);t.effects=(0,E.parseEffects)(i,!!e.logMissingFeatures),(0,x.skipBytes)(e,n())},function(e,t,n,r){var i=(0,E.serializeEffects)(t.effects,!!r.logMissingFeatures,!0);(0,w.writeUint32)(e,0),(0,E.writeVersionAndDescriptor)(e,"","null",i)})'
+$psdMultiEffectsLfx2Replace = $psdMultiEffectsLfx2DisabledFind
 $psdMultiEffectsLmfxFind = 'W("lmfx",function(e){return e.effects!==void 0&&Ml(e.effects)},function(e,t,n){var r=(0,x.readUint32)(e);if(r!==0)throw new Error("Invalid lmfx version");var i=(0,E.readVersionAndDescriptor)(e);t.effects=(0,E.parseEffects)(i,!!e.logMissingFeatures),(0,x.skipBytes)(e,n())},function(e,t,n,r){var i=(0,E.serializeEffects)(t.effects,!!r.logMissingFeatures,!0);(0,w.writeUint32)(e,0),(0,E.writeVersionAndDescriptor)(e,"","null",i)})'
 $psdMultiEffectsLmfxDisabledFind = 'W("lmfx",function(e){return!1},function(e,t,n){var r=(0,x.readUint32)(e);if(r!==0)throw new Error("Invalid lmfx version");var i=(0,E.readVersionAndDescriptor)(e);t.effects=(0,E.parseEffects)(i,!!e.logMissingFeatures),(0,x.skipBytes)(e,n())},function(e,t,n,r){var i=(0,E.serializeEffects)(t.effects,!!r.logMissingFeatures,!0);(0,w.writeUint32)(e,0),(0,E.writeVersionAndDescriptor)(e,"","null",i)})'
 $psdMultiEffectsLmfxReplace = $psdMultiEffectsLmfxFind
@@ -1044,15 +1045,22 @@ if ($uiBundle.Contains($psdThumbnailMatteFind)) {
     -Label 'ui psd thumbnail matte'
 }
 
-if ($uiBundle.Contains($psdMultiEffectsLfx2Find)) {
-  # Already matches the desired single-effect lfx2 guard.
+if ($uiBundle.Contains($psdMultiEffectsLfx2DisabledFind)) {
+  # Already disabled; carrier shadow layers use legacy lrFX for Photoshop UI compatibility.
+} elseif ($uiBundle.Contains($psdMultiEffectsLfx2Find)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $psdMultiEffectsLfx2Find `
+    -Replace $psdMultiEffectsLfx2Replace `
+    -ExpectedCount 1 `
+    -Label 'ui psd disable lfx2 shadow writer'
 } elseif ($uiBundle.Contains($psdMultiEffectsLfx2AlwaysFind)) {
   $uiBundle = Replace-Exact `
     -Text $uiBundle `
     -Find $psdMultiEffectsLfx2AlwaysFind `
     -Replace $psdMultiEffectsLfx2Replace `
     -ExpectedCount 1 `
-    -Label 'ui psd multi effects restore lfx2 single guard'
+    -Label 'ui psd disable lfx2 shadow writer'
 } elseif ($uiBundle.Contains($psdMultiEffectsLfx2Replace)) {
   # Already patched in this UI bundle variant.
 } else {
