@@ -61,7 +61,8 @@
           session,
           message.horizontalDegrees,
           message.verticalDegrees,
-          message.rotationDegrees
+          message.rotationDegrees,
+          false
         );
         figma.ui.postMessage({
           type: "skew-transform-preview-result",
@@ -77,7 +78,8 @@
           session,
           message.horizontalDegrees,
           message.verticalDegrees,
-          message.rotationDegrees
+          message.rotationDegrees,
+          true
         );
         activeSession = null;
         figma.ui.postMessage({
@@ -337,7 +339,8 @@
       },
     };
     const storedState = readSkewPluginState(node);
-    target.baseTransform = buildDeskewedTransform(target);
+    target.baseTransform =
+      storedState && storedState.baseTransform ? copySkewTransform(storedState.baseTransform) : buildDeskewedTransform(target);
     target.initialValues = storedState ? normalizeStoredSkewValues(storedState) : estimateSkewValues(target);
     target.hasStoredSkewData = !!storedState;
 
@@ -382,10 +385,11 @@
     return activeSession;
   }
 
-  function applySkewToSession(session, horizontalDegrees, verticalDegrees, rotationDegrees) {
+  function applySkewToSession(session, horizontalDegrees, verticalDegrees, rotationDegrees, persistState) {
     const horizontal = clampSkewDegrees(horizontalDegrees);
     const vertical = clampSkewDegrees(verticalDegrees);
     const rotation = clampRotationDegrees(rotationDegrees);
+    const shouldPersistState = persistState === true;
     const applied = [];
     const skipped = session.skipped.slice(0);
 
@@ -403,7 +407,9 @@
 
       try {
         target.node.relativeTransform = buildSkewedTransform(target, horizontal, vertical, rotation);
-        writeSkewPluginState(target, horizontal, vertical, rotation);
+        if (shouldPersistState) {
+          writeSkewPluginState(target, horizontal, vertical, rotation);
+        }
         applied.push({
           nodeId: target.nodeId,
           nodeName: target.nodeName,
@@ -526,6 +532,8 @@
     const cx = target.width / 2;
     const cy = target.height / 2;
 
+    const anchorX = original[0][0] * cx + original[0][1] * cy + original[0][2];
+    const anchorY = original[1][0] * cx + original[1][1] * cy + original[1][2];
     const skew00 = 1 + kx * ky;
     const skew01 = kx;
     const skew10 = ky;
@@ -544,17 +552,18 @@
     const d = original[1][1];
     const ty = original[1][2];
 
+    const next00 = a * local00 + c * local10;
+    const next01 = a * local01 + c * local11;
+    let next02 = a * local02 + c * local12 + tx;
+    const next10 = b * local00 + d * local10;
+    const next11 = b * local01 + d * local11;
+    let next12 = b * local02 + d * local12 + ty;
+    next02 += anchorX - (next00 * cx + next01 * cy + next02);
+    next12 += anchorY - (next10 * cx + next11 * cy + next12);
+
     return [
-      [
-        roundSkewTransformValue(a * local00 + c * local10),
-        roundSkewTransformValue(a * local01 + c * local11),
-        roundSkewTransformValue(a * local02 + c * local12 + tx),
-      ],
-      [
-        roundSkewTransformValue(b * local00 + d * local10),
-        roundSkewTransformValue(b * local01 + d * local11),
-        roundSkewTransformValue(b * local02 + d * local12 + ty),
-      ],
+      [roundSkewTransformValue(next00), roundSkewTransformValue(next01), roundSkewTransformValue(next02)],
+      [roundSkewTransformValue(next10), roundSkewTransformValue(next11), roundSkewTransformValue(next12)],
     ];
   }
 
@@ -686,7 +695,7 @@
       if (!parsed || typeof parsed !== "object") {
         return null;
       }
-      const values = normalizeStoredSkewValues(parsed);
+      const values = normalizeStoredSkewState(parsed);
       if (!hasMeaningfulSkewValues(values) && Math.abs(values.rotationDegrees) <= SKEW_EPSILON_DEGREES) {
         return null;
       }
@@ -705,6 +714,15 @@
     };
   }
 
+  function normalizeStoredSkewState(state) {
+    const values = normalizeStoredSkewValues(state);
+    const baseTransform = copySkewTransform(state && state.baseTransform);
+    if (baseTransform) {
+      values.baseTransform = baseTransform;
+    }
+    return values;
+  }
+
   function writeSkewPluginState(target, horizontalDegrees, verticalDegrees, rotationDegrees) {
     const node = target && target.node ? target.node : null;
     if (!node || typeof node.setPluginData !== "function") {
@@ -715,6 +733,7 @@
       horizontalDegrees: clampSkewDegrees(horizontalDegrees),
       verticalDegrees: clampSkewDegrees(verticalDegrees),
       rotationDegrees: clampRotationDegrees(rotationDegrees),
+      baseTransform: copySkewTransform(target.baseTransform),
       updatedAt: new Date().toISOString(),
     };
 

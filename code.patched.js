@@ -20766,7 +20766,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   });
   const AI_TRANSLATE_MODEL_BY_PROVIDER = Object.freeze({
     openai: "gpt-4.1-mini",
-    gemini: "gemini-2.5-flash-lite",
+    gemini: "gemini-2.5-flash",
   });
   const AI_TRANSLATE_MAX_CHUNK_ITEMS = 24;
   const AI_TRANSLATE_MAX_CHUNK_CHARS = 3600;
@@ -21242,7 +21242,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       return "현재 선택 범위에 남아 있는 AI 오타 주석을 정리하는 중입니다.";
     }
     if (task === "translate") {
-      return "선택한 화면의 텍스트를 번역 미리보기로 준비하고 있습니다. 선택이 없으면 전체 페이지 번역을 실행하지 않습니다.";
+      return "선택한 화면의 텍스트를 번역하고 있습니다. 선택이 없으면 전체 페이지 번역을 실행하지 않습니다.";
     }
     return "오타 후보를 찾고 Dev Mode 주석 또는 결과 패널로 정리하는 중입니다.";
   }
@@ -21418,7 +21418,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   async function runAiTranslate(message) {
     const runSelectionSignature = getSelectionSignature(figma.currentPage.selection);
     const targetLanguage = getTranslationLanguageMetadata(message && message.targetLanguage);
-    postTranslateStatus("running", `${targetLanguage.label} 번역 미리보기를 준비하는 중입니다.`);
+    postTranslateStatus("running", `${targetLanguage.label}로 번역하는 중입니다.`);
 
     try {
       const designReadResult = await readDesignReadCache();
@@ -21431,9 +21431,9 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       });
 
       figma.notify(
-        result.summary && result.summary.previewCount > 0
-          ? `번역 미리보기 준비 (${result.summary.previewCount}개 제안, ${result.summary.targetLanguageLabel})`
-          : `번역 미리보기 준비 (${result.summary.textNodeCount || 0}개 확인, 변경 없음)`,
+        result.summary && result.summary.translatedCount > 0
+          ? `번역 적용 완료 (${result.summary.translatedCount}개 텍스트, ${result.summary.targetLanguageLabel})`
+          : `번역 완료 (${result.summary ? result.summary.textNodeCount || 0 : 0}개 확인, 변경 없음)`,
         { timeout: 2200 }
       );
     } catch (error) {
@@ -22949,69 +22949,51 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
 
     const translationResult = await requestAiTranslations(textNodes, context, proofingSettings, targetLanguage);
-    const preview = buildTranslatedTextPreview(textNodes, translationResult.issues, proofingSettings, targetLanguage);
+    const applied = await applyTranslatedText(textNodes, translationResult.issues, proofingSettings, targetLanguage);
     const sourceLanguageLabel =
       context.languageHintLabel || context.detectedLanguageLabel || context.languageLabel || "자동 감지";
     const insights = buildTranslateInsights(
       context,
       textNodes,
-      {
-        applied: preview.preview,
-        appliedCount: preview.previewCount,
-        unchangedCount: preview.unchangedCount,
-        skipped: preview.skipped,
-      },
+      applied,
       translationResult.aiMeta,
       targetLanguage,
       translationResult.cacheStats
     );
-    const result = {
+
+    pendingTranslatePreviewState = null;
+    return {
       version: PATCH_VERSION,
-      source: "ai-translation-preview",
-      mode: "preview-text-translation",
+      source: "ai-translation-direct-edit",
+      mode: "direct-text-translation",
       selectionSignature: getSelectionSignature(selection),
       processedAt: new Date().toISOString(),
       summary: {
         selectionLabel: context.selectionLabel,
         contextLabel: context.contextLabel,
         textNodeCount: textNodes.length,
-        translatedCount: 0,
-        previewCount: preview.previewCount,
-        unchangedCount: preview.unchangedCount,
-        skippedCount: preview.skipped.length,
+        translatedCount: applied.appliedCount,
+        previewCount: 0,
+        unchangedCount: applied.unchangedCount,
+        skippedCount: applied.skipped.length,
         reusedCount: translationResult.cacheStats ? translationResult.cacheStats.reusedCount : 0,
         requestedTextCount: translationResult.cacheStats ? translationResult.cacheStats.requestedCount : textNodes.length,
         uniqueRequestedTextCount: translationResult.cacheStats ? translationResult.cacheStats.uniqueRequestedCount : textNodes.length,
         sourceLanguageLabel,
         targetLanguageCode: targetLanguage.code,
         targetLanguageLabel: targetLanguage.label,
-        mode: "preview-text-translation",
-        modeLabel: "번역 미리보기",
-        requiresApply: true,
-        previewLimit: AI_TRANSLATE_PREVIEW_LIMIT,
+        mode: "direct-text-translation",
+        modeLabel: "현재 선택 번역",
+        requiresApply: false,
         aiStatusLabel: translationResult.aiMeta ? translationResult.aiMeta.statusLabel : "AI 상태 미확인",
         aiProviderLabel: translationResult.aiMeta ? translationResult.aiMeta.providerLabel : "",
         aiModelLabel: translationResult.aiMeta ? translationResult.aiMeta.modelLabel : "",
       },
-      preview: preview.preview.slice(0, AI_TRANSLATE_PREVIEW_LIMIT),
-      applied: [],
-      skipped: preview.skipped.slice(0, 8),
+      preview: [],
+      applied: applied.applied.slice(0, 12),
+      skipped: applied.skipped.slice(0, 8),
       insights: insights.slice(0, 6),
     };
-
-    pendingTranslatePreviewState = {
-      selectionSignature: result.selectionSignature,
-      targetLanguage,
-      proofingSettings,
-      context,
-      textNodes,
-      issues: Array.isArray(translationResult.issues) ? translationResult.issues.slice() : [],
-      sourceLanguageLabel,
-      aiMeta: translationResult.aiMeta || null,
-      cacheStats: translationResult.cacheStats || null,
-    };
-
-    return result;
   }
 
   async function applyAiTranslationPreviewSelection(selectedIds) {
@@ -31831,7 +31813,8 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
           session,
           message.horizontalDegrees,
           message.verticalDegrees,
-          message.rotationDegrees
+          message.rotationDegrees,
+          false
         );
         figma.ui.postMessage({
           type: "skew-transform-preview-result",
@@ -31847,7 +31830,8 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
           session,
           message.horizontalDegrees,
           message.verticalDegrees,
-          message.rotationDegrees
+          message.rotationDegrees,
+          true
         );
         activeSession = null;
         figma.ui.postMessage({
@@ -32107,7 +32091,8 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       },
     };
     const storedState = readSkewPluginState(node);
-    target.baseTransform = buildDeskewedTransform(target);
+    target.baseTransform =
+      storedState && storedState.baseTransform ? copySkewTransform(storedState.baseTransform) : buildDeskewedTransform(target);
     target.initialValues = storedState ? normalizeStoredSkewValues(storedState) : estimateSkewValues(target);
     target.hasStoredSkewData = !!storedState;
 
@@ -32152,10 +32137,11 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return activeSession;
   }
 
-  function applySkewToSession(session, horizontalDegrees, verticalDegrees, rotationDegrees) {
+  function applySkewToSession(session, horizontalDegrees, verticalDegrees, rotationDegrees, persistState) {
     const horizontal = clampSkewDegrees(horizontalDegrees);
     const vertical = clampSkewDegrees(verticalDegrees);
     const rotation = clampRotationDegrees(rotationDegrees);
+    const shouldPersistState = persistState === true;
     const applied = [];
     const skipped = session.skipped.slice(0);
 
@@ -32173,7 +32159,9 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
       try {
         target.node.relativeTransform = buildSkewedTransform(target, horizontal, vertical, rotation);
-        writeSkewPluginState(target, horizontal, vertical, rotation);
+        if (shouldPersistState) {
+          writeSkewPluginState(target, horizontal, vertical, rotation);
+        }
         applied.push({
           nodeId: target.nodeId,
           nodeName: target.nodeName,
@@ -32296,6 +32284,8 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     const cx = target.width / 2;
     const cy = target.height / 2;
 
+    const anchorX = original[0][0] * cx + original[0][1] * cy + original[0][2];
+    const anchorY = original[1][0] * cx + original[1][1] * cy + original[1][2];
     const skew00 = 1 + kx * ky;
     const skew01 = kx;
     const skew10 = ky;
@@ -32314,17 +32304,18 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     const d = original[1][1];
     const ty = original[1][2];
 
+    const next00 = a * local00 + c * local10;
+    const next01 = a * local01 + c * local11;
+    let next02 = a * local02 + c * local12 + tx;
+    const next10 = b * local00 + d * local10;
+    const next11 = b * local01 + d * local11;
+    let next12 = b * local02 + d * local12 + ty;
+    next02 += anchorX - (next00 * cx + next01 * cy + next02);
+    next12 += anchorY - (next10 * cx + next11 * cy + next12);
+
     return [
-      [
-        roundSkewTransformValue(a * local00 + c * local10),
-        roundSkewTransformValue(a * local01 + c * local11),
-        roundSkewTransformValue(a * local02 + c * local12 + tx),
-      ],
-      [
-        roundSkewTransformValue(b * local00 + d * local10),
-        roundSkewTransformValue(b * local01 + d * local11),
-        roundSkewTransformValue(b * local02 + d * local12 + ty),
-      ],
+      [roundSkewTransformValue(next00), roundSkewTransformValue(next01), roundSkewTransformValue(next02)],
+      [roundSkewTransformValue(next10), roundSkewTransformValue(next11), roundSkewTransformValue(next12)],
     ];
   }
 
@@ -32456,7 +32447,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       if (!parsed || typeof parsed !== "object") {
         return null;
       }
-      const values = normalizeStoredSkewValues(parsed);
+      const values = normalizeStoredSkewState(parsed);
       if (!hasMeaningfulSkewValues(values) && Math.abs(values.rotationDegrees) <= SKEW_EPSILON_DEGREES) {
         return null;
       }
@@ -32475,6 +32466,15 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     };
   }
 
+  function normalizeStoredSkewState(state) {
+    const values = normalizeStoredSkewValues(state);
+    const baseTransform = copySkewTransform(state && state.baseTransform);
+    if (baseTransform) {
+      values.baseTransform = baseTransform;
+    }
+    return values;
+  }
+
   function writeSkewPluginState(target, horizontalDegrees, verticalDegrees, rotationDegrees) {
     const node = target && target.node ? target.node : null;
     if (!node || typeof node.setPluginData !== "function") {
@@ -32485,6 +32485,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       horizontalDegrees: clampSkewDegrees(horizontalDegrees),
       verticalDegrees: clampSkewDegrees(verticalDegrees),
       rotationDegrees: clampRotationDegrees(rotationDegrees),
+      baseTransform: copySkewTransform(target.baseTransform),
       updatedAt: new Date().toISOString(),
     };
 
@@ -35414,6 +35415,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   const BOUNDS_FIT_APPLY_IN_PROGRESS_MESSAGE = "Bounds fit is already applying a result.";
   const BOUNDS_FIT_SESSION_EXPIRED_MESSAGE = "The bounds-fit session expired. Please run it again.";
   const BOUNDS_FIT_APPLY_ERROR_MESSAGE = "Failed to apply the bounds-fit result.";
+  const ORIGINAL_SIZE_FIT_APPLY_ERROR_MESSAGE = "원본 크기 적용에 실패했습니다.";
   const UI_REPORTED_IMAGE_ERROR_FALLBACK = "The image task failed before a usable result was returned.";
   const IMAGE_TASK_NO_SELECTION_MESSAGE = "Select at least one node before running this image task.";
   const IMAGE_FILL_NOT_FOUND_MESSAGE = "Could not find the selected IMAGE fill.";
@@ -35508,6 +35510,11 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         return;
       }
 
+      if (message.type === "run-image-original-size-fit") {
+        await runImageOriginalSizeFit(message);
+        return;
+      }
+
       if (message.type === "request-image-bounds-fit-source") {
         await prepareImageBoundsFitSource(message);
         return;
@@ -35574,6 +35581,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         message.type === "apply-image-composite-image" ||
         message.type === "image-composite-report-error" ||
         message.type === "run-image-merge" ||
+        message.type === "run-image-original-size-fit" ||
         message.type === "request-image-bounds-fit-source" ||
         message.type === "apply-image-bounds-fit-image" ||
         message.type === "image-bounds-fit-report-error" ||
@@ -36489,6 +36497,45 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
   }
 
+  async function runImageOriginalSizeFit(message) {
+    const clientRequestId = sanitizeClientRequestId(message && message.clientRequestId);
+    const operationLabel = sanitizeOperationLabel(message && message.operationLabel) || "원본 크기로 맞추기";
+    if (
+      isPreparing ||
+      isApplying ||
+      isImageExtendPreparing ||
+      isImageExtendApplying ||
+      isCompositePreparing ||
+      isCompositeApplying ||
+      isBoundsFitPreparing ||
+      isBoundsFitApplying ||
+      isPromptDraftPreparing ||
+      isReferencePreparing ||
+      isTextOverlayPreparing ||
+      isTextOverlayApplying
+    ) {
+      postOriginalSizeFitError(IMAGE_TASK_ALREADY_RUNNING_MESSAGE, clientRequestId);
+      return;
+    }
+
+    isBoundsFitApplying = true;
+
+    try {
+      const result = await applyOriginalSizeFitToSelection(message);
+      figma.ui.postMessage({
+        type: "image-original-size-fit-result",
+        clientRequestId: clientRequestId,
+        result: result,
+      });
+      notifyOriginalSizeFitResult(result, operationLabel);
+    } catch (error) {
+      const messageText = normalizeErrorMessage(error, ORIGINAL_SIZE_FIT_APPLY_ERROR_MESSAGE);
+      postOriginalSizeFitError(messageText, clientRequestId);
+    } finally {
+      isBoundsFitApplying = false;
+    }
+  }
+
   async function applyImageBoundsFit(message) {
     if (isPreparing || isApplying || isImageExtendPreparing || isImageExtendApplying || isBoundsFitApplying) {
       postBoundsFitApplyError(
@@ -36624,6 +36671,23 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       message: message,
     });
     figma.notify(message, { error: true, timeout: 2600 });
+  }
+
+  function postOriginalSizeFitError(message, clientRequestId) {
+    const messageText = toKoreanImageErrorMessage(
+      message,
+      ORIGINAL_SIZE_FIT_APPLY_ERROR_MESSAGE,
+      {
+        operationLabel: "원본 크기로 맞추기",
+        operationKind: "original-size-fit",
+      }
+    );
+    figma.ui.postMessage({
+      type: "image-original-size-fit-error",
+      clientRequestId: sanitizeClientRequestId(clientRequestId),
+      message: messageText,
+    });
+    figma.notify(messageText, { error: true, timeout: 2600 });
   }
 
   function postReferenceSearchSourceError(message, clientRequestId) {
@@ -39782,6 +39846,44 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return cloned;
   }
 
+  function cloneOriginalSizeFitImagePaint(fill) {
+    if (!fill || !isImagePaint(fill) || !fill.imageHash) {
+      return null;
+    }
+
+    const cloned = cloneImagePaintWithHash(fill, fill.imageHash);
+    cloned.scaleMode = "FILL";
+    if ("imageTransform" in cloned) {
+      delete cloned.imageTransform;
+    }
+    if ("scalingFactor" in cloned) {
+      delete cloned.scalingFactor;
+    }
+    if ("rotation" in cloned) {
+      delete cloned.rotation;
+    }
+    return cloned;
+  }
+
+  function doesOriginalSizeFitNeedPaintReset(fill) {
+    if (!fill || !isImagePaint(fill)) {
+      return false;
+    }
+    if (fill.scaleMode !== "FILL") {
+      return true;
+    }
+    if ("imageTransform" in fill && !!fill.imageTransform) {
+      return true;
+    }
+    if ("scalingFactor" in fill && Number(fill.scalingFactor) !== 1) {
+      return true;
+    }
+    if ("rotation" in fill && Math.abs(Number(fill.rotation) || 0) > 0.01) {
+      return true;
+    }
+    return false;
+  }
+
   function cloneBoundsFitPreservedImagePaint(fill, target, processed) {
     if (!fill || !isImagePaint(fill) || !fill.imageHash || !target || !processed) {
       return null;
@@ -39891,6 +39993,16 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
     const operationLabel = sanitizeOperationLabel(options && options.operationLabel);
     return /extend|확장/i.test(operationLabel);
+  }
+
+  function isOriginalSizeFitOperation(options) {
+    const operationKind =
+      options && typeof options.operationKind === "string" ? options.operationKind.replace(/\s+/g, " ").trim().toLowerCase() : "";
+    if (operationKind === "original-size-fit") {
+      return true;
+    }
+    const operationLabel = sanitizeOperationLabel(options && options.operationLabel);
+    return /원본\s*크기|original\s*size/i.test(operationLabel);
   }
 
   function sanitizeSourceMode(value) {
@@ -40497,6 +40609,176 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       containers: state.containers,
       skipped: state.skipped,
     };
+  }
+
+  async function applyOriginalSizeFitToSelection(message) {
+    const selection = Array.from(figma.currentPage.selection || []).filter(Boolean);
+    if (!selection.length) {
+      throw new Error("원본 크기로 맞출 이미지 레이어를 먼저 선택하세요.");
+    }
+
+    const state = {
+      targets: [],
+      skipped: [],
+      targetNodeIds: {},
+      skippedNodeIds: {},
+    };
+
+    for (let index = 0; index < selection.length; index += 1) {
+      await collectOriginalSizeFitTargetsFromNode(selection[index], state, true);
+    }
+
+    if (!state.targets.length) {
+      throw new Error(buildOriginalSizeFitEmptySelectionMessage(state.skipped));
+    }
+
+    const skipped = state.skipped.slice();
+    let appliedCount = 0;
+    let unchangedCount = 0;
+
+    for (let index = 0; index < state.targets.length; index += 1) {
+      const status = await applyOriginalSizeFitTarget(state.targets[index], skipped);
+      if (status === "applied") {
+        appliedCount += 1;
+      } else if (status === "unchanged") {
+        unchangedCount += 1;
+      }
+    }
+
+    return {
+      processedAt: new Date().toISOString(),
+      summary: {
+        selectionLabel: formatSelectionLabel(selection),
+        requestedCount: selection.length,
+        eligibleCount: state.targets.length,
+        appliedCount: appliedCount,
+        unchangedCount: unchangedCount,
+        skippedCount: skipped.length,
+      },
+      skipped: skipped.slice(0, 24),
+    };
+  }
+
+  async function collectOriginalSizeFitTargetsFromNode(node, state, isRootSelection) {
+    if (!node || node.removed) {
+      if (isRootSelection) {
+        appendOriginalSizeFitSkipped(state, node, "선택한 레이어를 읽지 못했습니다.");
+      }
+      return false;
+    }
+
+    if (!isBoundsFitNodeVisible(node)) {
+      if (isRootSelection) {
+        appendOriginalSizeFitSkipped(state, node, "숨겨진 레이어는 원본 크기로 맞출 수 없습니다.");
+      }
+      return false;
+    }
+
+    if ("locked" in node && node.locked) {
+      if (isRootSelection) {
+        appendOriginalSizeFitSkipped(state, node, "잠긴 레이어는 원본 크기로 맞출 수 없습니다.");
+      }
+      return false;
+    }
+
+    if (hasChildren(node)) {
+      let hasEligibleDescendant = false;
+      for (let index = 0; index < node.children.length; index += 1) {
+        if (await collectOriginalSizeFitTargetsFromNode(node.children[index], state, false)) {
+          hasEligibleDescendant = true;
+        }
+      }
+
+      if (isRootSelection && !hasEligibleDescendant) {
+        appendOriginalSizeFitSkipped(
+          state,
+          node,
+          "선택 범위 안에서 원본 크기로 맞출 이미지 채우기 레이어를 찾지 못했습니다."
+        );
+      }
+      return hasEligibleDescendant;
+    }
+
+    const target = await analyzeOriginalSizeFitNode(node, isRootSelection);
+    if (target && target.target) {
+      appendOriginalSizeFitTarget(target.target, state);
+      return true;
+    }
+
+    if (target && target.skipped && isRootSelection) {
+      appendOriginalSizeFitSkipped(state, node, target.skipped.reason);
+    }
+    return false;
+  }
+
+  async function analyzeOriginalSizeFitNode(node, isRootSelection) {
+    if (!node || node.removed) {
+      return buildOriginalSizeFitSkipped(node, "선택한 레이어를 읽지 못했습니다.");
+    }
+
+    if (!canResizeBoundsFitNode(node)) {
+      return buildOriginalSizeFitSkipped(node, "이 레이어는 크기를 변경할 수 없습니다.");
+    }
+
+    if ("rotation" in node && typeof node.rotation === "number" && Math.abs(node.rotation) > 0.01) {
+      return buildOriginalSizeFitSkipped(node, "회전된 이미지 레이어는 아직 지원하지 않습니다.");
+    }
+
+    const fills = getNodeFills(node);
+    const fillIndex = getPrimaryVisibleImageFillIndex(fills);
+    if (fillIndex < 0) {
+      return isRootSelection ? buildOriginalSizeFitSkipped(node, "이미지 채우기를 찾지 못했습니다.") : null;
+    }
+
+    const fill = fills[fillIndex];
+    const image = fill && fill.imageHash ? figma.getImageByHash(fill.imageHash) : null;
+    if (!image || typeof image.getSizeAsync !== "function") {
+      return buildOriginalSizeFitSkipped(node, "원본 이미지 객체를 찾지 못했습니다.");
+    }
+
+    const size = await image.getSizeAsync();
+    const sourceWidth = size && typeof size.width === "number" ? size.width : 0;
+    const sourceHeight = size && typeof size.height === "number" ? size.height : 0;
+    if (!(sourceWidth > 0) || !(sourceHeight > 0)) {
+      return buildOriginalSizeFitSkipped(node, "원본 이미지 크기를 읽지 못했습니다.");
+    }
+
+    return {
+      target: {
+        nodeId: node.id,
+        nodeName: safeName(node),
+        fillIndex: fillIndex,
+        originalHash: fill.imageHash,
+        sourceWidth: sourceWidth,
+        sourceHeight: sourceHeight,
+      },
+    };
+  }
+
+  function appendOriginalSizeFitTarget(target, state) {
+    if (!target || !target.nodeId || !state || !state.targetNodeIds) {
+      return;
+    }
+    if (state.targetNodeIds[target.nodeId]) {
+      return;
+    }
+    state.targetNodeIds[target.nodeId] = true;
+    state.targets.push(target);
+  }
+
+  function appendOriginalSizeFitSkipped(state, node, reason) {
+    if (!state || !Array.isArray(state.skipped)) {
+      return;
+    }
+    const skipped = buildOriginalSizeFitSkipped(node, reason).skipped;
+    const key = skipped.nodeId || skipped.nodeName || skipped.reason;
+    if (key && state.skippedNodeIds && state.skippedNodeIds[key]) {
+      return;
+    }
+    if (key && state.skippedNodeIds) {
+      state.skippedNodeIds[key] = true;
+    }
+    state.skipped.push(skipped);
   }
 
   async function collectBoundsFitPlansFromNode(node, state, isRootSelection) {
@@ -41651,6 +41933,93 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return await applyBoundsFitImageTargetResult(target, processed, skipped);
   }
 
+  async function applyOriginalSizeFitTarget(target, skipped) {
+    const node = await figma.getNodeByIdAsync(target.nodeId);
+    if (!node || node.removed) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: target.nodeName,
+        reason: "레이어를 다시 찾지 못했습니다.",
+      });
+      return "skipped";
+    }
+
+    if (!canResizeBoundsFitNode(node)) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: "이 레이어는 크기를 변경할 수 없습니다.",
+      });
+      return "skipped";
+    }
+
+    const fills = getNodeFills(node);
+    let targetIndex = -1;
+    if (target.fillIndex >= 0 && target.fillIndex < fills.length) {
+      const directFill = fills[target.fillIndex];
+      if (isImagePaint(directFill) && directFill.imageHash === target.originalHash) {
+        targetIndex = target.fillIndex;
+      }
+    }
+    if (targetIndex < 0) {
+      targetIndex = findVisibleImageFillIndexByHash(fills, target.originalHash);
+    }
+    if (targetIndex < 0) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: "원본 이미지 채우기를 다시 찾지 못했습니다.",
+      });
+      return "skipped";
+    }
+
+    const sourceWidth = Number(target.sourceWidth) > 0 ? Number(target.sourceWidth) : 0;
+    const sourceHeight = Number(target.sourceHeight) > 0 ? Number(target.sourceHeight) : 0;
+    if (!(sourceWidth > 0) || !(sourceHeight > 0)) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: "원본 이미지 크기를 읽지 못했습니다.",
+      });
+      return "skipped";
+    }
+
+    const currentWidth = typeof node.width === "number" && Number.isFinite(node.width) ? node.width : 0;
+    const currentHeight = typeof node.height === "number" && Number.isFinite(node.height) ? node.height : 0;
+    const resetPaint = cloneOriginalSizeFitImagePaint(fills[targetIndex]);
+    if (!resetPaint) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: "이미지 채우기 설정을 초기화하지 못했습니다.",
+      });
+      return "skipped";
+    }
+
+    const needsResize = Math.abs(currentWidth - sourceWidth) > 0.01 || Math.abs(currentHeight - sourceHeight) > 0.01;
+    const needsFillReset = doesOriginalSizeFitNeedPaintReset(fills[targetIndex]);
+    if (!needsResize && !needsFillReset) {
+      return "unchanged";
+    }
+
+    try {
+      const nextFills = fills.slice();
+      nextFills[targetIndex] = resetPaint;
+      node.fills = nextFills;
+      if (needsResize) {
+        resizeBoundsFitNode(node, sourceWidth, sourceHeight, true);
+      }
+      return "applied";
+    } catch (error) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: normalizeErrorMessage(error, "원본 크기 적용에 실패했습니다."),
+      });
+      return "skipped";
+    }
+  }
+
   async function applyBoundsFitImageTargetResult(target, processed, skipped) {
     const node = await figma.getNodeByIdAsync(target.nodeId);
     if (!node || node.removed) {
@@ -42304,6 +42673,16 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     };
   }
 
+  function buildOriginalSizeFitSkipped(node, reason) {
+    return {
+      skipped: {
+        nodeId: node && typeof node.id === "string" ? node.id : "",
+        nodeName: safeName(node),
+        reason: reason,
+      },
+    };
+  }
+
   async function analyzeBoundsFitTextSelectionNode(node) {
     if (!node || node.removed) {
       return buildBoundsFitSkipped(node, "The selected text layer could not be read.");
@@ -42385,6 +42764,16 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       }
     }
     return "Could not find an eligible text, image, or supported container for bounds-fit.";
+  }
+
+  function buildOriginalSizeFitEmptySelectionMessage(skipped) {
+    if (Array.isArray(skipped) && skipped.length > 0) {
+      const first = skipped[0];
+      if (first && typeof first.reason === "string" && first.reason.trim()) {
+        return first.reason.trim();
+      }
+    }
+    return "선택 범위 안에서 원본 크기로 맞출 이미지 채우기 레이어를 찾지 못했습니다.";
   }
 
   function buildImageCompositeEmptySelectionMessage(layers, skipped) {
@@ -42631,6 +43020,37 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return "image-text-overlay-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
   }
 
+  function notifyOriginalSizeFitResult(result, operationLabel) {
+    const summary = result && result.summary ? result.summary : {};
+    const appliedCount =
+      typeof summary.appliedCount === "number" && Number.isFinite(summary.appliedCount) ? summary.appliedCount : 0;
+    const unchangedCount =
+      typeof summary.unchangedCount === "number" && Number.isFinite(summary.unchangedCount) ? summary.unchangedCount : 0;
+    const skippedCount =
+      typeof summary.skippedCount === "number" && Number.isFinite(summary.skippedCount) ? summary.skippedCount : 0;
+    const label = operationLabel || "원본 크기로 맞추기";
+
+    if (!appliedCount && unchangedCount > 0 && skippedCount === 0) {
+      figma.notify("선택한 이미지는 이미 원본 크기입니다.", { timeout: 2200 });
+      return;
+    }
+
+    if (!appliedCount && skippedCount > 0) {
+      figma.notify(label + "를 적용할 수 있는 이미지 레이어를 찾지 못했습니다.", { timeout: 2200 });
+      return;
+    }
+
+    let message = label + " 완료 (" + appliedCount + "개 적용";
+    if (unchangedCount > 0) {
+      message += ", " + unchangedCount + "개 유지";
+    }
+    if (skippedCount > 0) {
+      message += ", " + skippedCount + "개 건너뜀";
+    }
+    message += ")";
+    figma.notify(message, { timeout: 2600 });
+  }
+
   function notifyBoundsFitResult(result, operationLabel) {
     const summary = result && result.summary ? result.summary : {};
     const appliedCount =
@@ -42782,6 +43202,10 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
 
     if (isImageExtendOperation(options)) {
+      return text;
+    }
+
+    if (isOriginalSizeFitOperation(options)) {
       return text;
     }
 

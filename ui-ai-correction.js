@@ -4,6 +4,7 @@
   }
 
   window.__PIGMA_AI_LLM_UI_BRIDGE__ = true;
+  const AI_UI_BRIDGE_RETRY_DELAYS_MS = [500, 1500];
 
   window.addEventListener("message", async (event) => {
     const message = event.data?.pluginMessage;
@@ -93,6 +94,23 @@
   }
 
   async function callGeminiFromUi(model, apiKey, prompt) {
+    let lastError = null;
+    for (let attemptIndex = 0; attemptIndex <= AI_UI_BRIDGE_RETRY_DELAYS_MS.length; attemptIndex += 1) {
+      try {
+        return await callGeminiFromUiOnce(model, apiKey, prompt);
+      } catch (error) {
+        lastError = error;
+        if (!isRetryableUiBridgeError(error) || attemptIndex >= AI_UI_BRIDGE_RETRY_DELAYS_MS.length) {
+          break;
+        }
+        await waitForUiBridgeRetry(AI_UI_BRIDGE_RETRY_DELAYS_MS[attemptIndex]);
+      }
+    }
+
+    throw lastError || new Error("Gemini 요청에 실패했습니다.");
+  }
+
+  async function callGeminiFromUiOnce(model, apiKey, prompt) {
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: "POST",
       headers: {
@@ -114,12 +132,41 @@
     });
 
     if (!response.ok) {
-      throw new Error(await buildUiBridgeHttpError("Gemini", response));
+      const error = new Error(await buildUiBridgeHttpError("Gemini", response));
+      error.status = response.status;
+      throw error;
     }
 
     const data = await response.json();
     const text = getGeminiUiText(data);
     return parseUiBridgeJson(text);
+  }
+
+  function waitForUiBridgeRetry(delayMs) {
+    return new Promise((resolve) => {
+      setTimeout(resolve, Math.max(0, Number(delayMs) || 0));
+    });
+  }
+
+  function isRetryableUiBridgeError(error) {
+    const status = Number(error && error.status);
+    if ([408, 409, 425, 429, 500, 502, 503, 504].indexOf(status) >= 0) {
+      return true;
+    }
+
+    const message =
+      error && typeof error.message === "string"
+        ? error.message.toLowerCase()
+        : typeof error === "string"
+          ? error.toLowerCase()
+          : "";
+    return (
+      message.indexOf("service unavailable") >= 0 ||
+      message.indexOf("temporarily unavailable") >= 0 ||
+      message.indexOf("failed to fetch") >= 0 ||
+      message.indexOf("network") >= 0 ||
+      message.indexOf("timeout") >= 0
+    );
   }
 
   async function buildUiBridgeHttpError(provider, response) {
