@@ -689,8 +689,15 @@ $nativeShadowStackUnmergedFunctionFind = 'function pigmaNativeShadowStack(e){let
 $nativeShadowStackPreserveFunctionReplace = 'function pigmaNativeShadowStack(e){let t=e.map(n=>Ph(n)).filter(Boolean);return t}'
 $shadowExplodeLayerFunctionFind = 'function pigmaExplodeDropShadowLayer(e,t){let n=pigmaNativeDropShadowList(e.effects);if(n.length<2||!t.canvas)return null;let r=Object.assign({},t,{name:"Content"});pigmaRemoveDropShadowEffect(r);let i=n.map((a,o)=>Object.assign({},t,{name:"Drop Shadow ".concat(o+1),opacity:t.opacity,fillOpacity:0,blendMode:"normal",effects:{scale:100,dropShadow:[a]},effectsOpen:!0}));return{name:e.name,hidden:!e.visible,blendMode:"pass through",opened:!1,children:[r,...i]}}'
 $shadowExplodeLayerFunctionDisable = 'function pigmaExplodeDropShadowLayer(e,t){return null}'
+$psdMultiEffectsLfx2Find = 'W("lfx2",function(e){return e.effects!==void 0&&!Ml(e.effects)},function(e,t,n){var r=(0,x.readUint32)(e);if(r!==0)throw new Error("Invalid lfx2 version");var i=(0,E.readVersionAndDescriptor)(e);t.effects=(0,E.parseEffects)(i,!!e.logMissingFeatures),(0,x.skipBytes)(e,n())},function(e,t,n,r){var i=(0,E.serializeEffects)(t.effects,!!r.logMissingFeatures,!0);(0,w.writeUint32)(e,0),(0,E.writeVersionAndDescriptor)(e,"","null",i)})'
+$psdMultiEffectsLfx2Replace = 'W("lfx2",function(e){return e.effects!==void 0},function(e,t,n){var r=(0,x.readUint32)(e);if(r!==0)throw new Error("Invalid lfx2 version");var i=(0,E.readVersionAndDescriptor)(e);t.effects=(0,E.parseEffects)(i,!!e.logMissingFeatures),(0,x.skipBytes)(e,n())},function(e,t,n,r){var i=(0,E.serializeEffects)(t.effects,!!r.logMissingFeatures,!0);(0,w.writeUint32)(e,0),(0,E.writeVersionAndDescriptor)(e,"","null",i)})'
+$psdMultiEffectsLmfxFind = 'W("lmfx",function(e){return e.effects!==void 0&&Ml(e.effects)},function(e,t,n){var r=(0,x.readUint32)(e);if(r!==0)throw new Error("Invalid lmfx version");var i=(0,E.readVersionAndDescriptor)(e);t.effects=(0,E.parseEffects)(i,!!e.logMissingFeatures),(0,x.skipBytes)(e,n())},function(e,t,n,r){var i=(0,E.serializeEffects)(t.effects,!!r.logMissingFeatures,!0);(0,w.writeUint32)(e,0),(0,E.writeVersionAndDescriptor)(e,"","null",i)})'
+$psdMultiEffectsLmfxReplace = 'W("lmfx",function(e){return!1},function(e,t,n){var r=(0,x.readUint32)(e);if(r!==0)throw new Error("Invalid lmfx version");var i=(0,E.readVersionAndDescriptor)(e);t.effects=(0,E.parseEffects)(i,!!e.logMissingFeatures),(0,x.skipBytes)(e,n())},function(e,t,n,r){var i=(0,E.serializeEffects)(t.effects,!!r.logMissingFeatures,!0);(0,w.writeUint32)(e,0),(0,E.writeVersionAndDescriptor)(e,"","null",i)})'
 $psdMultiEffectsLegacyFind = 'W("lrFX",xe("effects"),function(e,t,n){t.effects||(t.effects=(0,Zf.readEffects)(e)),(0,x.skipBytes)(e,n())},function(e,t){(0,Zf.writeEffects)(e,t.effects)})'
-$psdMultiEffectsLegacyReplace = 'W("lrFX",function(e){return e.effects!==void 0&&!Ml(e.effects)},function(e,t,n){t.effects||(t.effects=(0,Zf.readEffects)(e)),(0,x.skipBytes)(e,n())},function(e,t){(0,Zf.writeEffects)(e,t.effects)})'
+$psdMultiEffectsLegacyGuardedFind = 'W("lrFX",function(e){return e.effects!==void 0&&!Ml(e.effects)},function(e,t,n){t.effects||(t.effects=(0,Zf.readEffects)(e)),(0,x.skipBytes)(e,n())},function(e,t){(0,Zf.writeEffects)(e,t.effects)})'
+$psdMultiEffectsLegacyReplace = 'W("lrFX",xe("effects"),function(e,t,n){t.effects||(t.effects=(0,Zf.readEffects)(e)),(0,x.skipBytes)(e,n())},function(e,t){(0,Zf.writeEffects)(e,Ml(t.effects)?function(n){var r={};for(var i in n)if(Object.prototype.hasOwnProperty.call(n,i)){var a=n[i];r[i]=Array.isArray(a)&&a.length>1?[a[0]]:a}return r}(t.effects):t.effects)})'
+$psdMultiEffectsLfx2LengthFind = 'l==="GdFl"||l==="lmfx"||l==="lrFX"||l==="cinf"'
+$psdMultiEffectsLfx2LengthReplace = 'l==="GdFl"||l==="lfx2"||l==="lmfx"||l==="lrFX"||l==="cinf"'
 $shadowCarrierPushFind = 's.push(T),m();continue}return{children:s,linkedFiles:u,backgroundDebug:l,warnings:c}}function editableTextParagraphRuns'
 $shadowCarrierPushReplace = '{let M=pigmaExplodeDropShadowLayer(v,T);s.push(M||T),m();continue}}return{children:s,linkedFiles:u,backgroundDebug:l,warnings:c}}function editableTextParagraphRuns'
 $shadowCarrierBrokenPushFind = 's.push(T),m();continue}{let M=pigmaExplodeDropShadowLayer(v,T);s.push(M||T),m()}return{children:s,linkedFiles:u,backgroundDebug:l,warnings:c}}function editableTextParagraphRuns'
@@ -1003,17 +1010,59 @@ if ($uiBundle.Contains($psdThumbnailMatteFind)) {
     -Label 'ui psd thumbnail matte'
 }
 
+if ($uiBundle.Contains($psdMultiEffectsLfx2Find)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $psdMultiEffectsLfx2Find `
+    -Replace $psdMultiEffectsLfx2Replace `
+    -ExpectedCount 1 `
+    -Label 'ui psd multi effects write lfx2'
+} elseif ($uiBundle.Contains($psdMultiEffectsLfx2Replace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI PSD multi effects lfx2 writer.'
+}
+
+if ($uiBundle.Contains($psdMultiEffectsLmfxFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $psdMultiEffectsLmfxFind `
+    -Replace $psdMultiEffectsLmfxReplace `
+    -ExpectedCount 1 `
+    -Label 'ui psd multi effects disable lmfx writer'
+} elseif ($uiBundle.Contains($psdMultiEffectsLmfxReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI PSD multi effects lmfx writer.'
+}
+
 if ($uiBundle.Contains($psdMultiEffectsLegacyFind)) {
   $uiBundle = Replace-Exact `
     -Text $uiBundle `
     -Find $psdMultiEffectsLegacyFind `
     -Replace $psdMultiEffectsLegacyReplace `
     -ExpectedCount 1 `
-    -Label 'ui psd multi effects skip legacy lrFX'
+    -Label 'ui psd multi effects legacy lrFX fallback'
+} elseif ($uiBundle.Contains($psdMultiEffectsLegacyGuardedFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $psdMultiEffectsLegacyGuardedFind `
+    -Replace $psdMultiEffectsLegacyReplace `
+    -ExpectedCount 1 `
+    -Label 'ui psd multi effects legacy lrFX fallback'
 } elseif ($uiBundle.Contains($psdMultiEffectsLegacyReplace)) {
   # Already patched in this UI bundle variant.
 } else {
   throw 'Could not patch UI PSD multi effects legacy lrFX guard.'
+}
+
+if ($uiBundle.Contains($psdMultiEffectsLfx2LengthFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $psdMultiEffectsLfx2LengthFind `
+    -Replace $psdMultiEffectsLfx2LengthReplace `
+    -ExpectedCount 1 `
+    -Label 'ui psd lfx2 long section length'
 }
 
 if ($uiBundle.Contains($nativeShadowStackFind)) {
