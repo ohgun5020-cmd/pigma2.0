@@ -17,6 +17,7 @@ const defaultFiles = [
   "ai-regroup-rename.js",
   "ai-typo-audit.js",
   "ai-pixel-perfect.js",
+  "unlock-locked-layers.js",
   "delete-hidden-layers.js",
   "original-image-download.js",
   "ai-image-upscale.js",

@@ -9,6 +9,10 @@
   const AI_REGROUP_RENAME_CACHE_KEY = "pigma:ai-regroup-rename-cache:v2";
   const PATCH_VERSION = 2;
   const DEFAULT_NAMING_MODE = "web";
+  const AI_RENAME_PAYLOAD_LIMIT = 24;
+  const AI_RENAME_DEEP_CONTEXT_LIMIT = 32;
+  const LARGE_HYBRID_SECTION_COUNT = 16;
+  let textSampleCache = new WeakMap();
   const NAMING_MODE_METADATA = {
     web: {
       id: "web",
@@ -239,13 +243,29 @@
         return;
       }
 
+      const namingMode = resolveNamingMode(message && message.namingMode);
+      const modeMeta = getNamingModeMeta(namingMode);
+      const isPreviewRequest = message.type === "request-ai-regroup-rename-preview";
+      const isPreviewApply = message.type === "apply-ai-regroup-rename-preview";
       await withExecutionLock(
         {
           status: "running",
-          message: getNamingModeMeta(resolveNamingMode(message && message.namingMode)).runningDescription,
-          namingMode: resolveNamingMode(message && message.namingMode),
+          message: isPreviewRequest
+            ? "\ub514\uc790\uc778 \uad6c\uc870 \ubbf8\ub9ac\ubcf4\uae30\ub97c \ub9cc\ub4dc\ub294 \uc911\uc785\ub2c8\ub2e4."
+            : isPreviewApply
+              ? "\uc120\ud0dd\ud55c \uad6c\uc870 \uc815\ub9ac\ub97c \uc801\uc6a9\ud558\ub294 \uc911\uc785\ub2c8\ub2e4."
+              : modeMeta.runningDescription,
+          namingMode,
         },
-        () => runRegroupRename(message)
+        () => {
+          if (isPreviewRequest) {
+            return runRegroupRenamePreview(message);
+          }
+          if (isPreviewApply) {
+            return runApplyRegroupRenamePreview(message);
+          }
+          return runRegroupRename(message);
+        }
       );
       return;
     }
@@ -256,7 +276,13 @@
   globalScope.__PIGMA_AI_REGROUP_RENAME_PATCH__ = true;
 
   function isAiRegroupRenameMessage(message) {
-    return !!message && (message.type === "request-ai-regroup-rename-cache" || message.type === "run-ai-regroup-rename");
+    return (
+      !!message &&
+      (message.type === "request-ai-regroup-rename-cache" ||
+        message.type === "run-ai-regroup-rename" ||
+        message.type === "request-ai-regroup-rename-preview" ||
+        message.type === "apply-ai-regroup-rename-preview")
+    );
   }
 
   async function withExecutionLock(execution, runner) {
@@ -291,7 +317,6 @@
     const modeMeta = getNamingModeMeta(namingMode);
     activeNamingMode = namingMode;
     postStatus("running", modeMeta.runningDescription, namingMode);
-    postStatus("running", "리그룹핑/리네이밍을 적용하는 중입니다.");
 
     try {
       const designReadResult = await readDesignReadCache();
@@ -307,6 +332,93 @@
       figma.notify(buildRegroupRenameToast(result), { timeout: 2200 });
     } catch (error) {
       const message = normalizeErrorMessage(error, "리그룹핑/리네이밍에 실패했습니다.");
+
+      figma.ui.postMessage({
+        type: "ai-regroup-rename-error",
+        message,
+        matchesCurrentSelection: matchesSelectionSignature(runSelectionSignature),
+      });
+
+      figma.notify(message, { error: true, timeout: 2200 });
+    }
+  }
+
+  async function runRegroupRenamePreview(message) {
+    const runSelectionSignature = getSelectionSignature(figma.currentPage.selection);
+    const namingMode = resolveNamingMode(message && message.namingMode);
+    activeNamingMode = namingMode;
+    postStatus("running", "\ub514\uc790\uc778 \uad6c\uc870 \ubbf8\ub9ac\ubcf4\uae30\ub97c \ub9cc\ub4dc\ub294 \uc911\uc785\ub2c8\ub2e4.", namingMode);
+
+    try {
+      const designReadResult = await readDesignReadCache();
+      const result = sanitizeRegroupRenameResult(
+        await applyRegroupRename(designReadResult, {
+          namingMode,
+          previewOnly: true,
+        })
+      );
+      await writeRegroupRenameCache(result);
+
+      figma.ui.postMessage({
+        type: "ai-regroup-rename-preview",
+        result,
+        matchesCurrentSelection: matchesSelectionSignature(result.selectionSignature || runSelectionSignature),
+      });
+
+      figma.notify("\ub514\uc790\uc778 \uad6c\uc870 \ubbf8\ub9ac\ubcf4\uae30\ub97c \ub9cc\ub4e4\uc5c8\uc2b5\ub2c8\ub2e4.", { timeout: 2200 });
+    } catch (error) {
+      const message = normalizeErrorMessage(error, "\ub514\uc790\uc778 \uad6c\uc870 \ubbf8\ub9ac\ubcf4\uae30\ub97c \ub9cc\ub4e4\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4.");
+
+      figma.ui.postMessage({
+        type: "ai-regroup-rename-error",
+        message,
+        matchesCurrentSelection: matchesSelectionSignature(runSelectionSignature),
+      });
+
+      figma.notify(message, { error: true, timeout: 2200 });
+    }
+  }
+
+  async function runApplyRegroupRenamePreview(message) {
+    const runSelectionSignature = getSelectionSignature(figma.currentPage.selection);
+    const namingMode = resolveNamingMode(message && message.namingMode);
+    const expectedSignature = typeof (message && message.selectionSignature) === "string" ? message.selectionSignature : "";
+    const renameIds = normalizeStringArray(message && message.renameIds, 80);
+    const regroupIds = normalizeStringArray(message && message.regroupIds, 80);
+
+    activeNamingMode = namingMode;
+    postStatus("running", "\uc120\ud0dd\ud55c \uad6c\uc870 \uc815\ub9ac\ub97c \uc801\uc6a9\ud558\ub294 \uc911\uc785\ub2c8\ub2e4.", namingMode);
+
+    try {
+      if (expectedSignature && expectedSignature !== runSelectionSignature) {
+        throw new Error("\uc120\ud0dd\uc774 \ubc14\ub00c\uc5c8\uc2b5\ub2c8\ub2e4. \ubbf8\ub9ac\ubcf4\uae30\ub97c \ub2e4\uc2dc \ub9cc\ub4e0 \ub4a4 \uc801\uc6a9\ud574 \uc8fc\uc138\uc694.");
+      }
+
+      if (!renameIds.length && !regroupIds.length) {
+        throw new Error("\uc801\uc6a9\ud560 \ud56d\ubaa9\uc744 \ud558\ub098 \uc774\uc0c1 \uc120\ud0dd\ud574 \uc8fc\uc138\uc694.");
+      }
+
+      const designReadResult = await readDesignReadCache();
+      const result = sanitizeRegroupRenameResult(
+        await applyRegroupRename(designReadResult, {
+          namingMode,
+          filters: {
+            renameIds,
+            regroupIds,
+          },
+        })
+      );
+      await writeRegroupRenameCache(result);
+
+      figma.ui.postMessage({
+        type: "ai-regroup-rename-result",
+        result,
+        matchesCurrentSelection: matchesSelectionSignature(result.selectionSignature || runSelectionSignature),
+      });
+
+      figma.notify(buildRegroupRenameToast(result), { timeout: 2200 });
+    } catch (error) {
+      const message = normalizeErrorMessage(error, "\uc120\ud0dd\ud55c \uad6c\uc870 \uc815\ub9ac\ub97c \uc801\uc6a9\ud558\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4.");
 
       figma.ui.postMessage({
         type: "ai-regroup-rename-error",
@@ -376,6 +488,7 @@
     return {
       version: typeof result.version === "number" ? result.version : PATCH_VERSION,
       source: typeof result.source === "string" ? result.source : "local-heuristic",
+      preview: result.preview === true,
       namingMode: typeof result.namingMode === "string" ? result.namingMode : resolveNamingMode(activeNamingMode),
       namingModeLabel: typeof result.namingModeLabel === "string" ? result.namingModeLabel : "",
       selectionSignature: typeof result.selectionSignature === "string" ? result.selectionSignature : "",
@@ -402,8 +515,8 @@
         skippedCount: Math.max(0, Number(summary.skippedCount) || 0),
         aiOnlySkippedCount: Math.max(0, Number(summary.aiOnlySkippedCount) || 0),
       },
-      renamed: sanitizeRegroupRenameEntryList(result.renamed, ["id", "from", "to", "reason", "nameSource"], 24),
-      regrouped: sanitizeRegroupRenameEntryList(result.regrouped, ["id", "name", "parentName", "nodes", "reason"], 12),
+      renamed: sanitizeRegroupRenameEntryList(result.renamed, ["id", "operationId", "from", "to", "reason", "nameSource"], 24),
+      regrouped: sanitizeRegroupRenameEntryList(result.regrouped, ["id", "operationId", "groupKind", "name", "parentName", "nodes", "reason"], 12),
       suggestions: sanitizeRegroupRenameEntryList(result.suggestions, ["name", "parentName", "nodes", "reason"], 12),
       skipped: sanitizeRegroupRenameEntryList(result.skipped, ["label", "reason", "nameSource"], 12),
       insights: sanitizeStringList(result.insights, 6),
@@ -478,6 +591,31 @@
     return items;
   }
 
+  function normalizeStringArray(values, limit) {
+    const rows = Array.isArray(values) ? values : [];
+    const max = typeof limit === "number" && limit > 0 ? limit : rows.length;
+    const items = [];
+    const seen = new Set();
+    for (const value of rows) {
+      if (typeof value !== "string") {
+        continue;
+      }
+
+      const item = value.trim();
+      if (!item || seen.has(item)) {
+        continue;
+      }
+
+      seen.add(item);
+      items.push(item);
+      if (items.length >= max) {
+        break;
+      }
+    }
+
+    return items;
+  }
+
   function matchesCurrentSelection(result) {
     return !!result && result.selectionSignature === getSelectionSignature(figma.currentPage.selection);
   }
@@ -486,18 +624,57 @@
     return typeof selectionSignature === "string" && selectionSignature === getSelectionSignature(figma.currentPage.selection);
   }
 
+  function normalizeRegroupRenameFilters(filters) {
+    if (!filters || typeof filters !== "object") {
+      return null;
+    }
+
+    return {
+      renameIds: new Set(normalizeStringArray(filters.renameIds, 120)),
+      regroupIds: new Set(normalizeStringArray(filters.regroupIds, 120)),
+    };
+  }
+
+  function isRegroupRenameFilterSelected(filters, key, id) {
+    if (!filters || !(filters[key] instanceof Set)) {
+      return true;
+    }
+
+    return typeof id === "string" && filters[key].has(id);
+  }
+
+  function buildRegroupOperationId(kind, parent, nodes) {
+    const parentId = parent && typeof parent.id === "string" ? parent.id : "parent";
+    const nodeIds = Array.isArray(nodes)
+      ? nodes
+          .map((node) => (node && typeof node.id === "string" ? node.id : ""))
+          .filter(Boolean)
+          .join("|")
+      : "";
+    return `${kind}:${parentId}:${nodeIds}`;
+  }
+
   async function applyRegroupRename(designReadResult, options) {
+    textSampleCache = new WeakMap();
     const selection = Array.from(figma.currentPage.selection || []);
     if (!selection.length) {
       throw new Error("프레임, 그룹, 레이어를 먼저 선택하세요.");
     }
 
+    const previewOnly = options && options.previewOnly === true;
+    const filters = normalizeRegroupRenameFilters(options && options.filters);
     const selectionIds = selection.map((node) => node.id);
     const context = buildSelectionContext(selection, designReadResult, options);
-    const renameResult = await applyRenamePlan(selection, context);
-    const refreshedSelection = resolveNodeListByIds(selectionIds);
-    const regroupResult = applyRegroupPlan(refreshedSelection, context);
-    const suggestionResult = buildRegroupSuggestions(refreshedSelection, regroupResult.usedNodeIds, context);
+    const renameResult = await applyRenamePlan(selection, context, {
+      previewOnly,
+      filters,
+    });
+    const refreshedSelection = previewOnly ? selection : resolveNodeListByIds(selectionIds);
+    const regroupResult = applyRegroupPlan(refreshedSelection, context, {
+      previewOnly,
+      filters,
+    });
+    const suggestionResult = previewOnly ? [] : buildRegroupSuggestions(refreshedSelection, regroupResult.usedNodeIds, context);
     const skippedCount = renameResult.skipped.length + regroupResult.skipped.length;
     const insights = buildInsights(context, renameResult, regroupResult, suggestionResult);
     const aiRenameCount = renameResult.aiAppliedCount || 0;
@@ -507,6 +684,7 @@
     return {
       version: PATCH_VERSION,
       source: aiRenameCount > 0 ? (localRenameCount > 0 ? "mixed" : "ai") : "local-heuristic",
+      preview: previewOnly,
       namingMode: context.namingMode,
       namingModeLabel: context.namingModeLabel,
       selectionSignature: getSelectionSignature(selection),
@@ -727,7 +905,42 @@
     return hints;
   }
 
-  async function applyRenamePlan(selection, context) {
+  function isLargeHybridSectionSelection(selection, context) {
+    if (resolveNamingMode(context && context.namingMode) !== "hybrid") {
+      return false;
+    }
+
+    const selectedRoots = getContextSelectedRoots(context);
+    if (selectedRoots.length > 1) {
+      const selectedMajorCount = selectedRoots.filter((node) => isPotentialMajorHybridSection(node, context)).length;
+      return selectedMajorCount >= LARGE_HYBRID_SECTION_COUNT;
+    }
+
+    const container = getMajorHybridSectionContainer(context);
+    if (container) {
+      return getPotentialMajorHybridChildren(container, context).length >= LARGE_HYBRID_SECTION_COUNT;
+    }
+
+    const root = Array.isArray(selection) ? selection.find(Boolean) : null;
+    return root && hasChildren(root) ? getPotentialMajorHybridChildren(root, context).length >= LARGE_HYBRID_SECTION_COUNT : false;
+  }
+
+  function shouldBuildDeepAiRenameContext(state) {
+    const context = state && state.context;
+    if (resolveNamingMode(context && context.namingMode) !== "hybrid") {
+      return true;
+    }
+
+    if (state && state.largeHybridSelection) {
+      return state.forceAiRename === true || state.majorSection === true;
+    }
+
+    return state && (state.useHybridDisplayName === true || state.forceAiRename === true || state.majorSection === true);
+  }
+
+  async function applyRenamePlan(selection, context, options) {
+    const previewOnly = options && options.previewOnly === true;
+    const filters = options && options.filters;
     const allNodes = collectSceneNodes(selection);
     const nodesByParent = new Map();
     const parentNameCounts = new Map();
@@ -744,6 +957,8 @@
     let aiErrorMessage = "";
     let aiFailureType = "";
     const parentGroups = [];
+    const largeHybridSelection = isLargeHybridSectionSelection(selection, context);
+    let remainingDeepAiContextBudget = AI_RENAME_DEEP_CONTEXT_LIMIT;
 
     for (const node of allNodes) {
       if (!canRenameNode(node)) {
@@ -833,16 +1048,31 @@
           continue;
         }
 
+        const useDeepAiContext =
+          remainingDeepAiContextBudget > 0 &&
+          shouldBuildDeepAiRenameContext({
+            context,
+            largeHybridSelection,
+            forceAiRename,
+            majorSection,
+            useHybridDisplayName,
+          });
+        if (useDeepAiContext) {
+          remainingDeepAiContextBudget -= 1;
+        }
+
         const majorSectionSiblings = majorSection ? getMajorHybridSectionSiblings(node, context) : [];
         const majorSectionOrder = majorSection ? majorSectionSiblings.findIndex((entry) => entry && entry.id === node.id) + 1 : 0;
-        const deepTextSamples = collectNodeTexts(node, 8, 4).slice(0, 8);
+        const deepTextSamples = useDeepAiContext ? collectNodeTexts(node, 8, 4).slice(0, 8) : (textHint ? [textHint] : []);
         const aiOnlySectionName = useHybridDisplayName && majorSection;
         const sectionRoleAnalysis =
-          useHybridDisplayName && hasChildren(node)
+          useDeepAiContext && useHybridDisplayName && hasChildren(node)
             ? analyzeSectionRole(node, context, {
                 textHint,
               })
             : null;
+        const headingTexts = useDeepAiContext ? collectProminentTexts(node, 3) : [];
+        const actionTexts = useDeepAiContext ? collectActionTexts(node, 3) : [];
         candidates.push({
           nodeId: node.id,
           currentName,
@@ -854,17 +1084,17 @@
           textHint,
           textSamples: deepTextSamples.slice(0, 3),
           deepTextSamples,
-          headingTexts: collectProminentTexts(node, 3),
-          actionTexts: collectActionTexts(node, 3),
-          contentDigest: buildNodeContentDigest(node, context),
+          headingTexts,
+          actionTexts,
+          contentDigest: useDeepAiContext ? buildNodeContentDigest(node, context) : "",
           sectionNarrative: sectionRoleAnalysis ? sectionRoleAnalysis.summary : "",
           sectionRoleHint: sectionRoleAnalysis ? sectionRoleAnalysis.role : "",
           sectionRoleReason: sectionRoleAnalysis ? sectionRoleAnalysis.reason : "",
           topicHint: formatTopicLabel(detectTopicSlug(node, context, textHint)),
-          colorHint: getNodeColorHint(node),
+          colorHint: useDeepAiContext ? getNodeColorHint(node) : "",
           imageRole: isImageLikeNode(node) ? detectImageRole(node) : "",
           hasImageFill: hasImageFill(node),
-          allowAiOverride: true,
+          allowAiOverride: useDeepAiContext,
           nameMode: candidateNameMode,
           aiOnlySectionName,
           localFallbackAllowed: !aiOnlySectionName || isSafeLocalDisplayFallback(baseName, node, context),
@@ -873,12 +1103,12 @@
           majorSectionCount: majorSectionSiblings.length,
           needsIndex: shouldPrefixHybridDisplayOrdinal(node, context),
           positionHint: describeNodeSectionPosition(node, context),
-          siblingContext: buildSiblingContentContext(node, context),
+          siblingContext: useDeepAiContext ? buildSiblingContentContext(node, context) : "",
           currentNameSafeDisplay: currentNameSafeDisplay,
           baseNameSafeDisplay: baseNameSafeDisplay,
           currentNameSemanticallyWeak: semanticWeakCurrentName,
           baseNameSemanticallyWeak: baseNameSemanticallyWeak,
-          looksLikePricing: looksLikePricingSection(node),
+          looksLikePricing: useDeepAiContext ? looksLikePricingSection(node) : false,
           bounds: snapshotNodeBounds(node),
           sectionSlug: sectionSlug,
           contentSlug: contentSlug,
@@ -910,6 +1140,11 @@
       const usedNames = group.usedNames;
       const candidates = group.candidates;
       for (const candidate of candidates) {
+        if (!isRegroupRenameFilterSelected(filters, "renameIds", candidate.nodeId)) {
+          usedNames.add(canonicalizeName(candidate.currentName));
+          continue;
+        }
+
         const aiSuggestion = candidate.allowAiOverride ? aiRenameMap.get(candidate.nodeId) : null;
         const renameDecision = resolveRenameDecision(candidate, aiSuggestion, aiRenameResult);
         if (!renameDecision) {
@@ -942,9 +1177,12 @@
             continue;
           }
 
-          liveNode.name = uniqueName;
+          if (!previewOnly) {
+            liveNode.name = uniqueName;
+          }
           applied.push({
             id: candidate.nodeId,
+            operationId: candidate.nodeId,
             from: candidate.currentName,
             to: uniqueName,
             reason: nextReason,
@@ -1101,7 +1339,7 @@
           contentSummary: context.contentSummary,
           selectionTextSamples: context.selectionTextSamples,
           paletteHints: context.paletteHints,
-          candidates: candidates.slice(0, 24),
+          candidates: candidates.slice(0, AI_RENAME_PAYLOAD_LIMIT),
         },
       });
       const map = new Map();
@@ -1219,7 +1457,9 @@
     return `리그룹핑/리네이밍 완료 (${parts.join(" · ")})`;
   }
 
-  function applySafeRegroup(selection, context) {
+  function applySafeRegroup(selection, context, options) {
+    const previewOnly = options && options.previewOnly === true;
+    const filters = options && options.filters;
     const parents = collectGroupableParents(selection);
     const applied = [];
     const skipped = [];
@@ -1228,7 +1468,34 @@
     for (const parent of parents) {
       const pairs = findIconLabelPairs(parent.children || [], usedNodeIds);
       for (const pair of pairs) {
+        const operationId = buildRegroupOperationId("icon-label", parent, [pair.icon, pair.label]);
+        if (!isRegroupRenameFilterSelected(filters, "regroupIds", operationId)) {
+          continue;
+        }
+
         try {
+          if (previewOnly) {
+            const groupName = ensureUniqueName(
+              buildGroupName(null, pair.label, context),
+              collectSiblingNameSet(parent, null)
+            );
+            applied.push({
+              id: operationId,
+              operationId,
+              groupKind: "icon-label",
+              name: groupName,
+              parentName: safeName(parent),
+              nodes: [
+                { id: pair.icon.id, name: safeName(pair.icon) },
+                { id: pair.label.id, name: safeName(pair.label) },
+              ],
+              reason: "媛源뚯슫 ?꾩씠肄섍낵 ?쇰꺼??臾띠뿀?듬땲??",
+            });
+            usedNodeIds.add(pair.icon.id);
+            usedNodeIds.add(pair.label.id);
+            continue;
+          }
+
           const group = figma.group([pair.icon, pair.label], parent);
           const groupName = ensureUniqueName(
             buildGroupName(group, pair.label, context),
@@ -1237,6 +1504,8 @@
           group.name = groupName;
           applied.push({
             id: group.id,
+            operationId,
+            groupKind: "icon-label",
             name: groupName,
             parentName: safeName(parent),
             nodes: [safeName(pair.icon), safeName(pair.label)],
@@ -1261,13 +1530,13 @@
     };
   }
 
-  function applyRegroupPlan(selection, context) {
-    const baseResult = applySafeRegroup(selection, context);
+  function applyRegroupPlan(selection, context, options) {
+    const baseResult = applySafeRegroup(selection, context, options);
     if (!context.aggressiveRegroup) {
       return baseResult;
     }
 
-    const textBlockResult = applyTextBlockRegroup(selection, baseResult.usedNodeIds, context);
+    const textBlockResult = applyTextBlockRegroup(selection, baseResult.usedNodeIds, context, options);
     return {
       applied: [...baseResult.applied, ...textBlockResult.applied],
       skipped: [...baseResult.skipped, ...textBlockResult.skipped],
@@ -1275,7 +1544,9 @@
     };
   }
 
-  function applyTextBlockRegroup(selection, seedUsedNodeIds, context) {
+  function applyTextBlockRegroup(selection, seedUsedNodeIds, context, options) {
+    const previewOnly = options && options.previewOnly === true;
+    const filters = options && options.filters;
     const usedNodeIds = new Set(seedUsedNodeIds || []);
     const applied = [];
     const skipped = [];
@@ -1291,12 +1562,37 @@
           continue;
         }
 
+        const operationId = buildRegroupOperationId("text-block", parent, nodes);
+        if (!isRegroupRenameFilterSelected(filters, "regroupIds", operationId)) {
+          continue;
+        }
+
         try {
+          if (previewOnly) {
+            const groupName = ensureUniqueName(
+              buildSuggestedTextBlockName(null, nodes[0], nodes[1], context),
+              collectSiblingNameSet(parent, null)
+            );
+            applied.push({
+              id: operationId,
+              operationId,
+              groupKind: "text-block",
+              name: groupName,
+              parentName: safeName(parent),
+              nodes: suggestion.nodes,
+              reason: suggestion.reason,
+            });
+            nodes.forEach((node) => usedNodeIds.add(node.id));
+            continue;
+          }
+
           const group = figma.group(nodes, parent);
           const groupName = ensureUniqueName(buildSuggestedTextBlockName(group, nodes[0], nodes[1], context), collectSiblingNameSet(parent, group));
           group.name = groupName;
           applied.push({
             id: group.id,
+            operationId,
+            groupKind: "text-block",
             name: groupName,
             parentName: safeName(parent),
             nodes: suggestion.nodes.map((entry) => entry.name),
@@ -1307,7 +1603,7 @@
         } catch (error) {
           skipped.push({
             label: suggestion.nodes.map((entry) => entry.name).join(" + "),
-            reason: normalizeErrorMessage(error, "由ш렇猷뱁븨???곸슜?섏? 紐삵뻽?듬땲??"),
+            reason: normalizeErrorMessage(error, "리그룹핑을 적용하지 못했습니다."),
           });
         }
       }
@@ -2833,15 +3129,48 @@
 
     const selectedRoots = getContextSelectedRoots(context);
     if (selectedRoots.length > 1 && selectedRoots.some((entry) => entry.id === node.id)) {
-      return selectedRoots.filter((entry) => isPotentialMajorHybridSection(entry, context)).sort(compareBounds);
+      return getCachedMajorHybridSections(context, "selected-roots", () =>
+        selectedRoots.filter((entry) => isPotentialMajorHybridSection(entry, context)).sort(compareBounds)
+      );
     }
 
     const container = getMajorHybridSectionContainer(context);
     if (container && node.parent && node.parent.id === container.id) {
-      return getPotentialMajorHybridChildren(container, context);
+      return getCachedMajorHybridSections(context, `container:${container.id}`, () =>
+        getPotentialMajorHybridChildren(container, context)
+      );
     }
 
     return [];
+  }
+
+  function getCachedMajorHybridSections(context, key, resolver) {
+    if (!context || typeof resolver !== "function") {
+      return [];
+    }
+
+    if (!context.__majorHybridSectionCache) {
+      try {
+        Object.defineProperty(context, "__majorHybridSectionCache", {
+          value: new Map(),
+          enumerable: false,
+          configurable: true,
+        });
+      } catch (error) {
+        context.__majorHybridSectionCache = new Map();
+      }
+    }
+
+    const cache = context.__majorHybridSectionCache;
+    if (cache instanceof Map && cache.has(key)) {
+      return cache.get(key);
+    }
+
+    const sections = resolver() || [];
+    if (cache instanceof Map) {
+      cache.set(key, sections);
+    }
+    return sections;
   }
 
   function isPotentialMajorHybridSection(node, context) {
@@ -3149,6 +3478,21 @@
   }
 
   function collectNodeTexts(node, limit, maxDepth) {
+    if (!node || typeof node !== "object") {
+      return [];
+    }
+
+    const cacheKey = `${Math.max(0, Number(limit) || 0)}:${Math.max(0, Number(maxDepth) || 0)}`;
+    let nodeCache = null;
+    try {
+      nodeCache = textSampleCache.get(node) || null;
+    } catch (error) {
+      nodeCache = null;
+    }
+    if (nodeCache && nodeCache.has(cacheKey)) {
+      return nodeCache.get(cacheKey).slice();
+    }
+
     const texts = [];
     const stack = [{ node, depth: 0 }];
 
@@ -3173,6 +3517,14 @@
         stack.push({ node: current.node.children[index], depth: current.depth + 1 });
       }
     }
+
+    try {
+      if (!nodeCache) {
+        nodeCache = new Map();
+        textSampleCache.set(node, nodeCache);
+      }
+      nodeCache.set(cacheKey, texts.slice());
+    } catch (error) {}
 
     return texts;
   }

@@ -35,9 +35,11 @@
   const AI_TRANSLATE_MAX_CHUNK_ITEMS = 24;
   const AI_TRANSLATE_MAX_CHUNK_CHARS = 3600;
   const AI_TRANSLATE_MEMORY_LIMIT = 400;
+  const AI_TRANSLATE_PREVIEW_LIMIT = 120;
   const loadedFontPromiseCache = new Map();
   const pendingTextHighlightMeasureRequests = new Map();
   let textHighlightMeasureRequestSequence = 0;
+  let pendingTranslatePreviewState = null;
   const ANNOTATION_PREFIX = "[Ai 판단]";
   const LEGACY_ANNOTATION_PREFIXES = ["[AI Typo]", ANNOTATION_PREFIX, "[Pigma Ai Audit]"];
   const ANNOTATION_CATEGORY_LABEL = "Pigma Ai Audit";
@@ -428,6 +430,13 @@
         return;
       }
 
+      if (message.type === "apply-ai-translate-preview") {
+        await withTypoTaskLock("translate", async () => {
+          await runApplyAiTranslatePreview(message);
+        });
+        return;
+      }
+
       if (message.type === "apply-ai-text-highlight") {
         await withTypoTaskLock("highlight", async () => {
           await runTextHighlight(message);
@@ -460,6 +469,7 @@
         message.type === "run-ai-typo-clear" ||
         message.type === "request-ai-translate-cache" ||
         message.type === "run-ai-translate" ||
+        message.type === "apply-ai-translate-preview" ||
         message.type === "request-ai-text-highlight-source" ||
         message.type === "apply-ai-text-highlight" ||
         message.type === "measure-ai-text-highlight-alpha-bounds-result")
@@ -496,7 +506,7 @@
       return "현재 선택 범위에 남아 있는 AI 오타 주석을 정리하는 중입니다.";
     }
     if (task === "translate") {
-      return "선택한 화면의 텍스트를 선택한 언어로 AI 번역하고 있으며, 선택이 없으면 현재 페이지 전체를 번역합니다.";
+      return "선택한 화면의 텍스트를 번역 미리보기로 준비하고 있습니다. 선택이 없으면 전체 페이지 번역을 실행하지 않습니다.";
     }
     return "오타 후보를 찾고 Dev Mode 주석 또는 결과 패널로 정리하는 중입니다.";
   }
@@ -672,11 +682,46 @@
   async function runAiTranslate(message) {
     const runSelectionSignature = getSelectionSignature(figma.currentPage.selection);
     const targetLanguage = getTranslationLanguageMetadata(message && message.targetLanguage);
-    postTranslateStatus("running", `${targetLanguage.label}로 번역하는 중입니다.`);
+    postTranslateStatus("running", `${targetLanguage.label} 번역 미리보기를 준비하는 중입니다.`);
 
     try {
       const designReadResult = await readDesignReadCache();
       const result = await applyAiTranslation(designReadResult, targetLanguage);
+
+      figma.ui.postMessage({
+        type: "ai-translate-result",
+        result,
+        matchesCurrentSelection: matchesSelectionSignature(result.selectionSignature || runSelectionSignature),
+      });
+
+      figma.notify(
+        result.summary && result.summary.previewCount > 0
+          ? `번역 미리보기 준비 (${result.summary.previewCount}개 제안, ${result.summary.targetLanguageLabel})`
+          : `번역 미리보기 준비 (${result.summary.textNodeCount || 0}개 확인, 변경 없음)`,
+        { timeout: 2200 }
+      );
+    } catch (error) {
+      const messageText = normalizeErrorMessage(error, "AI 번역에 실패했습니다.");
+      figma.ui.postMessage({
+        type: "ai-translate-error",
+        message: messageText,
+        matchesCurrentSelection: matchesSelectionSignature(runSelectionSignature),
+      });
+      figma.notify(messageText, { error: true, timeout: 2200 });
+    }
+  }
+
+  async function runApplyAiTranslatePreview(message) {
+    const runSelectionSignature = getSelectionSignature(figma.currentPage.selection);
+    postTranslateStatus("running", "선택한 번역 제안을 적용하는 중입니다.");
+
+    try {
+      const selectedIds = normalizeTranslatePreviewSelection(message && message.selectedIds);
+      if (!selectedIds.length) {
+        throw new Error("적용할 번역 제안을 하나 이상 선택해주세요.");
+      }
+
+      const result = await applyAiTranslationPreviewSelection(selectedIds);
       await writeTranslateCache(result);
 
       figma.ui.postMessage({
@@ -687,12 +732,12 @@
 
       figma.notify(
         result.summary && result.summary.translatedCount > 0
-          ? `번역 완료 (${result.summary.translatedCount}개 텍스트, ${result.summary.targetLanguageLabel})`
-          : `번역 완료 (${result.summary.textNodeCount || 0}개 확인, 변경 없음)`,
+          ? `번역 적용 완료 (${result.summary.translatedCount}개 텍스트)`
+          : "적용할 번역 변경이 없습니다.",
         { timeout: 2200 }
       );
     } catch (error) {
-      const messageText = normalizeErrorMessage(error, "AI 번역에 실패했습니다.");
+      const messageText = normalizeErrorMessage(error, "번역 제안을 적용하지 못했습니다.");
       figma.ui.postMessage({
         type: "ai-translate-error",
         message: messageText,
@@ -1856,7 +1901,7 @@
       return false;
     }
 
-    if (Array.isArray(kindLabels) && kindLabels.includes("臾몃쾿")) {
+    if (Array.isArray(kindLabels) && kindLabels.includes("문법")) {
       return false;
     }
 
@@ -2154,7 +2199,11 @@
 
   async function applyAiTranslation(designReadResult, targetLanguage) {
     const selection = Array.from(figma.currentPage.selection || []);
-    const translationRoots = selection.length ? selection : [figma.currentPage];
+    if (!selection.length) {
+      pendingTranslatePreviewState = null;
+      throw new Error("번역할 프레임, 그룹, 텍스트 레이어를 먼저 선택해주세요. 안전을 위해 선택이 없을 때 전체 페이지 번역은 실행하지 않습니다.");
+    }
+    const translationRoots = selection;
 
     const proofingSettings = await readProofingSettings();
     const context = buildSelectionContext(translationRoots, designReadResult, proofingSettings);
@@ -2164,47 +2213,134 @@
     }
 
     const translationResult = await requestAiTranslations(textNodes, context, proofingSettings, targetLanguage);
-    const applied = await applyTranslatedText(textNodes, translationResult.issues, proofingSettings, targetLanguage);
+    const preview = buildTranslatedTextPreview(textNodes, translationResult.issues, proofingSettings, targetLanguage);
     const sourceLanguageLabel =
       context.languageHintLabel || context.detectedLanguageLabel || context.languageLabel || "자동 감지";
     const insights = buildTranslateInsights(
       context,
       textNodes,
-      applied,
+      {
+        applied: preview.preview,
+        appliedCount: preview.previewCount,
+        unchangedCount: preview.unchangedCount,
+        skipped: preview.skipped,
+      },
       translationResult.aiMeta,
       targetLanguage,
       translationResult.cacheStats
     );
-
-    return {
+    const result = {
       version: PATCH_VERSION,
-      source: "ai-translation-direct-edit",
-      mode: "direct-text-translation",
+      source: "ai-translation-preview",
+      mode: "preview-text-translation",
       selectionSignature: getSelectionSignature(selection),
       processedAt: new Date().toISOString(),
       summary: {
         selectionLabel: context.selectionLabel,
         contextLabel: context.contextLabel,
         textNodeCount: textNodes.length,
-        translatedCount: applied.appliedCount,
-        unchangedCount: applied.unchangedCount,
-        skippedCount: applied.skipped.length,
+        translatedCount: 0,
+        previewCount: preview.previewCount,
+        unchangedCount: preview.unchangedCount,
+        skippedCount: preview.skipped.length,
         reusedCount: translationResult.cacheStats ? translationResult.cacheStats.reusedCount : 0,
         requestedTextCount: translationResult.cacheStats ? translationResult.cacheStats.requestedCount : textNodes.length,
         uniqueRequestedTextCount: translationResult.cacheStats ? translationResult.cacheStats.uniqueRequestedCount : textNodes.length,
         sourceLanguageLabel,
         targetLanguageCode: targetLanguage.code,
         targetLanguageLabel: targetLanguage.label,
-        mode: "direct-text-translation",
-        modeLabel: "현재 선택 번역",
+        mode: "preview-text-translation",
+        modeLabel: "번역 미리보기",
+        requiresApply: true,
+        previewLimit: AI_TRANSLATE_PREVIEW_LIMIT,
         aiStatusLabel: translationResult.aiMeta ? translationResult.aiMeta.statusLabel : "AI 상태 미확인",
         aiProviderLabel: translationResult.aiMeta ? translationResult.aiMeta.providerLabel : "",
         aiModelLabel: translationResult.aiMeta ? translationResult.aiMeta.modelLabel : "",
       },
+      preview: preview.preview.slice(0, AI_TRANSLATE_PREVIEW_LIMIT),
+      applied: [],
+      skipped: preview.skipped.slice(0, 8),
+      insights: insights.slice(0, 6),
+    };
+
+    pendingTranslatePreviewState = {
+      selectionSignature: result.selectionSignature,
+      targetLanguage,
+      proofingSettings,
+      context,
+      textNodes,
+      issues: Array.isArray(translationResult.issues) ? translationResult.issues.slice() : [],
+      sourceLanguageLabel,
+      aiMeta: translationResult.aiMeta || null,
+      cacheStats: translationResult.cacheStats || null,
+    };
+
+    return result;
+  }
+
+  async function applyAiTranslationPreviewSelection(selectedIds) {
+    const state = pendingTranslatePreviewState;
+    if (!state || !Array.isArray(state.textNodes) || !Array.isArray(state.issues)) {
+      throw new Error("적용할 번역 미리보기가 없습니다. 먼저 번역 미리보기를 다시 생성해주세요.");
+    }
+
+    if (!matchesSelectionSignature(state.selectionSignature)) {
+      throw new Error("현재 선택이 미리보기 생성 시점과 다릅니다. 안전하게 다시 미리보기를 생성해주세요.");
+    }
+
+    const selectedIdSet = new Set(selectedIds);
+    const selectedIssues = state.issues.filter((issue) => {
+      return !!(issue && issue.node && selectedIdSet.has(issue.node.id));
+    });
+    if (!selectedIssues.length) {
+      throw new Error("선택한 항목에서 적용할 번역 제안을 찾지 못했습니다.");
+    }
+
+    const applied = await applyTranslatedText(state.textNodes, selectedIssues, state.proofingSettings, state.targetLanguage);
+    const insights = buildTranslateInsights(
+      state.context,
+      state.textNodes,
+      applied,
+      state.aiMeta,
+      state.targetLanguage,
+      state.cacheStats
+    );
+    const result = {
+      version: PATCH_VERSION,
+      source: "ai-translation-selected-apply",
+      mode: "direct-text-translation",
+      selectionSignature: state.selectionSignature,
+      processedAt: new Date().toISOString(),
+      summary: {
+        selectionLabel: state.context.selectionLabel,
+        contextLabel: state.context.contextLabel,
+        textNodeCount: state.textNodes.length,
+        selectedCount: selectedIssues.length,
+        translatedCount: applied.appliedCount,
+        previewCount: 0,
+        unchangedCount: applied.unchangedCount,
+        skippedCount: applied.skipped.length,
+        reusedCount: state.cacheStats ? state.cacheStats.reusedCount : 0,
+        requestedTextCount: state.cacheStats ? state.cacheStats.requestedCount : state.textNodes.length,
+        uniqueRequestedTextCount: state.cacheStats ? state.cacheStats.uniqueRequestedCount : state.textNodes.length,
+        sourceLanguageLabel: state.sourceLanguageLabel,
+        targetLanguageCode: state.targetLanguage.code,
+        targetLanguageLabel: state.targetLanguage.label,
+        mode: "direct-text-translation",
+        modeLabel: "선택 번역 적용",
+        requiresApply: false,
+        aiStatusLabel: state.aiMeta ? state.aiMeta.statusLabel : "AI 상태 미확인",
+        aiProviderLabel: state.aiMeta ? state.aiMeta.providerLabel : "",
+        aiModelLabel: state.aiMeta ? state.aiMeta.modelLabel : "",
+      },
+      preview: [],
       applied: applied.applied.slice(0, 12),
       skipped: applied.skipped.slice(0, 8),
       insights: insights.slice(0, 6),
     };
+
+    pendingTranslatePreviewState = null;
+    return result;
   }
 
   async function requestAiTranslations(textNodes, context, proofingSettings, targetLanguage) {
@@ -2665,6 +2801,105 @@
     }
 
     return true;
+  }
+
+  function normalizeTranslatePreviewSelection(value) {
+    const source = Array.isArray(value) ? value : [];
+    const selected = [];
+    const seen = new Set();
+
+    for (const item of source) {
+      const id = typeof item === "string" ? item.trim() : "";
+      if (!id || seen.has(id)) {
+        continue;
+      }
+      seen.add(id);
+      selected.push(id);
+    }
+
+    return selected;
+  }
+
+  function buildTranslatedTextPreview(textNodes, issues, proofingSettings, targetLanguage) {
+    const issuesByNode = new Map();
+    const preview = [];
+    const skipped = [];
+    let unchangedCount = 0;
+
+    for (const issue of Array.isArray(issues) ? issues : []) {
+      if (!issue || !issue.node || !issue.node.id) {
+        continue;
+      }
+
+      issuesByNode.set(issue.node.id, issue);
+    }
+
+    for (const node of Array.isArray(textNodes) ? textNodes : []) {
+      const currentText = getTextValue(node);
+      if (!currentText) {
+        unchangedCount += 1;
+        continue;
+      }
+
+      const issue = issuesByNode.get(node.id);
+      if (!issue) {
+        unchangedCount += 1;
+        continue;
+      }
+
+      const nextText = normalizeTranslatedSuggestion(currentText, issue.suggestion);
+      if (!nextText || nextText === currentText) {
+        unchangedCount += 1;
+        continue;
+      }
+
+      if (!issueRespectsProofingTerms(currentText, nextText, proofingSettings)) {
+        skipped.push({
+          label: safeName(node),
+          reason: "보호된 용어가 바뀔 수 있어 번역 적용을 건너뜁니다.",
+        });
+        unchangedCount += 1;
+        continue;
+      }
+
+      if (!translationPreservesCriticalTokens(currentText, nextText)) {
+        skipped.push({
+          label: safeName(node),
+          reason: "URL, 플레이스홀더, 코드 토큰이 바뀔 수 있어 번역 적용을 건너뜁니다.",
+        });
+        unchangedCount += 1;
+        continue;
+      }
+
+      if (countTextLines(currentText) > 1 && countNonEmptyLines(nextText) < Math.max(1, countNonEmptyLines(currentText) - 1)) {
+        skipped.push({
+          label: safeName(node),
+          reason: "여러 줄 텍스트 구조가 크게 바뀌어 번역 적용을 건너뜁니다.",
+        });
+        unchangedCount += 1;
+        continue;
+      }
+
+      preview.push(
+        formatIssueResult(
+          createIssue(
+            node,
+            currentText,
+            nextText,
+            "번역",
+            issue.reason || `${targetLanguage.label}로 번역합니다.`,
+            issue.source || "ai"
+          )
+        )
+      );
+    }
+
+    return {
+      preview,
+      skipped,
+      previewCount: preview.length,
+      unchangedCount,
+    };
   }
 
   async function applyTranslatedText(textNodes, issues, proofingSettings, targetLanguage) {
@@ -4302,7 +4537,7 @@
       baseIssue.node,
       baseText,
       mergedText,
-      accepted.some((entry) => entry.issue && entry.issue.kind === "臾몃쾿") ? "臾몃쾿" : baseIssue.kind,
+      accepted.some((entry) => entry.issue && entry.issue.kind === "문법") ? "문법" : baseIssue.kind,
       "같은 텍스트 노드의 여러 언어 교정 후보를 함께 병합했습니다.",
       accepted.some((entry) => entry.issue && entry.issue.source === "ai") ? "ai" : baseIssue.source || "local"
     );
@@ -4472,7 +4707,7 @@
     const instructions =
       "You review UI copy inside a Figma plugin. Detect only obvious spelling mistakes, broken words, malformed polite endings, spacing errors, punctuation errors, and clearly broken grammar. Be conservative: if a word is already a valid standard word in its language, keep it unless the surrounding sentence is clearly wrong with that exact word. Never replace one valid word with another valid word just because the spellings are similar. Example: keep 'optimal motion' unchanged and never change it to 'optional motion'. Preserve the original language, script, wording, product naming, and marketing intent of each string. Do not translate, localize, rewrite into the dominant language of the screen, unify terminology, smooth tone, or replace brand/product names unless the product name itself has an obvious typo. In mixed-language strings, preserve every language segment as-is and only fix the clearly broken part inside that same language segment. Some textNodes are full node strings, while others are single extracted lines from a multiline node. If an item is a single extracted line, return a corrected single line only and do not rewrite neighboring lines. If preferredLocaleHint is provided, use it only for Latin-script nodes or segments that actually fit that locale. Do not suppress Korean, English, or other script corrections just because another preferred locale is set. If latinLocaleHint is provided, keep corrections inside that locale only for matching Latin-script segments. Ignore cosmetic whitespace cleanup such as empty brackets, bracket spacing, or punctuation-only cleanup. Only flag spacing when a word is visibly broken into fragments, for example 'app le' -> 'apple'. Example: German copy with an English brand should stay mixed as needed: 'Find e deine perfekte Work-Life-Balanfce mit LG' -> 'Finde deine perfekte Work-Life-Balance mit LG', 'Jedtazt kaufenq' -> 'Jetzt kaufen', while keeping 'LG' untouched. Return the full corrected string in suggestion for the given item, never only a changed token. If the original text contains multiple lines, preserve every line and keep the same line count unless the user text itself clearly intends a merge. Never drop unrelated lower lines. Never edit any protectedTerms under any circumstances. Never mark userDictionary terms as mistakes. Example: '방갑스비난.' should be corrected to the full string '반갑습니다.' If the text looks fine, omit it. Return concise reasons in Korean when possible.";
     const payload = {
-      languageHint: context.languageHintLabel || context.detectedLanguageLabel || context.languageLabel || "?먮룞 媛먯?",
+      languageHint: context.languageHintLabel || context.detectedLanguageLabel || context.languageLabel || "자동 감지",
       preferredLocaleHint: context.proofingLocale || "",
       preferredLocaleLabel: context.proofingLocaleAiLabel || context.proofingLocaleLabel || "",
       languageFamilyHint: detectLanguageFamilyLabel(context.detectedLanguageLabel || context.languageLabel || ""),

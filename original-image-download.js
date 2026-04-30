@@ -5,7 +5,8 @@
   }
 
   const originalOnMessage = figma.ui.onmessage;
-  const RESULT_PREVIEW_LIMIT = 24;
+  const RESULT_PREVIEW_LIMIT = 80;
+  const USAGE_PREVIEW_LIMIT = 12;
   let isRunning = false;
 
   if (typeof originalOnMessage !== "function") {
@@ -19,7 +20,7 @@
           status: "running",
           currentCount: 0,
           totalCount: 0,
-          message: "원본 이미지 추출이 이미 진행 중입니다.",
+          message: "원본 이미지 찾기가 이미 진행 중입니다.",
         });
         return;
       }
@@ -46,10 +47,7 @@
 
       if (!totalCount) {
         const emptyResult = buildResult({
-          selection: collection.selection,
-          totalFillCount: collection.totalFillCount,
-          duplicateFillCount: collection.duplicateFillCount,
-          uniqueCandidateCount: 0,
+          collection,
           downloadedFiles: [],
           skipped: collection.skipped,
         });
@@ -58,13 +56,14 @@
           type: "original-image-download-result",
           result: emptyResult,
         });
-        figma.notify("선택 범위에서 추출할 원본 이미지가 없습니다.", { timeout: 2000 });
+        figma.notify("선택 범위에서 다운로드할 원본 이미지가 없습니다.", { timeout: 2000 });
         return;
       }
 
       figma.ui.postMessage({
         type: "original-image-download-start",
-        totalCount: totalCount,
+        totalCount,
+        totalImagePaintCount: collection.totalImagePaintCount,
       });
 
       const downloadedFiles = [];
@@ -75,8 +74,8 @@
         postStatus({
           status: "prepare",
           currentCount: index + 1,
-          totalCount: totalCount,
-          message: '"' + entry.displayName + '" 원본 이미지를 준비하는 중입니다.',
+          totalCount,
+          message: `"${entry.displayName}" 원본 이미지를 준비하는 중입니다.`,
         });
 
         try {
@@ -89,34 +88,21 @@
           const extension = detectImageExtension(bytes);
           const mimeType = detectImageMimeType(extension);
           const fileName = buildFileName(entry, index, extension);
-          const fileRecord = {
+          const fileRecord = buildFileRecord(entry, {
             index: index + 1,
-            fileName: fileName,
-            mimeType: mimeType,
+            fileName,
+            mimeType,
             byteLength: bytes.length,
-            imageHash: entry.imageHash,
-            nodeId: entry.nodeId,
-            nodeName: entry.nodeName,
-            path: entry.path,
-            usageCount: entry.usageCount,
-          };
+          });
 
           downloadedFiles.push(fileRecord);
 
           figma.ui.postMessage({
             type: "original-image-download-file",
-            file: {
-              index: index + 1,
-              totalCount: totalCount,
-              fileName: fileName,
-              mimeType: mimeType,
-              imageHash: entry.imageHash,
-              nodeId: entry.nodeId,
-              nodeName: entry.nodeName,
-              usageCount: entry.usageCount,
-              byteLength: bytes.length,
-              bytes: bytes,
-            },
+            file: Object.assign({}, fileRecord, {
+              totalCount,
+              bytes,
+            }),
           });
         } catch (error) {
           skipped.push({
@@ -130,24 +116,21 @@
       }
 
       const result = buildResult({
-        selection: collection.selection,
-        totalFillCount: collection.totalFillCount,
-        duplicateFillCount: collection.duplicateFillCount,
-        uniqueCandidateCount: totalCount,
-        downloadedFiles: downloadedFiles,
-        skipped: skipped,
+        collection,
+        downloadedFiles,
+        skipped,
       });
 
       figma.ui.postMessage({
         type: "original-image-download-result",
-        result: result,
+        result,
       });
       notifyResult(result);
     } catch (error) {
-      const message = normalizeErrorMessage(error, "원본 이미지 추출에 실패했습니다.");
+      const message = normalizeErrorMessage(error, "원본 이미지 다운로드 준비에 실패했습니다.");
       figma.ui.postMessage({
         type: "original-image-download-error",
-        message: message,
+        message,
       });
       figma.notify(message, { error: true, timeout: 2400 });
     } finally {
@@ -158,14 +141,16 @@
   function collectOriginalImagesFromSelection() {
     const selection = Array.from(figma.currentPage.selection || []);
     if (!selection.length) {
-      throw new Error("프레임, 그룹, 레이어를 먼저 선택하세요.");
+      throw new Error("프레임, 그룹, 이미지 레이어를 먼저 선택해주세요.");
     }
 
     const uniqueEntries = [];
     const entriesByHash = {};
     const skipped = [];
     let totalFillCount = 0;
-    let duplicateFillCount = 0;
+    let totalStrokeCount = 0;
+    let totalImagePaintCount = 0;
+    let duplicateImagePaintCount = 0;
 
     for (let rootIndex = 0; rootIndex < selection.length; rootIndex += 1) {
       const root = selection[rootIndex];
@@ -183,42 +168,60 @@
           continue;
         }
 
-        const fills = getNodeFills(node);
-        for (let fillIndex = 0; fillIndex < fills.length; fillIndex += 1) {
-          const fill = fills[fillIndex];
-          if (!fill || fill.type !== "IMAGE") {
-            continue;
+        const imagePaints = collectNodeImagePaintEntries(node);
+        for (let paintIndex = 0; paintIndex < imagePaints.length; paintIndex += 1) {
+          const paintEntry = imagePaints[paintIndex];
+          totalImagePaintCount += 1;
+          if (paintEntry.paintKind === "fill") {
+            totalFillCount += 1;
+          } else if (paintEntry.paintKind === "stroke") {
+            totalStrokeCount += 1;
           }
 
-          totalFillCount += 1;
+          const usage = {
+            nodeId: node.id,
+            nodeName: safeName(node),
+            path: current.path,
+            paintKind: paintEntry.paintKind,
+            paintIndex: paintEntry.paintIndex,
+          };
 
-          if (!fill.imageHash || typeof fill.imageHash !== "string") {
+          if (!paintEntry.imageHash || typeof paintEntry.imageHash !== "string") {
             skipped.push({
               nodeId: node.id,
               nodeName: safeName(node),
               imageHash: "",
               path: current.path,
-              reason: "IMAGE fill에 imageHash가 없어 건너뛰었습니다.",
+              paintKind: paintEntry.paintKind,
+              paintIndex: paintEntry.paintIndex,
+              reason: `${paintEntry.paintKind} IMAGE paint에 imageHash가 없어 건너뜁니다.`,
             });
             continue;
           }
 
-          if (entriesByHash[fill.imageHash]) {
-            entriesByHash[fill.imageHash].usageCount += 1;
-            duplicateFillCount += 1;
+          const existing = entriesByHash[paintEntry.imageHash];
+          if (existing) {
+            existing.usageCount += 1;
+            existing.usages.push(usage);
+            existing.layerNames = collectUniqueStrings(existing.layerNames.concat([usage.nodeName]));
+            existing.paintKinds = collectUniqueStrings(existing.paintKinds.concat([usage.paintKind]));
+            duplicateImagePaintCount += 1;
             continue;
           }
 
           const entry = {
-            imageHash: fill.imageHash,
+            imageHash: paintEntry.imageHash,
             nodeId: node.id,
             nodeName: safeName(node),
             displayName: safeName(node),
             path: current.path,
             usageCount: 1,
+            usages: [usage],
+            layerNames: [usage.nodeName],
+            paintKinds: [usage.paintKind],
           };
 
-          entriesByHash[fill.imageHash] = entry;
+          entriesByHash[paintEntry.imageHash] = entry;
           uniqueEntries.push(entry);
         }
 
@@ -237,26 +240,38 @@
     }
 
     return {
-      selection: selection,
-      totalFillCount: totalFillCount,
-      duplicateFillCount: duplicateFillCount,
-      uniqueEntries: uniqueEntries,
-      skipped: skipped,
+      selection,
+      totalFillCount,
+      totalStrokeCount,
+      totalImagePaintCount,
+      duplicateFillCount: duplicateImagePaintCount,
+      duplicateImagePaintCount,
+      uniqueEntries,
+      skipped,
+    };
+  }
+
+  function buildFileRecord(entry, options) {
+    const usages = Array.isArray(entry.usages) ? entry.usages : [];
+    return {
+      index: options.index,
+      fileName: options.fileName,
+      mimeType: options.mimeType,
+      byteLength: options.byteLength,
+      imageHash: entry.imageHash,
+      nodeId: entry.nodeId,
+      nodeName: entry.nodeName,
+      path: entry.path,
+      usageCount: entry.usageCount,
+      usages: usages.slice(0, USAGE_PREVIEW_LIMIT),
+      layerNames: collectUniqueStrings(entry.layerNames).slice(0, USAGE_PREVIEW_LIMIT),
+      paintKinds: collectUniqueStrings(entry.paintKinds),
     };
   }
 
   function buildResult(options) {
-    const selection = Array.isArray(options.selection) ? options.selection : [];
-    const totalFillCount =
-      typeof options.totalFillCount === "number" && Number.isFinite(options.totalFillCount) ? options.totalFillCount : 0;
-    const duplicateFillCount =
-      typeof options.duplicateFillCount === "number" && Number.isFinite(options.duplicateFillCount)
-        ? options.duplicateFillCount
-        : 0;
-    const uniqueCandidateCount =
-      typeof options.uniqueCandidateCount === "number" && Number.isFinite(options.uniqueCandidateCount)
-        ? options.uniqueCandidateCount
-        : 0;
+    const collection = options && options.collection ? options.collection : {};
+    const selection = Array.isArray(collection.selection) ? collection.selection : [];
     const downloadedFiles = Array.isArray(options.downloadedFiles) ? options.downloadedFiles : [];
     const skipped = Array.isArray(options.skipped) ? options.skipped : [];
 
@@ -265,9 +280,12 @@
       summary: {
         selectionLabel: formatSelectionLabel(selection),
         rootCount: selection.length,
-        totalFillCount: totalFillCount,
-        uniqueCandidateCount: uniqueCandidateCount,
-        duplicateFillCount: duplicateFillCount,
+        totalFillCount: normalizeCount(collection.totalFillCount),
+        totalStrokeCount: normalizeCount(collection.totalStrokeCount),
+        totalImagePaintCount: normalizeCount(collection.totalImagePaintCount),
+        uniqueCandidateCount: normalizeCount(collection.uniqueEntries && collection.uniqueEntries.length),
+        duplicateFillCount: normalizeCount(collection.duplicateImagePaintCount),
+        duplicateImagePaintCount: normalizeCount(collection.duplicateImagePaintCount),
         downloadedCount: downloadedFiles.length,
         skippedCount: skipped.length,
       },
@@ -280,19 +298,19 @@
     const summary = result && result.summary ? result.summary : {};
     const downloadedCount = summary.downloadedCount || 0;
     const skippedCount = summary.skippedCount || 0;
-    const duplicateFillCount = summary.duplicateFillCount || 0;
+    const duplicateCount = summary.duplicateImagePaintCount || summary.duplicateFillCount || 0;
 
     if (!downloadedCount) {
-      figma.notify("추출할 수 있는 원본 이미지가 없습니다.", { timeout: 2000 });
+      figma.notify("다운로드할 수 있는 원본 이미지가 없습니다.", { timeout: 2000 });
       return;
     }
 
-    let message = "원본 이미지 " + downloadedCount + "개를 준비했습니다.";
-    if (duplicateFillCount > 0) {
-      message += " 중복 사용 " + duplicateFillCount + "건은 한 번만 내려받습니다.";
+    let message = `원본 이미지 ${downloadedCount}개를 찾았습니다. 목록에서 다운로드할 수 있습니다.`;
+    if (duplicateCount > 0) {
+      message += ` 중복 사용 ${duplicateCount}건은 한 번만 준비했습니다.`;
     }
     if (skippedCount > 0) {
-      message += " " + skippedCount + "건은 건너뛰었습니다.";
+      message += ` ${skippedCount}건은 건너뜁니다.`;
     }
     figma.notify(message, { timeout: 2600 });
   }
@@ -309,12 +327,34 @@
     });
   }
 
-  function getNodeFills(node) {
-    if (!node || !("fills" in node) || !Array.isArray(node.fills)) {
+  function collectNodeImagePaintEntries(node) {
+    const entries = [];
+    appendImagePaintEntries(entries, getNodePaints(node, "fills"), "fill");
+    appendImagePaintEntries(entries, getNodePaints(node, "strokes"), "stroke");
+    return entries;
+  }
+
+  function appendImagePaintEntries(entries, paints, paintKind) {
+    for (let index = 0; index < paints.length; index += 1) {
+      const paint = paints[index];
+      if (!paint || paint.type !== "IMAGE") {
+        continue;
+      }
+
+      entries.push({
+        paintKind,
+        paintIndex: index,
+        imageHash: paint.imageHash,
+      });
+    }
+  }
+
+  function getNodePaints(node, propertyName) {
+    if (!node || !(propertyName in node) || !Array.isArray(node[propertyName])) {
       return [];
     }
 
-    return node.fills;
+    return node[propertyName];
   }
 
   function hasChildren(node) {
@@ -393,10 +433,10 @@
     return "application/octet-stream";
   }
 
-  function buildFileName(entry, _index, extension) {
-    const baseName = sanitizeFileName(entry && entry.nodeName ? entry.nodeName : "figma-image");
+  function buildFileName(entry, index, extension) {
+    const baseName = sanitizeFileName(entry && entry.displayName ? entry.displayName : `figma-image-${index + 1}`);
     const hash = entry && typeof entry.imageHash === "string" ? entry.imageHash.slice(0, 8) : "image";
-    return baseName + "-" + hash + "." + extension;
+    return `${baseName}-${hash}.${extension}`;
   }
 
   function sanitizeFileName(value) {
@@ -414,7 +454,26 @@
       return safeName(selection[0]);
     }
 
-    return safeName(selection[0]) + " 외 " + (selection.length - 1) + "개";
+    return `${safeName(selection[0])} 외 ${selection.length - 1}개`;
+  }
+
+  function collectUniqueStrings(values) {
+    const result = [];
+    const seen = {};
+    const source = Array.isArray(values) ? values : [];
+    for (let index = 0; index < source.length; index += 1) {
+      const value = typeof source[index] === "string" ? source[index].trim() : "";
+      if (!value || seen[value]) {
+        continue;
+      }
+      seen[value] = true;
+      result.push(value);
+    }
+    return result;
+  }
+
+  function normalizeCount(value) {
+    return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
   }
 
   function safeName(node) {

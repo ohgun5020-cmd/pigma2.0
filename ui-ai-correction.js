@@ -262,36 +262,36 @@
     };
     const aiActionDescriptions = {
       aiReadDesignButton: {
-        title: "명도 대비, 폰트 크기, 터치 영역을 기준으로 현재 선택의 웹 접근성을 진단합니다.",
-        ariaLabel: "웹 접근성 진단. 명도 대비, 폰트 크기, 터치 영역을 기준으로 현재 선택의 웹 접근성을 진단합니다.",
+        title: "명도 대비, 폰트 크기, 터치 영역을 기준으로 현재 선택을 검수합니다.",
+        ariaLabel: "접근성 검수. 명도 대비, 폰트 크기, 터치 영역을 기준으로 현재 선택을 검수합니다.",
       },
       aiDesignConsistencyButton: {
-        title: "선택 화면의 색상, 타이포그래피, 여백과 제목·반복 블록·폼 규칙을 기준으로 디자인 일관성을 진단합니다.",
-        ariaLabel: "디자인 일관성. 색상, 타이포그래피, 여백과 제목, 반복 블록, 폼 규칙을 기준으로 현재 선택의 일관성을 진단합니다.",
+        title: "선택 화면의 색상, 타이포그래피, 여백과 제목·반복 블록·폼 규칙을 기준으로 디자인 일관성을 검수합니다.",
+        ariaLabel: "디자인 일관성 검수. 색상, 타이포그래피, 여백과 제목, 반복 블록, 폼 규칙을 기준으로 현재 선택의 일관성을 검수합니다.",
       },
       aiDesignConsistencyClearButton: {
-        title: "현재 선택 범위에 남아 있는 웹 접근성 진단과 디자인 일관성 Dev Mode 주석을 함께 정리합니다.",
-        ariaLabel: "디자인 진단 주석 삭제. 현재 선택 범위에 남아 있는 웹 접근성 진단과 디자인 일관성 Dev Mode 주석을 함께 정리합니다.",
+        title: "현재 선택 범위에 남아 있는 접근성/디자인 일관성 검수 주석을 함께 정리합니다.",
+        ariaLabel: "검수 주석 정리. 현재 선택 범위에 남아 있는 접근성/디자인 일관성 검수 주석을 함께 정리합니다.",
       },
       aiRegroupRenameButton: {
-        title: "맥락을 이해하고 웹용 구조 기준으로 그룹과 이름을 수정합니다.",
-        ariaLabel: "그룹과 이름 수정 웹용. 맥락을 이해하고 웹용 구조 기준으로 그룹과 이름을 수정합니다.",
+        title: "웹용 기준으로 이름과 그룹을 정리합니다.",
+        ariaLabel: "그룹과 이름 수정 웹용. 웹용 기준으로 이름과 그룹을 정리합니다.",
       },
       aiRegroupRenameHybridButton: {
         title: "맥락을 이해하고 디자인용 구조 기준으로 그룹과 이름을 수정합니다.",
         ariaLabel: "그룹과 이름 수정 디자인용. 맥락을 이해하고 디자인용 구조 기준으로 그룹과 이름을 수정합니다.",
       },
       aiTypoAuditButton: {
-        title: "맥락을 이해하고 오타 후보를 직접 수정하지 않고 Figma Dev Mode 주석 또는 결과 패널로 남깁니다.",
-        ariaLabel: "오타 검수. 맥락을 이해하고 오타 후보를 직접 수정하지 않고 Figma Dev Mode 주석 또는 결과 패널로 남깁니다.",
+        title: "오타 후보를 주석 또는 결과 패널에 남깁니다.",
+        ariaLabel: "오타 검수. 오타 후보를 주석 또는 결과 패널에 남깁니다.",
       },
       aiTypoFixButton: {
-        title: "맥락을 이해하고 오타 후보를 찾아 현재 선택의 텍스트를 직접 수정하고, 고친 부분에는 주석을 남깁니다.",
-        ariaLabel: "오타 자동 수정. 맥락을 이해하고 오타 후보를 찾아 현재 선택의 텍스트를 직접 수정하고, 고친 부분에는 주석을 남깁니다.",
+        title: "오타 후보를 직접 수정하고 주석을 남깁니다.",
+        ariaLabel: "오타 자동 수정. 오타 후보를 직접 수정하고 주석을 남깁니다.",
       },
       aiPixelPerfectButton: {
-        title: "레이어와 각종 수치 데이터의 소수점 보정 대상을 AI로 판독해 정수 스냅으로 교정합니다.",
-        ariaLabel: "픽셀 교정. 레이어와 각종 수치 데이터의 소수점 보정 대상을 AI로 판독해 정수 스냅으로 교정합니다.",
+        title: "소수점 보정 대상을 정수로 교정합니다.",
+        ariaLabel: "픽셀 교정. 소수점 보정 대상을 정수로 교정합니다.",
       },
       aiDeleteHiddenLayersButton: {
         title: "현재 선택 내부의 숨겨진 레이어를 정리하기 위한 준비 단계입니다.",
@@ -449,7 +449,7 @@
     const setReadButtonBusy = (busy) => {
       isReadingDesign = busy;
       elements.readButton.disabled = busy;
-      elements.readButton.textContent = busy ? "웹 접근성 진단 중..." : "웹 접근성 진단";
+      elements.readButton.textContent = busy ? "접근성 검수 중..." : "접근성 검수";
       elements.readButton.setAttribute("aria-busy", busy ? "true" : "false");
       syncIssueButtonsBusyState();
     };
@@ -471,15 +471,15 @@
 
     const formatAnalyzedAt = (isoString) => {
       if (typeof isoString !== "string" || !isoString) {
-        return "마지막 진단 없음";
+        return "마지막 검수 없음";
       }
 
       const date = new Date(isoString);
       if (!Number.isFinite(date.getTime())) {
-        return "마지막 진단 없음";
+        return "마지막 검수 없음";
       }
 
-      return `마지막 진단 ${date.toLocaleString("ko-KR", {
+      return `마지막 검수 ${date.toLocaleString("ko-KR", {
         month: "2-digit",
         day: "2-digit",
         hour: "2-digit",
@@ -649,12 +649,12 @@
       setReadButtonBusy(false);
       setIssueApplyBusy("");
       setStatus("idle", "대기");
-      elements.panelTitle.textContent = "웹 접근성 진단 준비";
-      elements.panelCopy.textContent = "진단 결과와 즉시 적용 가능한 접근성 수정안을 여기에 표시합니다.";
-      elements.analyzedAt.textContent = "마지막 진단 없음";
+      elements.panelTitle.textContent = "접근성 검수 준비";
+      elements.panelCopy.textContent = "검수 결과와 즉시 적용 가능한 접근성 수정안을 여기에 표시합니다.";
+      elements.analyzedAt.textContent = "마지막 검수 없음";
       elements.selectionSummary.textContent = "프레임, 그룹, 레이어를 선택한 뒤 실행하세요.";
       elements.selectionNote.textContent =
-        "명도 대비, 폰트 크기, 터치 영역을 기준으로 문제를 찾고 초록색 주석과 즉시 적용 버튼을 함께 제공합니다.";
+        "대비, 폰트, 터치 영역 문제를 주석과 적용 버튼으로 표시합니다.";
       fillMetric(elements.rootCount, 0);
       fillMetric(elements.layerCount, 0);
       fillMetric(elements.textCount, 0);
@@ -664,8 +664,8 @@
       elements.layerBreakdownValue.textContent = "대비 대기";
       elements.namingValue.textContent = "폰트 대기";
       elements.pixelValue.textContent = "터치 영역 대기";
-      elements.styleValue.textContent = "진단 대기";
-      elements.insightMeta.textContent = "진단 대기";
+      elements.styleValue.textContent = "검수 대기";
+      elements.insightMeta.textContent = "검수 대기";
       renderIssueList(null);
     };
 
@@ -673,8 +673,8 @@
       setReadButtonBusy(false);
       setIssueApplyBusy("");
       setStatus("error", "오류");
-      elements.panelTitle.textContent = "웹 접근성 진단 실패";
-      elements.panelCopy.textContent = message || "웹 접근성 진단에 실패했습니다.";
+      elements.panelTitle.textContent = "접근성 검수 실패";
+      elements.panelCopy.textContent = message || "접근성 검수에 실패했습니다.";
       elements.selectionSummary.textContent = message || "선택을 확인한 뒤 다시 시도하세요.";
       elements.selectionNote.textContent = "선택된 레이어가 없거나 읽을 수 없는 경우 이 안내가 표시됩니다.";
 
@@ -691,7 +691,7 @@
         elements.styleValue.textContent = "재시도 필요";
         elements.insightMeta.textContent = "재시도 필요";
         elements.insightList.replaceChildren();
-        appendIssuePlaceholder("다시 진단해 주세요", "선택을 다시 확인하고 웹 접근성 진단 버튼을 한 번 더 눌러주세요.");
+        appendIssuePlaceholder("다시 검수해 주세요", "선택을 다시 확인하고 접근성 검수 버튼을 한 번 더 눌러주세요.");
       }
     };
 
@@ -719,13 +719,13 @@
       setStatus(matchesCurrentSelection ? "ready" : "stale", statusLabel);
       elements.panelTitle.textContent = matchesCurrentSelection
         ? issueCount > 0
-          ? "웹 접근성 진단 완료"
-          : "웹 접근성 기준 통과"
-        : "최근 진단 불러옴";
+          ? "접근성 검수 완료"
+          : "접근성 기준 통과"
+        : "최근 검수 불러옴";
       elements.panelCopy.textContent = issueCount
         ? `문제 ${issueCount}건을 찾았고, ${fixableCount}건은 버튼에서 바로 적용할 수 있습니다.`
         : "즉시 수정이 필요한 접근성 이슈를 찾지 못했습니다.";
-      elements.analyzedAt.textContent = `${formatAnalyzedAt(result.analyzedAt)} · ${summary.aiStatusLabel || "로컬 진단"}`;
+      elements.analyzedAt.textContent = `${formatAnalyzedAt(result.analyzedAt)} · ${summary.aiStatusLabel || "로컬 검수"}`;
       elements.selectionSummary.textContent = `${summary.selectionLabel || "선택"} · ${summary.contextLabel || "일반 UI 화면"}`;
       elements.selectionNote.textContent = `${formatBounds(result.selectionBounds)} · 텍스트 ${
         stats.textNodeCount || 0
@@ -758,9 +758,9 @@
 
       setIssueApplyBusy("");
       setReadButtonBusy(true);
-      setStatus("running", "진단 중");
-      elements.panelTitle.textContent = "웹 접근성 진단 중";
-      elements.panelCopy.textContent = "현재 선택을 기준으로 명도 대비, 폰트 크기, 터치 영역을 분석하고 있습니다.";
+      setStatus("running", "검수 중");
+      elements.panelTitle.textContent = "접근성 검수 중";
+      elements.panelCopy.textContent = "대비, 폰트, 터치 영역을 분석하고 있습니다.";
       postPluginMessage({ type: "run-ai-design-read" });
     });
 
@@ -779,7 +779,7 @@
       setReadButtonBusy(true);
       setStatus("running", "적용 중");
       elements.panelTitle.textContent = "수정안 적용 중";
-      elements.panelCopy.textContent = "선택한 제안을 적용한 뒤 다시 진단하고 있습니다.";
+      elements.panelCopy.textContent = "선택한 제안을 적용한 뒤 다시 검수하고 있습니다.";
       postPluginMessage({
         type: "run-ai-design-read-apply-fix",
         issueId,
@@ -828,7 +828,7 @@
         if (message.status === "running") {
           setReadButtonBusy(true);
           setIssueApplyBusy("");
-          setStatus("running", "진단 중");
+          setStatus("running", "검수 중");
           return;
         }
 
@@ -904,20 +904,20 @@
       ariaLabel: "디자인 읽기. AI로 디자인을 전반적으로 이해하고 데이터를 캐시에 저장합니다.",
     },
     aiRegroupRenameButton: {
-      title: "맥락을 이해하고 웹용 구조 기준으로 그룹과 이름을 수정합니다.",
-      ariaLabel: "그룹과 이름 수정 웹용. 맥락을 이해하고 웹용 구조 기준으로 그룹과 이름을 수정합니다.",
+      title: "웹용 기준으로 이름과 그룹을 정리합니다.",
+      ariaLabel: "그룹과 이름 수정 웹용. 웹용 기준으로 이름과 그룹을 정리합니다.",
     },
     aiTypoAuditButton: {
-      title: "맥락을 이해하고 오타 후보를 직접 수정하지 않고 Figma Dev Mode 주석 또는 결과 패널로 남깁니다.",
-      ariaLabel: "오타 검수. 맥락을 이해하고 오타 후보를 직접 수정하지 않고 Figma Dev Mode 주석 또는 결과 패널로 남깁니다.",
+      title: "오타 후보를 주석 또는 결과 패널에 남깁니다.",
+      ariaLabel: "오타 검수. 오타 후보를 주석 또는 결과 패널에 남깁니다.",
     },
     aiTypoFixButton: {
-      title: "맥락을 이해하고 오타 후보를 찾아 현재 선택의 텍스트를 직접 수정하고, 고친 부분에는 주석을 남깁니다.",
-      ariaLabel: "오타 자동 수정. 맥락을 이해하고 오타 후보를 찾아 현재 선택의 텍스트를 직접 수정하고, 고친 부분에는 주석을 남깁니다.",
+      title: "오타 후보를 직접 수정하고 주석을 남깁니다.",
+      ariaLabel: "오타 자동 수정. 오타 후보를 직접 수정하고 주석을 남깁니다.",
     },
     aiPixelPerfectButton: {
-      title: "레이어와 각종 수치 데이터의 소수점 보정 대상을 AI로 판독해 정수 스냅으로 교정합니다.",
-      ariaLabel: "픽셀 교정. 레이어와 각종 수치 데이터의 소수점 보정 대상을 AI로 판독해 정수 스냅으로 교정합니다.",
+      title: "소수점 보정 대상을 정수로 교정합니다.",
+      ariaLabel: "픽셀 교정. 소수점 보정 대상을 정수로 교정합니다.",
     },
     aiDeleteHiddenLayersButton: {
       title: "현재 선택 내부의 숨겨진 레이어를 정리하기 위한 준비 단계입니다.",
@@ -1081,15 +1081,11 @@
     document.documentElement.dataset.aiCorrectionDebugMode === "true";
 
   const syncDeveloperOnlyVisibility = () => {
-    const shouldShow = isDebugModeEnabled();
     [elements.readButton, elements.button, elements.clearButton].forEach((button) => {
-      button.hidden = !shouldShow;
-      button.setAttribute("aria-hidden", shouldShow ? "false" : "true");
-      if (shouldShow) {
-        button.removeAttribute("tabindex");
-      } else {
-        button.tabIndex = -1;
-      }
+      button.hidden = false;
+      button.removeAttribute("aria-hidden");
+      button.removeAttribute("data-dev-debug-only");
+      button.removeAttribute("tabindex");
     });
   };
 
@@ -1232,7 +1228,7 @@
     elements.analyzedAt.textContent = "마지막 읽기 없음";
     elements.selectionSummary.textContent = "프레임, 그룹, 레이어를 선택한 뒤 실행하세요.";
     elements.selectionNote.textContent =
-      "첫 버튼에서 읽은 결과는 이후 그룹과 이름 수정, 오타 자동 수정, 픽셀 퍼펙트 판단의 기반 데이터로 재사용됩니다.";
+      "읽은 결과는 다음 AI 작업에 재사용됩니다.";
     fillMetric(elements.rootCount, 0);
     fillMetric(elements.layerCount, 0);
     fillMetric(elements.textCount, 0);
@@ -1490,17 +1486,17 @@
   let lastResult = null;
   let lastRenderMode = "";
 
-  const DEFAULT_BUTTON_LABEL = "디자인 일관성";
-  const BUSY_BUTTON_LABEL = "디자인 일관성 진단 중...";
-  const CLEAR_BUTTON_LABEL = "주석 삭제";
-  const CLEAR_BUSY_BUTTON_LABEL = "주석 삭제 중...";
+  const DEFAULT_BUTTON_LABEL = "디자인 일관성 검수";
+  const BUSY_BUTTON_LABEL = "디자인 일관성 검수 중...";
+  const CLEAR_BUTTON_LABEL = "검수 주석 정리";
+  const CLEAR_BUSY_BUTTON_LABEL = "검수 주석 정리 중...";
   const CONSISTENCY_TITLE =
-    "선택 화면의 색상, 타이포그래피, 여백 규칙을 기준으로 일관성을 진단하고 파란 Dev Mode 주석으로 표시합니다.";
+    "색상, 타이포, 여백 규칙을 검수하고 주석으로 표시합니다.";
   const CONSISTENCY_ARIA =
-    "디자인 일관성. 색상, 타이포그래피, 여백과 제목, 반복 블록, 폼 규칙을 기준으로 현재 선택의 일관성을 검사합니다.";
-  const CLEAR_TITLE = "현재 선택 범위에 남아 있는 웹 접근성 진단과 디자인 일관성 Dev Mode 주석을 함께 정리합니다.";
+    "디자인 일관성 검수. 색상, 타이포, 여백 규칙을 검사합니다.";
+  const CLEAR_TITLE = "현재 선택의 검수 주석을 정리합니다.";
   const CLEAR_ARIA =
-    "디자인 진단 주석 삭제. 현재 선택 범위에 남아 있는 웹 접근성 진단과 디자인 일관성 Dev Mode 주석을 함께 정리합니다.";
+    "검수 주석 정리. 현재 선택의 접근성/디자인 일관성 주석을 정리합니다.";
 
   const fillMetric = (element, value) => {
     element.textContent = String(value);
@@ -1508,15 +1504,15 @@
 
   const formatAnalyzedAt = (isoString) => {
     if (typeof isoString !== "string" || !isoString) {
-      return "마지막 진단 없음";
+      return "마지막 검수 없음";
     }
 
     const date = new Date(isoString);
     if (!Number.isFinite(date.getTime())) {
-      return "마지막 진단 없음";
+      return "마지막 검수 없음";
     }
 
-    return `마지막 진단 ${date.toLocaleString("ko-KR", {
+    return `마지막 검수 ${date.toLocaleString("ko-KR", {
       month: "2-digit",
       day: "2-digit",
       hour: "2-digit",
@@ -1611,13 +1607,13 @@
 
   const applyClearModeLabels = () => {
     if (elements.kicker) {
-      elements.kicker.textContent = "디자인 진단";
+      elements.kicker.textContent = "검수 주석 정리";
     }
     if (elements.compactHead) {
       elements.compactHead.textContent = "주석 정리";
     }
     if (elements.compactNote) {
-      elements.compactNote.textContent = "웹 접근성 진단의 초록 주석과 디자인 일관성의 파란 주석을 함께 삭제합니다.";
+      elements.compactNote.textContent = "접근성 검수의 초록 주석과 디자인 일관성의 파란 주석을 함께 삭제합니다.";
     }
     if (elements.insightHead) {
       elements.insightHead.textContent = "정리 결과";
@@ -1640,7 +1636,7 @@
 
   const applyModeLabels = () => {
     if (elements.kicker) {
-      elements.kicker.textContent = "디자인 일관성 진단";
+      elements.kicker.textContent = "디자인 일관성 검수";
     }
     if (elements.compactHead) {
       elements.compactHead.textContent = "감지된 규칙";
@@ -1669,10 +1665,10 @@
 
   const applyAccessibilityLabels = () => {
     if (elements.kicker) {
-      elements.kicker.textContent = "웹 접근성 진단";
+      elements.kicker.textContent = "접근성 검수";
     }
     if (elements.compactHead) {
-      elements.compactHead.textContent = "진단 기준";
+      elements.compactHead.textContent = "검수 기준";
     }
     if (elements.compactNote) {
       elements.compactNote.textContent = "즉시 적용 전에 먼저 확인해 주세요.";
@@ -1772,7 +1768,7 @@
     (Array.isArray(result?.cleared) ? result.cleared : []).slice(0, 6).forEach((entry) => {
       rows.push({
         title: `정리됨 · ${entry.nodeName || "이름 없음"}`,
-        detail: `진단 주석 ${entry.removedCount || 0}건 제거 · ${formatClearBreakdown(
+        detail: `검수 주석 ${entry.removedCount || 0}건 제거 · ${formatClearBreakdown(
           entry.removedAccessibilityCount || 0,
           entry.removedConsistencyCount || 0
         )}`,
@@ -1815,11 +1811,11 @@
     lastRenderMode = "";
     applyModeLabels();
     setStatus("idle", "대기");
-    elements.panelTitle.textContent = "디자인 일관성 진단 준비";
-    elements.panelCopy.textContent = "대표 토큰과 제목, 반복 블록, 폼 규칙을 기준으로 어긋난 부분을 찾아 제안합니다.";
-    elements.analyzedAt.textContent = "마지막 진단 없음";
+    elements.panelTitle.textContent = "디자인 일관성 검수 준비";
+    elements.panelCopy.textContent = "주요 규칙에서 어긋난 부분을 찾아 제안합니다.";
+    elements.analyzedAt.textContent = "마지막 검수 없음";
     elements.selectionSummary.textContent = "프레임, 그룹, 레이어를 선택한 뒤 실행해 주세요.";
-    elements.selectionNote.textContent = "어긋난 값과 반복 블록 편차는 파란 Dev Mode 주석으로 표시하고, 가능한 항목은 즉시 적용 버튼을 제공합니다.";
+    elements.selectionNote.textContent = "편차는 Dev Mode 주석과 적용 버튼으로 표시합니다.";
     fillMetric(elements.rootCount, 0);
     fillMetric(elements.layerCount, 0);
     fillMetric(elements.textCount, 0);
@@ -1829,8 +1825,8 @@
     elements.layerBreakdownValue.textContent = "색상 대기";
     elements.namingValue.textContent = "타이포 대기";
     elements.pixelValue.textContent = "여백 대기";
-    elements.styleValue.textContent = "진단 대기";
-    elements.insightMeta.textContent = "진단 대기";
+    elements.styleValue.textContent = "검수 대기";
+    elements.insightMeta.textContent = "검수 대기";
     renderIssueList(null);
     syncButtonState();
   };
@@ -1841,8 +1837,8 @@
     activeIssueId = "";
     applyModeLabels();
     setStatus("error", "오류");
-    elements.panelTitle.textContent = "디자인 일관성 진단 실패";
-    elements.panelCopy.textContent = message || "디자인 일관성 진단에 실패했습니다.";
+    elements.panelTitle.textContent = "디자인 일관성 검수 실패";
+    elements.panelCopy.textContent = message || "디자인 일관성 검수에 실패했습니다.";
     elements.selectionSummary.textContent = message || "선택 상태를 확인한 뒤 다시 시도해 주세요.";
     elements.selectionNote.textContent = "레이아웃, 색상, 텍스트가 너무 적은 선택에서는 안내 가능한 결과가 제한될 수 있습니다.";
 
@@ -1859,7 +1855,7 @@
       elements.styleValue.textContent = "재시도 필요";
       elements.insightMeta.textContent = "재시도 필요";
       elements.insightList.replaceChildren();
-      appendPlaceholder("다시 진단해 주세요", "선택을 다시 확인하고 디자인 일관성 버튼을 눌러 주세요.");
+      appendPlaceholder("다시 검수해 주세요", "선택을 다시 확인하고 디자인 일관성 검수 버튼을 눌러 주세요.");
     }
 
     syncButtonState();
@@ -1892,9 +1888,9 @@
     setStatus(matchesCurrentSelection ? "ready" : "stale", statusLabel);
     elements.panelTitle.textContent = matchesCurrentSelection
       ? issueCount > 0
-        ? "디자인 일관성 진단 완료"
+        ? "디자인 일관성 검수 완료"
         : "디자인 일관성 기준 통과"
-      : "최근 디자인 일관성 진단";
+      : "최근 디자인 일관성 검수";
     elements.panelCopy.textContent = issueCount
       ? `문제 ${issueCount}건을 찾았고 ${fixableCount}건은 버튼에서 바로 적용할 수 있습니다.`
       : "대표 색상, 타이포, 여백 규칙에서 큰 이탈을 찾지 못했습니다.";
@@ -1953,11 +1949,11 @@
   applyClearModeLabels();
   setStatus(matchesCurrentSelection ? "ready" : "stale", matchesCurrentSelection ? "완료" : "캐시");
   elements.panelTitle.textContent = matchesCurrentSelection
-    ? "디자인 진단 주석 정리 완료"
-    : "최근 디자인 진단 주석 정리";
+    ? "검수 주석 정리 완료"
+    : "최근 검수 주석 정리";
   elements.panelCopy.textContent = removedAnnotationCount
-    ? "현재 선택 범위에 남아 있던 웹 접근성 진단과 디자인 일관성 Dev Mode 주석을 정리했습니다."
-    : "현재 선택 범위에서 삭제할 디자인 진단 주석을 찾지 못했습니다.";
+    ? "현재 선택 범위에 남아 있던 접근성/디자인 일관성 검수 주석을 정리했습니다."
+    : "현재 선택 범위에서 삭제할 검수 주석을 찾지 못했습니다.";
     elements.analyzedAt.textContent = `${formatAnalyzedAt(result.analyzedAt)} · ${summary.modeLabel || "Blue Dev Mode annotation clear"}`;
     elements.selectionSummary.textContent = `${summary.selectionLabel || "선택"} · ${summary.contextLabel || "일반 UI 화면"}`;
     elements.selectionNote.textContent = `${formatBounds(result.selectionBounds)} · 검사 레이어 ${stats.totalNodes || 0}개 · 삭제 주석 ${
@@ -1969,7 +1965,7 @@
   fillMetric(elements.fractionalCount, stats.totalNodes || 0);
   elements.languageValue.textContent = summary.selectionLabel || "선택";
   elements.contextValue.textContent = summary.contextLabel || "일반 UI 화면";
-  elements.layerBreakdownValue.textContent = summary.categoryLabel || "웹 접근성 진단 + 디자인 일관성";
+  elements.layerBreakdownValue.textContent = summary.categoryLabel || "접근성 검수 + 디자인 일관성";
   elements.namingValue.textContent = cleared.length
     ? `${cleared[0].nodeName || "이름 없음"} · ${cleared[0].removedCount || 0}건 제거 · ${formatClearBreakdown(
         cleared[0].removedAccessibilityCount || 0,
@@ -1995,11 +1991,11 @@
   lastRenderMode = "clear";
   applyClearModeLabels();
   setStatus("error", "오류");
-  elements.panelTitle.textContent = "디자인 진단 주석 정리 실패";
-  elements.panelCopy.textContent = message || "디자인 진단 주석 정리에 실패했습니다.";
+  elements.panelTitle.textContent = "검수 주석 정리 실패";
+  elements.panelCopy.textContent = message || "검수 주석 정리에 실패했습니다.";
   elements.selectionSummary.textContent = message || "선택 범위를 확인한 뒤 다시 시도해 주세요.";
   elements.selectionNote.textContent =
-    "웹 접근성 진단과 디자인 일관성 주석만 삭제하며, 현재 선택 범위에 대상이 없으면 정리할 내용이 없다고 안내합니다.";
+    "접근성 검수와 디자인 일관성 주석만 삭제하며, 현재 선택 범위에 대상이 없으면 정리할 내용이 없다고 안내합니다.";
     fillMetric(elements.rootCount, 0);
     fillMetric(elements.layerCount, 0);
     fillMetric(elements.textCount, 0);
@@ -2026,8 +2022,8 @@
     activeIssueId = "";
     applyModeLabels();
     elements.panel.open = true;
-    setStatus("running", "진단 중");
-    elements.panelTitle.textContent = "디자인 일관성 진단 중";
+    setStatus("running", "검수 중");
+    elements.panelTitle.textContent = "디자인 일관성 검수 중";
     elements.panelCopy.textContent = "대표 색상, 타이포, 여백과 제목, 반복 블록, 폼 규칙을 추론하고 어긋난 값을 찾고 있습니다.";
     syncButtonState();
     postPluginMessage({ type: "run-ai-design-consistency" });
@@ -2043,9 +2039,9 @@
   applyClearModeLabels();
   elements.panel.open = true;
   setStatus("running", "정리 중");
-  elements.panelTitle.textContent = "디자인 진단 주석 정리 중";
+  elements.panelTitle.textContent = "검수 주석 정리 중";
   elements.panelCopy.textContent =
-    "현재 선택 범위에 남아 있는 웹 접근성 진단과 디자인 일관성 Dev Mode 주석을 함께 정리하고 있습니다.";
+    "현재 선택의 검수 주석을 정리하고 있습니다.";
   syncButtonState();
   postPluginMessage({ type: "run-ai-design-consistency-clear" });
 };
@@ -2118,7 +2114,7 @@
         ? "적용 중"
         : message.status === "clearing-annotations"
           ? "정리 중"
-          : "진단 중"
+          : "검수 중"
     );
     syncButtonState();
     return;
@@ -2357,7 +2353,7 @@
     setButtonBusy(false);
     setStatus("idle", "대기");
     elements.panelTitle.textContent = "그룹과 이름 수정 준비";
-    elements.panelCopy.textContent = "웹용 구조 기준으로 그룹과 이름을 정리하고, 안전한 그룹만 제한적으로 적용합니다.";
+    elements.panelCopy.textContent = "웹용 기준으로 이름과 그룹을 정리합니다.";
     elements.processedAt.textContent = "마지막 실행 없음";
     elements.selectionSummary.textContent = "그룹과 이름 수정을 실행하면 결과가 여기에 표시됩니다.";
     elements.selectionNote.textContent = "웹용은 안전한 조합 위주로 그룹과 이름을 정리합니다.";
@@ -2410,7 +2406,7 @@
     setStatus(matchesCurrentSelection ? "ready" : "stale", matchesCurrentSelection ? "완료" : "캐시");
     elements.panelTitle.textContent = matchesCurrentSelection ? "그룹과 이름 수정 완료" : "최근 결과 불러옴";
     elements.panelCopy.textContent = matchesCurrentSelection
-      ? "웹용 구조 기준으로 그룹과 이름을 정리하고, 안전한 조합만 보수적으로 묶었습니다."
+      ? "웹용 기준으로 이름과 그룹을 정리했습니다."
       : "최근에 실행한 그룹과 이름 수정 결과를 보여주고 있습니다.";
     elements.processedAt.textContent = `${formatProcessedAt(result.processedAt)} · 로컬 적용`;
     elements.selectionSummary.textContent = `${summary.selectionLabel || "선택"} · ${summary.contextLabel || "일반 UI 화면"}`;
@@ -2465,7 +2461,7 @@
     setButtonBusy(true);
     setStatus("running", "적용 중");
     elements.panelTitle.textContent = "그룹과 이름 수정 진행 중";
-    elements.panelCopy.textContent = "웹용 구조 기준으로 그룹과 이름을 정리하고 안전한 그룹 후보를 확인하고 있습니다.";
+    elements.panelCopy.textContent = "웹용 기준으로 이름과 그룹 후보를 확인하고 있습니다.";
     postPluginMessage({ type: "run-ai-regroup-rename", namingMode: "hybrid" });
   });
 
@@ -2639,7 +2635,7 @@ window.__PIGMA_AI_CORRECTION_REGROUP_RENAME__ = {
   const setButtonBusy = (busy) => {
     isApplying = busy;
     elements.button.disabled = busy;
-    elements.button.textContent = busy ? "검수 중..." : "검수";
+    elements.button.textContent = busy ? "오타 검수 중..." : "오타 검수";
     elements.button.setAttribute("aria-busy", busy ? "true" : "false");
   };
 
@@ -2728,7 +2724,7 @@ window.__PIGMA_AI_CORRECTION_REGROUP_RENAME__ = {
           setButtonBusy(false);
           setStatus("idle", "대기");
           elements.panelTitle.textContent = "오타 검수 준비";
-          elements.panelCopy.textContent = "직접 수정하지 않고 오타 후보를 Figma Dev Mode 주석 또는 결과 패널로 남깁니다.";
+          elements.panelCopy.textContent = "오타 후보를 주석 또는 결과 패널에 남깁니다.";
           elements.processedAt.textContent = "마지막 실행 없음";
           elements.selectionSummary.textContent = "오타 검수를 실행하면 결과가 여기에 표시됩니다.";
           elements.selectionNote.textContent =
@@ -2788,8 +2784,8 @@ window.__PIGMA_AI_CORRECTION_REGROUP_RENAME__ = {
           elements.panelTitle.textContent = matchesCurrentSelection ? "오타 검수 완료" : "최근 결과 불러옴";
           elements.panelCopy.textContent = matchesCurrentSelection
             ? usesAnnotations
-              ? "텍스트를 직접 수정하지 않고 오타 후보를 Figma Dev Mode 주석으로 남겼습니다."
-              : "텍스트를 직접 수정하지 않고 오타 후보를 결과 패널에 표시했습니다."
+              ? "오타 후보를 Dev Mode 주석으로 남겼습니다."
+              : "오타 후보를 결과 패널에 표시했습니다."
             : "최근에 실행한 오타 검수 결과를 보여주고 있습니다.";
           elements.processedAt.textContent = `${formatProcessedAt(result.processedAt)} · ${modeLabel}`;
           elements.selectionSummary.textContent = `${summary.selectionLabel || "선택"} · ${summary.contextLabel || "일반 UI 화면"}`;
@@ -3084,7 +3080,7 @@ window.__PIGMA_AI_CORRECTION_REGROUP_RENAME__ = {
     elements.processedAt.textContent = "마지막 실행 없음";
     elements.selectionSummary.textContent = "오타 자동 수정을 실행하면 결과가 여기에 표시됩니다.";
     elements.selectionNote.textContent =
-      "직접 수정이 가능한 텍스트만 반영합니다. 수정된 텍스트에는 Dev Mode 주석을 남기고, 구조 제한이 있으면 건너뛴 이유를 결과 패널에 남깁니다.";
+      "수정 가능 텍스트만 반영하고 제한 항목은 결과에 남깁니다.";
     fillMetric(elements.issueCount, 0);
     fillMetric(elements.appliedCount, 0);
     fillMetric(elements.annotationCount, 0);
@@ -3409,11 +3405,11 @@ window.__PIGMA_AI_CORRECTION_TYPO_FIX__ = {
     setStatus("idle", "대기");
     elements.panelTitle.textContent = "픽셀 교정 준비";
     elements.panelCopy.textContent =
-      "0.5 단위 stroke/blur 예외값은 유지하고, 나머지 소수점 보정 대상은 AI 판독 후 정수 스냅으로 적용합니다.";
+      "0.5 예외는 유지하고 나머지는 정수로 교정합니다.";
     elements.processedAt.textContent = "마지막 실행 없음";
     elements.selectionSummary.textContent = "픽셀 교정을 실행하면 결과가 여기에 표시됩니다.";
     elements.selectionNote.textContent =
-      "후보를 찾은 뒤 AI가 올림/내림 방향을 판독하고, 적용 불가 항목과 0.5 예외값은 결과 패널에 함께 남깁니다.";
+      "AI가 보정 방향을 판단하고 제외 항목은 결과에 남깁니다.";
     fillMetric(elements.candidateCount, 0);
     fillMetric(elements.appliedCount, 0);
     fillMetric(elements.excludedCount, 0);

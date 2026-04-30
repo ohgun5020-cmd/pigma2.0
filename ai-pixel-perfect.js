@@ -83,7 +83,7 @@
 
   function getPixelPerfectTaskRunningMessage(task) {
     if (task === "clear") {
-      return "Removing pixel-perfect Dev Mode annotations from the current selection.";
+      return "\uD604\uC7AC \uC120\uD0DD \uBC94\uC704\uC758 \uD53D\uC140 \uD37C\uD399\uD2B8 Dev Mode \uC8FC\uC11D\uC744 \uC815\uB9AC\uD558\uACE0 \uC788\uC2B5\uB2C8\uB2E4.";
     }
     return "소수점 보정 후보를 분석하고 정수 스냅 적용 중입니다.";
   }
@@ -128,15 +128,15 @@
       const appliedCount = summary.appliedCount || 0;
       const excludedCount = summary.excludedCount || 0;
       const annotationCount = summary.annotationCount || 0;
-      const annotationSuffix = annotationCount > 0 ? `, annotations ${annotationCount}` : "";
+      const annotationSuffix = annotationCount > 0 ? `, \uC8FC\uC11D ${annotationCount}\uAC74` : "";
       if (appliedCount > 0) {
-        figma.notify(`Pixel perfect complete (${appliedCount} applied, ${excludedCount} excluded${annotationSuffix})`, {
+        figma.notify(`\uD53D\uC140 \uAD50\uC815 \uC644\uB8CC (${appliedCount}\uAC74 \uC801\uC6A9, ${excludedCount}\uAC74 \uC81C\uC678${annotationSuffix})`, {
           timeout: 2200,
         });
       } else if ((summary.candidateCount || 0) === 0) {
         figma.notify("픽셀 퍼팩트 후보가 없습니다.", { timeout: 1800 });
       } else {
-        figma.notify(`Pixel perfect complete (0 applied, ${excludedCount} excluded${annotationSuffix})`, {
+        figma.notify(`\uD53D\uC140 \uAD50\uC815 \uC644\uB8CC (0\uAC74 \uC801\uC6A9, ${excludedCount}\uAC74 \uC81C\uC678${annotationSuffix})`, {
           timeout: 2200,
         });
       }
@@ -153,7 +153,7 @@
 
   async function runPixelPerfectClear() {
     const runSelectionSignature = getSelectionSignature(figma.currentPage.selection);
-    postClearStatus("running", "Removing pixel-perfect Dev Mode annotations from the current selection.");
+    postClearStatus("running", "\uD604\uC7AC \uC120\uD0DD \uBC94\uC704\uC758 \uD53D\uC140 \uD37C\uD399\uD2B8 Dev Mode \uC8FC\uC11D\uC744 \uC815\uB9AC\uD558\uACE0 \uC788\uC2B5\uB2C8\uB2E4.");
 
     try {
       const result = await clearPixelPerfectAnnotations();
@@ -168,14 +168,14 @@
       const summary = result.summary || {};
       const removedAnnotationCount = summary.removedAnnotationCount || 0;
       if (removedAnnotationCount > 0) {
-        figma.notify(`Pixel perfect annotations cleared (${removedAnnotationCount} removed)`, {
+        figma.notify(`\uD53D\uC140 \uD37C\uD399\uD2B8 \uC8FC\uC11D \uC815\uB9AC \uC644\uB8CC (${removedAnnotationCount}\uAC74 \uC0AD\uC81C)`, {
           timeout: 2200,
         });
       } else {
-        figma.notify("No pixel-perfect annotations found in the current selection.", { timeout: 1800 });
+        figma.notify("\uD604\uC7AC \uC120\uD0DD \uBC94\uC704\uC5D0 \uC815\uB9AC\uD560 \uD53D\uC140 \uD37C\uD399\uD2B8 \uC8FC\uC11D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.", { timeout: 1800 });
       }
     } catch (error) {
-      const message = normalizeErrorMessage(error, "Failed to clear the pixel-perfect annotations.");
+      const message = normalizeErrorMessage(error, "\uD53D\uC140 \uD37C\uD399\uD2B8 \uC8FC\uC11D \uC815\uB9AC\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.");
       figma.ui.postMessage({
         type: "ai-pixel-perfect-clear-error",
         message,
@@ -1395,7 +1395,7 @@
       } catch (error) {
         skipped.push({
           label: safeName(node),
-          reason: normalizeErrorMessage(error, "Failed to add the pixel-perfect annotation."),
+          reason: normalizeErrorMessage(error, "\uD53D\uC140 \uD37C\uD399\uD2B8 \uC8FC\uC11D \uCD94\uAC00\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4."),
         });
       }
     }
@@ -1443,7 +1443,7 @@
 
         skipped.push({
           label: safeName(node),
-          reason: normalizeErrorMessage(error, "Failed to clear the pixel-perfect annotation."),
+          reason: normalizeErrorMessage(error, "\uD53D\uC140 \uD37C\uD399\uD2B8 \uC8FC\uC11D \uC815\uB9AC\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4."),
         });
       }
     }

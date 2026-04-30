@@ -13,6 +13,8 @@ $aiDesignConsistencyPatch = Join-Path $root "ai-design-consistency.js"
 $aiRegroupRenamePatch = Join-Path $root "ai-regroup-rename.js"
 $aiTypoAuditPatch = Join-Path $root "ai-typo-audit.js"
 $aiPixelPerfectPatch = Join-Path $root "ai-pixel-perfect.js"
+$skewTransformPatch = Join-Path $root "skew-transform.js"
+$unlockLockedLayersPatch = Join-Path $root "unlock-locked-layers.js"
 $deleteHiddenLayersPatch = Join-Path $root "delete-hidden-layers.js"
 $aiUrlShortenerPatch = Join-Path $root "ai-url-shortener.js"
 $aiColorExtractPatch = Join-Path $root "ai-color-extract.js"
@@ -89,6 +91,14 @@ if (-not (Test-Path $aiTypoAuditPatch)) {
 
 if (-not (Test-Path $aiPixelPerfectPatch)) {
   throw "Missing AI pixel perfect patch: $aiPixelPerfectPatch"
+}
+
+if (-not (Test-Path $skewTransformPatch)) {
+  throw "Missing skew transform patch: $skewTransformPatch"
+}
+
+if (-not (Test-Path $unlockLockedLayersPatch)) {
+  throw "Missing locked layer unlock patch: $unlockLockedLayersPatch"
 }
 
 if (-not (Test-Path $deleteHiddenLayersPatch)) {
@@ -214,6 +224,8 @@ $runtimeSyntaxSourceFiles = @(
   $aiRegroupRenamePatch,
   $aiTypoAuditPatch,
   $aiPixelPerfectPatch,
+  $skewTransformPatch,
+  $unlockLockedLayersPatch,
   $deleteHiddenLayersPatch,
   $aiUrlShortenerPatch,
   $aiColorExtractPatch,
@@ -361,7 +373,7 @@ if ($bundle.Contains($selectionPreviewLogicFind)) {
 }
 
 $selectionPreviewDispatchFind = 'function Ee(){let e=rr();N({type:"selection-state",state:tr(e.state)})}function le(){Qt+=1,F=null}'
-$selectionPreviewDispatchReplace = 'function Ee(){let e=selectionResolutionForUi();N({type:"selection-state",state:tr(e.state)})}function le(){Qt+=1,F=null,selectionPreviewCache=null}'
+$selectionPreviewDispatchReplace = 'function pigmaSelectionDebugState(e){try{let t=figma.currentPage.selection||[],r=t[0],o=r?f(r):"",n=r?r.type:"",i=figma.currentPage&&figma.currentPage.name?figma.currentPage.name:"";return B(b({},e),{detail:"[debug 0429 selection api=".concat(t.length," page=").concat(i," first=").concat(o||"-"," type=").concat(n||"-","] ").concat(e.detail||""),warnings:e.warnings})}catch(t){return B(b({},e),{detail:"[debug 0429 selection read error] ".concat(e.detail||"")})}}function Ee(){let e=selectionResolutionForUi();N({type:"selection-state",state:pigmaSelectionDebugState(tr(e.state))})}function le(){Qt+=1,F=null,selectionPreviewCache=null}'
 if ($bundle.Contains($selectionPreviewDispatchFind)) {
   $bundle = Replace-Exact `
     -Text $bundle `
@@ -376,7 +388,7 @@ if ($bundle.Contains($selectionPreviewDispatchFind)) {
 }
 
 $startupPreviewRequestFind = 'async function Go(e){var t;if(e.type==="request-preferences"){await zo(e.detectedLocale),Ot(),Ee();return}if(e.type==="update-preferences"){await _o(e.preferences),Ot(),Ee();return}if(e.type==="request-selection-sync"){Ee();return}'
-$startupPreviewRequestReplace = 'async function Go(e){var t,r;if(e.type==="request-preferences"){await zo(e.detectedLocale),Ot(),r=buildStartupSelectionResolution(),N({type:"selection-state",state:tr(r.state)});return}if(e.type==="update-preferences"){await _o(e.preferences),Ot(),Ee();return}if(e.type==="request-selection-sync"){Ee();return}'
+$startupPreviewRequestReplace = 'async function pigmaEnsureSelectionAccess(){if(typeof figma.loadAllPagesAsync!="function")return;try{await figma.loadAllPagesAsync()}catch(e){console.warn("[pigma] selection page access preload failed:",e)}}async function Go(e){var t,r;if(e.type==="request-preferences"){await pigmaEnsureSelectionAccess(),await zo(e.detectedLocale),Ot(),r=buildStartupSelectionResolution(),N({type:"selection-state",state:typeof pigmaSelectionDebugState=="function"?pigmaSelectionDebugState(tr(r.state)):tr(r.state)});return}if(e.type==="update-preferences"){await pigmaEnsureSelectionAccess(),await _o(e.preferences),Ot(),Ee();return}if(e.type==="request-selection-sync"){await pigmaEnsureSelectionAccess(),Ee();return}'
 if ($bundle.Contains($startupPreviewRequestFind)) {
   $bundle = Replace-Exact `
     -Text $bundle `
@@ -637,6 +649,56 @@ $psdThumbnailWriteFind = 'let u=(0,Lh.writePsdUint8Array)(i,{invalidateTextLayer
 $psdThumbnailWriteReplace = 'let u=(0,Lh.writePsdUint8Array)(i,{invalidateTextLayers:n1,noBackground:!0,generateThumbnail:!0});'
 $psdThumbnailMatteFind = 'function ex(e){var t=(0,Oe.createCanvas)(10,10),n=1;e.width>e.height?(t.width=160,t.height=Math.floor(e.height*(t.width/e.width)),n=t.width/e.width):(t.height=160,t.width=Math.floor(e.width*(t.height/e.height)),n=t.height/e.height);var r=t.getContext("2d");return r.scale(n,n),e.imageData?r.drawImage((0,Oe.imageDataToCanvas)(e.imageData),0,0):e.canvas&&r.drawImage(e.canvas,0,0),t}'
 $psdThumbnailMatteReplace = 'function ex(e){var t=(0,Oe.createCanvas)(10,10),n=1;e.width>e.height?(t.width=160,t.height=Math.floor(e.height*(t.width/e.width)),n=t.width/e.width):(t.height=160,t.width=Math.floor(e.width*(t.height/e.height)),n=t.height/e.height);var r=t.getContext("2d");return r.fillStyle="#fff",r.fillRect(0,0,t.width,t.height),r.scale(n,n),e.imageData?r.drawImage((0,Oe.imageDataToCanvas)(e.imageData),0,0):e.canvas&&r.drawImage(e.canvas,0,0),t}'
+$uiSelectionBridgeStartupFind = 'qn({type:"request-preferences",detectedLocale:w0()});m0();Le();'
+$uiSelectionBridgeStartupReplace = 'function pigmaRequestSelectionBridge(){qn({type:"request-ai-design-chat-selection"})}qn({type:"request-preferences",detectedLocale:w0()});pigmaRequestSelectionBridge();setTimeout(pigmaRequestSelectionBridge,250);setTimeout(pigmaRequestSelectionBridge,1e3);m0();Le();'
+$uiSelectionBridgeTabFind = 'D.activeTab=t,D.unavailableModalOpen=!1,Le()'
+$uiSelectionBridgeTabReplace = 'D.activeTab=t,D.unavailableModalOpen=!1,Le(),t==="main"&&pigmaRequestSelectionBridge()'
+$uiAiSelectionStateBridgeFind = 'async function KS(e){switch(e.type){case"preferences":'
+$uiAiSelectionStateBridgeReplace = 'function pigmaSelectionFromAiChat(e){let t=e&&typeof e=="object"?e:{},n=Math.max(0,Number(t.selectionCount)||0),r=Math.max(0,Math.round(Number(t.width)||0)),i=Math.max(0,Math.round(Number(t.height)||0)),a=typeof t.selectionLabel=="string"?t.selectionLabel.trim():"",o=typeof t.selectionTypeLabel=="string"?t.selectionTypeLabel.trim():"",s=!!(t.ready&&n>0);return{ready:s,selectionId:n===1&&typeof t.selectionSignature=="string"?t.selectionSignature:null,selectionCount:n,selectionName:s?a||"Selection":"",selectionType:s?o||"Selection":null,summary:s?''"''.concat(a||"Selection",''" is ready to export.''):"Select one or more frames, groups, or layers to export.",detail:s?"AI selection bridge loaded the current Figma selection for PSD export.":"The exporter is waiting for a Figma selection.",documentWidth:s&&r>0?r:null,documentHeight:s&&i>0?i:null,exportNodeCount:s?n:0,editableTextCount:0,preservedGroupCount:0,warnings:[],analysisPending:s}}function pigmaKeepAiSelection(e){return!!(D&&D.selection&&D.selection.ready&&D.selection.detail==="AI selection bridge loaded the current Figma selection for PSD export."&&e&&e.selectionCount===0)}async function KS(e){switch(e.type){case"ai-design-chat-selection":{let t=pigmaSelectionFromAiChat(e.selection);D.selection=t,D.warnings=t.warnings.slice(),D.busy||(D.statusTone=t.ready?"ready":"idle",D.statusMessage=t.ready&&t.detail.trim().length>0?t.detail:Ch(t)),Le();return}case"preferences":'
+$uiAiSelectionStateOverwriteFind = 'case"selection-state":D.selection=e.state,D.warnings=e.state.warnings.slice(),D.busy||(D.statusTone=e.state.ready?"ready":"idle",D.statusMessage=e.state.ready&&e.state.detail.trim().length>0?e.state.detail:Ch(e.state)),Le();return;'
+$uiAiSelectionStateOverwriteReplace = 'case"selection-state":if(pigmaKeepAiSelection(e.state)){Le();return}D.selection=e.state,D.warnings=e.state.warnings.slice(),D.busy||(D.statusTone=e.state.ready?"ready":"idle",D.statusMessage=e.state.ready&&e.state.detail.trim().length>0?e.state.detail:Ch(e.state)),Le();return;'
+$nativeShadowStackFind = 'function Wn(e,t,n){let r=V1(t,n);r&&(e.effects=r,e.effectsOpen=!0)}function V1(e,t){let n={scale:100},r=!1,i=e?$1(e):Tm(),a=H1(t),o=i.dropShadow.map(c=>Ph(c)).filter(Boolean),s=i.innerShadow.map(c=>Ph(c)).filter(Boolean),u=i.outerGlow.map(c=>tw(c)).filter(Boolean),l=i.innerGlow.map(c=>nw(c)).filter(Boolean);return o.length>0&&(n.dropShadow=o,r=!0),s.length>0&&(n.innerShadow=s,r=!0),u.length>0&&(n.outerGlow=u[0],r=!0),l.length>0&&(n.innerGlow=l[0],r=!0),a&&(n.stroke=[a],r=!0),r?n:null}function Tm()'
+$nativeShadowStackReplace = @'
+function Wn(e,t,n){let r=V1(t,n);r&&(e.effects=r,e.effectsOpen=!0)}
+function pigmaEffectUnitValue(e,t=0){return e&&typeof e.value=="number"?e.value:t}
+function pigmaNativeShadowOffset(e){let t=pigmaEffectUnitValue(e.distance,0),n=Number.isFinite(e.angle)?e.angle:120,r=n*Math.PI/180;return{x:-Math.cos(r)*t,y:Math.sin(r)*t}}
+function pigmaNativeShadowStack(e){let t=e.map(n=>Ph(n)).filter(Boolean);return t}
+function pigmaMergeNativeShadowStack(e){let t=0,n=0,r=0,i=0,a=0,o=0,s=0,u=0,l=0,c=0,f=e[0];for(let d of e){let p=ae(typeof d.opacity=="number"?d.opacity:1,0,1),h=pigmaEffectUnitValue(d.size,0),g=pigmaEffectUnitValue(d.distance,0),v=Math.max(.001,p*(1+h+g)),m=pigmaNativeShadowOffset(d),b=d.color||{r:0,g:0,b:0};t+=m.x*v,n+=m.y*v,r+=v,i=Math.max(i,h),a=Math.max(a,pigmaEffectUnitValue(d.choke,0)),c=Math.max(c,g),o+=p,s+=b.r*p,u+=b.g*p,l+=b.b*p}let d=ae(o/e.length,0,1),p=o>0?{r:jn(s/o),g:jn(u/o),b:jn(l/o)}:f.color,h=r>0?t/r:0,g=r>0?n/r:0,v=Math.hypot(h,g),m=c>0&&v<c*.35,b=m?0:v,y=m?Math.max(i,c+i):Math.max(i,v*.35);return Object.assign({},f,{color:p,opacity:d,angle:m?120:rw(h,g),distance:wn(b),size:wn(y),choke:wn(a),useGlobalLight:!1})}
+function pigmaNativeDropShadowList(e){return e?$1(e).dropShadow.map(t=>Ph(t)).filter(Boolean):[]}
+function pigmaRemoveDropShadowEffect(e){if(!e.effects||!e.effects.dropShadow)return;let t=Object.assign({},e.effects);delete t.dropShadow;let n=Object.keys(t).filter(r=>r!=="scale"&&t[r]!==void 0&&(!Array.isArray(t[r])||t[r].length>0));if(n.length===0){delete e.effects,delete e.effectsOpen;return}e.effects=t}
+function pigmaExplodeDropShadowLayer(e,t){return null}
+function V1(e,t){let n={scale:100},r=!1,i=e?$1(e):Tm(),a=H1(t),o=pigmaNativeShadowStack(i.dropShadow),s=pigmaNativeShadowStack(i.innerShadow),u=i.outerGlow.map(c=>tw(c)).filter(Boolean),l=i.innerGlow.map(c=>nw(c)).filter(Boolean);return o.length>0&&(n.dropShadow=o,r=!0),s.length>0&&(n.innerShadow=s,r=!0),u.length>0&&(n.outerGlow=u[0],r=!0),l.length>0&&(n.innerGlow=l[0],r=!0),a&&(n.stroke=[a],r=!0),r?n:null}
+function Tm()
+'@
+$importEffectUnitFind = 'function rt(e){if(!e||!Number.isFinite(e.value))return 0;switch(e.units){case"Points":return Number(e.value);case"Picas":return Number(e.value)*12;case"Millimeters":return Number(e.value)*72/25.4;case"Centimeters":return Number(e.value)*72/2.54;case"Inches":return Number(e.value)*72;default:return Number(e.value)}}function Zp(e,t){return Number.isFinite(e)?Number(e):t}function Zl(e)'
+$importEffectUnitReplace = 'function rt(e){if(Number.isFinite(e))return Number(e);if(!e||!Number.isFinite(e.value))return 0;let t=Number(e.value);switch(e.units){case"Points":case"Pixels":return t;case"Picas":return t*12;case"Millimeters":return t*72/25.4;case"Centimeters":return t*72/2.54;case"Inches":return t*72;default:return t}}function Zp(e,t){return Number.isFinite(e)?Number(e):t}function Zl(e)'
+$importOpacityUnitFind = 'function xS(e){let t=typeof e.name=="string"?e.name.trim():"";return t.length>0?t:"Layer"}function dr(e){return Number.isFinite(e)?Math.min(1,Math.max(0,Number(e))):1}function mo(e,t,n)'
+$importOpacityUnitReplace = 'function xS(e){let t=typeof e.name=="string"?e.name.trim():"";return t.length>0?t:"Layer"}function dr(e){let t=null;if(Number.isFinite(e))t=Number(e);else if(e&&Number.isFinite(e.value)){t=Number(e.value);let r=typeof e.units=="string"?e.units.toLowerCase():"";r.includes("percent")&&(t=t/100)}return t===null?1:Math.min(1,Math.max(0,t>1?(t<=100?t/100:t/255):t))}function mo(e,t,n)'
+$bitmapLayerNativeEffectsFind = 'let T={name:v.name,left:v.x,top:v.y,opacity:v.opacity,hidden:!v.visible,blendMode:wr(v.blendMode)};if(!(t&&v.kind==="text"))'
+$bitmapLayerNativeEffectsReplace = 'let T={name:v.name,left:v.x,top:v.y,opacity:v.opacity,hidden:!v.visible,blendMode:wr(v.blendMode)};Wn(T,v.effects,v.strokeEffect);if(!(t&&v.kind==="text"))'
+$preserveMultiShadowFind = 'function V1(e,t){let n={scale:100},r=!1,i=e?$1(e):Tm(),a=H1(t),o=i.dropShadow.map(c=>Ph(c)).filter(Boolean),s=i.innerShadow.map(c=>Ph(c)).filter(Boolean),u=i.outerGlow.map(c=>tw(c)).filter(Boolean),l=i.innerGlow.map(c=>nw(c)).filter(Boolean);return o.length>0&&(n.dropShadow=o,r=!0),s.length>0&&(n.innerShadow=s,r=!0),u.length>0&&(n.outerGlow=u[0],r=!0),l.length>0&&(n.innerGlow=l[0],r=!0),a&&(n.stroke=[a],r=!0),r?n:null}'
+$preserveMultiShadowReplace = 'function V1(e,t){let n={scale:100},r=!1,i=e?$1(e):Tm(),a=H1(t),o=pigmaNativeShadowStack(i.dropShadow),s=pigmaNativeShadowStack(i.innerShadow),u=i.outerGlow.map(c=>tw(c)).filter(Boolean),l=i.innerGlow.map(c=>nw(c)).filter(Boolean);return o.length>0&&(n.dropShadow=o,r=!0),s.length>0&&(n.innerShadow=s,r=!0),u.length>0&&(n.outerGlow=u[0],r=!0),l.length>0&&(n.innerGlow=l[0],r=!0),a&&(n.stroke=[a],r=!0),r?n:null}'
+$shadowMergeAntiCancelFind = 'function pigmaMergeNativeShadowStack(e){let t=0,n=0,r=0,i=0,a=0,o=0,s=0,u=0,l=0,c=e[0];for(let f of e){let d=ae(typeof f.opacity=="number"?f.opacity:1,0,1),p=pigmaEffectUnitValue(f.size,0),h=pigmaEffectUnitValue(f.distance,0),g=Math.max(.001,d*(1+p+h)),v=pigmaNativeShadowOffset(f),m=f.color||{r:0,g:0,b:0};t+=v.x*g,n+=v.y*g,r+=g,i=Math.max(i,p),a=Math.max(a,pigmaEffectUnitValue(f.choke,0)),o+=d,s+=m.r*d,u+=m.g*d,l+=m.b*d}let d=ae(o,0,1),p=o>0?{r:jn(s/o),g:jn(u/o),b:jn(l/o)}:c.color,h=r>0?t/r:0,g=r>0?n/r:0,v=Math.hypot(h,g);return Object.assign({},c,{color:p,opacity:d,angle:rw(h,g),distance:wn(v),size:wn(i),choke:wn(a),useGlobalLight:!1})}'
+$shadowMergeAntiCancelReplace = 'function pigmaMergeNativeShadowStack(e){let t=0,n=0,r=0,i=0,a=0,o=0,s=0,u=0,l=0,c=0,f=e[0];for(let d of e){let p=ae(typeof d.opacity=="number"?d.opacity:1,0,1),h=pigmaEffectUnitValue(d.size,0),g=pigmaEffectUnitValue(d.distance,0),v=Math.max(.001,p*(1+h+g)),m=pigmaNativeShadowOffset(d),b=d.color||{r:0,g:0,b:0};t+=m.x*v,n+=m.y*v,r+=v,i=Math.max(i,h),a=Math.max(a,pigmaEffectUnitValue(d.choke,0)),c=Math.max(c,g),o+=p,s+=b.r*p,u+=b.g*p,l+=b.b*p}let d=ae(o/e.length,0,1),p=o>0?{r:jn(s/o),g:jn(u/o),b:jn(l/o)}:f.color,h=r>0?t/r:0,g=r>0?n/r:0,v=Math.hypot(h,g),m=c>0&&v<c*.35,b=m?0:v,y=m?Math.max(i,c+i):Math.max(i,v*.35);return Object.assign({},f,{color:p,opacity:d,angle:m?120:rw(h,g),distance:wn(b),size:wn(y),choke:wn(a),useGlobalLight:!1})}'
+$shadowCarrierHelpersFind = $shadowMergeAntiCancelReplace + 'function V1(e,t){'
+$shadowCarrierHelpersReplace = $shadowMergeAntiCancelReplace + 'function pigmaNativeDropShadowList(e){return e?$1(e).dropShadow.map(t=>Ph(t)).filter(Boolean):[]}function pigmaRemoveDropShadowEffect(e){if(!e.effects||!e.effects.dropShadow)return;let t=Object.assign({},e.effects);delete t.dropShadow;let n=Object.keys(t).filter(r=>r!=="scale"&&t[r]!==void 0&&(!Array.isArray(t[r])||t[r].length>0));if(n.length===0){delete e.effects,delete e.effectsOpen;return}e.effects=t}function pigmaExplodeDropShadowLayer(e,t){return null}function V1(e,t){'
+$shadowCarrierV1Marker = 'function V1(e,t){'
+$shadowCarrierHelperBlock = 'function pigmaNativeDropShadowList(e){return e?$1(e).dropShadow.map(t=>Ph(t)).filter(Boolean):[]}function pigmaRemoveDropShadowEffect(e){if(!e.effects||!e.effects.dropShadow)return;let t=Object.assign({},e.effects);delete t.dropShadow;let n=Object.keys(t).filter(r=>r!=="scale"&&t[r]!==void 0&&(!Array.isArray(t[r])||t[r].length>0));if(n.length===0){delete e.effects,delete e.effectsOpen;return}e.effects=t}function pigmaExplodeDropShadowLayer(e,t){return null}'
+$nativeShadowStackMergedFunctionFind = 'function pigmaNativeShadowStack(e){let t=e.map(n=>Ph(n)).filter(Boolean);return t.length<=1?t:[pigmaMergeNativeShadowStack(t)]}'
+$nativeShadowStackUnmergedFunctionFind = 'function pigmaNativeShadowStack(e){let t=e.map(n=>Ph(n)).filter(Boolean);return t}'
+$nativeShadowStackPreserveFunctionReplace = 'function pigmaNativeShadowStack(e){let t=e.map(n=>Ph(n)).filter(Boolean);return t}'
+$shadowExplodeLayerFunctionFind = 'function pigmaExplodeDropShadowLayer(e,t){let n=pigmaNativeDropShadowList(e.effects);if(n.length<2||!t.canvas)return null;let r=Object.assign({},t,{name:"Content"});pigmaRemoveDropShadowEffect(r);let i=n.map((a,o)=>Object.assign({},t,{name:"Drop Shadow ".concat(o+1),opacity:t.opacity,fillOpacity:0,blendMode:"normal",effects:{scale:100,dropShadow:[a]},effectsOpen:!0}));return{name:e.name,hidden:!e.visible,blendMode:"pass through",opened:!1,children:[r,...i]}}'
+$shadowExplodeLayerFunctionDisable = 'function pigmaExplodeDropShadowLayer(e,t){return null}'
+$psdMultiEffectsLegacyFind = 'W("lrFX",xe("effects"),function(e,t,n){t.effects||(t.effects=(0,Zf.readEffects)(e)),(0,x.skipBytes)(e,n())},function(e,t){(0,Zf.writeEffects)(e,t.effects)})'
+$psdMultiEffectsLegacyReplace = 'W("lrFX",function(e){return e.effects!==void 0&&!Ml(e.effects)},function(e,t,n){t.effects||(t.effects=(0,Zf.readEffects)(e)),(0,x.skipBytes)(e,n())},function(e,t){(0,Zf.writeEffects)(e,t.effects)})'
+$shadowCarrierPushFind = 's.push(T),m();continue}return{children:s,linkedFiles:u,backgroundDebug:l,warnings:c}}function editableTextParagraphRuns'
+$shadowCarrierPushReplace = '{let M=pigmaExplodeDropShadowLayer(v,T);s.push(M||T),m();continue}}return{children:s,linkedFiles:u,backgroundDebug:l,warnings:c}}function editableTextParagraphRuns'
+$shadowCarrierBrokenPushFind = 's.push(T),m();continue}{let M=pigmaExplodeDropShadowLayer(v,T);s.push(M||T),m()}return{children:s,linkedFiles:u,backgroundDebug:l,warnings:c}}function editableTextParagraphRuns'
+$shadowCarrierBrokenPushReplace = $shadowCarrierPushReplace
+$shadowCarrierMissingLoopCloseFind = '{let M=pigmaExplodeDropShadowLayer(v,T);s.push(M||T),m();continue}return{children:s,linkedFiles:u,backgroundDebug:l,warnings:c}}function editableTextParagraphRuns'
+$shadowCarrierMissingLoopCloseReplace = $shadowCarrierPushReplace
+$editableTextMissingCloseFind = 'if(!B)throw M;T.text=void 0,T.canvas=B,c.push("\"".concat(Su(v.name),"\" text metadata could not be encoded safely (").concat(M instanceof Error?M.message:String(M),"), so it fell back to a bitmap layer."))}Wn(T,v.effects,v.strokeEffect);if(P){'
+$editableTextMissingCloseReplace = 'if(!B)throw M;T.text=void 0,T.canvas=B,c.push("\"".concat(Su(v.name),"\" text metadata could not be encoded safely (").concat(M instanceof Error?M.message:String(M),"), so it fell back to a bitmap layer."))}}Wn(T,v.effects,v.strokeEffect);if(P){'
 if ($uiBundle.Contains('invalidateTextLayers:t&&e.hasEditableText')) {
   $uiBundle = Replace-Exact `
     -Text $uiBundle `
@@ -692,6 +754,18 @@ if ($bundle.Contains($editableTextPreflightLegacyFind)) {
     -Label 'editable text preflight fallback fixed'
 }
 
+# Bitmap/image layers use the generic T canvas layer path. That path used to
+# skip native PSD layer styles, so Figma shadows survived on groups/vectors/text
+# but disappeared from Photoshop image layers as if effects never existed.
+if ($bundle.Contains($bitmapLayerNativeEffectsFind)) {
+  $bundle = Replace-Exact `
+    -Text $bundle `
+    -Find $bitmapLayerNativeEffectsFind `
+    -Replace $bitmapLayerNativeEffectsReplace `
+    -ExpectedCount 1 `
+    -Label 'bitmap layer native effects attach'
+}
+
 if ($uiBundle.Contains('function g1(e){') -and $uiBundle.Contains('function v1(')) {
   $uiBundle = Replace-Section `
     -Text $uiBundle `
@@ -733,6 +807,148 @@ if ($uiBundle.Contains($editableTextPreflightLegacyFind)) {
     -Replace $editableTextPreflightReplace `
     -ExpectedCount 1 `
     -Label 'ui editable text preflight fallback fixed'
+}
+
+if ($uiBundle.Contains($editableTextMissingCloseFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $editableTextMissingCloseFind `
+    -Replace $editableTextMissingCloseReplace `
+    -ExpectedCount 1 `
+    -Label 'ui editable text missing close repair'
+}
+
+if ($uiBundle.Contains($bitmapLayerNativeEffectsFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $bitmapLayerNativeEffectsFind `
+    -Replace $bitmapLayerNativeEffectsReplace `
+    -ExpectedCount 1 `
+    -Label 'ui bitmap layer native effects attach'
+}
+
+if ($uiBundle.Contains($uiSelectionBridgeStartupFind) -and -not $uiBundle.Contains('function pigmaRequestSelectionBridge()')) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiSelectionBridgeStartupFind `
+    -Replace $uiSelectionBridgeStartupReplace `
+    -ExpectedCount 1 `
+    -Label 'ui startup ai selection bridge request'
+}
+
+if ($uiBundle.Contains($uiSelectionBridgeTabFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiSelectionBridgeTabFind `
+    -Replace $uiSelectionBridgeTabReplace `
+    -ExpectedCount 1 `
+    -Label 'ui main tab ai selection bridge request'
+}
+
+if ($uiBundle.Contains($uiAiSelectionStateBridgeFind) -and -not $uiBundle.Contains('function pigmaSelectionFromAiChat(')) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiAiSelectionStateBridgeFind `
+    -Replace $uiAiSelectionStateBridgeReplace `
+    -ExpectedCount 1 `
+    -Label 'ui ai selection state bridge'
+}
+
+if ($uiBundle.Contains($uiAiSelectionStateOverwriteFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiAiSelectionStateOverwriteFind `
+    -Replace $uiAiSelectionStateOverwriteReplace `
+    -ExpectedCount 1 `
+    -Label 'ui ai selection empty overwrite guard'
+}
+
+if ($uiBundle.Contains($nativeShadowStackMergedFunctionFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $nativeShadowStackMergedFunctionFind `
+    -Replace $nativeShadowStackPreserveFunctionReplace `
+    -ExpectedCount 1 `
+    -Label 'ui keep merged native shadow stack entries'
+} elseif ($uiBundle.Contains($nativeShadowStackUnmergedFunctionFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $nativeShadowStackUnmergedFunctionFind `
+    -Replace $nativeShadowStackPreserveFunctionReplace `
+    -ExpectedCount 1 `
+    -Label 'ui restore merged native shadow stack entries'
+}
+
+if ($uiBundle.Contains($shadowExplodeLayerFunctionFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $shadowExplodeLayerFunctionFind `
+    -Replace $shadowExplodeLayerFunctionDisable `
+    -ExpectedCount 1 `
+    -Label 'ui disable bitmap shadow carrier split'
+}
+
+if ($uiBundle.Contains($preserveMultiShadowFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $preserveMultiShadowFind `
+    -Replace $preserveMultiShadowReplace `
+    -ExpectedCount 1 `
+    -Label 'ui preserve multiple native shadows'
+}
+
+if ($uiBundle.Contains($shadowMergeAntiCancelFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $shadowMergeAntiCancelFind `
+    -Replace $shadowMergeAntiCancelReplace `
+    -ExpectedCount 1 `
+    -Label 'ui anti-cancel native shadow merge'
+}
+
+if ($uiBundle.Contains($shadowCarrierHelpersFind) -and -not $uiBundle.Contains('function pigmaExplodeDropShadowLayer(')) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $shadowCarrierHelpersFind `
+    -Replace $shadowCarrierHelpersReplace `
+    -ExpectedCount 1 `
+    -Label 'ui native shadow carrier helpers'
+}
+
+if ((-not $uiBundle.Contains('function pigmaExplodeDropShadowLayer(')) -and $uiBundle.Contains($shadowCarrierV1Marker)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $shadowCarrierV1Marker `
+    -Replace ($shadowCarrierHelperBlock + $shadowCarrierV1Marker) `
+    -ExpectedCount 1 `
+    -Label 'ui native shadow carrier helpers before V1'
+}
+
+if ($uiBundle.Contains($shadowCarrierBrokenPushFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $shadowCarrierBrokenPushFind `
+    -Replace $shadowCarrierBrokenPushReplace `
+    -ExpectedCount 1 `
+    -Label 'ui bitmap native shadow carrier layers repair'
+}
+
+if ($uiBundle.Contains($shadowCarrierMissingLoopCloseFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $shadowCarrierMissingLoopCloseFind `
+    -Replace $shadowCarrierMissingLoopCloseReplace `
+    -ExpectedCount 1 `
+    -Label 'ui bitmap native shadow carrier loop close repair'
+}
+
+if ($uiBundle.Contains($shadowCarrierPushFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $shadowCarrierPushFind `
+    -Replace $shadowCarrierPushReplace `
+    -ExpectedCount 1 `
+    -Label 'ui bitmap native shadow carrier layers'
 }
 
 if ($uiBundle.Contains($editableTextFallbackSummaryFind)) {
@@ -785,6 +1001,58 @@ if ($uiBundle.Contains($psdThumbnailMatteFind)) {
     -Replace $psdThumbnailMatteReplace `
     -ExpectedCount 1 `
     -Label 'ui psd thumbnail matte'
+}
+
+if ($uiBundle.Contains($psdMultiEffectsLegacyFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $psdMultiEffectsLegacyFind `
+    -Replace $psdMultiEffectsLegacyReplace `
+    -ExpectedCount 1 `
+    -Label 'ui psd multi effects skip legacy lrFX'
+} elseif ($uiBundle.Contains($psdMultiEffectsLegacyReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI PSD multi effects legacy lrFX guard.'
+}
+
+if ($uiBundle.Contains($nativeShadowStackFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $nativeShadowStackFind `
+    -Replace $nativeShadowStackReplace `
+    -ExpectedCount 1 `
+    -Label 'ui native shadow stack flattening'
+} elseif ($uiBundle.Contains('function pigmaNativeShadowStack(')) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI native shadow stack flattening.'
+}
+
+if ($uiBundle.Contains($importEffectUnitFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $importEffectUnitFind `
+    -Replace $importEffectUnitReplace `
+    -ExpectedCount 1 `
+    -Label 'ui psd import effect unit normalization'
+} elseif ($uiBundle.Contains('function rt(e){if(Number.isFinite(e))return Number(e);')) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI PSD import effect unit normalization.'
+}
+
+if ($uiBundle.Contains($importOpacityUnitFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $importOpacityUnitFind `
+    -Replace $importOpacityUnitReplace `
+    -ExpectedCount 1 `
+    -Label 'ui psd import opacity unit normalization'
+} elseif ($uiBundle.Contains('function dr(e){let t=null;if(Number.isFinite(e))')) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI PSD import opacity unit normalization.'
 }
 
 if ($uiBundle.Contains($editableTextRootFallbackFind)) {
@@ -1060,7 +1328,7 @@ $bundle = Replace-Exact `
 # documentchange handler. Keep startup immediate, then enable document tracking
 # asynchronously only when that preload succeeds.
 $documentChangeBootstrapFind = 'figma.on("selectionchange",()=>{vt()});figma.on("currentpagechange",()=>{vt(!0)});figma.on("documentchange",()=>{figma.currentPage.selection.length>0&&vt(!0)});figma.ui.onmessage=e=>{Dt.handleUiMessage(e)};vt(!0);'
-$documentChangeBootstrapReplace = 'figma.on("selectionchange",()=>{vt()});figma.on("currentpagechange",()=>{vt(!0)});figma.ui.onmessage=e=>{Dt.handleUiMessage(e)};async function initDocumentChangeTracking(){if(typeof figma.loadAllPagesAsync!="function")return;try{await figma.loadAllPagesAsync(),figma.on("documentchange",()=>{figma.currentPage.selection.length>0&&vt(!0)})}catch(e){console.warn("[pigma] documentchange tracking disabled:",e)}}initDocumentChangeTracking();'
+$documentChangeBootstrapReplace = 'figma.on("selectionchange",()=>{typeof pigmaEnsureSelectionAccess=="function"?pigmaEnsureSelectionAccess().finally(()=>vt(!0)):vt(!0)});figma.on("currentpagechange",()=>{typeof pigmaEnsureSelectionAccess=="function"?pigmaEnsureSelectionAccess().finally(()=>vt(!0)):vt(!0)});figma.ui.onmessage=e=>{Dt.handleUiMessage(e)};(typeof pigmaEnsureSelectionAccess=="function"?pigmaEnsureSelectionAccess():Promise.resolve()).finally(()=>{vt(!0);setTimeout(()=>{vt(!0)},250)});async function initDocumentChangeTracking(){if(typeof figma.loadAllPagesAsync!="function")return;try{await figma.loadAllPagesAsync(),figma.on("documentchange",()=>{figma.currentPage.selection.length>0&&vt(!0)})}catch(e){console.warn("[pigma] documentchange tracking disabled:",e)}}initDocumentChangeTracking();'
 if ($bundle.Contains($documentChangeBootstrapFind)) {
   $bundle = Replace-Exact `
     -Text $bundle `
@@ -1075,14 +1343,14 @@ if ($bundle.Contains($documentChangeBootstrapFind)) {
 }
 
 $startupBootstrapFind = 'figma.on("selectionchange",()=>{vt()});figma.on("currentpagechange",()=>{vt(!0)});figma.ui.onmessage=e=>{Dt.handleUiMessage(e)};vt(!0);'
-$startupBootstrapReplace = 'figma.on("selectionchange",()=>{vt()});figma.on("currentpagechange",()=>{vt(!0)});figma.ui.onmessage=e=>{Dt.handleUiMessage(e)};'
+$startupBootstrapReplace = 'figma.on("selectionchange",()=>{typeof pigmaEnsureSelectionAccess=="function"?pigmaEnsureSelectionAccess().finally(()=>vt(!0)):vt(!0)});figma.on("currentpagechange",()=>{typeof pigmaEnsureSelectionAccess=="function"?pigmaEnsureSelectionAccess().finally(()=>vt(!0)):vt(!0)});figma.ui.onmessage=e=>{Dt.handleUiMessage(e)};(typeof pigmaEnsureSelectionAccess=="function"?pigmaEnsureSelectionAccess():Promise.resolve()).finally(()=>{vt(!0);setTimeout(()=>{vt(!0)},250)});'
 if ($bundle.Contains($startupBootstrapFind)) {
   $bundle = Replace-Exact `
     -Text $bundle `
     -Find $startupBootstrapFind `
     -Replace $startupBootstrapReplace `
     -ExpectedCount 1 `
-    -Label 'startup bootstrap without eager selection sync'
+    -Label 'startup bootstrap eager selection sync'
 } elseif ($bundle.Contains($startupBootstrapReplace)) {
   # Already patched in this bundle variant.
 } else {
@@ -1142,6 +1410,13 @@ $bundle = Replace-Section `
 
 $bundle = Replace-Section `
   -Text $bundle `
+  -StartMarker 'async function xr(' `
+  -EndMarker 'function Xe(' `
+  -Replacement 'async function xr(e,t){var n,i;let r=e.type==="TEXT"&&(n=ge(e,!1))!=null?n:v(e);if(!r)return t.warnings.add(''"''.concat(f(e),''" was skipped because it has no exportable bounds.'')),null;let a=oa(e),s=a!=null&&a.warning?a.warning:null;s&&t.warnings.add(s);let l=await hr(e,t,null),u=l.effects,c=_(u),p=me(e),g=progressiveBlurShouldRasterize(u),y=Re(e)?Nr(e):null,m=(e.type==="LINE"||e.type==="VECTOR")&&!!p&&!(y!=null&&y.fill),h=a||u||p||c?g?{normalizePaintOpacity:(a==null?void 0:a.normalizePaintOpacity)===!0,normalizePaintBlendMode:(a==null?void 0:a.normalizePaintBlendMode)===!0}:{normalizePaintOpacity:(a==null?void 0:a.normalizePaintOpacity)===!0,normalizePaintBlendMode:(a==null?void 0:a.normalizePaintBlendMode)===!0,removeSupportedEffects:l.removeSupportedEffects||!!c,removeSupportedStroke:!!p&&!m}:void 0,T=g?((i=v(e))!=null?i:r):a||u||p||c?((i=tt(e))!=null?i:r):r;if(t.longFrameMode&&pe(e)&&De(r)){t.currentLeaf+=1,Y(t,f(e));let C=await pt(e,r,h,t.documentBounds);return t.warnings.add(Te(f(e),C.length)),Be(e.id,f(e),e.type,a?a.effectiveOpacity:j(e),e.visible,at(a?a.effectiveBlendMode:K(e)),C)}g&&t.warnings.add(''"''.concat(f(e),''" kept its progressive blur as a bitmap layer for closer Photoshop matching.''));let E=await Me(e,t,T,h);return E?{kind:"bitmap",id:e.id,name:f(e),sourceType:e.type,opacity:a?a.effectiveOpacity:j(e),visible:e.visible,blendMode:at(a?a.effectiveBlendMode:K(e)),effects:g?null:u,strokeEffect:g||m?null:p,x:E.x,y:E.y,width:E.width,height:E.height,nodeTransform:de(e,t.documentBounds,E.x,E.y),pngBytes:E.pngBytes}:null}' `
+  -Label 'safe layered bitmap live effects export'
+
+$bundle = Replace-Section `
+  -Text $bundle `
   -StartMarker 'async function ct(' `
   -EndMarker 'async function Cn(' `
   -Replacement 'async function ct(e,t,r=null){var i,a,s;if(t.hiddenLayerMode==="ignore-hidden"&&!q(e))return null;let o=e.type==="TEXT"?await Hn(e):null;if(o&&!o.ok)return t.warnings.add(o.reason),await Cn(e,t);let n=Fe(e);if(n==="group"){let l=e,u=await gr(l,t,(i=Ut(l))!=null?i:r);if(u.length>0)return t.preservedGroupCount+=1,{kind:"group",id:e.id,name:f(e),sourceType:e.type,opacity:j(e),visible:e.visible,blendMode:K(e),effects:null,strokeEffect:null,mask:containerMask(l,t.documentBounds,t.root),children:u}}if(n==="split"){let l=await kn(e,t,(a=Ut(e))!=null?a:r);if(l)return t.preservedGroupCount+=1,l;let u=await gr(e,t,r);if(u.length>0)return t.warnings.add("\"".concat(f(e),"\" could not separate its background cleanly, so it preserved the child layers without a synthetic background.")),t.preservedGroupCount+=1,{kind:"group",id:e.id,name:f(e),sourceType:e.type,opacity:j(e),visible:e.visible,blendMode:K(e),effects:null,strokeEffect:null,mask:containerMask(e,t.documentBounds,t.root),children:u};t.warnings.add("\"".concat(f(e),"\" could not separate its background cleanly, so it was flattened."))}if(progressiveBlurShouldRasterize(L(e,t.root)))return await qn(e,t,r);if(e.type==="TEXT"&&t.settings.textExportMode!=="rasterize-text"){let l=await Gn(e,t,r);if(l)return _(l.effects)||(t.editableTextCount+=1),l}if(Re(e)){let l=(s=ft(e))!=null?s:v(e),u=!t.longFrameMode?await pigmaExportMultiFillGroup(e,t,r,l):null;if(u)return t.preservedGroupCount+=1,u;if(t.longFrameMode&&!!l&&Ne(d(l.width),d(l.height),!1))t.warnings.add(jo(f(e)));else{let c=await Jn(e,t);if(c)return c;t.warnings.add("\"".concat(f(e),"\" could not keep its SVG/vector data, so it fell back to a bitmap layer."))}}if(V(e)&&e.children.length>0){let l=L(e);_(l)?t.warnings.add(Mr(e,"past")):ze(e)?t.warnings.add(Ir(e,"past")):$e(l)?t.warnings.add(Rr(e,"past")):Pt(l)?t.warnings.add(Ar(e,"past")):t.warnings.add(Br(e,"past"))}return await qn(e,t,r)}' `
@@ -1159,6 +1434,8 @@ $aiDesignConsistencyPatchContent = [System.IO.File]::ReadAllText($aiDesignConsis
 $aiRegroupRenamePatchContent = [System.IO.File]::ReadAllText($aiRegroupRenamePatch, [System.Text.Encoding]::UTF8)
 $aiTypoAuditPatchContent = [System.IO.File]::ReadAllText($aiTypoAuditPatch, [System.Text.Encoding]::UTF8)
 $aiPixelPerfectPatchContent = [System.IO.File]::ReadAllText($aiPixelPerfectPatch, [System.Text.Encoding]::UTF8)
+$skewTransformPatchContent = [System.IO.File]::ReadAllText($skewTransformPatch, [System.Text.Encoding]::UTF8)
+$unlockLockedLayersPatchContent = [System.IO.File]::ReadAllText($unlockLockedLayersPatch, [System.Text.Encoding]::UTF8)
 $deleteHiddenLayersPatchContent = [System.IO.File]::ReadAllText($deleteHiddenLayersPatch, [System.Text.Encoding]::UTF8)
 $aiUrlShortenerPatchContent = [System.IO.File]::ReadAllText($aiUrlShortenerPatch, [System.Text.Encoding]::UTF8)
 $aiColorExtractPatchContent = [System.IO.File]::ReadAllText($aiColorExtractPatch, [System.Text.Encoding]::UTF8)
@@ -1180,6 +1457,8 @@ $patchedRuntimeParts = @(
   $aiRegroupRenamePatchContent,
   $aiTypoAuditPatchContent,
   $aiPixelPerfectPatchContent,
+  $skewTransformPatchContent,
+  $unlockLockedLayersPatchContent,
   $deleteHiddenLayersPatchContent,
   $aiUrlShortenerPatchContent,
   $aiColorExtractPatchContent,

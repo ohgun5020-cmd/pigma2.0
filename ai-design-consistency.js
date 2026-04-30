@@ -274,8 +274,8 @@
       analyzedAt: new Date().toISOString(),
       selectionBounds: result.selectionBounds || null,
       summary: {
-        selectionLabel: summary.selectionLabel || "?좏깮",
-        contextLabel: summary.contextLabel || "?쇰컲 UI ?붾㈃",
+        selectionLabel: summary.selectionLabel || "선택",
+        contextLabel: summary.contextLabel || "일반 UI 화면",
         aiStatusLabel: "주석 정리",
         aiProviderLabel: "",
         aiModelLabel: "",

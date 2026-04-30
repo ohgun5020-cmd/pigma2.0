@@ -15,11 +15,15 @@
   figma.ui.onmessage = async (message) => {
     if (isDeleteHiddenLayersMessage(message)) {
       if (isRunning) {
-        postStatus("running", "숨겨진 레이어 삭제가 이미 진행 중입니다.");
+        postStatus("running", "\uC228\uACA8\uC9C4 \uB808\uC774\uC5B4 \uC0AD\uC81C\uAC00 \uC774\uBBF8 \uC9C4\uD589 \uC911\uC785\uB2C8\uB2E4.");
         return;
       }
 
-      await runDeleteHiddenLayers();
+      if (message.type === "request-delete-hidden-layers-preview") {
+        await runDeleteHiddenLayersPreview();
+      } else {
+        await runDeleteHiddenLayers();
+      }
       return;
     }
 
@@ -29,7 +33,35 @@
   globalScope.__PIGMA_DELETE_HIDDEN_LAYERS_PATCH__ = true;
 
   function isDeleteHiddenLayersMessage(message) {
-    return !!message && message.type === "run-delete-hidden-layers";
+    return (
+      !!message &&
+      (message.type === "request-delete-hidden-layers-preview" || message.type === "run-delete-hidden-layers")
+    );
+  }
+
+  async function runDeleteHiddenLayersPreview() {
+    isRunning = true;
+    postStatus("running", "\uC0AD\uC81C\uD560 \uC228\uACA8\uC9C4 \uB808\uC774\uC5B4\uB97C \uD655\uC778\uD558\uACE0 \uC788\uC2B5\uB2C8\uB2E4.");
+
+    try {
+      const result = previewHiddenLayersInSelection();
+      figma.ui.postMessage({
+        type: "delete-hidden-layers-preview",
+        result,
+      });
+    } catch (error) {
+      const message = normalizeErrorMessage(
+        error,
+        "\uC228\uACA8\uC9C4 \uB808\uC774\uC5B4 \uD655\uC778\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4."
+      );
+      figma.ui.postMessage({
+        type: "delete-hidden-layers-preview-error",
+        message,
+      });
+      figma.notify(message, { error: true, timeout: 2200 });
+    } finally {
+      isRunning = false;
+    }
   }
 
   async function runDeleteHiddenLayers() {
@@ -112,6 +144,24 @@
     });
   }
 
+  function previewHiddenLayersInSelection() {
+    const selection = Array.from(figma.currentPage.selection || []);
+    if (!selection.length) {
+      throw new Error("\uD504\uB808\uC784, \uADF8\uB8F9, \uB808\uC774\uC5B4\uB97C \uBA3C\uC800 \uC120\uD0DD\uD558\uC138\uC694.");
+    }
+
+    const candidates = collectHiddenDescendants(selection);
+
+    return buildResult({
+      selection,
+      deleted: [],
+      skipped: [],
+      candidates,
+      candidateCount: candidates.length,
+      removedNodeCount: sumCandidateSubtreeSize(candidates),
+    });
+  }
+
   function collectHiddenDescendants(selection) {
     const results = [];
     const stack = [];
@@ -172,6 +222,7 @@
     const selection = Array.isArray(options.selection) ? options.selection : [];
     const deleted = Array.isArray(options.deleted) ? options.deleted : [];
     const skipped = Array.isArray(options.skipped) ? options.skipped : [];
+    const candidates = Array.isArray(options.candidates) ? options.candidates : [];
     const candidateCount =
       typeof options.candidateCount === "number" && Number.isFinite(options.candidateCount) ? options.candidateCount : 0;
     const removedNodeCount =
@@ -189,6 +240,13 @@
         skippedCount: skipped.length,
         removedNodeCount,
       },
+      candidates: candidates.slice(0, RESULT_PREVIEW_LIMIT).map((entry) => ({
+        nodeId: entry.nodeId,
+        nodeName: entry.nodeName,
+        nodeType: entry.nodeType,
+        path: entry.path,
+        removedLayerCount: entry.subtreeSize,
+      })),
       deleted: deleted.slice(0, RESULT_PREVIEW_LIMIT),
       skipped: skipped.slice(0, RESULT_PREVIEW_LIMIT),
     };
@@ -247,6 +305,18 @@
     }
 
     return count;
+  }
+
+  function sumCandidateSubtreeSize(candidates) {
+    if (!Array.isArray(candidates) || !candidates.length) {
+      return 0;
+    }
+
+    return candidates.reduce((total, entry) => {
+      const subtreeSize =
+        entry && typeof entry.subtreeSize === "number" && Number.isFinite(entry.subtreeSize) ? entry.subtreeSize : 0;
+      return total + subtreeSize;
+    }, 0);
   }
 
   function formatSelectionLabel(selection) {

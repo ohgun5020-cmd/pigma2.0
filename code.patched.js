@@ -1,4 +1,4 @@
-"use strict";(()=>{var so=Object.defineProperty,lo=Object.defineProperties;var uo=Object.getOwnPropertyDescriptors;var Ct=Object.getOwnPropertySymbols;var co=Object.prototype.hasOwnProperty,po=Object.prototype.propertyIsEnumerable;var kt=(e,t,r)=>t in e?so(e,t,{enumerable:!0,configurable:!0,writable:!0,value:r}):e[t]=r,b=(e,t)=>{for(var r in t||(t={}))co.call(t,r)&&kt(e,r,t[r]);if(Ct)for(var r of Ct(t))po.call(t,r)&&kt(e,r,t[r]);return e},B=(e,t)=>lo(e,uo(t));var A={psdVersion:"max-compatibility",textExportMode:"editable-text",imageExportMode:"bitmap-only",hiddenLayerMode:"ignore-hidden",exportPackageMode:"psd-only",fileNamePattern:"{frame-name}.psd"},$={psdVersion:"max-compatibility",textExportMode:"editable-text",imageExportMode:"smart-object-if-possible",hiddenLayerMode:"ignore-hidden",exportPackageMode:"psd-only",fileNamePattern:"{frame-name}.psd"},U={psdVersion:"max-compatibility",textExportMode:"rasterize-text",imageExportMode:"smart-object-if-possible",hiddenLayerMode:"ignore-hidden",exportPackageMode:"psd-only",fileNamePattern:"{frame-name}.psd"},H={psdVersion:"max-compatibility",textExportMode:"rasterize-text",imageExportMode:"bitmap-only",hiddenLayerMode:"ignore-hidden",exportPackageMode:"psd-only",fileNamePattern:"{frame-name}.psd"},Mt="ko",ne={locale:Mt,localeMode:"auto",exportSettings:A};function It(e){return e?B(b({},e),{imageExportMode:e.imageExportMode===U.imageExportMode?A.imageExportMode:e.imageExportMode}):{}}function Rt(e){if(!e)return{};let t=typeof e.fileNamePattern=="string"&&e.fileNamePattern.trim().length>0?e.fileNamePattern.trim():H.fileNamePattern,r=e.psdVersion==="max-compatibility"?e.psdVersion:H.psdVersion,o=e.textExportMode==="editable-text"||e.textExportMode==="rasterize-text"?e.textExportMode:H.textExportMode,n=e.imageExportMode==="smart-object-if-possible"||e.imageExportMode==="bitmap-only"?e.imageExportMode:H.imageExportMode;return r!==H.psdVersion||o!==H.textExportMode||n!==H.imageExportMode||t!==H.fileNamePattern?e:B(b({},e),{imageExportMode:A.imageExportMode})}function At(e){if(!e)return{};let t=typeof e.fileNamePattern=="string"&&e.fileNamePattern.trim().length>0?e.fileNamePattern.trim():$.fileNamePattern,r=e.psdVersion==="max-compatibility"?e.psdVersion:$.psdVersion,o=e.textExportMode==="editable-text"||e.textExportMode==="rasterize-text"?e.textExportMode:$.textExportMode,n=e.imageExportMode==="smart-object-if-possible"||e.imageExportMode==="bitmap-only"?e.imageExportMode:$.imageExportMode;return r!==$.psdVersion||o!==$.textExportMode||n!==$.imageExportMode||t!==$.fileNamePattern?e:B(b({},e),{imageExportMode:A.imageExportMode})}function Lt(e){if(!e)return{};let t=typeof e.fileNamePattern=="string"&&e.fileNamePattern.trim().length>0?e.fileNamePattern.trim():U.fileNamePattern,r=e.psdVersion==="max-compatibility"?e.psdVersion:U.psdVersion,o=e.textExportMode==="editable-text"||e.textExportMode==="rasterize-text"?e.textExportMode:U.textExportMode,n=e.imageExportMode==="smart-object-if-possible"||e.imageExportMode==="bitmap-only"?e.imageExportMode:U.imageExportMode;return r!==U.psdVersion||o!==U.textExportMode||n!==U.imageExportMode||t!==U.fileNamePattern?e:B(b({},e),{textExportMode:A.textExportMode})}function Ft(e){let t=e!=null?e:{};return{psdVersion:t.psdVersion==="max-compatibility"?t.psdVersion:A.psdVersion,textExportMode:t.textExportMode==="editable-text"||t.textExportMode==="rasterize-text"?t.textExportMode:A.textExportMode,imageExportMode:t.imageExportMode==="smart-object-if-possible"||t.imageExportMode==="bitmap-only"?t.imageExportMode:A.imageExportMode,hiddenLayerMode:t.hiddenLayerMode==="preserve-hidden"||t.hiddenLayerMode==="ignore-hidden"?t.hiddenLayerMode:A.hiddenLayerMode,exportPackageMode:t.exportPackageMode==="bundle-with-rasters"||t.exportPackageMode==="psd-only"?t.exportPackageMode:A.exportPackageMode,fileNamePattern:typeof t.fileNamePattern=="string"&&t.fileNamePattern.trim().length>0?t.fileNamePattern.trim():A.fileNamePattern}}var fo={"?대낫???뚯씪???ш린???쒖떆?⑸땲??":"내보내기 파일이 여기에 표시됩니다.","?꾨젅???먮뒗 ?덉씠?대? ?좏깮?섏꽭??":"프레임 또는 레이어를 선택하세요.","?몄뀡 ?쒖옉":"세션 시작","?좏깮 ?湲?以묒엯?덈떎.":"선택 대기 중입니다.","PSD 留뚮뱾湲?以鍮?以묒엯?덈떎.":"PSD 만들기 준비 중입니다.","PSD 留뚮뱾湲??묒뾽??吏꾪뻾 以묒엯?덈떎.":"PSD 만들기 작업이 진행 중입니다.","PSD 媛?몄삤湲?以鍮?以묒엯?덈떎.":"PSD 가져오기 준비 중입니다.","PSD ???筌띻퀣肉?揶쎛?紐꾩궎疫?餓Β??餓λ쵐???덈뼄.":"PSD 파일들을 선택했습니다.","PSD 揶쎛?紐꾩궎疫?餓Β??餓λ쵐???덈뼄.":"PSD 파일을 선택했습니다.","PSD 媛?몄삤湲곗뿉 ?ㅽ뙣?덉뒿?덈떎.":"PSD 가져오기에 실패했습니다.","PSD 媛?몄삤湲??ㅽ뙣":"PSD 가져오기 실패","PSD 媛?몄삤湲??쒖옉":"PSD 가져오기 시작","PSD 臾띠쓬 ?꾨즺":"PSD 묶음 완료","PSD 鈺곌퀡????쎈솭":"PSD 조립 실패","PSD 議곕┰ ?ㅽ뙣":"PSD 조립 실패","PSD 議곕┰ 以묒엯?덈떎.":"PSD 조립 중입니다.","?????용┛ ??쎈솭":"플러그인 패널 오류","?⑥씪 ?⑹꽦 ?대?吏":"단일 합성 이미지","?꾨젅?? 洹몃９, ?덉씠?대? 癒쇱? ?좏깮?섏꽭??":"프레임, 그룹, 레이어를 먼저 선택하세요.","?꾨즺":"완료","?꾩옱 ?좏깮?쇰줈 PSD ?뚯씪??留뚮벊?덈떎.":"현재 선택으로 PSD 파일을 만듭니다.","?꾪뿕 硫붾え":"위험 메모","?紐꾩춿 揶쎛????용뮞??鈺곌퀡?????쎈솭????筌?PSD嚥??袁れ넎??뤿???щ빍??":"편집 가능한 텍스트 조립이 실패해 대체 PSD로 전환했습니다.","?泥?PSD ?ы븿":"대체 PSD 포함","?대낫?닿린 ?꾨즺":"내보내기 완료","?대낫?닿린 ?명듃 ?꾨즺":"내보내기 세트 완료","?대낫?닿린 ?ㅽ뙣":"내보내기 실패","?덉씠??援ъ“ ?좎?":"레이어 구조 유지","?됰슢??怨? UI?癒?퐣 筌ㅼ뮇伊???쇱뒲嚥≪뮆諭??얜씈???餓Β??쑵釉?쭪? 筌륁궢六??щ빍??":"브라우저 UI에서 최종 다운로드 묶음을 준비하지 못했습니다.","?됰슢??怨? UI?癒?퐣 PSD 鈺곌퀡?????쎈솭??됰뮸??덈뼄.":"브라우저 UI에서 PSD 조립에 실패했습니다.","?뚮윭洹몄씤":"플러그인","?띿뒪???꾨낫":"텍스트 후보","?몄뀡 湲곕줉???ш린???쒖떆?⑸땲??":"세션 기록이 여기에 표시됩니다.","?몄쭛 媛???띿뒪??議곕┰???ㅽ뙣???泥?PSD濡??꾪솚?섏뿀?듬땲??":"편집 가능한 텍스트 조립이 실패해 대체 PSD로 전환했습니다.","?명듃":"세트","?명솚??硫붾え媛 ?ш린???쒖떆?⑸땲??":"호환성 메모가 여기에 표시됩니다.","?붾쾭洹?異붿쟻???ш린???쒖떆?⑸땲??":"디버그 추적이 여기에 표시됩니다.","?쒓컙 ?놁쓬":"시간 없음","?쒖쇅 ??異붿텧":"제외 후 추출","?얜씈??餓Β????쎈솭":"다운로드 오류","?ㅻ쪟":"오류","?щ윭 猷⑦듃 ?ш린":"여러 루트 크기","?ъ쟾 ?먭? ?붾㈃.":"사전 점검 화면.","?ъ쟾 ?먭?.":"사전 점검.","1珥?誘몃쭔":"1초 미만","理쒓렐 ?대낫?닿린 ?놁쓬":"최근 내보내기 없음","理쒓렐 ?뚯씪???ш린???쒖떆?⑸땲??":"최근 파일이 여기에 표시됩니다.","寃쎄퀬 ?놁쓬":"경고 없음","諛곌꼍 異붿쟻 ?놁쓬":"배경 추적 없음","釉뚮씪?곗? UI?먯꽌 理쒖쥌 ?ㅼ슫濡쒕뱶 臾띠쓬??以鍮꾪븯吏 紐삵뻽?듬땲??":"브라우저 UI에서 최종 다운로드 묶음을 준비하지 못했습니다.","釉뚮씪?곗? UI?먯꽌 PSD 議곕┰???ㅽ뙣?덉뒿?덈떎.":"브라우저 UI에서 PSD 조립에 실패했습니다.","臾띠쓬 以鍮??ㅽ뙣":"묶음 준비 실패","濡쒓렇 ?놁쓬":"로그 없음","異붿텧 ???④? ?좎?":"추출 후 숨김 유지","PNG+JPG ?ы븿":"PNG+JPG 포함","?щ윭 PSD瑜? ?좏깮?섎㈃ ?꾩뿉?? ?꾨옒濡? ?먮룞 ?대?留곗뿬 媛?몄샃?덈떎.":"여러 PSD를 선택하면 한 페이지 안에 아래로 자동 이어 붙여 가져옵니다.","?쇨렇留덈줈 媛?몄삤湲?":"피그마로 가져오기"},Da=Object.entries(fo).reduce((e,[t,r])=>{let o=e.get(r);return o?o.push(t):e.set(r,[t]),e},new Map),mo={"PSD 媛?몄삤湲??꾨즺":"PSD 가져오기 완료","PSD 揶쎛?紐꾩궎疫꿸퀣肉???쎈솭??됰뮸??덈뼄.":"PSD 가져오기에 실패했습니다.","PSD ?⑹꽦 ?대?吏瑜?李얠? 紐삵뻽?듬땲??":"PSD 합성 이미지를 찾지 못했습니다.","PSD ??밴쉐 ???筌왖??筌≪뼚? 筌륁궢六??щ빍??":"PSD 합성 이미지를 찾지 못했습니다.","媛?몄삱 ???덈뒗 PSD ?뚯씪???놁뒿?덈떎.":"가져올 수 있는 PSD 파일이 없습니다.","媛?몄삱 ???덈뒗 PSD ?덉씠?대? 李얠? 紐삵뻽?듬땲??":"가져올 수 있는 PSD 레이어를 찾지 못했습니다.","吏?먯븯吏 ?딆뒗 PSD 諛곗튂 諛⑹떇?낅땲??":"지원하지 않는 PSD 배치 방식입니다.","蹂듭썝 媛?ν븳 PSD ?덉씠?닿? ?놁뼱 ?⑹꽦 ?대?吏 ???μ쑝濡?媛?몄샃?덈떎.":"복원 가능한 PSD 레이어가 없어 합성 이미지 한 장으로 가져옵니다."},Bt={"Select one or more frames, groups, or layers to export.":{ko:"내보낼 프레임, 그룹 또는 레이어를 하나 이상 선택하세요.",ja:"書き出すフレーム、グループ、またはレイヤーを1つ以上選択してください。","zh-CN":"请选择一个或多个要导出的画板、组或图层。"},"The exporter keeps editable text where possible, and multiple selected roots are packaged into a ZIP archive.":{ko:"가능한 경우 편집 가능한 텍스트를 유지하며, 여러 루트를 선택하면 ZIP 묶음으로 준비됩니다.",ja:"可能な限り編集可能テキストを保持し、複数のルートを選択すると ZIP にまとめられます。","zh-CN":"会在可能时保留可编辑文本，选择多个根节点时会打包为 ZIP。"},"This selection cannot be exported by Figma.":{ko:"이 선택 항목은 Figma에서 내보낼 수 없습니다.",ja:"この選択項目は Figma で書き出せません。","zh-CN":"此选择内容无法通过 Figma 导出。"},"Try a visible frame, group, text layer, or image layer.":{ko:"보이는 프레임, 그룹, 텍스트 레이어 또는 이미지 레이어를 선택해보세요.",ja:"表示されているフレーム、グループ、テキストレイヤー、または画像レイヤーを試してください。","zh-CN":"请尝试选择可见的画板、组、文本图层或图像图层。"},"This selection does not have exportable bounds.":{ko:"이 선택 항목에는 내보낼 수 있는 경계가 없습니다.",ja:"この選択項目には書き出し可能な境界がありません。","zh-CN":"此选择内容没有可导出的边界。"},"No exportable content was found inside this selection.":{ko:"이 선택 안에서 내보낼 수 있는 콘텐츠를 찾지 못했습니다.",ja:"この選択内に書き出し可能なコンテンツが見つかりませんでした。","zh-CN":"在此选择中未找到可导出的内容。"},"Masks or empty containers can still block export. Hidden layers can be preserved or ignored from the export defaults.":{ko:"마스크나 빈 컨테이너도 내보내기를 막을 수 있습니다. 숨김 레이어는 내보내기 기본값에서 유지하거나 무시할 수 있습니다.",ja:"マスクや空のコンテナも書き出しを妨げることがあります。非表示レイヤーは書き出しデフォルトで保持または無視できます。","zh-CN":"蒙版或空容器也可能阻止导出。隐藏图层可在导出默认值中保留或忽略。"},"Editable text is preserved when fills and typography are compatible. Hidden layers can be ignored or included as hidden PSD layers.":{ko:"채우기와 타이포그래피가 호환되면 편집 가능한 텍스트를 유지합니다. 숨김 레이어는 무시하거나 PSD 안에서 숨김 상태로 포함할 수 있습니다.",ja:"塗りとタイポグラフィが互換なら編集可能テキストを保持します。非表示レイヤーは無視することも、PSDで非表示のまま含めることもできます。","zh-CN":"当填充和排版兼容时会保留可编辑文本。隐藏图层可以忽略，也可以作为隐藏的 PSD 图层包含。"},"Text export is currently set to rasterize text, so text layers will export as bitmap layers until you change the export defaults.":{ko:"현재 텍스트 내보내기 설정이 비트맵 고정으로 되어 있어, 내보내기 기본값을 바꾸기 전까지 텍스트 레이어는 비트맵 레이어로 내보내집니다.",ja:"現在のテキスト書き出し設定はラスタライズ固定のため、書き出しデフォルトを変更するまでテキストレイヤーはビットマップレイヤーとして書き出されます。","zh-CN":"当前文本导出设置为栅格化文本，因此在更改导出默认值之前，文本图层都会导出为位图图层。"},"Each selected root is exported as its own PSD file. When more than one file is ready, the download is packaged as a ZIP archive.":{ko:"선택한 각 루트는 개별 PSD 파일로 내보내집니다. 두 개 이상 준비되면 ZIP으로 묶어 다운로드합니다.",ja:"選択した各ルートは個別の PSD ファイルとして書き出されます。2つ以上になると ZIP にまとめてダウンロードします。","zh-CN":"每个选中的根节点都会导出为单独的 PSD 文件。准备好的文件超过一个时会打包为 ZIP 下载。"},"An unknown error happened while building the PSD.":{ko:"PSD를 구성하는 중 알 수 없는 오류가 발생했습니다.",ja:"PSD の生成中に不明なエラーが発生しました。","zh-CN":"构建 PSD 时发生未知错误。"},"Unable to calculate document bounds for the selected root.":{ko:"선택한 루트의 문서 경계를 계산할 수 없습니다.",ja:"選択したルートのドキュメント境界を計算できません。","zh-CN":"无法计算所选根节点的文档边界。"},"No exportable layers remain after ignoring hidden layers.":{ko:"숨김 레이어를 제외하고 나면 내보낼 수 있는 레이어가 남지 않습니다.",ja:"非表示レイヤーを除外すると、書き出し可能なレイヤーが残りません。","zh-CN":"忽略隐藏图层后，没有剩余可导出的图层。"},"There are no visible exportable layers inside this selection.":{ko:"이 선택 안에는 보이는 내보내기 가능 레이어가 없습니다.",ja:"この選択内には表示されている書き出し可能レイヤーがありません。","zh-CN":"此选择中没有可见的可导出图层。"},"The exporter could not produce any PSD layers from this selection.":{ko:"이 선택에서 PSD 레이어를 생성하지 못했습니다.",ja:"この選択から PSD レイヤーを生成できませんでした。","zh-CN":"无法从此选择生成任何 PSD 图层。"},"Missing composite raster bytes for bundle packaging.":{ko:"묶음 패키징에 필요한 합성 래스터 바이트가 없습니다.",ja:"バンドル作成に必要な合成ラスターのバイトがありません。","zh-CN":"缺少用于打包的合成栅格字节数据。"},"Document bounds are required to place PSD vector paths.":{ko:"PSD 벡터 경로를 배치하려면 문서 경계가 필요합니다.",ja:"PSD のベクターパスを配置するにはドキュメント境界が必要です。","zh-CN":"放置 PSD 矢量路径需要文档边界。"},"Expected an SVG root element.":{ko:"SVG 루트 요소가 필요합니다.",ja:"SVG のルート要素が必要です。","zh-CN":"需要 SVG 根元素。"},"Invalid SVG matrix() transform.":{ko:"유효하지 않은 SVG matrix() 변환입니다.",ja:"無効な SVG matrix() 変換です。","zh-CN":"无效的 SVG matrix() 变换。"},"Invalid SVG rect dimensions.":{ko:"유효하지 않은 SVG rect 크기입니다.",ja:"無効な SVG rect サイズです。","zh-CN":"无效的 SVG rect 尺寸。"},"Raster smart object blur export requires Layer Blur metadata.":{ko:"래스터 스마트 오브젝트 블러 내보내기에는 Layer Blur 메타데이터가 필요합니다.",ja:"ラスターのスマートオブジェクトぼかしを書き出すには Layer Blur のメタデータが必要です。","zh-CN":"导出栅格智能对象模糊需要 Layer Blur 元数据。"},"Shape vector export requires a solid fill.":{ko:"도형 벡터 내보내기에는 단색 채우기가 필요합니다.",ja:"シェイプのベクター書き出しには単色塗りが必要です。","zh-CN":"形状矢量导出需要纯色填充。"},"The SVG did not contain any shape paths.":{ko:"SVG 안에 도형 경로가 없습니다.",ja:"SVG にシェイプパスが含まれていませんでした。","zh-CN":"SVG 中不包含任何形状路径。"},"The SVG path started without a command.":{ko:"SVG 경로가 명령 없이 시작되었습니다.",ja:"SVG パスがコマンドなしで開始されました。","zh-CN":"SVG 路径在没有命令的情况下开始。"},"The SVG viewBox was empty.":{ko:"SVG viewBox가 비어 있습니다.",ja:"SVG の viewBox が空でした。","zh-CN":"SVG viewBox 为空。"},"The exported SVG did not have an <svg> root.":{ko:"내보낸 SVG에 <svg> 루트가 없습니다.",ja:"書き出された SVG に <svg> ルートがありませんでした。","zh-CN":"导出的 SVG 没有 <svg> 根节点。"},"Unexpected end of SVG path data.":{ko:"SVG 경로 데이터가 예상보다 일찍 끝났습니다.",ja:"SVG パスデータが途中で終了しました。","zh-CN":"SVG 路径数据意外结束。"}},xo=[{pattern:/^Export failed for "(.+)" \((\d+)\/(\d+)\): (.+)$/,replace:(e,t)=>({ko:'"'.concat(t[1],'" 내보내기에 실패했습니다. (').concat(t[2],"/").concat(t[3],"): ").concat(w(e,t[4])),ja:'"'.concat(t[1],'" の書き出しに失敗しました。(').concat(t[2],"/").concat(t[3],"): ").concat(w(e,t[4])),"zh-CN":'"'.concat(t[1],'" 导出失败。(').concat(t[2],"/").concat(t[3],"): ").concat(w(e,t[4]))})[e]},{pattern:/^PSD ready: (\d+) layers, (\d+) editable text layers$/,replace:(e,t)=>({ko:"PSD 준비됨: 레이어 ".concat(t[1],"개, 편집 가능 텍스트 ").concat(t[2],"개"),ja:"PSD の準備完了: レイヤー ".concat(t[1],"枚、編集可能テキスト ").concat(t[2],"件"),"zh-CN":"PSD 已准备好：".concat(t[1]," 个图层，").concat(t[2]," 个可编辑文本图层")})[e]},{pattern:/^(\d+) PSD files are ready\. The download will be packaged as a ZIP archive\.$/,replace:(e,t)=>({ko:"PSD ".concat(t[1],"개가 준비되었습니다. 다운로드는 ZIP 묶음으로 제공됩니다."),ja:"PSD が ".concat(t[1]," 個準備できました。ダウンロードは ZIP にまとめられます。"),"zh-CN":"".concat(t[1]," 个 PSD 已准备好。下载内容将打包为 ZIP。")})[e]},{pattern:/^(\d+) roots selected: (\d+) PSD layers, (\d+) editable text layers, (\d+) preserved groups\.$/,replace:(e,t)=>({ko:"".concat(t[1],"개 루트 선택됨: PSD 레이어 ").concat(t[2],"개, 편집 가능 텍스트 ").concat(t[3],"개, 유지된 그룹 ").concat(t[4],"개"),ja:"".concat(t[1]," 個のルートを選択: PSD レイヤー ").concat(t[2]," 枚、編集可能テキスト ").concat(t[3]," 件、保持されたグループ ").concat(t[4]," 件"),"zh-CN":"已选择 ".concat(t[1]," 个根节点：").concat(t[2]," 个 PSD 图层，").concat(t[3]," 个可编辑文本图层，").concat(t[4]," 个保留的组")})[e]},{pattern:/^"(.+)" is ready: (\d+) PSD layers, (\d+) editable text layers, (\d+) preserved groups\.$/,replace:(e,t)=>({ko:'"'.concat(t[1],'" 준비 완료: PSD 레이어 ').concat(t[2],"개, 편집 가능 텍스트 ").concat(t[3],"개, 유지된 그룹 ").concat(t[4],"개"),ja:'"'.concat(t[1],'" の準備完了: PSD レイヤー ').concat(t[2]," 枚、編集可能テキスト ").concat(t[3]," 件、保持されたグループ ").concat(t[4]," 件"),"zh-CN":"“".concat(t[1],"”已就绪：").concat(t[2]," 个 PSD 图层，").concat(t[3]," 个可编辑文本图层，").concat(t[4]," 个保留的组")})[e]},{pattern:/^"(.+)" is not ready for batch export\.$/,replace:(e,t)=>({ko:'"'.concat(t[1],'"은(는) 일괄 내보내기 준비가 되지 않았습니다.'),ja:'"'.concat(t[1],'" は一括書き出しの準備ができていません。'),"zh-CN":"“".concat(t[1],"”尚未准备好进行批量导出。")})[e]},{pattern:/^"(.+)" could not separate its background cleanly, so it was flattened\.$/,replace:(e,t)=>({ko:'"'.concat(t[1],'"의 배경을 깔끔하게 분리하지 못해 평면화되었습니다.'),ja:'"'.concat(t[1],'" の背景をきれいに分離できなかったため、フラット化されました。'),"zh-CN":"无法干净地分离“".concat(t[1],"”的背景，因此已被扁平化。")})[e]},{pattern:/^"(.+)" could not keep its SVG\/vector data, so it fell back to a bitmap layer\.$/,replace:(e,t)=>({ko:'"'.concat(t[1],'"의 SVG/벡터 데이터를 유지하지 못해 비트맵 레이어로 대체되었습니다.'),ja:'"'.concat(t[1],'" の SVG/ベクターデータを保持できず、ビットマップレイヤーにフォールバックしました。'),"zh-CN":"“".concat(t[1],"”无法保留 SVG/矢量数据，因此回退为位图图层。")})[e]},{pattern:/^"(.+)" could not be reconstructed as a PSD mask\.$/,replace:(e,t)=>({ko:'"'.concat(t[1],'"을(를) PSD 마스크로 복원하지 못했습니다.'),ja:'"'.concat(t[1],'" を PSD マスクとして再構築できませんでした。'),"zh-CN":"无法将“".concat(t[1],"”重建为 PSD 蒙版。")})[e]},{pattern:/^"(.+)" uses masking and will export as a flattened bitmap layer\.$/,replace:(e,t)=>({ko:'"'.concat(t[1],'"은(는) 마스킹을 사용하므로 평면화된 비트맵 레이어로 내보내집니다.'),ja:'"'.concat(t[1],'" はマスクを使用しているため、フラット化されたビットマップレイヤーとして書き出されます。'),"zh-CN":"“".concat(t[1],"”使用了蒙版，因此会导出为扁平化的位图图层。")})[e]},{pattern:/^"(.+)" uses Layer Blur, so it will preserve the blur as a Photoshop Smart Filter and rasterize the text instead of keeping an editable text layer\.$/,replace:(e,t)=>({ko:'"'.concat(t[1],'"은(는) Layer Blur를 사용하므로 블러는 Photoshop 스마트 필터로 유지되고, 텍스트는 편집 가능한 레이어 대신 래스터화됩니다.'),ja:'"'.concat(t[1],'" は Layer Blur を使用しているため、ぼかしは Photoshop のスマートフィルターとして保持され、テキストは編集可能レイヤーではなくラスタライズされます。'),"zh-CN":"“".concat(t[1],"”使用了 Layer Blur，因此模糊会保留为 Photoshop 智能滤镜，而文本会被栅格化，不再保留为可编辑文本图层。")})[e]},{pattern:/^"(.+)" uses both layer and image-fill blend modes, so only the layer blend stayed editable in the PSD\.$/,replace:(e,t)=>({ko:'"'.concat(t[1],'"은(는) 레이어와 이미지 채우기 블렌드 모드를 함께 사용하므로 PSD에서는 레이어 블렌드만 편집 가능한 상태로 유지되었습니다.'),ja:'"'.concat(t[1],'" はレイヤーと画像塗りの両方にブレンドモードを使っているため、PSD ではレイヤーブレンドのみが編集可能なまま保持されました。'),"zh-CN":"“".concat(t[1],"”同时使用了图层与图像填充混合模式，因此在 PSD 中只有图层混合保留为可编辑。")})[e]},{pattern:/^Unable to encode (.+) preview in the browser UI\.$/,replace:(e,t)=>({ko:"브라우저 UI에서 ".concat(t[1]," 미리보기를 인코딩할 수 없습니다."),ja:"ブラウザ UI で ".concat(t[1]," プレビューをエンコードできません。"),"zh-CN":"无法在浏览器 UI 中编码 ".concat(t[1]," 预览。")})[e]}];function Gt(e,t=Mt){if(!e)return t;let r=e.trim().toLowerCase();return r==="ko"||r.startsWith("ko-")?"ko":r==="ja"||r.startsWith("ja-")?"ja":r==="en"||r.startsWith("en-")?"en":r==="es"||r.startsWith("es-")?"es":r==="zh"||r==="zh-cn"||r==="zh-hans"||r.startsWith("zh-cn")||r.startsWith("zh-hans")?"zh-CN":t}function go(e){var t;return(t=mo[e])!=null?t:e}function w(e,t){var i;if(!t)return t;let r=go(t);if(e==="ko"||e==="en")return r;let o=(i=Bt[r])!=null?i:Bt[t];if(o){let a=o[e];if(a)return a}if(e==="es")return r;for(let a of xo){let s=a.pattern.exec(r);if(s)return a.replace(e,s)}let n=r.match(/^([^:]+): (.+)$/);if(n){let a=w(e,n[2]);if(a!==n[2])return"".concat(n[1],": ").concat(a)}return r}var Xt={disableShapePreviewCanvas:!1,forceBitmapVectorPreview:!1,disableEditableTextPreview:!1,disableLayerBlur:!1,disableProgressiveLayerBlur:!1,disableBackgroundBlur:!1,disableNoise:!1,disableTexture:!1},ho=new Set(["COMPONENT","COMPONENT_SET","FRAME","INSTANCE","SECTION","TEXT"]),yo=new Set(["GROUP","SECTION","FRAME","COMPONENT","COMPONENT_SET","INSTANCE"]),So=new Set(["GROUP","FRAME","SECTION","COMPONENT","INSTANCE"]),bo=["fontName","fontSize","lineHeight","letterSpacing","fills","textDecoration","textCase"],Kt=["fontName"],je=new Map,We=null,Ze=null,O=b({},Xt),Eo=80,Po=70,No=70,To=12e6,Do=6e3,vo=12e6,wo=4e3,Co=8e6,ko=4e6,Bo=512,Yt=2048,Mo=1e4,Io=16e6,Ro=8e3,Ao=12e6,Lo={monotone:{primaryAlphaScale:.64,secondaryAlphaScale:1,overlayOpacityScale:1},duotone:{primaryAlphaScale:.56,secondaryAlphaScale:.48,overlayOpacityScale:1},multitone:{primaryAlphaScale:1,secondaryAlphaScale:1,overlayOpacityScale:.6}},qt="pigma:ui-preferences:v2",Fo="pigma:ui-preferences:v1",Jt="pigma:ui-preferences-flags:v1",S={closePlugin:()=>{figma.closePlugin()},notify:(e,t)=>figma.notify(e,t),postToUi:()=>{}},P=ne,G={},be=null,F=null,selectionPreviewCache=null,Qt=0;function er(e){return S=b(b({},S),e),{handleUiMessage:Go,invalidateSelectionCache:le,postSelectionState:Ee}}async function Go(e){var t,r;if(e.type==="request-preferences"){await zo(e.detectedLocale),Ot(),r=buildStartupSelectionResolution(),N({type:"selection-state",state:tr(r.state)});return}if(e.type==="update-preferences"){await _o(e.preferences),Ot(),Ee();return}if(e.type==="request-selection-sync"){Ee();return}if(e.type==="request-export"){await Qo(e.hiddenLayerMode,Tt(e.settings),e.includeCompositePng===!0,e.developerExportExperiments);return}if(e.type==="request-next-export-root"){await se();return}if(e.type==="request-import"){await en(e.payload);return}if(e.type==="request-import-batch"){await tn(e.batch);return}e.type==="close-plugin"&&((t=S.closePlugin)==null||t.call(S))}function N(e){S.postToUi(e)}function ae(e,t){console.info("[pigma-export][plugin]",b({stage:e},t))}function Oo(e){let t=e!=null?e:{};return{disableShapePreviewCanvas:t.disableShapePreviewCanvas===!0,forceBitmapVectorPreview:t.forceBitmapVectorPreview===!0,disableEditableTextPreview:t.disableEditableTextPreview===!0,disableLayerBlur:t.disableLayerBlur===!0,disableProgressiveLayerBlur:t.disableProgressiveLayerBlur===!0,disableBackgroundBlur:t.disableBackgroundBlur===!0,disableNoise:t.disableNoise===!0,disableTexture:t.disableTexture===!0}}function Uo(e){return O=Oo(e),O}function Qe(){O=b({},Xt)}function Ot(){N({type:"preferences",preferences:P})}function Ee(){let e=selectionResolutionForUi();N({type:"selection-state",state:tr(e.state)})}function le(){Qt+=1,F=null,selectionPreviewCache=null}async function zo(e){let t=Ho(e);try{G=$o(await figma.clientStorage.getAsync(Jt))}catch(r){G={}}try{let r=await figma.clientStorage.getAsync(qt);if(r!=null)P=Pe(r,t,!1,G.imageExportModeExplicit!==!0,G.textExportModeExplicit!==!0);else{let o=await figma.clientStorage.getAsync(Fo);P=Pe(o,t,!0,G.imageExportModeExplicit!==!0,G.textExportModeExplicit!==!0)}await et()}catch(r){G={},P=Pe(null,t),await et()}}async function _o(e){var t,r;if(e.exportSettings){let o=Object.prototype.hasOwnProperty.call(e.exportSettings,"imageExportMode"),n=Object.prototype.hasOwnProperty.call(e.exportSettings,"textExportMode");(o||n)&&(G=b(b(b({},G),o?{imageExportModeExplicit:!0}:{}),n?{textExportModeExplicit:!0}:{}))}P=Pe({locale:(t=e.locale)!=null?t:P.locale,localeMode:(r=e.localeMode)!=null?r:P.localeMode,exportSettings:e.exportSettings?b(b({},P.exportSettings),e.exportSettings):P.exportSettings}),await et()}async function et(){try{await figma.clientStorage.setAsync(qt,P),await figma.clientStorage.setAsync(Jt,G)}catch(e){}}function Pe(e,t=null,r=!1,o=!1,n=!1){var y;let i=e,a=r?It(i==null?void 0:i.exportSettings):i==null?void 0:i.exportSettings,s=o?Rt(a):a,l=n?Lt(s):s,u=o?At(l):l,c=(i==null?void 0:i.locale)==="ko"||(i==null?void 0:i.locale)==="en"||(i==null?void 0:i.locale)==="es"||(i==null?void 0:i.locale)==="ja"||(i==null?void 0:i.locale)==="zh-CN",p=c?i.locale:null,g=(i==null?void 0:i.localeMode)==="auto"||(i==null?void 0:i.localeMode)==="manual"?i.localeMode:c?"manual":"auto";return{locale:g==="auto"?(y=t!=null?t:p)!=null?y:ne.locale:p!=null?p:ne.locale,localeMode:g,exportSettings:Tt(u)}}function $o(e){let t=e;return b(b({},typeof(t==null?void 0:t.imageExportModeExplicit)=="boolean"?{imageExportModeExplicit:t.imageExportModeExplicit}:{}),typeof(t==null?void 0:t.textExportModeExplicit)=="boolean"?{textExportModeExplicit:t.textExportModeExplicit}:{})}function Ho(e){return e?Gt(e,ne.locale):null}function tr(e){return B(b({},e),{summary:w(P.locale,e.summary),detail:w(P.locale,e.detail),warnings:e.warnings.map(t=>w(P.locale,t))})}function buildSelectionPreviewEmptyState(e){return{ok:!1,state:{ready:!1,selectionId:null,selectionCount:0,selectionName:"",selectionType:null,summary:"Select one or more frames, groups, or layers to export.",detail:e.textExportMode==="rasterize-text"?"Text export is currently set to rasterize text, so text layers will export as bitmap layers until you change the export defaults.":"The exporter keeps editable text where possible, and multiple selected roots are packaged into a ZIP archive.",documentWidth:null,documentHeight:null,exportNodeCount:0,editableTextCount:0,preservedGroupCount:0,warnings:[],analysisPending:!1}}}function isSelectionPreviewHeavy(e){let t=xe(e);if(t){let r=d(t.width),o=d(t.height);if(o>=Do||r*o>=vo)return!0}if(!V(e)||e.children.length===0)return!1;let n=[e],i=0;for(;n.length>0;){let a=n.pop();if(i+=1,i>400)return!0;if(!V(a))continue;let s=a.children;if(!s||s.length===0)continue;if(s.length>120)return!0;for(let l=0;l<s.length;l+=1){let u=s[l];he(u)&&n.push(u)}}return!1}function shouldUseQuickSelectionPreview(e){if(e.length===0)return!1;for(let t=0;t<e.length;t+=1)if(isSelectionPreviewHeavy(e[t]))return!0;return!1}function buildQuickSelectionResolution(){let e=figma.currentPage.selection,t=Tt(P.exportSettings),r=Jo(e,t);if(selectionPreviewCache&&selectionPreviewCache.cacheKey===r)return selectionPreviewCache.resolution;if(e.length===0){let y=buildSelectionPreviewEmptyState(t);return selectionPreviewCache={cacheKey:r,resolution:y},y}let o=[],n=[],i=!1;for(let y=0;y<e.length;y+=1){let m=e[y];if(!he(m)){let T={ok:!1,state:Ye(e,m,"This selection cannot be exported by Figma.","Try a visible frame, group, text layer, or image layer.")};return selectionPreviewCache={cacheKey:r,resolution:T},T}let C=xe(m);if(!C){let T={ok:!1,state:Ye(e,m,"This selection does not have exportable bounds.","Try a visible frame, group, text layer, or image layer.")};return selectionPreviewCache={cacheKey:r,resolution:T},T}o.push(m),n.push(C),!i&&isSelectionPreviewHeavy(m)&&(i=!0)}let a=o[0],s=o.length,l=n[0],u=i?"Large selection detected. Pigma is showing a lightweight preview first to keep Figma responsive. Full layer analysis runs when export starts.":s===1?"Editable text is preserved when fills and typography are compatible. Hidden layers can be ignored or included as hidden PSD layers.":"Each selected root is exported as its own PSD file. When more than one file is ready, the download is packaged as a ZIP archive.",c=i?["Large selection detected. Detailed layer counts will load when export starts."]:[],p={ready:!0,selectionId:s===1?a.id:null,selectionCount:s,selectionName:no(o),selectionType:io(o),summary:s===1?'"'.concat(f(a),'" is ready to export.'):"".concat(s," roots selected and ready to export."),detail:u,documentWidth:s===1?d(l.width):null,documentHeight:s===1?d(l.height):null,exportNodeCount:s,editableTextCount:0,preservedGroupCount:0,warnings:c,analysisPending:i},g={ok:!0,nodes:o,state:p};return selectionPreviewCache={cacheKey:r,resolution:g},g}function buildStartupSelectionResolution(){let e=figma.currentPage.selection,t=Tt(P.exportSettings);if(e.length===0)return buildSelectionPreviewEmptyState(t);let r=[],o=[],n=null;for(let i=0;i<e.length;i+=1){let a=e[i];if(!he(a)){n={ok:!1,state:Ye(e,a,"This selection cannot be exported by Figma.","Try a visible frame, group, text layer, or image layer.")};break}let s=xe(a);if(!s){n={ok:!1,state:Ye(e,a,"This selection does not have exportable bounds.","Try a visible frame, group, text layer, or image layer.")};break}r.push(a),o.push(s)}if(n)return n;let i=r[0],a=r.length,s=o[0];return{ok:!0,nodes:r,state:{ready:!0,selectionId:a===1?i.id:null,selectionCount:a,selectionName:no(r),selectionType:io(r),summary:a===1?'"'.concat(f(i),'" is ready to export.'):"".concat(a," roots selected and ready to export."),detail:"Startup preview keeps the selection summary lightweight. Full layer analysis runs when export starts or when the selection changes.",documentWidth:a===1?d(s.width):null,documentHeight:a===1?d(s.height):null,exportNodeCount:a,editableTextCount:0,preservedGroupCount:0,warnings:["Detailed layer counts are deferred until export starts or the selection changes."],analysisPending:!0}}}function selectionResolutionForUi(){let e=figma.currentPage.selection;return shouldUseQuickSelectionPreview(e)?buildQuickSelectionResolution():rr()}function rr(){let e=figma.currentPage.selection,t=Tt(P.exportSettings),r=Jo(e,t);if((F==null?void 0:F.cacheKey)===r)return F.resolution;if(e.length===0){let m={ok:!1,state:{ready:!1,selectionId:null,selectionCount:0,selectionName:"",selectionType:null,summary:"Select one or more frames, groups, or layers to export.",detail:t.textExportMode==="rasterize-text"?"Text export is currently set to rasterize text, so text layers will export as bitmap layers until you change the export defaults.":"The exporter keeps editable text where possible, and multiple selected roots are packaged into a ZIP archive.",documentWidth:null,documentHeight:null,exportNodeCount:0,editableTextCount:0,preservedGroupCount:0,warnings:[]}};return F={cacheKey:r,resolution:m},m}let o=[],n=new Set,i=0,a=0,s=0;for(let m of e){if(!he(m)){let R={ok:!1,state:Ye(e,m,"This selection cannot be exported by Figma.","Try a visible frame, group, text layer, or image layer.")};return F={cacheKey:r,resolution:R},R}let T=m,C=xe(T);if(!C){let R={ok:!1,state:Ye(e,T,"This selection does not have exportable bounds.","Try a visible frame, group, text layer, or image layer.")};return F={cacheKey:r,resolution:R},R}let E=Ie(T,t.hiddenLayerMode);if(E.exportNodeCount===0){let R={ok:!1,state:Ye(e,T,"No exportable content was found inside this selection.","Masks or empty containers can still block export. Hidden layers can be preserved or ignored from the export defaults.",Array.from(E.warnings),C)};return F={cacheKey:r,resolution:R},R}lt(C,E.containsHeavyEffects)&&E.warnings.add(ut(d(C.width),d(C.height),E.containsHeavyEffects)),o.push({node:T,documentBounds:C,analysis:E}),i+=E.exportNodeCount,a+=E.editableTextCount,s+=E.preservedGroupCount;for(let R of E.warnings)n.add(Nt(f(T),R,e.length>1))}let l=o[0],u=o.length,c=ua(a,t),p={exportNodeCount:i,editableTextCount:c,preservedGroupCount:s,containsHeavyEffects:o.some(m=>m.analysis.containsHeavyEffects),warnings:n},g={ready:!0,selectionId:u===1?l.node.id:null,selectionCount:u,selectionName:no(o.map(m=>m.node)),selectionType:io(o.map(m=>m.node)),summary:fa(f(l.node),p,u),detail:ca(o,u,t,a),documentWidth:u===1?d(l.documentBounds.width):null,documentHeight:u===1?d(l.documentBounds.height):null,exportNodeCount:i,editableTextCount:c,preservedGroupCount:s,warnings:Array.from(n)},y={ok:!0,nodes:o.map(m=>m.node),roots:o,state:g};return F={cacheKey:r,resolution:y},y}function or(e){return e?{height:wo,area:Co}:{height:Do,area:vo}}function Ne(e,t,r){let o=or(r);return t>=o.height||e*t>=o.area}function lt(e,t){return Ne(d(e.width),d(e.height),t)}function ut(e,t,r){let o=or(r);return"This export is treated as a long frame (".concat(e," x ").concat(t,"px). Pigma will switch oversized layers to a lower-memory raster path once the document exceeds ").concat(o.height,"px tall or ").concat(o.area.toLocaleString("en-US")," pixels.")}function Vo(){return"Long-frame mode rasterizes editable text layers to keep export memory stable."}function jo(e){return'"'.concat(e,'" switches to a raster export in long-frame mode to keep memory usage stable.')}function Te(e,t){return'"'.concat(e,'" was split into ').concat(t," raster tiles in long-frame mode to keep memory usage stable.")}function nr(e,t){let r=d(e.width),o=d(e.height),n=r*o,i=t?{height:Ro,area:Ao}:{height:Mo,area:Io};return o>=i.height||n>=i.area}function ir(e,t){return nr(e,t)}function Wo(e,t,r){return'"'.concat(e,'" switched to a safe layered bitmap export (').concat(t," x ").concat(r,"px) so very large documents keep a PSD layer stack without triggering the heavier editable reconstruction path.")}function Zo(e,t){return'"'.concat(e,'" retried with the safe layered bitmap export after layered reconstruction failed (').concat(t,").")}function Xo(e,t,r){return'"'.concat(e,'" switched to a safe flattened export (').concat(t," x ").concat(r,"px) so very large documents finish as a complete PSD instead of failing during heavy layer reconstruction.")}function Ko(e,t){return'"'.concat(e,'" retried as a safe flattened PSD after layered export failed (').concat(t,").")}function Yo(e,t){return ze(e)||Xr(e)||!!fe(e,t)}function De(e){return Ne(d(e.width),d(e.height),!1)&&d(e.height)>Yt}function qo(e,t){let r=Math.max(1,d(e)),o=Math.max(1,d(t)),n=Math.floor(ko/r),i=Math.max(1,n),a=Math.max(Bo,Math.min(Yt,i));return Math.min(o,a)}function Jo(e,t){let r=e.map(o=>o.id).join(",");return[Qt,figma.currentPage.id,t.hiddenLayerMode,t.textExportMode,r].join("|")}async function Qo(e,t,r,o){var l;let n=Uo(o);P=b(b({},P),{exportSettings:Tt(t)});let i=rr();if(!i.ok){Qe(),le();let u=tr(i.state);N({type:"export-error",message:u.summary}),(l=S.notify)==null||l.call(S,u.summary,{error:!0});return}let a=i.nodes.length,s=xa(i.nodes,t);be={nodes:i.nodes,roots:i.roots,hiddenLayerMode:e,settings:t,includeCompositePng:r,developerExportExperiments:n,rootCount:a,bundleFileName:s,nextIndex:0,singlePayloadSummary:null},ae("session-start",{rootCount:a,includeCompositePng:r,developerExportExperiments:n}),N({type:"export-bundle-started",fileName:s,rootCount:a}),await se()}async function en(e){var t,r;N({type:"import-started",fileName:e.fileName,rootName:e.rootName,mode:e.mode});try{let o=ar(e.placement,e.rootName),n=nn(e,o),i=0;if(e.mode==="flatten-image"||e.nodes.length===0){if(!e.compositePngBytes||e.compositePngBytes.length===0)throw new Error("PSD 합성 이미지를 찾지 못했습니다.");let a=Q({kind:"bitmap",name:e.rootName,x:0,y:0,width:e.documentWidth,height:e.documentHeight,opacity:1,visible:!0,blendMode:"normal",effects:null,strokeEffect:null,pngBytes:e.compositePngBytes});n.appendChild(a),i=1}else i=await lr(e.nodes,n,e.warnings);o!==figma.currentPage&&await figma.setCurrentPageAsync(o),o.selection=[n],figma.viewport.scrollAndZoomIntoView([n]),N({type:"import-finished",rootName:e.rootName,importedNodeCount:i,warningCount:e.warnings.length}),(t=S.notify)==null||t.call(S,w(P.locale,"PSD 가져오기 완료"))}catch(o){let n=w(P.locale,o instanceof Error?o.message:"PSD 가져오기에 실패했습니다.");N({type:"import-error",message:n}),(r=S.notify)==null||r.call(S,n,{error:!0})}}async function tn(e){var o,n;let t=e.items.filter(i=>{var a,s;return i&&i.documentWidth>0&&i.documentHeight>0&&(i.mode==="flatten-image"||i.nodes.length>0||((s=(a=i.compositePngBytes)==null?void 0:a.length)!=null?s:0)>0)}),r=t.every(i=>i.mode==="flatten-image")?"flatten-image":"keep-layers";N({type:"import-started",fileName:e.fileName,rootName:e.rootName,mode:r});try{if(t.length===0)throw new Error("가져올 수 있는 PSD 파일이 없습니다.");if(e.arrangement!=="stitch-vertical")throw new Error("지원하지 않는 PSD 배치 방식입니다.");let i=Math.max(0,x(e.gap)),a=Math.max(...t.map(m=>d(m.documentWidth)),1),s=Math.max(1,t.reduce((m,T,C)=>{let E=d(T.documentHeight);return m+E+(C>0?i:0)},0)),l=ar(e.placement,e.rootName),u=sr(e.placement,a,s),c=figma.createFrame();c.name=e.rootName.trim().length>0?e.rootName:"PSD stitch",c.resize(a,s),c.clipsContent=!1,c.fills=[],c.strokes=[],c.x=u.x,c.y=u.y,l.appendChild(c);let p=0,g=0;for(let m of t){let T=Math.max(1,d(m.documentWidth)),C=Math.max(1,d(m.documentHeight)),E=figma.createFrame();E.name=m.rootName.trim().length>0?m.rootName:"PSD section",E.resize(T,C),E.clipsContent=!1,E.fills=[],E.strokes=[],E.x=0,E.y=g,c.appendChild(E),p+=await rn(m,E),g+=C+i}l!==figma.currentPage&&await figma.setCurrentPageAsync(l),l.selection=[c],figma.viewport.scrollAndZoomIntoView([c]);let y=Array.from(new Set(t.flatMap(m=>m.warnings.filter(Boolean)))).length;N({type:"import-finished",rootName:e.rootName,importedNodeCount:p,warningCount:y}),(o=S.notify)==null||o.call(S,w(P.locale,"PSD 媛?몄삤湲??꾨즺"))}catch(i){let a=w(P.locale,i instanceof Error?i.message:"PSD 媛?몄삤湲곗뿉 ?ㅽ뙣?덉뒿?덈떎.");N({type:"import-error",message:a}),(n=S.notify)==null||n.call(S,a,{error:!0})}}async function rn(e,t){if(e.mode==="flatten-image"||e.nodes.length===0){if(!e.compositePngBytes||e.compositePngBytes.length===0)throw new Error("PSD ?⑹꽦 ?대?吏瑜?李얠? 紐삵뻽?듬땲??");let r=Q({kind:"bitmap",name:e.rootName,x:0,y:0,width:e.documentWidth,height:e.documentHeight,opacity:1,visible:!0,blendMode:"normal",effects:null,strokeEffect:null,pngBytes:e.compositePngBytes});return t.appendChild(r),1}return lr(e.nodes,t,e.warnings)}function ar(e,t){if(e==="current-page")return figma.currentPage;let r=figma.createPage();return r.parent||figma.root.appendChild(r),r.name=on(t),r}function on(e){let t=e.trim();return t.length>0?"".concat(t," import"):"PSD import"}function nn(e,t){let r=figma.createFrame();r.name=e.rootName,r.resize(Math.max(1,d(e.documentWidth)),Math.max(1,d(e.documentHeight))),r.clipsContent=!1,r.fills=[],r.strokes=[];let o=sr(e.placement,e.documentWidth,e.documentHeight);return r.x=o.x,r.y=o.y,t.appendChild(r),r}function sr(e,t,r){return e==="new-page"?{x:0,y:0}:{x:x(figma.viewport.center.x-t/2),y:x(figma.viewport.center.y-r/2)}}async function lr(e,t,r){let o=0;for(let n of e){let i=await ur(n,r);i&&(t.appendChild(i.node),cr(i.node,n,t),o+=i.count)}return o}async function ur(e,t){if(e.kind==="group"){if(e.width<=0||e.height<=0)return null;let r=figma.createFrame();r.resize(Math.max(1,d(e.width)),Math.max(1,d(e.height))),r.clipsContent=!1,r.fills=[],r.strokes=[],r.x=x(e.x),r.y=x(e.y),ve(r,e,!0);let o=1;for(let n of e.children){let i=await ur(n,t);i&&(r.appendChild(i.node),cr(i.node,n,r),o+=i.count)}return{node:r,count:o}}if(e.kind==="text"){let r=await sn(e,t);return r?{node:r,count:1}:null}return e.kind==="shape"?{node:an(e),count:1}:e.width<=0||e.height<=0||e.pngBytes.length===0?null:{node:Q(e),count:1}}function cr(e,t,r){var c,p;if(e.type!=="TEXT"||t.kind!=="text")return;let o=t.text.shapeType==="box"?(c=k(e))!=null?c:I(e):(p=I(e))!=null?p:k(e),n=k(r),i=o&&n?o.x-n.x:e.x,a=o&&n?o.y-n.y:e.y,s=x(t.x-i),l=x(t.y-a);if(s===0&&l===0)return;let u=e.relativeTransform;e.relativeTransform=[[u[0][0],u[0][1],u[0][2]+s],[u[1][0],u[1][1],u[1][2]+l]]}function Q(e){let t=figma.createRectangle();t.resize(Math.max(1,d(e.width)),Math.max(1,d(e.height))),t.x=x(e.x),t.y=x(e.y),t.strokes=[],t.cornerRadius=0;let r=figma.createImage(e.pngBytes);return t.fills=[{type:"IMAGE",imageHash:r.hash,scaleMode:"FILL"}],ve(t,e,!1),t}function an(e){let t=figma.createRectangle();return t.resize(Math.max(1,d(e.width)),Math.max(1,d(e.height))),t.x=x(e.x),t.y=x(e.y),t.fills=hn(e.fill),t.strokes=[],yn(t,e.shape,e.width,e.height),Sn(t,e.stroke),ve(t,e,!1),t}async function sn(e,t){if(e.width<=0||e.height<=0)return e.pngBytes.length>0?Q(e):null;let r=figma.createText();try{let o=await ln(e,t);if(o.length===0)return r.removed||r.remove(),e.pngBytes.length>0?Q(e):null;await Ce(o[0].fontName),r.fontName=o[0].fontName,r.characters=e.text.value,r.autoRename=!1;for(let n of o)cn(r,n);return dn(r,e),pn(r,e),ve(r,e,!1),r}catch(o){return r.removed||r.remove(),e.pngBytes.length>0?(t.push('"'.concat(e.name,'" editable text could not be reconstructed (').concat(o instanceof Error?o.message:"unknown error","), so a bitmap preview was imported instead.")),Q(e)):null}}async function ln(e,t){let r=await dr(),o=new Map,n=[],i=0;for(let a of e.text.styleRuns){let s=Math.max(0,Math.round(a.length));if(s<=0||i>=e.text.value.length)continue;let l=Math.min(e.text.value.length,i+s),u="".concat(a.style.photoshopFontName,"\0").concat(a.style.fontFamily,"\0").concat(a.style.fontStyle),c=o.get(u);if(!c){let p=un(a.style,r);c=p.fontName,o.set(u,c),p.exact||t.push('"'.concat(e.name,'" uses Photoshop font "').concat(a.style.photoshopFontName,'", so "').concat(c.family," ").concat(c.style,'" was used in Figma.'))}await Ce(c),n.push({start:i,end:l,fontName:c,style:a.style}),i=l}return n}function un(e,t){var a,s;let r=Z(e.fontFamily),o=Z(e.fontStyle),n=Z(e.photoshopFontName),i=null;for(let l of t){let u=l.fontName,c=Z(u.family),p=Z(u.style),g=Z("".concat(u.family).concat(u.style)),y=Z("".concat(u.family,"Regular")),m=0;c===r?m+=100:r.length>0&&(c.includes(r)||r.includes(c))&&(m+=60),p===o?m+=40:o.length>0&&(p.includes(o)||o.includes(p))&&(m+=20),n.length>0&&g===n?m+=120:n.length>0&&y===n&&(m+=100);let T=c===r&&p===o;(!i||m>i.score||m===i.score&&T&&!i.exact)&&(i={fontName:u,score:m,exact:T})}return i&&i.score>0?{fontName:i.fontName,exact:i.exact}:{fontName:(s=(a=t[0])==null?void 0:a.fontName)!=null?s:{family:"Inter",style:"Regular"},exact:!1}}function Z(e){return e.trim().toLowerCase().replace(/[^a-z0-9]/g,"")}async function dr(){return We||(We=figma.listAvailableFontsAsync()),await We}function cn(e,t){e.setRangeFontName(t.start,t.end,t.fontName),e.setRangeFontSize(t.start,t.end,Math.max(1,t.style.fontSize)),e.setRangeLineHeight(t.start,t.end,fn(t.style.lineHeightPx)),e.setRangeLetterSpacing(t.start,t.end,mn(t.style.tracking,t.style.fontSize)),e.setRangeTextCase(t.start,t.end,xn(t.style.fontCaps)),e.setRangeTextDecoration(t.start,t.end,t.style.strikethrough?"STRIKETHROUGH":t.style.underline?"UNDERLINE":"NONE"),e.setRangeFills(t.start,t.end,pr(t.style.fillColor))}function dn(e,t){var r,o,n,i,a,s,l,u;if(e.textAlignHorizontal=gn(t.text.justification),e.textAlignVertical="TOP",t.text.shapeType==="box"){let c=Math.max(1,d(((o=(r=t.text.boxBounds)==null?void 0:r[2])!=null?o:t.width)-((i=(n=t.text.boxBounds)==null?void 0:n[0])!=null?i:0))),p=Math.max(1,d(((s=(a=t.text.boxBounds)==null?void 0:a[3])!=null?s:t.height)-((u=(l=t.text.boxBounds)==null?void 0:l[1])!=null?u:0)));if(t.text.sizingMode==="auto-height"){e.textAutoResize="HEIGHT",e.resizeWithoutConstraints(c,Math.max(1,d(e.height)));return}e.textAutoResize="NONE",e.resizeWithoutConstraints(c,p);return}e.textAutoResize="WIDTH_AND_HEIGHT"}function pn(e,t){let[r,o,n,i,a,s]=t.text.transform,l=Math.hypot(r,o),u=Math.hypot(n,i),c=l>1e-4?r/l:1,p=l>1e-4?o/l:0,g=u>1e-4?n/u:0,y=u>1e-4?i/u:1;e.relativeTransform=[[c,g,x(Number.isFinite(a)?a:t.x)],[p,y,x(Number.isFinite(s)?s:t.y)]]}function fn(e){return e===null||!Number.isFinite(e)||e<=0?{unit:"AUTO"}:{unit:"PIXELS",value:e}}function mn(e,t){return{unit:"PIXELS",value:t>0?e/1e3*t:0}}function xn(e){switch(e){case 2:return"UPPER";case 1:return"SMALL_CAPS";default:return"ORIGINAL"}}function gn(e){switch(e){case"center":case"justify-center":return"CENTER";case"right":case"justify-right":return"RIGHT";case"justify-all":case"justify-left":return"JUSTIFIED";default:return"LEFT"}}function pr(e){return!e||e.a<=0?[]:[{type:"SOLID",color:{r:e.r/255,g:e.g/255,b:e.b/255},opacity:h(e.a/255,0,1)}]}function hn(e){return e?e.kind==="solid"?pr(e.color):[]:[]}function yn(e,t,r,o){let n=Math.min(r,o)/2;e.cornerRadius=0,t.kind==="rounded-rect"&&(e.topLeftRadius=h(t.topLeftRadius,0,n),e.topRightRadius=h(t.topRightRadius,0,n),e.bottomRightRadius=h(t.bottomRightRadius,0,n),e.bottomLeftRadius=h(t.bottomLeftRadius,0,n))}function Sn(e,t){if(!t){e.strokes=[];return}e.strokes=[{type:"SOLID",color:{r:t.color.r/255,g:t.color.g/255,b:t.color.b/255},opacity:h(t.color.a/255,0,1)}],e.strokeWeight=Math.max(0,t.width),e.strokeAlign=t.position==="inside"?"INSIDE":t.position==="outside"?"OUTSIDE":"CENTER"}function ve(e,t,r){e.name=t.name||(t.kind==="group"?"Group":"Layer"),e.visible=t.visible,"opacity"in e&&typeof e.opacity=="number"&&(e.opacity=h(t.opacity,0,1)),"blendMode"in e&&(e.blendMode=J(t.blendMode,r)),bn(e,t.effects),Pn(e,t.strokeEffect),function(o,n){/*PIGMA_TEXT_IMPORT_GUARD::SOURCE_ID_TAGGING*/if(!o||typeof o.setPluginData!="function"||!n||n.id==null)return;try{o.setPluginData("__pigmaImportSourceId",String(n.id)),o.setPluginData("__pigmaImportSourceKind",String(n.kind||""))}catch(i){}}(e,t)}function bn(e,t){if(!("effects"in e))return;let r=e;r.effects=En(t)}function En(e){if(!e)return[];let t=[];for(let r of e)switch(r.style){case"drop-shadow":t.push({type:"DROP_SHADOW",color:ye(r.color),offset:{x:r.offsetX,y:r.offsetY},radius:r.blur,spread:r.spread,visible:!0,blendMode:J(r.blendMode,!1),showShadowBehindNode:r.showBehindTransparentAreas});break;case"inner-shadow":t.push({type:"INNER_SHADOW",color:ye(r.color),offset:{x:r.offsetX,y:r.offsetY},radius:r.blur,spread:r.spread,visible:!0,blendMode:J(r.blendMode,!1)});break;case"outer-glow":t.push({type:"DROP_SHADOW",color:ye(r.color),offset:{x:0,y:0},radius:r.blur,spread:r.spread,visible:!0,blendMode:J(r.blendMode,!1),showShadowBehindNode:!0});break;case"inner-glow":t.push({type:"INNER_SHADOW",color:ye(r.color),offset:{x:0,y:0},radius:r.blur,spread:r.spread,visible:!0,blendMode:J(r.blendMode,!1)});break;case"layer-blur":t.push({type:"LAYER_BLUR",blurType:"NORMAL",radius:r.blurType==="PROGRESSIVE"?Math.max(r.startRadius,r.radius):r.radius,visible:!0});break;case"background-blur":t.push({type:"BACKGROUND_BLUR",blurType:"NORMAL",radius:r.radius,visible:!0});break;case"noise":case"texture":break}return t}function ye(e){return{r:h(e.r/255,0,1),g:h(e.g/255,0,1),b:h(e.b/255,0,1),a:h(e.a/255,0,1)}}function Pn(e,t){if(!t||!("strokes"in e)||!("strokeWeight"in e)||!("strokeAlign"in e))return;let r=e;r.strokes=[{type:"SOLID",color:{r:t.color.r/255,g:t.color.g/255,b:t.color.b/255},opacity:h(t.color.a/255,0,1),blendMode:J(t.blendMode,!1)}],r.strokeWeight=Math.max(0,t.width),r.strokeAlign=t.position==="inside"?"INSIDE":t.position==="outside"?"OUTSIDE":"CENTER"}function J(e,t){switch(e){case"pass through":return t?"PASS_THROUGH":"NORMAL";case"darken":return"DARKEN";case"multiply":return"MULTIPLY";case"linear burn":return"LINEAR_BURN";case"color burn":return"COLOR_BURN";case"lighten":return"LIGHTEN";case"screen":return"SCREEN";case"linear dodge":return"LINEAR_DODGE";case"color dodge":return"COLOR_DODGE";case"overlay":return"OVERLAY";case"soft light":return"SOFT_LIGHT";case"hard light":return"HARD_LIGHT";case"difference":return"DIFFERENCE";case"exclusion":return"EXCLUSION";case"hue":return"HUE";case"saturation":return"SATURATION";case"color":return"COLOR";case"luminosity":return"LUMINOSITY";default:return"NORMAL"}}async function se(){var n,i,a;let e=be;if(!e)return;O=e.developerExportExperiments;let t=e.nextIndex;if(t>=e.rootCount){N({type:"export-finished",fileName:e.bundleFileName,rootCount:e.rootCount}),e.rootCount===1&&e.singlePayloadSummary?(n=S.notify)==null||n.call(S,w(P.locale,"PSD ready: ".concat(e.singlePayloadSummary.exportNodeCount," layers, ").concat(e.singlePayloadSummary.editableTextCount," text candidates"))):(i=S.notify)==null||i.call(S,w(P.locale,"".concat(e.rootCount," PSD files are ready. The download will be packaged as a ZIP archive."))),be=null,Qe(),le();return}let r=(e.roots||e.nodes)[t],o="node"in r?r.node:r,s="node"in r?r:null,u=f(o);ae("build-marker",{patch:"root-preserved-20260319-1949",main:"code.patched.js"});try{let l=await Dn(o,e.hiddenLayerMode,e.settings,t+1,e.rootCount,e.includeCompositePng,s);e.rootCount===1&&(e.singlePayloadSummary={exportNodeCount:l.exportNodeCount,editableTextCount:l.editableTextCount});let c=Xe(l);e.nextIndex+=1,N({type:"export-root-ready",fileName:e.bundleFileName,rootIndex:t+1,rootCount:e.rootCount,payload:c}),qe(l),e.nextIndex>=e.rootCount&&await se()}catch(l){let c=await Nn(o,e.hiddenLayerMode,e.settings,t+1,e.rootCount,e.includeCompositePng,l,s);if(c){e.rootCount===1&&(e.singlePayloadSummary={exportNodeCount:c.exportNodeCount,editableTextCount:c.editableTextCount});let p=Xe(c);e.nextIndex+=1,N({type:"export-root-ready",fileName:e.bundleFileName,rootIndex:t+1,rootCount:e.rootCount,payload:p}),qe(c),e.nextIndex>=e.rootCount&&await se();return}let g=await Tn(o,e.hiddenLayerMode,e.settings,t+1,e.rootCount,e.includeCompositePng,l,s);if(g){e.rootCount===1&&(e.singlePayloadSummary={exportNodeCount:g.exportNodeCount,editableTextCount:g.editableTextCount});let p=Xe(g);e.nextIndex+=1,N({type:"export-root-ready",fileName:e.bundleFileName,rootIndex:t+1,rootCount:e.rootCount,payload:p}),qe(g),e.nextIndex>=e.rootCount&&await se();return}be=null,Qe(),le();let y=w(P.locale,l instanceof Error?e.rootCount>1?'Export failed for "'.concat(u,'" (').concat(t+1,"/").concat(e.rootCount,"): ").concat(l.message):l.message:"An unknown error happened while building the PSD.");N({type:"export-error",message:y}),(a=S.notify)==null||a.call(S,y,{error:!0})}}async function Nn(e,t,r,o,n,i,a,s=null){let l=s?s.documentBounds:xe(e);if(!l)return null;let u=s?s.analysis:Ie(e,t);return u.exportNodeCount===0||!ir(l,u.containsHeavyEffects)?null:await fr(e,t,r,o,n,i,u,a instanceof Error&&a.message.trim().length>0?a.message.trim():null,s)}async function Tn(e,t,r,o,n,i,a,s=null){let l=s?s.documentBounds:xe(e);if(!l)return null;let u=s?s.analysis:Ie(e,t);if(u.exportNodeCount===0||!nr(l,u.containsHeavyEffects))return null;let c=f(e),p=d(l.width),g=d(l.height),y=new Set(u.warnings);y.add(Xo(c,p,g)),y.add(Ko(c,a instanceof Error&&a.message.trim().length>0?a.message.trim():"unknown error")),N({type:"export-started",rootName:c,rootIndex:o,rootCount:n,total:1}),N({type:"export-progress",rootName:c,rootIndex:o,rootCount:n,current:1,total:1,layerName:c});let m=await e.exportAsync({format:"PNG",useAbsoluteBounds:l.useAbsoluteBounds});return{fileName:He(e,r,o,n),rootName:e.name||"Untitled",documentWidth:p,documentHeight:g,compositePngBytes:i?m:null,nodes:[{kind:"bitmap",id:"".concat(e.id,":safe-root"),name:c,sourceType:"".concat(e.type,"_SAFE_ROOT"),opacity:1,visible:!0,blendMode:"normal",effects:null,strokeEffect:null,x:0,y:0,width:p,height:g,nodeTransform:null,pngBytes:m}],warnings:Array.from(y),exportNodeCount:1,editableTextCount:0,preservedGroupCount:0,hasEditableText:!1,backgroundDebug:[]}}async function Dn(e,t,r,o,n,i,a=null){let s=Date.now(),l=a?a.documentBounds:xe(e);if(!l)throw new Error("Unable to calculate document bounds for the selected root.");let u=a?a.analysis:Ie(e,t);if(u.exportNodeCount===0)throw new Error(t==="ignore-hidden"?"No exportable layers remain after ignoring hidden layers.":"There are no visible exportable layers inside this selection.");let c=lt(l,u.containsHeavyEffects);ae("payload-start",{rootName:f(e),rootIndex:o,rootCount:n,includeCompositePng:i,exportNodeCount:u.exportNodeCount,documentWidth:d(l.width),documentHeight:d(l.height),longFrameMode:c});let p={root:e,documentBounds:l,totalLeaves:u.exportNodeCount,currentLeaf:0,warnings:new Set(u.warnings),editableTextCount:0,preservedGroupCount:0,hiddenLayerMode:t,settings:r,backgroundDebug:[],rootName:f(e),rootIndex:o,rootCount:n,lastProgressPostedAt:0,longFrameMode:c};c&&p.warnings.add(ut(d(l.width),d(l.height),u.containsHeavyEffects)),N({type:"export-started",rootName:p.rootName,rootIndex:p.rootIndex,rootCount:p.rootCount,total:p.totalLeaves});let g=mt(e,t),y=[];for(let m of g){let T=await ct(m,p);T&&y.push(T)}if(!y.length)throw new Error("The exporter could not produce any PSD layers from this selection.");ae("payload-nodes-built",{rootName:p.rootName,nodeCount:y.length,warningCount:p.warnings.size,editableTextCount:p.editableTextCount,durationMs:Date.now()-s});let C=i?await e.exportAsync({format:"PNG",useAbsoluteBounds:l.useAbsoluteBounds}):null;return C&&ae("payload-composite-exported",{rootName:p.rootName,bytes:C.byteLength,durationMs:Date.now()-s}),{fileName:He(e,r,o,n),rootName:e.name||"Untitled",documentWidth:d(l.width),documentHeight:d(l.height),compositePngBytes:C,nodes:y,warnings:Array.from(p.warnings),exportNodeCount:p.totalLeaves,editableTextCount:p.editableTextCount,preservedGroupCount:p.preservedGroupCount,hasEditableText:p.editableTextCount>0,backgroundDebug:p.backgroundDebug}}async function fr(e,t,r,o,n,i,a,s=null,l=null){let u=l?l.documentBounds:xe(e);if(!u)throw new Error("Unable to calculate document bounds for the selected root.");let c=lt(u,a.containsHeavyEffects),p=f(e),g=d(u.width),y=d(u.height),m=new Set(a.warnings);m.add(Wo(p,g,y)),s&&m.add(Zo(p,s));let T={root:e,documentBounds:u,totalLeaves:a.exportNodeCount,currentLeaf:0,warnings:m,editableTextCount:0,preservedGroupCount:0,hiddenLayerMode:t,settings:r,backgroundDebug:[],rootName:p,rootIndex:o,rootCount:n,lastProgressPostedAt:0,longFrameMode:c};c&&T.warnings.add(ut(g,y,a.containsHeavyEffects)),ae("payload-safe-layered-start",{rootName:p,rootIndex:o,rootCount:n,includeCompositePng:i,exportNodeCount:a.exportNodeCount,documentWidth:g,documentHeight:y,longFrameMode:c}),N({type:"export-started",rootName:T.rootName,rootIndex:T.rootIndex,rootCount:T.rootCount,total:T.totalLeaves});let C=t==="ignore-hidden"&&!q(e)?[]:[e];ae("payload-safe-layered-entry",{rootName:p,entryCount:C.length,entryMode:"root-preserved"});let E=[];for(let R of C){let wt=await mr(R,T);wt&&E.push(wt)}if(!E.length)throw new Error("The exporter could not produce any PSD layers from this selection.");let k=i?await e.exportAsync({format:"PNG",useAbsoluteBounds:u.useAbsoluteBounds}):null;return{fileName:He(e,r,o,n),rootName:e.name||"Untitled",documentWidth:g,documentHeight:y,compositePngBytes:k,nodes:E,warnings:Array.from(T.warnings),exportNodeCount:T.currentLeaf,editableTextCount:T.editableTextCount,preservedGroupCount:T.preservedGroupCount,hasEditableText:T.editableTextCount>0,backgroundDebug:T.backgroundDebug}}async function mr(e,t){if(t.hiddenLayerMode==="ignore-hidden"&&!q(e))return null;if(Cr(e)){let r=await gr(e,t,Ut(e));if(r.length>0)return t.preservedGroupCount+=1,{kind:"group",id:e.id,name:f(e),sourceType:e.type,opacity:j(e),visible:e.visible,blendMode:K(e),effects:null,strokeEffect:null,mask:containerMask(e,t.documentBounds,t.root),children:r}}let r=e===t.root&&V(e)&&e.children.length>0&&Ur(e),o=r||hi(e);if(o){let n=await kn(e,t,Ut(e));if(n)return t.preservedGroupCount+=1,n;let i=await gr(e,t);if(i.length>0)return t.warnings.add("\"".concat(f(e),"\" could not separate its background cleanly, so it preserved the child layers without a synthetic background.")),t.preservedGroupCount+=1,{kind:"group",id:e.id,name:f(e),sourceType:e.type,opacity:j(e),visible:e.visible,blendMode:K(e),effects:null,strokeEffect:null,mask:containerMask(e,t.documentBounds,t.root),children:i};t.warnings.add("\"".concat(f(e),"\" could not separate its background cleanly, so it was flattened."))}return await xr(e,t)}function vn(e,t){if(!Cr(e))return!1;let r=ue(e,t);return r.length===0?!1:r.every(o=>o.kind==="node")}async function wn(e,t){let r=[],o=ue(e,t.hiddenLayerMode);for(let n of o){if(n.kind!=="node")return await xr(e,t);let i=await mr(n.node,t);i&&r.push(i)}return r.length===0?null:(t.preservedGroupCount+=1,{kind:"group",id:e.id,name:f(e),sourceType:e.type,opacity:j(e),visible:e.visible,blendMode:K(e),effects:null,strokeEffect:null,mask:containerMask(e,t.documentBounds,t.root),children:r})}async function xr(e,t){var n;let r=e.type==="TEXT"&&(n=ge(e,!1))!=null?n:v(e);if(!r)return t.warnings.add('"'.concat(f(e),'" was skipped because it has no exportable bounds.')),null;if(t.longFrameMode&&pe(e)&&De(r)){t.currentLeaf+=1,Y(t,f(e));let i=await pt(e,r,void 0,t.documentBounds);return t.warnings.add(Te(f(e),i.length)),Be(e.id,f(e),e.type,1,e.visible,"normal",i)}let o=await Me(e,t,r);return o?{kind:"bitmap",id:e.id,name:f(e),sourceType:e.type,opacity:1,visible:e.visible,blendMode:"normal",effects:null,strokeEffect:null,x:o.x,y:o.y,width:o.width,height:o.height,nodeTransform:de(e,t.documentBounds,o.x,o.y),pngBytes:o.pngBytes}:null}function Xe(e){return B(b({},e),{warnings:e.warnings.map(t=>w(P.locale,t))})}async function ct(e,t,r=null){var i,a,s;if(t.hiddenLayerMode==="ignore-hidden"&&!q(e))return null;let o=e.type==="TEXT"?await Hn(e):null;if(o&&!o.ok)return t.warnings.add(o.reason),await Cn(e,t);let n=Fe(e);if(n==="group"){let l=e,u=await gr(l,t,(i=Ut(l))!=null?i:r);if(u.length>0)return t.preservedGroupCount+=1,{kind:"group",id:e.id,name:f(e),sourceType:e.type,opacity:j(e),visible:e.visible,blendMode:K(e),effects:null,strokeEffect:null,mask:containerMask(l,t.documentBounds,t.root),children:u}}if(n==="split"){let l=await kn(e,t,(a=Ut(e))!=null?a:r);if(l)return t.preservedGroupCount+=1,l;let u=await gr(e,t,r);if(u.length>0)return t.warnings.add("\"".concat(f(e),"\" could not separate its background cleanly, so it preserved the child layers without a synthetic background.")),t.preservedGroupCount+=1,{kind:"group",id:e.id,name:f(e),sourceType:e.type,opacity:j(e),visible:e.visible,blendMode:K(e),effects:null,strokeEffect:null,mask:containerMask(e,t.documentBounds,t.root),children:u};t.warnings.add("\"".concat(f(e),"\" could not separate its background cleanly, so it was flattened."))}if(progressiveBlurShouldRasterize(L(e,t.root)))return await qn(e,t,r);if(e.type==="TEXT"&&t.settings.textExportMode!=="rasterize-text"){let l=await Gn(e,t,r);if(l)return _(l.effects)||(t.editableTextCount+=1),l}if(Re(e)){let l=(s=ft(e))!=null?s:v(e),u=!t.longFrameMode?await pigmaExportMultiFillGroup(e,t,r,l):null;if(u)return t.preservedGroupCount+=1,u;if(t.longFrameMode&&!!l&&Ne(d(l.width),d(l.height),!1))t.warnings.add(jo(f(e)));else{let c=await Jn(e,t);if(c)return c;t.warnings.add("\"".concat(f(e),"\" could not keep its SVG/vector data, so it fell back to a bitmap layer."))}}if(V(e)&&e.children.length>0){let l=L(e);_(l)?t.warnings.add(Mr(e,"past")):ze(e)?t.warnings.add(Ir(e,"past")):$e(l)?t.warnings.add(Rr(e,"past")):Pt(l)?t.warnings.add(Ar(e,"past")):t.warnings.add(Br(e,"past"))}return await qn(e,t,r)}async function Cn(e,t){var a;let r=e.type==="TEXT"&&(a=ge(e,!1))!=null?a:v(e);if(!r)return t.warnings.add('"'.concat(f(e),'" was skipped because it has no exportable bounds.')),null;if(t.currentLeaf+=1,Y(t,f(e)),t.longFrameMode&&pe(e)&&De(r)){let s=await pt(e,r,void 0,t.documentBounds);return t.warnings.add(Te(f(e),s.length)),Be(e.id,f(e),e.type,1,e.visible,"normal",s)}let o=await e.exportAsync({format:"PNG",useAbsoluteBounds:r.useAbsoluteBounds}),n=x(r.x-t.documentBounds.x),i=x(r.y-t.documentBounds.y);return{kind:"bitmap",id:e.id,name:f(e),sourceType:e.type,opacity:1,visible:e.visible,blendMode:"normal",effects:null,strokeEffect:null,x:n,y:i,width:d(r.width),height:d(r.height),nodeTransform:de(e,t.documentBounds,n,i),pngBytes:o}}async function kn(e,t,r=null){let o=await gr(e,t,r),n=await pigmaExportMultiFillBackgroundGroup(e,t,r);if(n)return n.backgroundLayer&&(o.push(n.backgroundLayer)),{kind:"group",id:e.id,name:f(e),sourceType:e.type,opacity:j(e),visible:e.visible,blendMode:K(e),effects:n.groupEffects,strokeEffect:n.groupStrokeEffect,mask:containerMask(e,t.documentBounds,t.root),children:o};let i=L(e,t.root),a=me(e),s=await Rn(e,t),l=Bn(s,i,a);return!l.backgroundLayer&&o.length===0?null:(l.backgroundLayer&&(o.push(l.backgroundLayer),(l.backgroundLayer.kind==="bitmap"||l.backgroundLayer.kind==="shape")&&ha(t.backgroundDebug,ga(e,l.backgroundLayer,o.length-1,o.length))),{kind:"group",id:e.id,name:f(e),sourceType:e.type,opacity:j(e),visible:e.visible,blendMode:K(e),effects:l.groupEffects,strokeEffect:l.groupStrokeEffect,mask:containerMask(e,t.documentBounds,t.root),children:o})}function Bn(e,t,r){if(!e)return{backgroundLayer:null,groupEffects:t,groupStrokeEffect:r};let o=Hi(t),n=Vi(t);if(!o&&!r)return{backgroundLayer:e,groupEffects:n,groupStrokeEffect:null};if(e.kind==="group")return{backgroundLayer:e,groupEffects:null,groupStrokeEffect:null};let i=e.kind==="shape"&&e.stroke?null:r;return{backgroundLayer:B(b({},e),{effects:o,strokeEffect:i}),groupEffects:n,groupStrokeEffect:null}}async function gr(e,t,r=null){let o=[],n=ue(e,t.hiddenLayerMode);for(let i of n){let a=await Mn(i,t,r);a&&o.push(a)}return o}async function Mn(e,t,r=null){return e.kind==="node"?await ct(e.node,t,r):await In(e,t,r)}async function In(e,t,r=null){var a;let o=(a=Lr(e.maskNode,xt(e.maskNode)))!=null?a:r,n=[];for(let s of e.maskedNodes){let l=await ct(s,t,o);l&&n.push(l)}if(n.length===0)return null;let i=await Si(e.maskNode,t);return i?(t.preservedGroupCount+=1,{kind:"group",id:"".concat(e.maskNode.id,":mask-group"),name:f(e.maskNode),sourceType:"MASK_OBJECT",opacity:1,visible:e.maskNode.visible,blendMode:"pass through",effects:null,strokeEffect:null,mask:i,children:n}):(t.warnings.add('"'.concat(f(e.maskNode),'" could not be reconstructed as a PSD mask.')),null)}async function Rn(e,t){if(!Ln(e))return null;let r=An(e,t.documentBounds,t);if(r)return r;if(!Ur(e))return null;let o=Fn(e);if(!o)return null;if(!await preloadTreeFontsSafely(e))return null;let n=oa(e),i=n&&((n.normalizePaintOpacity===!0)||(n.normalizePaintBlendMode===!0))?n:null,a=!!L(e,t.root)||!!fe(e,t.root),s=me(e),l=e.clone();try{try{if(Ii(l),i&&to(l,i),bt(l,o),t.longFrameMode&&De(o)){let u=await Er(l,o,t.documentBounds);return t.warnings.add(Te("".concat(f(e)," background"),u.length)),Be("".concat(e.id,":background"),"Background","".concat(e.type,"_BACKGROUND"),i?i.effectiveOpacity:1,!0,at(i?i.effectiveBlendMode:"normal"),u)}let c=await Me(l,t,o,{normalizePaintOpacity:(i==null?void 0:i.normalizePaintOpacity)===!0,normalizePaintBlendMode:(i==null?void 0:i.normalizePaintBlendMode)===!0,removeSupportedEffects:a,removeSupportedStroke:!!s});return c?{kind:"bitmap",id:"".concat(e.id,":background"),name:"Background",sourceType:"".concat(e.type,"_BACKGROUND"),opacity:i?i.effectiveOpacity:1,visible:!0,blendMode:at(i?i.effectiveBlendMode:"normal"),effects:null,strokeEffect:null,x:c.x,y:c.y,width:c.width,height:c.height,nodeTransform:null,pngBytes:c.pngBytes}:null}catch(c){return null}}finally{l.removed||l.remove()}}function An(e,t,r){if(fe(e))return null;let o=Di(e),n=oa(e),i=n&&((n.normalizePaintOpacity===!0)||(n.normalizePaintBlendMode===!0))?n:null;if(!o)return null;let a=Fr(e,t);return!a||!o.fill&&!o.stroke?null:{kind:"shape",id:"".concat(e.id,":background-shape"),name:"Background",sourceType:"".concat(e.type,"_BACKGROUND_SHAPE"),opacity:i?i.effectiveOpacity:1,visible:!0,blendMode:at(i?i.effectiveBlendMode:"normal"),effects:null,strokeEffect:null,x:a.x,y:a.y,width:a.width,height:a.height,nodeTransform:null,shape:a,fill:o.fill,stroke:o.stroke}}function Ln(e){return X(e,"fills")||X(e,"strokes")?!0:te(e)}function Fn(e){let t=k(e);if(t&&t.width>0&&t.height>0)return{x:t.x,y:t.y,width:t.width,height:t.height,useAbsoluteBounds:!0};if("absoluteTransform"in e&&"width"in e&&"height"in e){let r=ce(e);if(r)return r}return v(e)}function tt(e){var r;let o=Zr(e)||re(e),n=o?v(e):null;if(e.type==="TEXT")return n!=null?n:v(e);if(Re(e))return n!=null?n:(r=ft(e))!=null?r:v(e);if(n)return n;let t=k(e);if(t&&t.width>0&&t.height>0)return{x:t.x,y:t.y,width:t.width,height:t.height,useAbsoluteBounds:!0};if("absoluteTransform"in e&&"width"in e&&"height"in e){let i=ce(e);if(i)return i}return v(e)}function Ut(e){if(!ht(e))return null;let t=k(e);if(t&&t.width>0&&t.height>0)return{x:t.x,y:t.y,width:t.width,height:t.height,useAbsoluteBounds:!0};if("absoluteTransform"in e&&"width"in e&&"height"in e){let r=ce(e);if(r)return r}return null}async function hr(e,t,r=null){let o=L(e,t.root);if(!_e(o))return{effects:o,removeSupportedEffects:!!o};if(t.longFrameMode){t.warnings.add($t(f(e)));let a=jt(o);return{effects:a,removeSupportedEffects:!!a}}let i=await Ri(e,t,r);if(!i){t.warnings.add($t(f(e)));let a=jt(o);return{effects:a,removeSupportedEffects:!!a}}return{effects:_i(o,i),removeSupportedEffects:!0}}async function Gn(e,t,r=null){var n;let o=e;try{try{o=(n=await $n(e))!=null?n:e}catch(y){t.warnings.add('"'.concat(f(e),'" could not prepare its editable text clone because Figma could not load one of its fonts, so export continued without the point-text auto-fix.')),o=e}let i=Tr(o,t.documentBounds);if(!i){let y=Pr(o);return y.supported||t.warnings.add(y.reason),null}let a=jr(o,i),s=await hr(e,t,r),l=s.effects,u=_(l),c=me(e);u&&t.warnings.add(eo(f(e)));let p=await zn(o,i,{riskScore:a,removeSupportedEffects:s.removeSupportedEffects||!!u,removeSupportedStroke:!!c});if(!p)return null;_n(i,p.bounds,t.documentBounds,p.usedVisualProbe);let g=await On(o,t,i,p.bounds,{removeSupportedEffects:s.removeSupportedEffects||!!u,removeSupportedStroke:!!c});return g?{kind:"text",id:e.id,name:f(e),sourceType:e.type,opacity:j(e),visible:e.visible,blendMode:ro(e),effects:l,strokeEffect:c,x:g.x,y:g.y,width:g.width,height:g.height,nodeTransform:de(o,t.documentBounds,g.x,g.y),pngBytes:g.pngBytes,text:i}:null}finally{o!==e&&!o.removed&&o.remove()}}async function On(e,t,r,o,n){t.currentLeaf+=1,Y(t,f(e));let i=yt(e)||(n==null?void 0:n.normalizePaintOpacity)===!0||(n==null?void 0:n.normalizePaintBlendMode)===!0||(n==null?void 0:n.removeAllEffects)===!0||(n==null?void 0:n.removeSupportedEffects)===!0||(n==null?void 0:n.removeSupportedStroke)===!0,a=Un(e,r.shapeType,o),s=r.shapeType==="point"||a?await Hr(e,o,n,i):i?await $r(e,o,t,n):await e.exportAsync({format:"PNG",useAbsoluteBounds:o.useAbsoluteBounds});return{x:x(o.x-t.documentBounds.x),y:x(o.y-t.documentBounds.y),width:d(o.width),height:d(o.height),pngBytes:s}}function Un(e,t,r){if(t==="point")return!0;let o=Ae(e,t);return o?Math.abs(o.x-r.x)>.5||Math.abs(o.y-r.y)>.5||Math.abs(o.width-r.width)>.5||Math.abs(o.height-r.height)>.5:!0}async function zn(e,t,r){var a,s;let o=Ae(e,t.shapeType);if(!o)return null;let n=((a=r==null?void 0:r.riskScore)!=null?a:0)>=No?Wr(t,(s=r==null?void 0:r.riskScore)!=null?s:0):null;if(t.shapeType!=="point"){let l=I(e);if(l&&l.width>0&&l.height>0){let u=Vt(o,{x:l.x,y:l.y,width:l.width,height:l.height,useAbsoluteBounds:!1});return{bounds:ie(u,Se(Ht(t),n)),usedVisualProbe:!1}}return{bounds:ie(o,Se(Ht(t),n)),usedVisualProbe:!1}}let i=await Li(e,o,r);if(i){let l=Se(it(e,t),n);return{bounds:ie(Vt(o,i),l),usedVisualProbe:!0}}return{bounds:ie(o,Se(it(e,t),n)),usedVisualProbe:!1}}function Se(e,t){return t?{left:Math.max(e.left,t.left),top:Math.max(e.top,t.top),right:Math.max(e.right,t.right),bottom:Math.max(e.bottom,t.bottom)}:e}function _n(e,t,r,o){let n=x(t.x-r.x),i=x(t.y-r.y),a=x(n+t.width),s=x(i+t.height);e.bounds={left:n,top:i,right:a,bottom:s},e.boundingBox={left:n,top:i,right:a,bottom:s},e.hasVisualBoundsProbe=o}async function $n(e){if(!Wn(e))return null;let t=Zn(e);if(!t)return null;await we(e);let r=e.clone();try{return figma.currentPage.appendChild(r),r.visible=!0,r.textAutoResize="NONE",r.resizeWithoutConstraints(d(t.width),d(t.height)),Xn(e,r,t.x,t.y),Kn(e,r),r}catch(o){throw r.removed||r.remove(),o}}async function we(e){if(!e.characters||e.characters.length===0)return;let t=new Map;for(let r of e.getStyledTextSegments(Kt)){let o=r.fontName,n=ke(o);t.has(n)||t.set(n,o)}await Promise.all(Array.from(t.values(),r=>Ce(r)))}async function dt(e){let t=[],r=[e];for(;r.length>0;){let o=r.pop();if(o){if(o.type==="TEXT"){t.push(o);continue}"children"in o&&r.push(...o.children)}}await Promise.all(t.map(o=>we(o)))}async function preloadTreeFontsSafely(e){try{return await dt(e),!0}catch(t){return!1}}async function outlineLongFrameFallbackTiles(e,t,r=null){let o="";try{o=await e.exportAsync({format:"SVG_STRING",useAbsoluteBounds:t.useAbsoluteBounds,svgOutlineText:!0,svgIdAttribute:!0,svgSimplifyStroke:!1})}catch(i){return null}if(!o||o.trim().length===0)return null;let n=figma.createNodeFromSvg(o);try{let i=("absoluteBoundingBox"in n?n.absoluteBoundingBox:null)||("absoluteRenderBounds"in n?n.absoluteRenderBounds:null);return i&&("x"in n&&(n.x=x(n.x+(t.x-i.x))),"y"in n&&(n.y=x(n.y+(t.y-i.y)))),await Er(n,t,r)}catch(i){return n.removed||n.remove(),null}}async function Hn(e){if(!e.characters||e.characters.length===0)return{ok:!0};let t=new Map;for(let o of e.getStyledTextSegments(Kt)){let n=o.fontName,i=ke(n);t.has(i)||t.set(i,n)}let r=await Vn();for(let[o,n]of t)if(!r.has(o))return{ok:!1,reason:'"'.concat(f(e),'" uses "').concat(yr(n),'", which is not available in this Figma session, so it fell back to a flattened bitmap layer.')};try{return await Promise.all(Array.from(t.values(),o=>Ce(o))),{ok:!0}}catch(o){return{ok:!1,reason:'"'.concat(f(e),'" uses a font that Figma could not prepare for text editing (').concat(jn(o),"), so it fell back to a flattened bitmap layer.")}}}async function Ce(e){let t=ke(e),r=je.get(t);if(r){await r;return}let o=figma.loadFontAsync(e).catch(n=>{throw je.delete(t),new Error('font "'.concat(yr(e),'": ').concat(Sr(n)))});je.set(t,o),await o}function ke(e){return"".concat(e.family,"\0").concat(e.style)}async function Vn(){return Ze||(Ze=dr().then(e=>new Set(e.map(t=>ke(t.fontName))))),await Ze}function yr(e){return"".concat(e.family," ").concat(e.style).trim()}function jn(e){let t=Sr(e);return t.length>0?t:"unknown font loading error"}function Sr(e){return e instanceof Error&&typeof e.message=="string"&&e.message.trim().length>0?e.message.trim():typeof e=="string"&&e.trim().length>0?e.trim():"unknown error"}function Wn(e){if(e.textAutoResize!=="WIDTH_AND_HEIGHT")return!1;let t=k(e),r=I(e);if(!t||!r)return!1;let o=br(t,r),n=Le(e),i=n.ok?n.baseStyle.fontSize:16,a=Math.max(2,d(i*.02));return o.left>=a||o.top>=a||o.right>=a||o.bottom>=a}function Zn(e){let t=k(e),r=I(e),o=t&&r?Yn(t,r):t!=null?t:r;if(!o)return null;let n=Le(e),i=n.ok?n.baseStyle.fontSize:16,a={left:d(Math.max(4,i*.04)),top:d(Math.max(4,i*.03)),right:d(Math.max(8,i*.1)),bottom:d(Math.max(10,i*.12))};return{x:o.x-a.left,y:o.y-a.top,width:o.width+a.left+a.right,height:o.height+a.top+a.bottom,useAbsoluteBounds:!1}}function Xn(e,t,r,o){if("relativeTransform"in t){t.relativeTransform=[[e.absoluteTransform[0][0],e.absoluteTransform[0][1],r],[e.absoluteTransform[1][0],e.absoluteTransform[1][1],o]];return}let n=t;n.x=r,n.y=o}function Kn(e,t){let r=I(e),o=I(t);if(!r||!o)return;let n=x(r.x-o.x),i=x(r.y-o.y);if(n===0&&i===0)return;if("relativeTransform"in t){let s=t.relativeTransform;t.relativeTransform=[[s[0][0],s[0][1],s[0][2]+n],[s[1][0],s[1][1],s[1][2]+i]];return}let a=t;a.x+=n,a.y+=i}function br(e,t){let r=e.x+e.width,o=e.y+e.height,n=t.x+t.width,i=t.y+t.height;return{left:Math.max(0,e.x-t.x),top:Math.max(0,e.y-t.y),right:Math.max(0,n-r),bottom:Math.max(0,i-o)}}function Yn(e,t){let r=Math.min(e.x,t.x),o=Math.min(e.y,t.y),n=Math.max(e.x+e.width,t.x+t.width),i=Math.max(e.y+e.height,t.y+t.height);return{x:r,y:o,width:n-r,height:i-o}}function Be(e,t,r,o,n,i,a){return{kind:"group",id:"".concat(e,":tiles"),name:t,sourceType:r,opacity:o,visible:n,blendMode:i,effects:null,strokeEffect:null,mask:null,children:a.map((s,l)=>({kind:"bitmap",id:"".concat(e,":tile:").concat(l+1),name:"".concat(t," Tile ").concat(l+1),sourceType:"".concat(r,"_TILE"),opacity:1,visible:!0,blendMode:"normal",effects:null,strokeEffect:null,x:s.x,y:s.y,width:s.width,height:s.height,nodeTransform:null,pngBytes:s.pngBytes}))}}async function pt(e,t,r,o=null){let n=(r==null?void 0:r.normalizePaintOpacity)===!0||(r==null?void 0:r.normalizePaintBlendMode)===!0||(r==null?void 0:r.removeAllEffects)===!0||(r==null?void 0:r.removeSupportedEffects)===!0||(r==null?void 0:r.removeSupportedStroke)===!0,i=await preloadTreeFontsSafely(e);if(!i){let a=await outlineLongFrameFallbackTiles(e,t,o);if(a)return a;return[{x:o?x(t.x-o.x):x(t.x),y:o?x(t.y-o.y):x(t.y),width:Math.max(1,d(t.width)),height:Math.max(1,d(t.height)),pngBytes:await e.exportAsync({format:"PNG",useAbsoluteBounds:t.useAbsoluteBounds})}]}let s=e.clone();try{return n&&Oe(s,r),await Er(s,t,o)}finally{s.removed||s.remove()}}async function Er(e,t,r=null){let o=figma.createFrame(),n=Math.max(1,d(t.width)),i=Math.max(1,d(t.height)),a=qo(n,i),s=[];try{o.clipsContent=!0,o.fills=[],o.strokes=[],o.name="__pigma-long-frame-tile__",o.resize(n,Math.min(a,i)),figma.currentPage.appendChild(o),o.appendChild(e);for(let l=0;l<i;l+=a){let u=Math.min(a,i-l),c={x:t.x,y:t.y+l,width:t.width,height:u,useAbsoluteBounds:!1},p=r?x(c.x-r.x):x(c.x),g=r?x(c.y-r.y):x(c.y);o.resize(n,Math.max(1,u)),o.x=x(c.x),o.y=x(c.y),_r(e,t,c),s.push({x:p,y:g,width:n,height:d(u),pngBytes:await o.exportAsync({format:"PNG",useAbsoluteBounds:!1})})}return s}finally{o.removed||o.remove(),e.removed||e.remove()}}async function qn(e,t,r=null){var g,y;let o=oa(e),n=e.type==="TEXT"?Gi(e,t.documentBounds):null,i=(g=n!=null?n:tt(e))!=null?g:v(e),a=o!=null&&o.warning?o.warning:null;if(a&&t.warnings.add(a),!t.longFrameMode){let T=await pigmaExportMultiFillGroup(e,t,r,i);if(T)return T}if(t.longFrameMode&&i&&pe(e)&&De(i)){t.currentLeaf+=1,Y(t,f(e));let T=await pt(e,i,{normalizePaintOpacity:(o==null?void 0:o.normalizePaintOpacity)===!0,normalizePaintBlendMode:(o==null?void 0:o.normalizePaintBlendMode)===!0});return t.warnings.add(Te(f(e),T.length)),Be(e.id,f(e),e.type,o?o.effectiveOpacity:j(e),e.visible,at(o?o.effectiveBlendMode:K(e)),T)}let s=await hr(e,t,r),l=s.effects,u=_(l),c=me(e),p=progressiveBlurShouldRasterize(l),d=Re(e)?Nr(e):null,m=(e.type==="LINE"||e.type==="VECTOR")&&!!c&&!(d!=null&&d.fill),h=o||l||c||u?p?{normalizePaintOpacity:(o==null?void 0:o.normalizePaintOpacity)===!0,normalizePaintBlendMode:(o==null?void 0:o.normalizePaintBlendMode)===!0}:{normalizePaintOpacity:(o==null?void 0:o.normalizePaintOpacity)===!0,normalizePaintBlendMode:(o==null?void 0:o.normalizePaintBlendMode)===!0,removeSupportedEffects:s.removeSupportedEffects||!!u,removeSupportedStroke:!!c&&!m}:void 0,Bounds=p?(n!=null?n:v(e)):n!=null?n:(o||l||c||u)&&(y=tt(e))!=null?y:void 0;p&&t.warnings.add('"'.concat(f(e),'" kept its progressive blur as a bitmap layer for closer Photoshop matching.'));let E=n&&e.type==="TEXT"?await Qn(e,t,n,h):await Me(e,t,Bounds,h);return E?{kind:"bitmap",id:e.id,name:f(e),sourceType:e.type,opacity:o?o.effectiveOpacity:j(e),visible:e.visible,blendMode:at(o?o.effectiveBlendMode:K(e)),effects:p?null:l,strokeEffect:p||m?null:c,x:E.x,y:E.y,width:E.width,height:E.height,nodeTransform:de(e,t.documentBounds,E.x,E.y),pngBytes:E.pngBytes}:null}async function Jn(e,t){if(O.forceBitmapVectorPreview)return null;let r=ft(e);if(!r)return null;let o=L(e,t.root),n=_(o),i=me(e),a=Nr(e),s=oa(e),l="fills"in e&&Array.isArray(e.fills)?e.fills.some(W):!1,u=(e.type==="LINE"||e.type==="VECTOR")&&!!i&&!l;if(u)return null;let c=!!i&&!(a!=null&&a.fill)&&!I(e)?Math.max(3,Math.ceil(i.width/2)+2):0,p=c?{x:r.x-c,y:r.y-c,width:r.width+c*2,height:r.height+c*2,useAbsoluteBounds:!1}:r,g=await Me(e,t,o||i||n||s?p:void 0,o||i||n||s?{normalizePaintOpacity:(s==null?void 0:s.normalizePaintOpacity)===!0,normalizePaintBlendMode:(s==null?void 0:s.normalizePaintBlendMode)===!0,removeSupportedEffects:!0,removeSupportedStroke:!!i&&!!a.fill}:void 0);if(!g)return null;let y=x(r.x-t.documentBounds.x),m=x(r.y-t.documentBounds.y),T=d(r.width),C=d(r.height),E=x(g.x-y),R=x(g.y-m),N="";try{N=await e.exportAsync({format:"SVG_STRING",useAbsoluteBounds:r.useAbsoluteBounds,svgOutlineText:!0,svgIdAttribute:!0,svgSimplifyStroke:!1})}catch(F){return null}if(!N||N.trim().length===0)return null;return{kind:"vector",id:e.id,name:f(e),sourceType:e.type,opacity:s?s.effectiveOpacity:j(e),visible:e.visible,blendMode:at(s?s.effectiveBlendMode:K(e)),effects:o,strokeEffect:a.fill?i:null,x:y,y:m,width:T,height:C,nodeTransform:de(e,t.documentBounds,y,m),pngBytes:g.pngBytes,strategy:a.strategy,svgString:N,fill:a.fill,previewOffsetX:E,previewOffsetY:R}}async function Qn(e,t,r,o){t.currentLeaf+=1,Y(t,f(e));let n=yt(e)||(o==null?void 0:o.normalizePaintOpacity)===!0||(o==null?void 0:o.normalizePaintBlendMode)===!0||(o==null?void 0:o.removeAllEffects)===!0||(o==null?void 0:o.removeSupportedEffects)===!0||(o==null?void 0:o.removeSupportedStroke)===!0,i=await Hr(e,r,o,n);return{x:x(r.x-t.documentBounds.x),y:x(r.y-t.documentBounds.y),width:d(r.width),height:d(r.height),pngBytes:i}}async function Me(e,t,r,o){let n=r!=null?r:v(e);if(!n)return t.warnings.add('"'.concat(f(e),'" was skipped because it has no exportable bounds.')),null;t.currentLeaf+=1,Y(t,f(e));let a=yt(e)||(o==null?void 0:o.normalizePaintOpacity)===!0||(o==null?void 0:o.normalizePaintBlendMode)===!0||(o==null?void 0:o.removeAllEffects)===!0||(o==null?void 0:o.removeSupportedEffects)===!0||(o==null?void 0:o.removeSupportedStroke)===!0?await $r(e,n,t,o):await e.exportAsync({format:"PNG",useAbsoluteBounds:n.useAbsoluteBounds});return{x:x(n.x-t.documentBounds.x),y:x(n.y-t.documentBounds.y),width:d(n.width),height:d(n.height),pngBytes:a}}function Y(e,t){let r=Date.now();!(e.currentLeaf>=e.totalLeaves)&&r-e.lastProgressPostedAt<Eo||(e.lastProgressPostedAt=r,N({type:"export-progress",rootName:e.rootName,rootIndex:e.rootIndex,rootCount:e.rootCount,current:e.currentLeaf,total:e.totalLeaves,layerName:t}))}function Ie(e,t){let r={exportNodeCount:0,editableTextCount:0,preservedGroupCount:0,containsHeavyEffects:!1,warnings:new Set},o=mt(e,t);for(let n of o)rt(n,r,t,e);return r}function rt(e,t,r,o){if(r==="ignore-hidden"&&!q(e))return;Yo(e,o)&&(t.containsHeavyEffects=!0),te(e,o)&&t.warnings.add(yi(e));let n=Fe(e);if(n==="group"){let i=ue(e,r);if(i.length>0){t.preservedGroupCount+=1;for(let a of i)zt(a,t,r,o);return}}if(n==="split"){t.preservedGroupCount+=1,t.exportNodeCount+=1;let i=ue(e,r);for(let a of i)zt(a,t,r,o);return}if(t.exportNodeCount+=1,t.exportNodeCount+=Wi(L(e,o)),e.type==="TEXT"){let i=Pr(e);i.supported?fe(e,o)?t.warnings.add(eo(f(e))):t.editableTextCount+=1:t.warnings.add(i.reason)}else if(Re(e))Nr(e).strategy==="smart-object"&&t.warnings.add('"'.concat(f(e),'" is a complex vector, so it will export as a smart object instead of a native PSD shape layer.'));else if(V(e)&&e.children.length>0){let i=L(e);_(i)?t.warnings.add(Mr(e,"future")):ze(e)?t.warnings.add(Ir(e,"future")):$e(i)?t.warnings.add(Rr(e,"future")):Pt(i)?t.warnings.add(Ar(e,"future")):t.warnings.add(Br(e,"future"))}re(e)&&t.warnings.add('"'.concat(f(e),'" uses masking and will export as a flattened bitmap layer.'))}function zt(e,t,r,o){if(e.kind==="node"){rt(e.node,t,r,o);return}t.preservedGroupCount+=1,t.exportNodeCount+=1;for(let n of e.maskedNodes)rt(n,t,r,o)}function Pr(e){if(!e.characters||e.characters.length===0)return{supported:!1,reason:'"'.concat(f(e),'" is empty, so it falls back to a bitmap layer.')};let t=Le(e);if(!t.ok)return{supported:!1,reason:'"'.concat(f(e),'" falls back to bitmap: ').concat(t.reason)};let r=Dr(e,t.baseStyle);return r.ok?{supported:!0}:{supported:!1,reason:'"'.concat(f(e),'" falls back to bitmap: ').concat(r.reason)}}function Re(e){return e.type==="VECTOR"||e.type==="BOOLEAN_OPERATION"||e.type==="RECTANGLE"||e.type==="ELLIPSE"||e.type==="POLYGON"||e.type==="STAR"||e.type==="LINE"}function Nr(e){if(re(e)||te(e)||fe(e))return{strategy:"smart-object",fill:null};let t=Ti(e);return t?{strategy:"shape",fill:t}:{strategy:"smart-object",fill:null}}function ft(e){let t=me(e),r=Re(e)?Nr(e):null,o=Re(e)&&!!t&&!(r!=null&&r.fill),n=o?I(e):null;if(n&&n.width>0&&n.height>0)return{x:n.x,y:n.y,width:n.width,height:n.height,useAbsoluteBounds:!1};let i=ce(e);if(!i)return v(e);if(!o)return{x:i.x,y:i.y,width:i.width,height:i.height,useAbsoluteBounds:!0};let a=Math.max(3,Math.ceil(t.width/2)+2);return{x:i.x-a,y:i.y-a,width:i.width+a*2,height:i.height+a*2,useAbsoluteBounds:!1}}function ce(e){let t=ei(e.absoluteTransform,e.width,e.height);if(t.length===0)return null;let r=t.map(l=>l.x),o=t.map(l=>l.y),n=Math.min(...r),i=Math.min(...o),a=Math.max(...r),s=Math.max(...o);return!Number.isFinite(n)||!Number.isFinite(i)||!Number.isFinite(a)||!Number.isFinite(s)?null:{x:n,y:i,width:a-n,height:s-i,useAbsoluteBounds:!0}}function ei(e,t,r){return[{x:0,y:0},{x:t,y:0},{x:t,y:r},{x:0,y:r}].map(n=>({x:e[0][0]*n.x+e[0][1]*n.y+e[0][2],y:e[1][0]*n.x+e[1][1]*n.y+e[1][2]}))}function de(e,t,r,o){if(!("absoluteTransform"in e)||!("width"in e)||!("height"in e))return null;let n=oo(e.absoluteTransform,t);return{matrix:[n[0],n[1],n[2],n[3],D(n[4]-r),D(n[5]-o)],width:d(e.width),height:d(e.height)}}function Tr(e,t){let r=Le(e);if(!r.ok)return null;let o=Dr(e,r.baseStyle);if(!o.ok)return null;let n=Ae(e,o.shapeType);if(!n)return null;let i=oo(e.absoluteTransform,t),a=x(n.x-t.x),s=x(n.y-t.y),l=x(a+n.width),u=x(s+n.height);return{value:r.value,transform:i,bounds:{left:a,top:s,right:l,bottom:u},boundingBox:{left:a,top:s,right:l,bottom:u},hasVisualBoundsProbe:!1,sizingMode:o.sizingMode,shapeType:o.shapeType,pointBase:o.pointBase,boxBounds:o.boxBounds,textTruncation:o.textTruncation,maxLines:o.maxLines,justification:ia(e.textAlignHorizontal),baseStyle:r.baseStyle,styleRuns:r.styleRuns}}function Dr(e,t){if(e.textAutoResize==="TRUNCATE")return{ok:!1,reason:"truncate mode is not mapped safely to editable Photoshop text yet"};if(e.textTruncation==="ENDING")return{ok:!1,reason:"ellipsis truncation is not mapped safely to editable Photoshop text yet"};let r=d(e.width),o=d(e.height),n=ti(e);return ri(e,t)?{ok:!0,sizingMode:n,shapeType:"point",pointBase:[0,0],boxBounds:null,textTruncation:"disabled",maxLines:e.maxLines}:e.textAutoResize==="HEIGHT"?{ok:!0,sizingMode:n,shapeType:"box",pointBase:null,boxBounds:[0,0,r,o],textTruncation:"disabled",maxLines:e.maxLines}:{ok:!0,sizingMode:n,shapeType:"box",pointBase:null,boxBounds:[0,0,r,o],textTruncation:"disabled",maxLines:e.maxLines}}function ti(e){return e.textAutoResize==="WIDTH_AND_HEIGHT"?"auto-width":e.textAutoResize==="HEIGHT"?"auto-height":"fixed"}function ri(e,t){return e.textAutoResize==="WIDTH_AND_HEIGHT"?!0:ni(e)?!1:oi(e,t)===1}function oi(e,t){let r=ai(e.characters);if(r>1)return r;let o=ii(t),n=d(e.height);if(!_t(n,o))return 2;let i=I(e);return i&&!_t(i.height,o)?2:1}function _t(e,t){return e<=t*1.45}function ni(e){let t=Math.max(1,d(e.width)),r=Math.max(1,d(e.height)),o=I(e);return o?o.width>t*1.2||o.height>r*1.05:!1}function ii(e){return e.lineHeightPx!==null&&e.lineHeightPx>0?e.lineHeightPx:Math.max(e.fontSize,e.fontSize*1.2)}function ai(e){return Math.max(1,e.replace(/\r\n?/g,"\n").split("\n").length)}function vr(e){return e.replace(/\r\n?/g,"\n").replace(/\s+/g,"").length}function Ae(e,t){return t==="point"?ge(e,!1):v(e)}function Le(e){let t=e.getStyledTextSegments([...bo]);if(t.length===0)return{ok:!1,reason:"the text node has no style segments"};let r=[],o="";for(let n of t){let i=si(n);if(!i)return{ok:!1,reason:"it uses unsupported fills or text styling for editable export"};o+=li(e.characters.slice(n.start,n.end),n.textCase),r.push({length:n.end-n.start,style:i})}return{ok:!0,value:o,baseStyle:r[0].style,styleRuns:r}}function si(e){let t=di(e.fills);return t?{photoshopFontName:sa(e.fontName),fontFamily:e.fontName.family,fontStyle:e.fontName.style,fontSize:Math.max(1,e.fontSize),fillColor:t,lineHeightPx:aa(e.lineHeight,e.fontSize),tracking:ci(e.letterSpacing,e.fontSize),fontCaps:ui(e.textCase),underline:e.textDecoration==="UNDERLINE",strikethrough:e.textDecoration==="STRIKETHROUGH"}:null}function li(e,t){switch(t){case"UPPER":return e.toLocaleUpperCase();case"LOWER":return e.toLocaleLowerCase();case"TITLE":return e.replace(new RegExp("\\b(\\p{L})(\\p{L}*)","gu"),(r,o,n)=>o.toLocaleUpperCase()+n.toLocaleLowerCase());default:return e}}function ui(e){switch(e){case"UPPER":return 2;case"SMALL_CAPS":case"SMALL_CAPS_FORCED":return 1;default:return 0}}function ci(e,t){return t<=0?0:e.unit==="PIXELS"?Math.round(e.value/t*1e3):Math.round(e.value/100*500)}function di(e){let t=e.filter(o=>W(o));if(t.length!==1)return null;let r=t[0];return r.type!=="SOLID"?null:{r:z(r.color.r*255),g:z(r.color.g*255),b:z(r.color.b*255),a:z((r.opacity!==void 0?r.opacity:1)*255)}}function mt(e,t){return t==="ignore-hidden"&&!q(e)?[]:!V(e)||e.children.length===0?[e]:Cr(e)||hi(e)?[e]:pi(e,t)}function pi(e,t){return ot(e).filter(o=>!(!he(o)||t==="ignore-hidden"&&!q(o)))}function ue(e,t){let r=fi(e).filter(n=>!(!he(n)||t==="ignore-hidden"&&!q(n))),o=[];for(let n=0;n<r.length;n+=1){let i=r[n];if(!re(i)){o.push({kind:"node",node:i});continue}let a=[],s=n+1;for(;s<r.length;s+=1){let l=r[s];if(mi(l))break;a.push(l)}if(a.length===0){o.push({kind:"node",node:i});continue}o.push({kind:"mask-group",maskNode:i,maskedNodes:a.reverse()}),n=s-1}return o.reverse()}function ot(e){let t=e.children.slice();return wr(e)?t:t.reverse()}function fi(e){let t=e.children.slice();return wr(e)?t.reverse():t}function wr(e){return"itemReverseZIndex"in e&&e.itemReverseZIndex===!0}function mi(e){return re(e)||xi(e)||gi(e)}function xi(e){return V(e)?e.children.some(t=>he(t)&&re(t)):!1}function gi(e){return"clipsContent"in e&&e.clipsContent===!0}function Fe(e){return!V(e)||e.children.length===0?null:!yo.has(e.type)||re(e)||"clipsContent"in e&&e.clipsContent&&!ht(e)?"flatten":kr(e)?ze(e)||$i(L(e))?"flatten":So.has(e.type)&&Ur(e)?"split":"flatten":"group"}function Cr(e){return Fe(e)==="group"}function hi(e){return Fe(e)==="split"}function kr(e){return X(e,"fills")||X(e,"strokes")||Zr(e)}function Br(e,t){let r=f(e),o=t==="future"?"will flatten into one bitmap layer":"was flattened";if((e.type==="INSTANCE"||e.type==="COMPONENT")&&kr(e)){let n=e.type==="INSTANCE"?"instance":"component";return'"'.concat(r,'" ').concat(o," because Photoshop cannot preserve Figma ").concat(n," structure once the container also renders its own appearance.")}return'"'.concat(r,'" ').concat(o," because the container renders its own appearance.")}function Mr(e,t){let r=t==="future"?"will flatten into one bitmap layer":"was flattened";return'"'.concat(f(e),'" ').concat(r," because Layer Blur on a container with children must apply to the whole group composite, and that editable group Smart Filter path is not implemented yet.")}function Ir(e,t){let r=t==="future"?"will flatten into one bitmap layer":"was flattened";return'"'.concat(f(e),'" ').concat(r," because Background Blur on a container with children must sample the whole backdrop behind the group composite, and that editable reconstruction path is not implemented yet.")}function Rr(e,t){let r=t==="future"?"will flatten into one bitmap layer":"was flattened";return'"'.concat(f(e),'" ').concat(r," because Photoshop does not reliably reopen container shadow/glow exported as folder layer effects, so this container is rasterized for compatibility.")}function Ar(e,t){let r=t==="future"?"will flatten into one bitmap layer":"was flattened";return'"'.concat(f(e),'" ').concat(r," because top-level Noise or Texture on a container with children must apply to the whole group composite, and that editable reconstruction path is not implemented yet.")}function yi(e){return Xr(e)?'"'.concat(f(e),'" uses Glass, which cannot stay editable in the PSD yet, so it will be baked into raster pixels.'):'"'.concat(f(e),'" uses Figma effects that cannot stay editable in the PSD, so they will be baked into raster pixels.')}function $t(e){return'"'.concat(e,'" uses Background Blur, but Pigma could not isolate a clean editable backdrop snapshot inside the selected export root, so that blur was baked into raster pixels.')}async function Si(e,t){let r=await bi(e,t);return r?{kind:"bitmap",mode:xt(e),x:r.x,y:r.y,width:r.width,height:r.height,pngBytes:r.pngBytes}:null}async function bi(e,t){let r=xt(e),o=Lr(e,r);if(!o)return t.warnings.add('"'.concat(f(e),'" could not provide mask bounds for export.')),null;t.currentLeaf+=1,Y(t,"".concat(f(e)," (Mask)"));let n=await Ei(e,o,t,r);return{x:x(o.x-t.documentBounds.x),y:x(o.y-t.documentBounds.y),width:d(o.width),height:d(o.height),pngBytes:n}}async function Ei(e,t,r,o){await dt(e);let n=e.clone(),i=null;try{if(Pi(n,o),"absoluteTransform"in e&&"relativeTransform"in n){i=figma.createFrame(),i.resize(Math.max(1,d(t.width)),Math.max(1,d(t.height))),i.clipsContent=!0,i.fills=[],i.strokes=[],i.name="__pigma-mask-preview__",i.x=t.x,i.y=t.y,figma.currentPage.appendChild(i),i.appendChild(n),Vr(e,n,t);return await i.exportAsync({format:"PNG",useAbsoluteBounds:!1})}return bt(n,t),await n.exportAsync({format:"PNG",useAbsoluteBounds:t.useAbsoluteBounds})}finally{i&&!i.removed&&i.remove(),n.removed||n.remove()}}function Pi(e,t){e.visible=!0,"isMask"in e&&(e.isMask=!1),t==="vector"&&("opacity"in e&&typeof e.opacity=="number"&&(e.opacity=1),"blendMode"in e&&(e.blendMode="NORMAL"),Qr(e),to(e,{normalizePaintOpacity:!0,normalizePaintBlendMode:!0}))}function xt(e){if(!("maskType"in e))return"alpha";switch(e.maskType){case"VECTOR":return"vector";case"LUMINANCE":return"luminance";default:return"alpha"}}function maskPreviewPaddingRadius(e){let t=L(e),r=0;if(t)for(let o of t)o&&o.style==="layer-blur"&&(r=Math.max(r,o.blurType==="PROGRESSIVE"?Math.max(o.startRadius,o.radius):o.radius));return r<=.01?0:Math.ceil(h(r*2.5+8,8,256))}function padExportBounds(e,t){return!e||t<=0?e:{x:e.x-t,y:e.y-t,width:e.width+t*2,height:e.height+t*2,useAbsoluteBounds:!1}}function Lr(e,t){let r=maskPreviewPaddingRadius(e),o=null;if(t!=="vector")return padExportBounds(v(e),r);let n=k(e);if(n&&n.width>0&&n.height>0)o={x:n.x,y:n.y,width:n.width,height:n.height,useAbsoluteBounds:!0};else if("absoluteTransform"in e&&"width"in e&&"height"in e){let i=ce(e);i&&(o=i)}return padExportBounds(o!=null?o:v(e),r)}function gt(e,t){return Fr(e,t,!0)}function Fr(e,t,r=!1){if(r&&!ht(e))return null;let o=k(e);if(!o||o.width<=0||o.height<=0)return null;let n=Ni(e,o.width,o.height);return{kind:"rounded-rect",x:x(o.x-t.x),y:x(o.y-t.y),width:d(o.width),height:d(o.height),topLeftRadius:n.topLeftRadius,topRightRadius:n.topRightRadius,bottomRightRadius:n.bottomRightRadius,bottomLeftRadius:n.bottomLeftRadius}}function redundantRootMask(e,t,r){if(e!==r)return!1;let o=gt(e,t);return!!o&&o.x===0&&o.y===0&&o.width===d(t.width)&&o.height===d(t.height)&&o.topLeftRadius===0&&o.topRightRadius===0&&o.bottomRightRadius===0&&o.bottomLeftRadius===0}function containerMask(e,t,r){return redundantRootMask(e,t,r)?null:gt(e,t)}function ht(e){if(!("clipsContent"in e)||e.clipsContent!==!0||!("width"in e)||!("height"in e))return!1;let t=k(e);return!!t&&t.width>0&&t.height>0}function Ni(e,t,r){let o=Math.min(t,r)/2,n={topLeftRadius:0,topRightRadius:0,bottomRightRadius:0,bottomLeftRadius:0};return!("topLeftRadius"in e)||!("topRightRadius"in e)||!("bottomRightRadius"in e)||!("bottomLeftRadius"in e)?n:{topLeftRadius:h(e.topLeftRadius,0,o),topRightRadius:h(e.topRightRadius,0,o),bottomRightRadius:h(e.bottomRightRadius,0,o),bottomLeftRadius:h(e.bottomLeftRadius,0,o)}}function Ti(e){return te(e)||X(e,"strokes")||!("fills"in e)||!Array.isArray(e.fills)?null:vi(e.fills)}function Di(e){if(te(e))return null;let t="fills"in e&&Array.isArray(e.fills)?wi(e.fills):null,r="strokes"in e&&Array.isArray(e.strokes)?Gr(e.strokes):null,o=null;if(r){let n=Jr(e);if(n===null)return null;o={kind:"solid",color:Ge(r),width:n,position:Or(e)}}return!t&&!o?null:{fill:t,stroke:o}}function vi(e){let t=e.filter(o=>W(o));if(t.length!==1)return null;let r=t[0];return r.type==="SOLID"?{kind:"solid",color:Ge(r)}:Ci(r)?ki(r):null}function wi(e){let t=e.filter(o=>W(o));if(t.length!==1)return null;let r=t[0];return r.type!=="SOLID"?null:{kind:"solid",color:Ge(r)}}function Gr(e){let t=e.filter(o=>W(o));if(t.length!==1)return null;let r=t[0];return r.type!=="SOLID"?null:r}function Ci(e){return e.type==="GRADIENT_LINEAR"||e.type==="GRADIENT_RADIAL"||e.type==="GRADIENT_ANGULAR"||e.type==="GRADIENT_DIAMOND"}function ki(e){var n;if(!Array.isArray(e.gradientStops)||e.gradientStops.length<2)return null;let t=Mi(e.gradientTransform);if(!t)return null;let r=h((n=e.opacity)!=null?n:1,0,1),o=e.gradientStops.slice().sort((i,a)=>i.position-a.position);return{kind:"gradient",gradientType:Bi(e.type),transform:t,colorStops:o.map(i=>({position:h(i.position,0,1),color:ee({r:i.color.r,g:i.color.g,b:i.color.b,a:1})})),opacityStops:o.map(i=>({position:h(i.position,0,1),opacity:h(i.color.a*r,0,1)}))}}function Bi(e){switch(e){case"GRADIENT_LINEAR":return"linear";case"GRADIENT_RADIAL":return"radial";case"GRADIENT_ANGULAR":return"angular";case"GRADIENT_DIAMOND":return"diamond";default:return"linear"}}function Mi(e){if(!Array.isArray(e)||e.length!==2||!Array.isArray(e[0])||!Array.isArray(e[1])||e[0].length!==3||e[1].length!==3)return null;let t=[D(e[0][0]),D(e[1][0]),D(e[0][1]),D(e[1][1]),D(e[0][2]),D(e[1][2])];return t.every(r=>Number.isFinite(r))?t:null}function Ge(e){return ee({r:e.color.r,g:e.color.g,b:e.color.b,a:e.opacity!==void 0?e.opacity:1})}function ee(e){return{r:z(e.r*255),g:z(e.g*255),b:z(e.b*255),a:z(e.a*255)}}function Or(e){if(!("strokeAlign"in e))return"center";switch(e.strokeAlign){case"INSIDE":return"inside";case"OUTSIDE":return"outside";default:return"center"}}function X(e,t){let r=Oi(e,t);return r==null?!1:Array.isArray(r)?r.some(o=>W(o)):!0}function Ur(e){return"clone"in e&&typeof e.clone=="function"}function pe(e){return"clone"in e&&typeof e.clone=="function"}function zr(e,t){let r=[],o=e;for(;o&&o!==t;){let n=o.parent&&"children"in o.parent?o.parent:null;if(!n)return null;let i=o.id,a=n.children.findIndex(s=>s.id===i);if(a<0)return null;r.unshift(a),o=n}return o===t?r:null}function Ii(e){"opacity"in e&&(e.opacity=1),"blendMode"in e&&(e.blendMode="NORMAL");for(let t of e.children)nt(t)}function nt(e){if("opacity"in e&&typeof e.opacity=="number"){e.opacity=0;return}e.visible=!1}async function Ri(e,t,r=null){var s;if(!qr(e,t.root)||!pe(t.root))return null;let o=(s=r!=null?r:tt(e))!=null?s:v(e);if(!o||Sa(o.width,o.height,To))return null;let n=zr(e,t.root);if(!n||n.length===0)return null;if(!await preloadTreeFontsSafely(t.root))return null;let i=t.root.clone(),a=figma.createFrame();try{return a.resize(d(o.width),d(o.height)),a.clipsContent=!0,a.fills=[],a.strokes=[],a.x=o.x,a.y=o.y,a.name="__pigma-background-blur-crop__",figma.currentPage.appendChild(a),a.appendChild(i),Ai(t.root,i,n)?(_r(i,t.documentBounds,o),await a.exportAsync({format:"PNG",useAbsoluteBounds:!1})):null}catch(l){return null}finally{a.removed||a.remove(),i.removed||i.remove()}}function Ai(e,t,r){let o=e,n=t;for(let i=0;i<r.length;i+=1){if(!("children"in o)||!("children"in n))return!1;let a=o.children[r[i]],s=n.children[r[i]];if(!a||!s)return!1;let l=ot(o),u=ot(n),c=l.findIndex(p=>p.id===a.id);if(c<0)return!1;for(let p=0;p<c;p+=1)nt(u[p]);if(i===r.length-1)return nt(s),!0;o=a,n=s}return!1}function _r(e,t,r){let o=x(t.x-r.x),n=x(t.y-r.y);if("relativeTransform"in e){let i=e,a=i.relativeTransform;i.relativeTransform=[[a[0][0],a[0][1],o],[a[1][0],a[1][1],n]];return}if("x"in e&&"y"in e){let i=e;i.x=o,i.y=n}}async function $r(e,t,r,o){await dt(e);let n=e.clone(),i=null,a=Re(e)?Nr(e):null,s=Re(e)&&!!me(e)&&!(a!=null&&a.fill)&&"relativeTransform"in n;try{return Oe(n,o),s?(i=figma.createFrame(),i.resize(Math.max(1,d(t.width)),Math.max(1,d(t.height))),i.clipsContent=!0,i.fills=[],i.strokes=[],i.name="__pigma-vector-preview__",i.x=t.x,i.y=t.y,figma.currentPage.appendChild(i),i.appendChild(n),Vr(e,n,t),await i.exportAsync({format:"PNG",useAbsoluteBounds:!1})):(bt(n,t),await n.exportAsync({format:"PNG",useAbsoluteBounds:t.useAbsoluteBounds}))}finally{i&&!i.removed&&i.remove(),n.removed||n.remove()}}async function Hr(e,t,r,o){await we(e);let n=e.clone(),i=figma.createFrame();try{return i.resize(d(t.width),d(t.height)),i.clipsContent=!0,i.fills=[],i.strokes=[],i.name="__pigma-text-preview-padding__",i.x=t.x,i.y=t.y,figma.currentPage.appendChild(i),i.appendChild(n),o&&Oe(n,r),Vr(e,n,t),await i.exportAsync({format:"PNG",useAbsoluteBounds:!1})}finally{i.removed||i.remove(),n.removed||n.remove()}}async function Li(e,t,r){await we(e);let o=e.clone(),n=figma.createFrame();try{n.resize(d(t.width),d(t.height)),n.clipsContent=!1,n.fills=[],n.strokes=[],n.name="__pigma-text-visual-probe__",n.x=t.x,n.y=t.y,figma.currentPage.appendChild(n),n.appendChild(o),Oe(o,r),Vr(e,o,t);let i=figma.flatten([o],n),a=v(i);return a||null}catch(i){return null}finally{n.removed||n.remove(),o.removed||o.remove()}}function yt(e){return!q(e)||Fi(e)}function Fi(e){return"opacity"in e&&typeof e.opacity=="number"&&!St(e.opacity,1)?!0:"blendMode"in e?e.blendMode!=="NORMAL"&&e.blendMode!=="PASS_THROUGH":!1}function Oe(e,t){e.visible=!0,"opacity"in e&&typeof e.opacity=="number"&&(e.opacity=1),"blendMode"in e&&(e.blendMode="NORMAL"),t!=null&&t.removeAllEffects&&Qr(e),t!=null&&t.removeSupportedEffects&&ta(e),t!=null&&t.removeSupportedStroke&&ra(e),(t!=null&&t.normalizePaintOpacity||t!=null&&t.normalizePaintBlendMode)&&to(e,t)}function q(e){let t=e;for(;t;){if("visible"in t&&t.visible===!1)return!1;t=t.parent}return!0}function St(e,t){return Math.abs(e-t)<1e-4}function bt(e,t){if(e.parent!==figma.currentPage&&figma.currentPage.appendChild(e),"relativeTransform"in e){let r=e,o=r.relativeTransform;r.relativeTransform=[[o[0][0],o[0][1],t.x],[o[1][0],o[1][1],t.y]];return}if("x"in e&&"y"in e){let r=e;r.x=t.x,r.y=t.y}}function Vr(e,t,r){if("relativeTransform"in t){t.relativeTransform=[[e.absoluteTransform[0][0],e.absoluteTransform[0][1],e.absoluteTransform[0][2]-r.x],[e.absoluteTransform[1][0],e.absoluteTransform[1][1],e.absoluteTransform[1][2]-r.y]];return}let o=t,n=e;o.x=n.x-r.x,o.y=n.y-r.y}function it(e,t){let r=Math.max(1,t.baseStyle.fontSize),o=k(e),n=I(e),i=o?o.x+o.width:null,a=o?o.y+o.height:null,s=n?n.x+n.width:null,l=n?n.y+n.height:null,u=o&&n?Math.max(0,o.x-n.x):0,c=o&&n?Math.max(0,o.y-n.y):0,p=i!==null&&s!==null?Math.max(0,s-i):0,g=a!==null&&l!==null?Math.max(0,l-a):0;return{left:d(h(r*.1+u,6,r*.45)),top:d(h(r*.08+c,6,r*.3)),right:d(h(r*.16+p,10,r*.55)),bottom:d(h(r*.24+g,12,r*.7))}}function Ht(e){let t=Math.max(1,e.baseStyle.fontSize),r=vr(e.value),o=r<=1?1.4:r<=3?1.1:1;return{left:d(t*.06*o),top:d(t*.05),right:d(t*.12*o),bottom:d(t*.11*o)}}function jr(e,t){let r=Math.max(1,t.baseStyle.fontSize),o=vr(t.value),i=Math.max(1,t.bounds.right-t.bounds.left)/r,a=t.value.replace(/\s+/g,""),s=0;r>=400?s+=35:r>=240?s+=22:r>=120&&(s+=10),o<=1?s+=25:o<=3&&(s+=14),i<=.3?s+=20:i<=.55&&(s+=10),t.shapeType==="point"&&(s+=8),/[fgjkpqty]/i.test(a)&&(s+=12),/[^\u0000-\u00ff]/.test(a)&&(s+=10);let l=k(e),u=I(e);if(l&&u){let c=br(l,u);(c.left>0||c.top>0||c.right>0||c.bottom>0)&&(s+=10)}return h(s,0,100)}function Gi(e,t){let r=Tr(e,t);if(!r)return null;let o=jr(e,r);if(o<Po)return null;let n=Ae(e,r.shapeType);if(!n)return null;let i=r.shapeType==="point"?it(e,r):{left:0,top:0,right:0,bottom:0},a=Wr(r,o);return ie(n,{left:Math.max(i.left,a.left),top:Math.max(i.top,a.top),right:Math.max(i.right,a.right),bottom:Math.max(i.bottom,a.bottom)})}function Wr(e,t){let r=Math.max(1,e.baseStyle.fontSize),o=h(t/100,0,1);return{left:d(r*(.05+o*.2)),top:d(r*(.04+o*.1)),right:d(r*(.08+o*.3)),bottom:d(r*(.12+o*.16))}}function ie(e,t){return{x:e.x-t.left,y:e.y-t.top,width:e.width+t.left+t.right,height:e.height+t.top+t.bottom,useAbsoluteBounds:!1}}function Vt(e,t){let r=Math.min(e.x,t.x),o=Math.min(e.y,t.y),n=Math.max(e.x+e.width,t.x+t.width),i=Math.max(e.y+e.height,t.y+t.height);return{x:r,y:o,width:n-r,height:i-o,useAbsoluteBounds:!1}}function Oi(e,t){return t==="fills"?"fills"in e?e.fills:null:"strokes"in e?e.strokes:null}function Ui(e){return"visible"in e&&e.visible===!1?!1:e.type==="LAYER_BLUR"?O.disableLayerBlur?!1:!(O.disableProgressiveLayerBlur&&e.blurType==="PROGRESSIVE"):e.type==="BACKGROUND_BLUR"?!O.disableBackgroundBlur:e.type==="NOISE"?!O.disableNoise:e.type==="TEXTURE"?!O.disableTexture:!0}function Ue(e){if(!("effects"in e))return null;let t=e.effects;return Array.isArray(t)?t.filter(r=>Ui(r)):null}function Zr(e){let t=Ue(e);return!!t&&t.length>0}function ze(e){let t=Ue(e);return t?t.some(r=>r.type==="BACKGROUND_BLUR"):!1}function Xr(e){let t=Ue(e);return t?t.some(r=>r.type==="GLASS"):!1}function L(e,t=null){let r=Ue(e);if(!r||r.length===0)return null;let o=[],n=r.filter(a=>a.type==="DROP_SHADOW"&&Ke(a)).length,i=r.filter(a=>a.type==="INNER_SHADOW"&&Ke(a)).length;for(let a of r){if(a.type==="LAYER_BLUR"){if(Kr(o))return null;let u=Ki(a);if(!u)return null;o.push(u);continue}if(a.type==="BACKGROUND_BLUR"){if(_e(o))return null;let u=Yi(a,e,t);if(!u)return null;o.push(u);continue}if(a.type==="NOISE"){let u=qi(a);if(!u)return null;o.push(u);continue}if(a.type==="TEXTURE"){let u=ea(a);if(!u)return null;o.push(u);continue}if(a.type!=="DROP_SHADOW"&&a.type!=="INNER_SHADOW")return null;if(Ke(a)&&(a.type==="DROP_SHADOW"&&n===1||a.type==="INNER_SHADOW"&&i===1)){let u=Xi(a);if(!u)return null;o.push(u);continue}let l=Zi(a);if(!l)return null;o.push(l)}return ji(o)&&o.length>0?o:null}function fe(e,t=null){return _(L(e,t))}function progressiveBlurShouldRasterize(e){let t=_(e);return!!t&&t.blurType==="PROGRESSIVE"}function _(e){let t=Kr(e);return t&&zi(t)>0?t:null}function Kr(e){var t;return e&&(t=e.find(r=>r.style==="layer-blur"))!=null?t:null}function zi(e){return e.blurType==="PROGRESSIVE"?Math.max(e.startRadius,e.radius):e.radius}function _e(e){var t;return e&&(t=e.find(r=>r.style==="background-blur"))!=null?t:null}function _i(e,t){return e?e.map(r=>r.style==="background-blur"?B(b({},r),{backdropPngBytes:t}):r):null}function jt(e){if(!e)return null;let t=e.filter(r=>r.style!=="background-blur");return t.length>0?t:null}function Et(e){return e?e.filter(t=>t.style==="noise"):[]}function Yr(e){return e?e.filter(t=>t.style==="texture"):[]}function Pt(e){return Et(e).length>0||Yr(e).length>0}function $i(e){return!!_(e)||!!_e(e)||Pt(e)}function $e(e){return!!(e!=null&&e.some(t=>t.style==="drop-shadow"||t.style==="inner-shadow"||t.style==="outer-glow"||t.style==="inner-glow"))}function Hi(e){if(!e)return null;let t=e.filter(r=>r.style==="drop-shadow"||r.style==="inner-shadow"||r.style==="outer-glow"||r.style==="inner-glow");return t.length>0?t:null}function Vi(e){if(!e)return null;let t=e.filter(r=>r.style!=="drop-shadow"&&r.style!=="inner-shadow"&&r.style!=="outer-glow"&&r.style!=="inner-glow");return t.length>0?t:null}function ji(e){let t=_(e),r=_e(e),o=Et(e),n=Yr(e);return!t&&!r&&o.length===0&&n.length===0?!0:r?e.length===1:!(t&&(o.length>0||n.length>0)||o.length>0&&n.length>0||n.some(i=>i.clipToShape!==!0)||(o.length>0||n.length>0)&&$e(e))}function Wi(e){return Et(e).length}function te(e,t=null){return Zr(e)&&L(e,t)===null}function Zi(e){return!e.color||!e.offset?null:{style:e.type==="DROP_SHADOW"?"drop-shadow":"inner-shadow",blendMode:oe(e.blendMode),color:ee(e.color),offsetX:x(e.offset.x),offsetY:x(e.offset.y),blur:M(Math.max(0,e.radius)),spread:M(typeof e.spread=="number"?e.spread:0),showBehindTransparentAreas:e.type==="DROP_SHADOW"&&e.showShadowBehindNode===!0}}function Xi(e){return e.color?{style:e.type==="DROP_SHADOW"?"outer-glow":"inner-glow",blendMode:oe(e.blendMode),color:ee(e.color),blur:M(Math.max(0,e.radius)),spread:M(typeof e.spread=="number"?e.spread:0)}:null}function Ki(e){return e.blurType==="PROGRESSIVE"?{style:"layer-blur",blurType:"PROGRESSIVE",radius:M(Math.max(0,e.radius)),startRadius:M(Math.max(0,e.startRadius)),startOffset:Zt(e.startOffset),endOffset:Zt(e.endOffset)}:e.blurType!=="NORMAL"?null:{style:"layer-blur",blurType:"NORMAL",radius:M(Math.max(0,e.radius))}}function Yi(e,t,r){return e.blurType!=="NORMAL"||!qr(t,r)?null:{style:"background-blur",radius:M(Math.max(0,e.radius)),backdropPngBytes:null}}function qi(e){let t={style:"noise",noiseType:e.noiseType.toLowerCase(),blendMode:oe(e.blendMode),primaryColor:ee(e.color),secondaryColor:"secondaryColor"in e?ee(e.secondaryColor):null,noiseSize:M(Math.max(0,e.noiseSize)),density:h(e.density,0,1),opacity:h("opacity"in e?e.opacity:e.color.a,0,1)};return Ji(t)}function Ji(e){let t=Lo[e.noiseType];return B(b({},e),{primaryColor:Wt(e.primaryColor,t.primaryAlphaScale),secondaryColor:e.secondaryColor?Wt(e.secondaryColor,t.secondaryAlphaScale):null,density:Qi(e.density),opacity:D(h(e.opacity*t.overlayOpacityScale,0,1))})}function Qi(e){return D(h(e-e*e*.12,0,1))}function Wt(e,t){return t===1?e:B(b({},e),{a:z(e.a*t)})}function ea(e){return{style:"texture",noiseSize:M(Math.max(0,e.noiseSize)),radius:M(Math.max(0,e.radius)),clipToShape:e.clipToShape===!0}}function qr(e,t){if(!t||e===t||!he(e)||Re(e)||V(e)&&e.children.length>0||!V(t)||!pe(t))return!1;let r=zr(e,t);return!!r&&r.length>0}function Ke(e){return Math.abs(e.offset.x)<.01&&Math.abs(e.offset.y)<.01}function me(e){if(!("strokes"in e)||!Array.isArray(e.strokes))return null;let t=Gr(e.strokes);if(!t)return null;let r=Jr(e);return r===null?null:{blendMode:oe(t.blendMode),color:Ge(t),width:r,position:Or(e)}}function Jr(e){if(!("strokeWeight"in e)||typeof e.strokeWeight!="number"||e.strokeWeight<=0)return null;if(!("strokeTopWeight"in e)||!("strokeBottomWeight"in e)||!("strokeLeftWeight"in e)||!("strokeRightWeight"in e))return M(e.strokeWeight);let t=[e.strokeTopWeight,e.strokeRightWeight,e.strokeBottomWeight,e.strokeLeftWeight];if(t.some(o=>typeof o!="number"||!Number.isFinite(o)||o<=0))return null;let r=t[0];return t.some(o=>Math.abs(o-r)>.01)||Math.abs(e.strokeWeight-r)>.01?null:M(r)}function ta(e){!("effects"in e)||!Array.isArray(e.effects)||(e.effects=e.effects.filter(t=>"visible"in t&&t.visible===!1?!0:t.type!=="DROP_SHADOW"&&t.type!=="INNER_SHADOW"&&t.type!=="LAYER_BLUR"&&t.type!=="BACKGROUND_BLUR"))}function Qr(e){!("effects"in e)||!Array.isArray(e.effects)||(e.effects=e.effects.filter(t=>"visible"in t&&t.visible===!1))}function eo(e){return'"'.concat(e,'" uses Layer Blur, so it will preserve the blur as a Photoshop Smart Filter and rasterize the text instead of keeping an editable text layer.')}function ra(e){if(!("strokes"in e)||!Array.isArray(e.strokes))return;let t=e;t.strokes=e.strokes.filter(r=>!W(r))}function W(e){return!("visible"in e)||e.visible!==!1}function re(e){return"isMask"in e&&e.isMask}function xe(e){let t=ho.has(e.type);return ge(e,t)}function v(e){let t=e.type==="TEXT";return ge(e,t)}function ge(e,t){let r=t?k(e):I(e),o=t?I(e):k(e),n=r!=null?r:o;return!n||n.width<=0||n.height<=0?null:{x:n.x,y:n.y,width:n.width,height:n.height,useAbsoluteBounds:t}}function k(e){return"absoluteBoundingBox"in e?e.absoluteBoundingBox:null}function I(e){return"absoluteRenderBounds"in e?e.absoluteRenderBounds:null}function he(e){return"exportAsync"in e}function V(e){return"children"in e}function j(e){return!("opacity"in e)||typeof e.opacity!="number"?1:h(e.opacity,0,1)}function oa(e){var u;if(!("fills"in e)||!Array.isArray(e.fills))return null;let t=e.fills.filter(c=>W(c));if(t.length!==1)return null;let r=t[0],o=r.type==="IMAGE"&&!!r.imageHash,n=o?h((u=r.opacity)!=null?u:1,0,1):1,i=o&&!St(n,1),a=!st(r.blendMode);if(!i&&!a)return null;let s="blendMode"in e?e.blendMode:void 0,l=!st(s),c=a,p=c?oe(r.blendMode):K(e),g=l&&c&&K(e)!==p;return{normalizePaintOpacity:i||c&&o,normalizePaintBlendMode:c,effectiveOpacity:o?h(j(e)*n,0,1):j(e),effectiveBlendMode:p,warning:g?'"'.concat(f(e),'" collapses Figma layer/fill blend modes into the fill blend for PSD export.'):null}}function pigmaVisibleFillEntries(e){return!("fills"in e)||!Array.isArray(e.fills)?[]:e.fills.map((t,r)=>({paint:t,index:r})).filter(t=>W(t.paint))}
+"use strict";(()=>{var so=Object.defineProperty,lo=Object.defineProperties;var uo=Object.getOwnPropertyDescriptors;var Ct=Object.getOwnPropertySymbols;var co=Object.prototype.hasOwnProperty,po=Object.prototype.propertyIsEnumerable;var kt=(e,t,r)=>t in e?so(e,t,{enumerable:!0,configurable:!0,writable:!0,value:r}):e[t]=r,b=(e,t)=>{for(var r in t||(t={}))co.call(t,r)&&kt(e,r,t[r]);if(Ct)for(var r of Ct(t))po.call(t,r)&&kt(e,r,t[r]);return e},B=(e,t)=>lo(e,uo(t));var A={psdVersion:"max-compatibility",textExportMode:"editable-text",imageExportMode:"bitmap-only",hiddenLayerMode:"ignore-hidden",exportPackageMode:"psd-only",fileNamePattern:"{frame-name}.psd"},$={psdVersion:"max-compatibility",textExportMode:"editable-text",imageExportMode:"smart-object-if-possible",hiddenLayerMode:"ignore-hidden",exportPackageMode:"psd-only",fileNamePattern:"{frame-name}.psd"},U={psdVersion:"max-compatibility",textExportMode:"rasterize-text",imageExportMode:"smart-object-if-possible",hiddenLayerMode:"ignore-hidden",exportPackageMode:"psd-only",fileNamePattern:"{frame-name}.psd"},H={psdVersion:"max-compatibility",textExportMode:"rasterize-text",imageExportMode:"bitmap-only",hiddenLayerMode:"ignore-hidden",exportPackageMode:"psd-only",fileNamePattern:"{frame-name}.psd"},Mt="ko",ne={locale:Mt,localeMode:"auto",exportSettings:A};function It(e){return e?B(b({},e),{imageExportMode:e.imageExportMode===U.imageExportMode?A.imageExportMode:e.imageExportMode}):{}}function Rt(e){if(!e)return{};let t=typeof e.fileNamePattern=="string"&&e.fileNamePattern.trim().length>0?e.fileNamePattern.trim():H.fileNamePattern,r=e.psdVersion==="max-compatibility"?e.psdVersion:H.psdVersion,o=e.textExportMode==="editable-text"||e.textExportMode==="rasterize-text"?e.textExportMode:H.textExportMode,n=e.imageExportMode==="smart-object-if-possible"||e.imageExportMode==="bitmap-only"?e.imageExportMode:H.imageExportMode;return r!==H.psdVersion||o!==H.textExportMode||n!==H.imageExportMode||t!==H.fileNamePattern?e:B(b({},e),{imageExportMode:A.imageExportMode})}function At(e){if(!e)return{};let t=typeof e.fileNamePattern=="string"&&e.fileNamePattern.trim().length>0?e.fileNamePattern.trim():$.fileNamePattern,r=e.psdVersion==="max-compatibility"?e.psdVersion:$.psdVersion,o=e.textExportMode==="editable-text"||e.textExportMode==="rasterize-text"?e.textExportMode:$.textExportMode,n=e.imageExportMode==="smart-object-if-possible"||e.imageExportMode==="bitmap-only"?e.imageExportMode:$.imageExportMode;return r!==$.psdVersion||o!==$.textExportMode||n!==$.imageExportMode||t!==$.fileNamePattern?e:B(b({},e),{imageExportMode:A.imageExportMode})}function Lt(e){if(!e)return{};let t=typeof e.fileNamePattern=="string"&&e.fileNamePattern.trim().length>0?e.fileNamePattern.trim():U.fileNamePattern,r=e.psdVersion==="max-compatibility"?e.psdVersion:U.psdVersion,o=e.textExportMode==="editable-text"||e.textExportMode==="rasterize-text"?e.textExportMode:U.textExportMode,n=e.imageExportMode==="smart-object-if-possible"||e.imageExportMode==="bitmap-only"?e.imageExportMode:U.imageExportMode;return r!==U.psdVersion||o!==U.textExportMode||n!==U.imageExportMode||t!==U.fileNamePattern?e:B(b({},e),{textExportMode:A.textExportMode})}function Ft(e){let t=e!=null?e:{};return{psdVersion:t.psdVersion==="max-compatibility"?t.psdVersion:A.psdVersion,textExportMode:t.textExportMode==="editable-text"||t.textExportMode==="rasterize-text"?t.textExportMode:A.textExportMode,imageExportMode:t.imageExportMode==="smart-object-if-possible"||t.imageExportMode==="bitmap-only"?t.imageExportMode:A.imageExportMode,hiddenLayerMode:t.hiddenLayerMode==="preserve-hidden"||t.hiddenLayerMode==="ignore-hidden"?t.hiddenLayerMode:A.hiddenLayerMode,exportPackageMode:t.exportPackageMode==="bundle-with-rasters"||t.exportPackageMode==="psd-only"?t.exportPackageMode:A.exportPackageMode,fileNamePattern:typeof t.fileNamePattern=="string"&&t.fileNamePattern.trim().length>0?t.fileNamePattern.trim():A.fileNamePattern}}var fo={"내보내기 파일이 여기에 표시됩니다.":"내보내기 파일이 여기에 표시됩니다.","프레임 또는 레이어를 선택하세요.":"프레임 또는 레이어를 선택하세요.","세션 시작":"세션 시작","선택 대기 중입니다.":"선택 대기 중입니다.","PSD 만들기 준비 중입니다.":"PSD 만들기 준비 중입니다.","PSD 만들기 작업이 진행 중입니다.":"PSD 만들기 작업이 진행 중입니다.","PSD 가져오기 준비 중입니다.":"PSD 가져오기 준비 중입니다.","PSD 파일들을 선택했습니다.":"PSD 파일들을 선택했습니다.","PSD 파일을 선택했습니다.":"PSD 파일을 선택했습니다.","PSD 가져오기에 실패했습니다.":"PSD 가져오기에 실패했습니다.","PSD 가져오기 실패":"PSD 가져오기 실패","PSD 가져오기 시작":"PSD 가져오기 시작","PSD 묶음 완료":"PSD 묶음 완료","PSD 조립 실패":"PSD 조립 실패","PSD 조립 실패":"PSD 조립 실패","PSD 조립 중입니다.":"PSD 조립 중입니다.","플러그인 패널 오류":"플러그인 패널 오류","단일 합성 이미지":"단일 합성 이미지","프레임, 그룹, 레이어를 먼저 선택하세요.":"프레임, 그룹, 레이어를 먼저 선택하세요.","완료":"완료","현재 선택으로 PSD 파일을 만듭니다.":"현재 선택으로 PSD 파일을 만듭니다.","위험 메모":"위험 메모","편집 가능한 텍스트 조립이 실패해 대체 PSD로 전환했습니다.":"편집 가능한 텍스트 조립이 실패해 대체 PSD로 전환했습니다.","대체 PSD 포함":"대체 PSD 포함","내보내기 완료":"내보내기 완료","내보내기 세트 완료":"내보내기 세트 완료","내보내기 실패":"내보내기 실패","레이어 구조 유지":"레이어 구조 유지","브라우저 UI에서 최종 다운로드 묶음을 준비하지 못했습니다.":"브라우저 UI에서 최종 다운로드 묶음을 준비하지 못했습니다.","브라우저 UI에서 PSD 조립에 실패했습니다.":"브라우저 UI에서 PSD 조립에 실패했습니다.","플러그인":"플러그인","텍스트 후보":"텍스트 후보","세션 기록이 여기에 표시됩니다.":"세션 기록이 여기에 표시됩니다.","편집 가능한 텍스트 조립이 실패해 대체 PSD로 전환했습니다.":"편집 가능한 텍스트 조립이 실패해 대체 PSD로 전환했습니다.","세트":"세트","호환성 메모가 여기에 표시됩니다.":"호환성 메모가 여기에 표시됩니다.","디버그 추적이 여기에 표시됩니다.":"디버그 추적이 여기에 표시됩니다.","시간 없음":"시간 없음","제외 후 추출":"제외 후 추출","다운로드 오류":"다운로드 오류","오류":"오류","여러 루트 크기":"여러 루트 크기","사전 점검 화면.":"사전 점검 화면.","사전 점검.":"사전 점검.","1초 미만":"1초 미만","최근 내보내기 없음":"최근 내보내기 없음","최근 파일이 여기에 표시됩니다.":"최근 파일이 여기에 표시됩니다.","경고 없음":"경고 없음","배경 추적 없음":"배경 추적 없음","브라우저 UI에서 최종 다운로드 묶음을 준비하지 못했습니다.":"브라우저 UI에서 최종 다운로드 묶음을 준비하지 못했습니다.","브라우저 UI에서 PSD 조립에 실패했습니다.":"브라우저 UI에서 PSD 조립에 실패했습니다.","묶음 준비 실패":"묶음 준비 실패","로그 없음":"로그 없음","추출 후 숨김 유지":"추출 후 숨김 유지","PNG+JPG 포함":"PNG+JPG 포함","여러 PSD를 선택하면 한 페이지 안에 아래로 자동 이어 붙여 가져옵니다.":"여러 PSD를 선택하면 한 페이지 안에 아래로 자동 이어 붙여 가져옵니다.","피그마로 가져오기":"피그마로 가져오기"},Da=Object.entries(fo).reduce((e,[t,r])=>{let o=e.get(r);return o?o.push(t):e.set(r,[t]),e},new Map),mo={"PSD 가져오기 완료":"PSD 가져오기 완료","PSD 가져오기에 실패했습니다.":"PSD 가져오기에 실패했습니다.","PSD 합성 이미지를 찾지 못했습니다.":"PSD 합성 이미지를 찾지 못했습니다.","PSD 합성 이미지를 찾지 못했습니다.":"PSD 합성 이미지를 찾지 못했습니다.","가져올 수 있는 PSD 파일이 없습니다.":"가져올 수 있는 PSD 파일이 없습니다.","가져올 수 있는 PSD 레이어를 찾지 못했습니다.":"가져올 수 있는 PSD 레이어를 찾지 못했습니다.","지원하지 않는 PSD 배치 방식입니다.":"지원하지 않는 PSD 배치 방식입니다.","복원 가능한 PSD 레이어가 없어 합성 이미지 한 장으로 가져옵니다.":"복원 가능한 PSD 레이어가 없어 합성 이미지 한 장으로 가져옵니다."},Bt={"Select one or more frames, groups, or layers to export.":{ko:"내보낼 프레임, 그룹 또는 레이어를 하나 이상 선택하세요.",ja:"書き出すフレーム、グループ、またはレイヤーを1つ以上選択してください。","zh-CN":"请选择一个或多个要导出的画板、组或图层。"},"The exporter keeps editable text where possible, and multiple selected roots are packaged into a ZIP archive.":{ko:"가능한 경우 편집 가능한 텍스트를 유지하며, 여러 루트를 선택하면 ZIP 묶음으로 준비됩니다.",ja:"可能な限り編集可能テキストを保持し、複数のルートを選択すると ZIP にまとめられます。","zh-CN":"会在可能时保留可编辑文本，选择多个根节点时会打包为 ZIP。"},"This selection cannot be exported by Figma.":{ko:"이 선택 항목은 Figma에서 내보낼 수 없습니다.",ja:"この選択項目は Figma で書き出せません。","zh-CN":"此选择内容无法通过 Figma 导出。"},"Try a visible frame, group, text layer, or image layer.":{ko:"보이는 프레임, 그룹, 텍스트 레이어 또는 이미지 레이어를 선택해보세요.",ja:"表示されているフレーム、グループ、テキストレイヤー、または画像レイヤーを試してください。","zh-CN":"请尝试选择可见的画板、组、文本图层或图像图层。"},"This selection does not have exportable bounds.":{ko:"이 선택 항목에는 내보낼 수 있는 경계가 없습니다.",ja:"この選択項目には書き出し可能な境界がありません。","zh-CN":"此选择内容没有可导出的边界。"},"No exportable content was found inside this selection.":{ko:"이 선택 안에서 내보낼 수 있는 콘텐츠를 찾지 못했습니다.",ja:"この選択内に書き出し可能なコンテンツが見つかりませんでした。","zh-CN":"在此选择中未找到可导出的内容。"},"Masks or empty containers can still block export. Hidden layers can be preserved or ignored from the export defaults.":{ko:"마스크나 빈 컨테이너도 내보내기를 막을 수 있습니다. 숨김 레이어는 내보내기 기본값에서 유지하거나 무시할 수 있습니다.",ja:"マスクや空のコンテナも書き出しを妨げることがあります。非表示レイヤーは書き出しデフォルトで保持または無視できます。","zh-CN":"蒙版或空容器也可能阻止导出。隐藏图层可在导出默认值中保留或忽略。"},"Editable text is preserved when fills and typography are compatible. Hidden layers can be ignored or included as hidden PSD layers.":{ko:"채우기와 타이포그래피가 호환되면 편집 가능한 텍스트를 유지합니다. 숨김 레이어는 무시하거나 PSD 안에서 숨김 상태로 포함할 수 있습니다.",ja:"塗りとタイポグラフィが互換なら編集可能テキストを保持します。非表示レイヤーは無視することも、PSDで非表示のまま含めることもできます。","zh-CN":"当填充和排版兼容时会保留可编辑文本。隐藏图层可以忽略，也可以作为隐藏的 PSD 图层包含。"},"Text export is currently set to rasterize text, so text layers will export as bitmap layers until you change the export defaults.":{ko:"현재 텍스트 내보내기 설정이 비트맵 고정으로 되어 있어, 내보내기 기본값을 바꾸기 전까지 텍스트 레이어는 비트맵 레이어로 내보내집니다.",ja:"現在のテキスト書き出し設定はラスタライズ固定のため、書き出しデフォルトを変更するまでテキストレイヤーはビットマップレイヤーとして書き出されます。","zh-CN":"当前文本导出设置为栅格化文本，因此在更改导出默认值之前，文本图层都会导出为位图图层。"},"Each selected root is exported as its own PSD file. When more than one file is ready, the download is packaged as a ZIP archive.":{ko:"선택한 각 루트는 개별 PSD 파일로 내보내집니다. 두 개 이상 준비되면 ZIP으로 묶어 다운로드합니다.",ja:"選択した各ルートは個別の PSD ファイルとして書き出されます。2つ以上になると ZIP にまとめてダウンロードします。","zh-CN":"每个选中的根节点都会导出为单独的 PSD 文件。准备好的文件超过一个时会打包为 ZIP 下载。"},"An unknown error happened while building the PSD.":{ko:"PSD를 구성하는 중 알 수 없는 오류가 발생했습니다.",ja:"PSD の生成中に不明なエラーが発生しました。","zh-CN":"构建 PSD 时发生未知错误。"},"Unable to calculate document bounds for the selected root.":{ko:"선택한 루트의 문서 경계를 계산할 수 없습니다.",ja:"選択したルートのドキュメント境界を計算できません。","zh-CN":"无法计算所选根节点的文档边界。"},"No exportable layers remain after ignoring hidden layers.":{ko:"숨김 레이어를 제외하고 나면 내보낼 수 있는 레이어가 남지 않습니다.",ja:"非表示レイヤーを除外すると、書き出し可能なレイヤーが残りません。","zh-CN":"忽略隐藏图层后，没有剩余可导出的图层。"},"There are no visible exportable layers inside this selection.":{ko:"이 선택 안에는 보이는 내보내기 가능 레이어가 없습니다.",ja:"この選択内には表示されている書き出し可能レイヤーがありません。","zh-CN":"此选择中没有可见的可导出图层。"},"The exporter could not produce any PSD layers from this selection.":{ko:"이 선택에서 PSD 레이어를 생성하지 못했습니다.",ja:"この選択から PSD レイヤーを生成できませんでした。","zh-CN":"无法从此选择生成任何 PSD 图层。"},"Missing composite raster bytes for bundle packaging.":{ko:"묶음 패키징에 필요한 합성 래스터 바이트가 없습니다.",ja:"バンドル作成に必要な合成ラスターのバイトがありません。","zh-CN":"缺少用于打包的合成栅格字节数据。"},"Document bounds are required to place PSD vector paths.":{ko:"PSD 벡터 경로를 배치하려면 문서 경계가 필요합니다.",ja:"PSD のベクターパスを配置するにはドキュメント境界が必要です。","zh-CN":"放置 PSD 矢量路径需要文档边界。"},"Expected an SVG root element.":{ko:"SVG 루트 요소가 필요합니다.",ja:"SVG のルート要素が必要です。","zh-CN":"需要 SVG 根元素。"},"Invalid SVG matrix() transform.":{ko:"유효하지 않은 SVG matrix() 변환입니다.",ja:"無効な SVG matrix() 変換です。","zh-CN":"无效的 SVG matrix() 变换。"},"Invalid SVG rect dimensions.":{ko:"유효하지 않은 SVG rect 크기입니다.",ja:"無効な SVG rect サイズです。","zh-CN":"无效的 SVG rect 尺寸。"},"Raster smart object blur export requires Layer Blur metadata.":{ko:"래스터 스마트 오브젝트 블러 내보내기에는 Layer Blur 메타데이터가 필요합니다.",ja:"ラスターのスマートオブジェクトぼかしを書き出すには Layer Blur のメタデータが必要です。","zh-CN":"导出栅格智能对象模糊需要 Layer Blur 元数据。"},"Shape vector export requires a solid fill.":{ko:"도형 벡터 내보내기에는 단색 채우기가 필요합니다.",ja:"シェイプのベクター書き出しには単色塗りが必要です。","zh-CN":"形状矢量导出需要纯色填充。"},"The SVG did not contain any shape paths.":{ko:"SVG 안에 도형 경로가 없습니다.",ja:"SVG にシェイプパスが含まれていませんでした。","zh-CN":"SVG 中不包含任何形状路径。"},"The SVG path started without a command.":{ko:"SVG 경로가 명령 없이 시작되었습니다.",ja:"SVG パスがコマンドなしで開始されました。","zh-CN":"SVG 路径在没有命令的情况下开始。"},"The SVG viewBox was empty.":{ko:"SVG viewBox가 비어 있습니다.",ja:"SVG の viewBox が空でした。","zh-CN":"SVG viewBox 为空。"},"The exported SVG did not have an <svg> root.":{ko:"내보낸 SVG에 <svg> 루트가 없습니다.",ja:"書き出された SVG に <svg> ルートがありませんでした。","zh-CN":"导出的 SVG 没有 <svg> 根节点。"},"Unexpected end of SVG path data.":{ko:"SVG 경로 데이터가 예상보다 일찍 끝났습니다.",ja:"SVG パスデータが途中で終了しました。","zh-CN":"SVG 路径数据意外结束。"}},xo=[{pattern:/^Export failed for "(.+)" \((\d+)\/(\d+)\): (.+)$/,replace:(e,t)=>({ko:'"'.concat(t[1],'" 내보내기에 실패했습니다. (').concat(t[2],"/").concat(t[3],"): ").concat(w(e,t[4])),ja:'"'.concat(t[1],'" の書き出しに失敗しました。(').concat(t[2],"/").concat(t[3],"): ").concat(w(e,t[4])),"zh-CN":'"'.concat(t[1],'" 导出失败。(').concat(t[2],"/").concat(t[3],"): ").concat(w(e,t[4]))})[e]},{pattern:/^PSD ready: (\d+) layers, (\d+) editable text layers$/,replace:(e,t)=>({ko:"PSD 준비됨: 레이어 ".concat(t[1],"개, 편집 가능 텍스트 ").concat(t[2],"개"),ja:"PSD の準備完了: レイヤー ".concat(t[1],"枚、編集可能テキスト ").concat(t[2],"件"),"zh-CN":"PSD 已准备好：".concat(t[1]," 个图层，").concat(t[2]," 个可编辑文本图层")})[e]},{pattern:/^(\d+) PSD files are ready\. The download will be packaged as a ZIP archive\.$/,replace:(e,t)=>({ko:"PSD ".concat(t[1],"개가 준비되었습니다. 다운로드는 ZIP 묶음으로 제공됩니다."),ja:"PSD が ".concat(t[1]," 個準備できました。ダウンロードは ZIP にまとめられます。"),"zh-CN":"".concat(t[1]," 个 PSD 已准备好。下载内容将打包为 ZIP。")})[e]},{pattern:/^(\d+) roots selected: (\d+) PSD layers, (\d+) editable text layers, (\d+) preserved groups\.$/,replace:(e,t)=>({ko:"".concat(t[1],"개 루트 선택됨: PSD 레이어 ").concat(t[2],"개, 편집 가능 텍스트 ").concat(t[3],"개, 유지된 그룹 ").concat(t[4],"개"),ja:"".concat(t[1]," 個のルートを選択: PSD レイヤー ").concat(t[2]," 枚、編集可能テキスト ").concat(t[3]," 件、保持されたグループ ").concat(t[4]," 件"),"zh-CN":"已选择 ".concat(t[1]," 个根节点：").concat(t[2]," 个 PSD 图层，").concat(t[3]," 个可编辑文本图层，").concat(t[4]," 个保留的组")})[e]},{pattern:/^"(.+)" is ready: (\d+) PSD layers, (\d+) editable text layers, (\d+) preserved groups\.$/,replace:(e,t)=>({ko:'"'.concat(t[1],'" 준비 완료: PSD 레이어 ').concat(t[2],"개, 편집 가능 텍스트 ").concat(t[3],"개, 유지된 그룹 ").concat(t[4],"개"),ja:'"'.concat(t[1],'" の準備完了: PSD レイヤー ').concat(t[2]," 枚、編集可能テキスト ").concat(t[3]," 件、保持されたグループ ").concat(t[4]," 件"),"zh-CN":"“".concat(t[1],"”已就绪：").concat(t[2]," 个 PSD 图层，").concat(t[3]," 个可编辑文本图层，").concat(t[4]," 个保留的组")})[e]},{pattern:/^"(.+)" is not ready for batch export\.$/,replace:(e,t)=>({ko:'"'.concat(t[1],'"은(는) 일괄 내보내기 준비가 되지 않았습니다.'),ja:'"'.concat(t[1],'" は一括書き出しの準備ができていません。'),"zh-CN":"“".concat(t[1],"”尚未准备好进行批量导出。")})[e]},{pattern:/^"(.+)" could not separate its background cleanly, so it was flattened\.$/,replace:(e,t)=>({ko:'"'.concat(t[1],'"의 배경을 깔끔하게 분리하지 못해 평면화되었습니다.'),ja:'"'.concat(t[1],'" の背景をきれいに分離できなかったため、フラット化されました。'),"zh-CN":"无法干净地分离“".concat(t[1],"”的背景，因此已被扁平化。")})[e]},{pattern:/^"(.+)" could not keep its SVG\/vector data, so it fell back to a bitmap layer\.$/,replace:(e,t)=>({ko:'"'.concat(t[1],'"의 SVG/벡터 데이터를 유지하지 못해 비트맵 레이어로 대체되었습니다.'),ja:'"'.concat(t[1],'" の SVG/ベクターデータを保持できず、ビットマップレイヤーにフォールバックしました。'),"zh-CN":"“".concat(t[1],"”无法保留 SVG/矢量数据，因此回退为位图图层。")})[e]},{pattern:/^"(.+)" could not be reconstructed as a PSD mask\.$/,replace:(e,t)=>({ko:'"'.concat(t[1],'"을(를) PSD 마스크로 복원하지 못했습니다.'),ja:'"'.concat(t[1],'" を PSD マスクとして再構築できませんでした。'),"zh-CN":"无法将“".concat(t[1],"”重建为 PSD 蒙版。")})[e]},{pattern:/^"(.+)" uses masking and will export as a flattened bitmap layer\.$/,replace:(e,t)=>({ko:'"'.concat(t[1],'"은(는) 마스킹을 사용하므로 평면화된 비트맵 레이어로 내보내집니다.'),ja:'"'.concat(t[1],'" はマスクを使用しているため、フラット化されたビットマップレイヤーとして書き出されます。'),"zh-CN":"“".concat(t[1],"”使用了蒙版，因此会导出为扁平化的位图图层。")})[e]},{pattern:/^"(.+)" uses Layer Blur, so it will preserve the blur as a Photoshop Smart Filter and rasterize the text instead of keeping an editable text layer\.$/,replace:(e,t)=>({ko:'"'.concat(t[1],'"은(는) Layer Blur를 사용하므로 블러는 Photoshop 스마트 필터로 유지되고, 텍스트는 편집 가능한 레이어 대신 래스터화됩니다.'),ja:'"'.concat(t[1],'" は Layer Blur を使用しているため、ぼかしは Photoshop のスマートフィルターとして保持され、テキストは編集可能レイヤーではなくラスタライズされます。'),"zh-CN":"“".concat(t[1],"”使用了 Layer Blur，因此模糊会保留为 Photoshop 智能滤镜，而文本会被栅格化，不再保留为可编辑文本图层。")})[e]},{pattern:/^"(.+)" uses both layer and image-fill blend modes, so only the layer blend stayed editable in the PSD\.$/,replace:(e,t)=>({ko:'"'.concat(t[1],'"은(는) 레이어와 이미지 채우기 블렌드 모드를 함께 사용하므로 PSD에서는 레이어 블렌드만 편집 가능한 상태로 유지되었습니다.'),ja:'"'.concat(t[1],'" はレイヤーと画像塗りの両方にブレンドモードを使っているため、PSD ではレイヤーブレンドのみが編集可能なまま保持されました。'),"zh-CN":"“".concat(t[1],"”同时使用了图层与图像填充混合模式，因此在 PSD 中只有图层混合保留为可编辑。")})[e]},{pattern:/^Unable to encode (.+) preview in the browser UI\.$/,replace:(e,t)=>({ko:"브라우저 UI에서 ".concat(t[1]," 미리보기를 인코딩할 수 없습니다."),ja:"ブラウザ UI で ".concat(t[1]," プレビューをエンコードできません。"),"zh-CN":"无法在浏览器 UI 中编码 ".concat(t[1]," 预览。")})[e]}];function Gt(e,t=Mt){if(!e)return t;let r=e.trim().toLowerCase();return r==="ko"||r.startsWith("ko-")?"ko":r==="ja"||r.startsWith("ja-")?"ja":r==="en"||r.startsWith("en-")?"en":r==="es"||r.startsWith("es-")?"es":r==="zh"||r==="zh-cn"||r==="zh-hans"||r.startsWith("zh-cn")||r.startsWith("zh-hans")?"zh-CN":t}function go(e){var t;return(t=mo[e])!=null?t:e}function w(e,t){var i;if(!t)return t;let r=go(t);if(e==="ko"||e==="en")return r;let o=(i=Bt[r])!=null?i:Bt[t];if(o){let a=o[e];if(a)return a}if(e==="es")return r;for(let a of xo){let s=a.pattern.exec(r);if(s)return a.replace(e,s)}let n=r.match(/^([^:]+): (.+)$/);if(n){let a=w(e,n[2]);if(a!==n[2])return"".concat(n[1],": ").concat(a)}return r}var Xt={disableShapePreviewCanvas:!1,forceBitmapVectorPreview:!1,disableEditableTextPreview:!1,disableLayerBlur:!1,disableProgressiveLayerBlur:!1,disableBackgroundBlur:!1,disableNoise:!1,disableTexture:!1},ho=new Set(["COMPONENT","COMPONENT_SET","FRAME","INSTANCE","SECTION","TEXT"]),yo=new Set(["GROUP","SECTION","FRAME","COMPONENT","COMPONENT_SET","INSTANCE"]),So=new Set(["GROUP","FRAME","SECTION","COMPONENT","INSTANCE"]),bo=["fontName","fontSize","lineHeight","letterSpacing","fills","textDecoration","textCase"],Kt=["fontName"],je=new Map,We=null,Ze=null,O=b({},Xt),Eo=80,Po=70,No=70,To=12e6,Do=6e3,vo=12e6,wo=4e3,Co=8e6,ko=4e6,Bo=512,Yt=2048,Mo=1e4,Io=16e6,Ro=8e3,Ao=12e6,Lo={monotone:{primaryAlphaScale:.64,secondaryAlphaScale:1,overlayOpacityScale:1},duotone:{primaryAlphaScale:.56,secondaryAlphaScale:.48,overlayOpacityScale:1},multitone:{primaryAlphaScale:1,secondaryAlphaScale:1,overlayOpacityScale:.6}},qt="pigma:ui-preferences:v2",Fo="pigma:ui-preferences:v1",Jt="pigma:ui-preferences-flags:v1",S={closePlugin:()=>{figma.closePlugin()},notify:(e,t)=>figma.notify(e,t),postToUi:()=>{}},P=ne,G={},be=null,F=null,selectionPreviewCache=null,Qt=0;function er(e){return S=b(b({},S),e),{handleUiMessage:Go,invalidateSelectionCache:le,postSelectionState:Ee}}async function pigmaEnsureSelectionAccess(){if(typeof figma.loadAllPagesAsync!="function")return;try{await figma.loadAllPagesAsync()}catch(e){console.warn("[pigma] selection page access preload failed:",e)}}async function Go(e){var t,r;if(e.type==="request-preferences"){await pigmaEnsureSelectionAccess(),await zo(e.detectedLocale),Ot(),r=buildStartupSelectionResolution(),N({type:"selection-state",state:typeof pigmaSelectionDebugState=="function"?pigmaSelectionDebugState(tr(r.state)):tr(r.state)});return}if(e.type==="update-preferences"){await pigmaEnsureSelectionAccess(),await _o(e.preferences),Ot(),Ee();return}if(e.type==="request-selection-sync"){await pigmaEnsureSelectionAccess(),Ee();return}if(e.type==="request-export"){await Qo(e.hiddenLayerMode,Tt(e.settings),e.includeCompositePng===!0,e.developerExportExperiments);return}if(e.type==="request-next-export-root"){await se();return}if(e.type==="request-import"){await en(e.payload);return}if(e.type==="request-import-batch"){await tn(e.batch);return}e.type==="close-plugin"&&((t=S.closePlugin)==null||t.call(S))}function N(e){S.postToUi(e)}function ae(e,t){console.info("[pigma-export][plugin]",b({stage:e},t))}function Oo(e){let t=e!=null?e:{};return{disableShapePreviewCanvas:t.disableShapePreviewCanvas===!0,forceBitmapVectorPreview:t.forceBitmapVectorPreview===!0,disableEditableTextPreview:t.disableEditableTextPreview===!0,disableLayerBlur:t.disableLayerBlur===!0,disableProgressiveLayerBlur:t.disableProgressiveLayerBlur===!0,disableBackgroundBlur:t.disableBackgroundBlur===!0,disableNoise:t.disableNoise===!0,disableTexture:t.disableTexture===!0}}function Uo(e){return O=Oo(e),O}function Qe(){O=b({},Xt)}function Ot(){N({type:"preferences",preferences:P})}function pigmaSelectionDebugState(e){try{let t=figma.currentPage.selection||[],r=t[0],o=r?f(r):"",n=r?r.type:"",i=figma.currentPage&&figma.currentPage.name?figma.currentPage.name:"";return B(b({},e),{detail:"[debug 0429 selection api=".concat(t.length," page=").concat(i," first=").concat(o||"-"," type=").concat(n||"-","] ").concat(e.detail||""),warnings:e.warnings})}catch(t){return B(b({},e),{detail:"[debug 0429 selection read error] ".concat(e.detail||"")})}}function Ee(){let e=selectionResolutionForUi();N({type:"selection-state",state:pigmaSelectionDebugState(tr(e.state))})}function le(){Qt+=1,F=null,selectionPreviewCache=null}async function zo(e){let t=Ho(e);try{G=$o(await figma.clientStorage.getAsync(Jt))}catch(r){G={}}try{let r=await figma.clientStorage.getAsync(qt);if(r!=null)P=Pe(r,t,!1,G.imageExportModeExplicit!==!0,G.textExportModeExplicit!==!0);else{let o=await figma.clientStorage.getAsync(Fo);P=Pe(o,t,!0,G.imageExportModeExplicit!==!0,G.textExportModeExplicit!==!0)}await et()}catch(r){G={},P=Pe(null,t),await et()}}async function _o(e){var t,r;if(e.exportSettings){let o=Object.prototype.hasOwnProperty.call(e.exportSettings,"imageExportMode"),n=Object.prototype.hasOwnProperty.call(e.exportSettings,"textExportMode");(o||n)&&(G=b(b(b({},G),o?{imageExportModeExplicit:!0}:{}),n?{textExportModeExplicit:!0}:{}))}P=Pe({locale:(t=e.locale)!=null?t:P.locale,localeMode:(r=e.localeMode)!=null?r:P.localeMode,exportSettings:e.exportSettings?b(b({},P.exportSettings),e.exportSettings):P.exportSettings}),await et()}async function et(){try{await figma.clientStorage.setAsync(qt,P),await figma.clientStorage.setAsync(Jt,G)}catch(e){}}function Pe(e,t=null,r=!1,o=!1,n=!1){var y;let i=e,a=r?It(i==null?void 0:i.exportSettings):i==null?void 0:i.exportSettings,s=o?Rt(a):a,l=n?Lt(s):s,u=o?At(l):l,c=(i==null?void 0:i.locale)==="ko"||(i==null?void 0:i.locale)==="en"||(i==null?void 0:i.locale)==="es"||(i==null?void 0:i.locale)==="ja"||(i==null?void 0:i.locale)==="zh-CN",p=c?i.locale:null,g=(i==null?void 0:i.localeMode)==="auto"||(i==null?void 0:i.localeMode)==="manual"?i.localeMode:c?"manual":"auto";return{locale:g==="auto"?(y=t!=null?t:p)!=null?y:ne.locale:p!=null?p:ne.locale,localeMode:g,exportSettings:Tt(u)}}function $o(e){let t=e;return b(b({},typeof(t==null?void 0:t.imageExportModeExplicit)=="boolean"?{imageExportModeExplicit:t.imageExportModeExplicit}:{}),typeof(t==null?void 0:t.textExportModeExplicit)=="boolean"?{textExportModeExplicit:t.textExportModeExplicit}:{})}function Ho(e){return e?Gt(e,ne.locale):null}function tr(e){return B(b({},e),{summary:w(P.locale,e.summary),detail:w(P.locale,e.detail),warnings:e.warnings.map(t=>w(P.locale,t))})}function buildSelectionPreviewEmptyState(e){return{ok:!1,state:{ready:!1,selectionId:null,selectionCount:0,selectionName:"",selectionType:null,summary:"Select one or more frames, groups, or layers to export.",detail:e.textExportMode==="rasterize-text"?"Text export is currently set to rasterize text, so text layers will export as bitmap layers until you change the export defaults.":"The exporter keeps editable text where possible, and multiple selected roots are packaged into a ZIP archive.",documentWidth:null,documentHeight:null,exportNodeCount:0,editableTextCount:0,preservedGroupCount:0,warnings:[],analysisPending:!1}}}function isSelectionPreviewHeavy(e){let t=xe(e);if(t){let r=d(t.width),o=d(t.height);if(o>=Do||r*o>=vo)return!0}if(!V(e)||e.children.length===0)return!1;let n=[e],i=0;for(;n.length>0;){let a=n.pop();if(i+=1,i>400)return!0;if(!V(a))continue;let s=a.children;if(!s||s.length===0)continue;if(s.length>120)return!0;for(let l=0;l<s.length;l+=1){let u=s[l];he(u)&&n.push(u)}}return!1}function shouldUseQuickSelectionPreview(e){if(e.length===0)return!1;for(let t=0;t<e.length;t+=1)if(isSelectionPreviewHeavy(e[t]))return!0;return!1}function buildQuickSelectionResolution(){let e=figma.currentPage.selection,t=Tt(P.exportSettings),r=Jo(e,t);if(selectionPreviewCache&&selectionPreviewCache.cacheKey===r)return selectionPreviewCache.resolution;if(e.length===0){let y=buildSelectionPreviewEmptyState(t);return selectionPreviewCache={cacheKey:r,resolution:y},y}let o=[],n=[],i=!1;for(let y=0;y<e.length;y+=1){let m=e[y];if(!he(m)){let T={ok:!1,state:Ye(e,m,"This selection cannot be exported by Figma.","Try a visible frame, group, text layer, or image layer.")};return selectionPreviewCache={cacheKey:r,resolution:T},T}let C=xe(m);if(!C){let T={ok:!1,state:Ye(e,m,"This selection does not have exportable bounds.","Try a visible frame, group, text layer, or image layer.")};return selectionPreviewCache={cacheKey:r,resolution:T},T}o.push(m),n.push(C),!i&&isSelectionPreviewHeavy(m)&&(i=!0)}let a=o[0],s=o.length,l=n[0],u=i?"Large selection detected. Pigma is showing a lightweight preview first to keep Figma responsive. Full layer analysis runs when export starts.":s===1?"Editable text is preserved when fills and typography are compatible. Hidden layers can be ignored or included as hidden PSD layers.":"Each selected root is exported as its own PSD file. When more than one file is ready, the download is packaged as a ZIP archive.",c=i?["Large selection detected. Detailed layer counts will load when export starts."]:[],p={ready:!0,selectionId:s===1?a.id:null,selectionCount:s,selectionName:no(o),selectionType:io(o),summary:s===1?'"'.concat(f(a),'" is ready to export.'):"".concat(s," roots selected and ready to export."),detail:u,documentWidth:s===1?d(l.width):null,documentHeight:s===1?d(l.height):null,exportNodeCount:s,editableTextCount:0,preservedGroupCount:0,warnings:c,analysisPending:i},g={ok:!0,nodes:o,state:p};return selectionPreviewCache={cacheKey:r,resolution:g},g}function buildStartupSelectionResolution(){let e=figma.currentPage.selection,t=Tt(P.exportSettings);if(e.length===0)return buildSelectionPreviewEmptyState(t);let r=[],o=[],n=null;for(let i=0;i<e.length;i+=1){let a=e[i];if(!he(a)){n={ok:!1,state:Ye(e,a,"This selection cannot be exported by Figma.","Try a visible frame, group, text layer, or image layer.")};break}let s=xe(a);if(!s){n={ok:!1,state:Ye(e,a,"This selection does not have exportable bounds.","Try a visible frame, group, text layer, or image layer.")};break}r.push(a),o.push(s)}if(n)return n;let i=r[0],a=r.length,s=o[0];return{ok:!0,nodes:r,state:{ready:!0,selectionId:a===1?i.id:null,selectionCount:a,selectionName:no(r),selectionType:io(r),summary:a===1?'"'.concat(f(i),'" is ready to export.'):"".concat(a," roots selected and ready to export."),detail:"Startup preview keeps the selection summary lightweight. Full layer analysis runs when export starts or when the selection changes.",documentWidth:a===1?d(s.width):null,documentHeight:a===1?d(s.height):null,exportNodeCount:a,editableTextCount:0,preservedGroupCount:0,warnings:["Detailed layer counts are deferred until export starts or the selection changes."],analysisPending:!0}}}function selectionResolutionForUi(){let e=figma.currentPage.selection;return shouldUseQuickSelectionPreview(e)?buildQuickSelectionResolution():rr()}function rr(){let e=figma.currentPage.selection,t=Tt(P.exportSettings),r=Jo(e,t);if((F==null?void 0:F.cacheKey)===r)return F.resolution;if(e.length===0){let m={ok:!1,state:{ready:!1,selectionId:null,selectionCount:0,selectionName:"",selectionType:null,summary:"Select one or more frames, groups, or layers to export.",detail:t.textExportMode==="rasterize-text"?"Text export is currently set to rasterize text, so text layers will export as bitmap layers until you change the export defaults.":"The exporter keeps editable text where possible, and multiple selected roots are packaged into a ZIP archive.",documentWidth:null,documentHeight:null,exportNodeCount:0,editableTextCount:0,preservedGroupCount:0,warnings:[]}};return F={cacheKey:r,resolution:m},m}let o=[],n=new Set,i=0,a=0,s=0;for(let m of e){if(!he(m)){let R={ok:!1,state:Ye(e,m,"This selection cannot be exported by Figma.","Try a visible frame, group, text layer, or image layer.")};return F={cacheKey:r,resolution:R},R}let T=m,C=xe(T);if(!C){let R={ok:!1,state:Ye(e,T,"This selection does not have exportable bounds.","Try a visible frame, group, text layer, or image layer.")};return F={cacheKey:r,resolution:R},R}let E=Ie(T,t.hiddenLayerMode);if(E.exportNodeCount===0){let R={ok:!1,state:Ye(e,T,"No exportable content was found inside this selection.","Masks or empty containers can still block export. Hidden layers can be preserved or ignored from the export defaults.",Array.from(E.warnings),C)};return F={cacheKey:r,resolution:R},R}lt(C,E.containsHeavyEffects)&&E.warnings.add(ut(d(C.width),d(C.height),E.containsHeavyEffects)),o.push({node:T,documentBounds:C,analysis:E}),i+=E.exportNodeCount,a+=E.editableTextCount,s+=E.preservedGroupCount;for(let R of E.warnings)n.add(Nt(f(T),R,e.length>1))}let l=o[0],u=o.length,c=ua(a,t),p={exportNodeCount:i,editableTextCount:c,preservedGroupCount:s,containsHeavyEffects:o.some(m=>m.analysis.containsHeavyEffects),warnings:n},g={ready:!0,selectionId:u===1?l.node.id:null,selectionCount:u,selectionName:no(o.map(m=>m.node)),selectionType:io(o.map(m=>m.node)),summary:fa(f(l.node),p,u),detail:ca(o,u,t,a),documentWidth:u===1?d(l.documentBounds.width):null,documentHeight:u===1?d(l.documentBounds.height):null,exportNodeCount:i,editableTextCount:c,preservedGroupCount:s,warnings:Array.from(n)},y={ok:!0,nodes:o.map(m=>m.node),roots:o,state:g};return F={cacheKey:r,resolution:y},y}function or(e){return e?{height:wo,area:Co}:{height:Do,area:vo}}function Ne(e,t,r){let o=or(r);return t>=o.height||e*t>=o.area}function lt(e,t){return Ne(d(e.width),d(e.height),t)}function ut(e,t,r){let o=or(r);return"This export is treated as a long frame (".concat(e," x ").concat(t,"px). Pigma will switch oversized layers to a lower-memory raster path once the document exceeds ").concat(o.height,"px tall or ").concat(o.area.toLocaleString("en-US")," pixels.")}function Vo(){return"Long-frame mode rasterizes editable text layers to keep export memory stable."}function jo(e){return'"'.concat(e,'" switches to a raster export in long-frame mode to keep memory usage stable.')}function Te(e,t){return'"'.concat(e,'" was split into ').concat(t," raster tiles in long-frame mode to keep memory usage stable.")}function nr(e,t){let r=d(e.width),o=d(e.height),n=r*o,i=t?{height:Ro,area:Ao}:{height:Mo,area:Io};return o>=i.height||n>=i.area}function ir(e,t){return nr(e,t)}function Wo(e,t,r){return'"'.concat(e,'" switched to a safe layered bitmap export (').concat(t," x ").concat(r,"px) so very large documents keep a PSD layer stack without triggering the heavier editable reconstruction path.")}function Zo(e,t){return'"'.concat(e,'" retried with the safe layered bitmap export after layered reconstruction failed (').concat(t,").")}function Xo(e,t,r){return'"'.concat(e,'" switched to a safe flattened export (').concat(t," x ").concat(r,"px) so very large documents finish as a complete PSD instead of failing during heavy layer reconstruction.")}function Ko(e,t){return'"'.concat(e,'" retried as a safe flattened PSD after layered export failed (').concat(t,").")}function Yo(e,t){return ze(e)||Xr(e)||!!fe(e,t)}function De(e){return Ne(d(e.width),d(e.height),!1)&&d(e.height)>Yt}function qo(e,t){let r=Math.max(1,d(e)),o=Math.max(1,d(t)),n=Math.floor(ko/r),i=Math.max(1,n),a=Math.max(Bo,Math.min(Yt,i));return Math.min(o,a)}function Jo(e,t){let r=e.map(o=>o.id).join(",");return[Qt,figma.currentPage.id,t.hiddenLayerMode,t.textExportMode,r].join("|")}async function Qo(e,t,r,o){var l;let n=Uo(o);P=b(b({},P),{exportSettings:Tt(t)});let i=rr();if(!i.ok){Qe(),le();let u=tr(i.state);N({type:"export-error",message:u.summary}),(l=S.notify)==null||l.call(S,u.summary,{error:!0});return}let a=i.nodes.length,s=xa(i.nodes,t);be={nodes:i.nodes,roots:i.roots,hiddenLayerMode:e,settings:t,includeCompositePng:r,developerExportExperiments:n,rootCount:a,bundleFileName:s,nextIndex:0,singlePayloadSummary:null},ae("session-start",{rootCount:a,includeCompositePng:r,developerExportExperiments:n}),N({type:"export-bundle-started",fileName:s,rootCount:a}),await se()}async function en(e){var t,r;N({type:"import-started",fileName:e.fileName,rootName:e.rootName,mode:e.mode});try{let o=ar(e.placement,e.rootName),n=nn(e,o),i=0;if(e.mode==="flatten-image"||e.nodes.length===0){if(!e.compositePngBytes||e.compositePngBytes.length===0)throw new Error("PSD 합성 이미지를 찾지 못했습니다.");let a=Q({kind:"bitmap",name:e.rootName,x:0,y:0,width:e.documentWidth,height:e.documentHeight,opacity:1,visible:!0,blendMode:"normal",effects:null,strokeEffect:null,pngBytes:e.compositePngBytes});n.appendChild(a),i=1}else i=await lr(e.nodes,n,e.warnings);o!==figma.currentPage&&await figma.setCurrentPageAsync(o),o.selection=[n],figma.viewport.scrollAndZoomIntoView([n]),N({type:"import-finished",rootName:e.rootName,importedNodeCount:i,warningCount:e.warnings.length}),(t=S.notify)==null||t.call(S,w(P.locale,"PSD 가져오기 완료"))}catch(o){let n=w(P.locale,o instanceof Error?o.message:"PSD 가져오기에 실패했습니다.");N({type:"import-error",message:n}),(r=S.notify)==null||r.call(S,n,{error:!0})}}async function tn(e){var o,n;let t=e.items.filter(i=>{var a,s;return i&&i.documentWidth>0&&i.documentHeight>0&&(i.mode==="flatten-image"||i.nodes.length>0||((s=(a=i.compositePngBytes)==null?void 0:a.length)!=null?s:0)>0)}),r=t.every(i=>i.mode==="flatten-image")?"flatten-image":"keep-layers";N({type:"import-started",fileName:e.fileName,rootName:e.rootName,mode:r});try{if(t.length===0)throw new Error("가져올 수 있는 PSD 파일이 없습니다.");if(e.arrangement!=="stitch-vertical")throw new Error("지원하지 않는 PSD 배치 방식입니다.");let i=Math.max(0,x(e.gap)),a=Math.max(...t.map(m=>d(m.documentWidth)),1),s=Math.max(1,t.reduce((m,T,C)=>{let E=d(T.documentHeight);return m+E+(C>0?i:0)},0)),l=ar(e.placement,e.rootName),u=sr(e.placement,a,s),c=figma.createFrame();c.name=e.rootName.trim().length>0?e.rootName:"PSD stitch",c.resize(a,s),c.clipsContent=!1,c.fills=[],c.strokes=[],c.x=u.x,c.y=u.y,l.appendChild(c);let p=0,g=0;for(let m of t){let T=Math.max(1,d(m.documentWidth)),C=Math.max(1,d(m.documentHeight)),E=figma.createFrame();E.name=m.rootName.trim().length>0?m.rootName:"PSD section",E.resize(T,C),E.clipsContent=!1,E.fills=[],E.strokes=[],E.x=0,E.y=g,c.appendChild(E),p+=await rn(m,E),g+=C+i}l!==figma.currentPage&&await figma.setCurrentPageAsync(l),l.selection=[c],figma.viewport.scrollAndZoomIntoView([c]);let y=Array.from(new Set(t.flatMap(m=>m.warnings.filter(Boolean)))).length;N({type:"import-finished",rootName:e.rootName,importedNodeCount:p,warningCount:y}),(o=S.notify)==null||o.call(S,w(P.locale,"PSD 가져오기 완료"))}catch(i){let a=w(P.locale,i instanceof Error?i.message:"PSD 가져오기에 실패했습니다.");N({type:"import-error",message:a}),(n=S.notify)==null||n.call(S,a,{error:!0})}}async function rn(e,t){if(e.mode==="flatten-image"||e.nodes.length===0){if(!e.compositePngBytes||e.compositePngBytes.length===0)throw new Error("PSD 합성 이미지를 찾지 못했습니다.");let r=Q({kind:"bitmap",name:e.rootName,x:0,y:0,width:e.documentWidth,height:e.documentHeight,opacity:1,visible:!0,blendMode:"normal",effects:null,strokeEffect:null,pngBytes:e.compositePngBytes});return t.appendChild(r),1}return lr(e.nodes,t,e.warnings)}function ar(e,t){if(e==="current-page")return figma.currentPage;let r=figma.createPage();return r.parent||figma.root.appendChild(r),r.name=on(t),r}function on(e){let t=e.trim();return t.length>0?"".concat(t," import"):"PSD import"}function nn(e,t){let r=figma.createFrame();r.name=e.rootName,r.resize(Math.max(1,d(e.documentWidth)),Math.max(1,d(e.documentHeight))),r.clipsContent=!1,r.fills=[],r.strokes=[];let o=sr(e.placement,e.documentWidth,e.documentHeight);return r.x=o.x,r.y=o.y,t.appendChild(r),r}function sr(e,t,r){return e==="new-page"?{x:0,y:0}:{x:x(figma.viewport.center.x-t/2),y:x(figma.viewport.center.y-r/2)}}async function lr(e,t,r){let o=0;for(let n of e){let i=await ur(n,r);i&&(t.appendChild(i.node),cr(i.node,n,t),o+=i.count)}return o}async function ur(e,t){if(e.kind==="group"){if(e.width<=0||e.height<=0)return null;let r=figma.createFrame();r.resize(Math.max(1,d(e.width)),Math.max(1,d(e.height))),r.clipsContent=!1,r.fills=[],r.strokes=[],r.x=x(e.x),r.y=x(e.y),ve(r,e,!0);let o=1;for(let n of e.children){let i=await ur(n,t);i&&(r.appendChild(i.node),cr(i.node,n,r),o+=i.count)}return{node:r,count:o}}if(e.kind==="text"){let r=await sn(e,t);return r?{node:r,count:1}:null}return e.kind==="shape"?{node:an(e),count:1}:e.width<=0||e.height<=0||e.pngBytes.length===0?null:{node:Q(e),count:1}}function cr(e,t,r){var c,p;if(e.type!=="TEXT"||t.kind!=="text")return;let o=t.text.shapeType==="box"?(c=k(e))!=null?c:I(e):(p=I(e))!=null?p:k(e),n=k(r),i=o&&n?o.x-n.x:e.x,a=o&&n?o.y-n.y:e.y,s=x(t.x-i),l=x(t.y-a);if(s===0&&l===0)return;let u=e.relativeTransform;e.relativeTransform=[[u[0][0],u[0][1],u[0][2]+s],[u[1][0],u[1][1],u[1][2]+l]]}function Q(e){let t=figma.createRectangle();t.resize(Math.max(1,d(e.width)),Math.max(1,d(e.height))),t.x=x(e.x),t.y=x(e.y),t.strokes=[],t.cornerRadius=0;let r=figma.createImage(e.pngBytes);return t.fills=[{type:"IMAGE",imageHash:r.hash,scaleMode:"FILL"}],ve(t,e,!1),t}function an(e){let t=figma.createRectangle();return t.resize(Math.max(1,d(e.width)),Math.max(1,d(e.height))),t.x=x(e.x),t.y=x(e.y),t.fills=hn(e.fill),t.strokes=[],yn(t,e.shape,e.width,e.height),Sn(t,e.stroke),ve(t,e,!1),t}async function sn(e,t){if(e.width<=0||e.height<=0)return e.pngBytes.length>0?Q(e):null;let r=figma.createText();try{let o=await ln(e,t);if(o.length===0)return r.removed||r.remove(),e.pngBytes.length>0?Q(e):null;await Ce(o[0].fontName),r.fontName=o[0].fontName,r.characters=e.text.value,r.autoRename=!1;for(let n of o)cn(r,n);return dn(r,e),pn(r,e),ve(r,e,!1),r}catch(o){return r.removed||r.remove(),e.pngBytes.length>0?(t.push('"'.concat(e.name,'" editable text could not be reconstructed (').concat(o instanceof Error?o.message:"unknown error","), so a bitmap preview was imported instead.")),Q(e)):null}}async function ln(e,t){let r=await dr(),o=new Map,n=[],i=0;for(let a of e.text.styleRuns){let s=Math.max(0,Math.round(a.length));if(s<=0||i>=e.text.value.length)continue;let l=Math.min(e.text.value.length,i+s),u="".concat(a.style.photoshopFontName,"\0").concat(a.style.fontFamily,"\0").concat(a.style.fontStyle),c=o.get(u);if(!c){let p=un(a.style,r);c=p.fontName,o.set(u,c),p.exact||t.push('"'.concat(e.name,'" uses Photoshop font "').concat(a.style.photoshopFontName,'", so "').concat(c.family," ").concat(c.style,'" was used in Figma.'))}await Ce(c),n.push({start:i,end:l,fontName:c,style:a.style}),i=l}return n}function un(e,t){var a,s;let r=Z(e.fontFamily),o=Z(e.fontStyle),n=Z(e.photoshopFontName),i=null;for(let l of t){let u=l.fontName,c=Z(u.family),p=Z(u.style),g=Z("".concat(u.family).concat(u.style)),y=Z("".concat(u.family,"Regular")),m=0;c===r?m+=100:r.length>0&&(c.includes(r)||r.includes(c))&&(m+=60),p===o?m+=40:o.length>0&&(p.includes(o)||o.includes(p))&&(m+=20),n.length>0&&g===n?m+=120:n.length>0&&y===n&&(m+=100);let T=c===r&&p===o;(!i||m>i.score||m===i.score&&T&&!i.exact)&&(i={fontName:u,score:m,exact:T})}return i&&i.score>0?{fontName:i.fontName,exact:i.exact}:{fontName:(s=(a=t[0])==null?void 0:a.fontName)!=null?s:{family:"Inter",style:"Regular"},exact:!1}}function Z(e){return e.trim().toLowerCase().replace(/[^a-z0-9]/g,"")}async function dr(){return We||(We=figma.listAvailableFontsAsync()),await We}function cn(e,t){e.setRangeFontName(t.start,t.end,t.fontName),e.setRangeFontSize(t.start,t.end,Math.max(1,t.style.fontSize)),e.setRangeLineHeight(t.start,t.end,fn(t.style.lineHeightPx)),e.setRangeLetterSpacing(t.start,t.end,mn(t.style.tracking,t.style.fontSize)),e.setRangeTextCase(t.start,t.end,xn(t.style.fontCaps)),e.setRangeTextDecoration(t.start,t.end,t.style.strikethrough?"STRIKETHROUGH":t.style.underline?"UNDERLINE":"NONE"),e.setRangeFills(t.start,t.end,pr(t.style.fillColor))}function dn(e,t){var r,o,n,i,a,s,l,u;if(e.textAlignHorizontal=gn(t.text.justification),e.textAlignVertical="TOP",t.text.shapeType==="box"){let c=Math.max(1,d(((o=(r=t.text.boxBounds)==null?void 0:r[2])!=null?o:t.width)-((i=(n=t.text.boxBounds)==null?void 0:n[0])!=null?i:0))),p=Math.max(1,d(((s=(a=t.text.boxBounds)==null?void 0:a[3])!=null?s:t.height)-((u=(l=t.text.boxBounds)==null?void 0:l[1])!=null?u:0)));if(t.text.sizingMode==="auto-height"){e.textAutoResize="HEIGHT",e.resizeWithoutConstraints(c,Math.max(1,d(e.height)));return}e.textAutoResize="NONE",e.resizeWithoutConstraints(c,p);return}e.textAutoResize="WIDTH_AND_HEIGHT"}function pn(e,t){let[r,o,n,i,a,s]=t.text.transform,l=Math.hypot(r,o),u=Math.hypot(n,i),c=l>1e-4?r/l:1,p=l>1e-4?o/l:0,g=u>1e-4?n/u:0,y=u>1e-4?i/u:1;e.relativeTransform=[[c,g,x(Number.isFinite(a)?a:t.x)],[p,y,x(Number.isFinite(s)?s:t.y)]]}function fn(e){return e===null||!Number.isFinite(e)||e<=0?{unit:"AUTO"}:{unit:"PIXELS",value:e}}function mn(e,t){return{unit:"PIXELS",value:t>0?e/1e3*t:0}}function xn(e){switch(e){case 2:return"UPPER";case 1:return"SMALL_CAPS";default:return"ORIGINAL"}}function gn(e){switch(e){case"center":case"justify-center":return"CENTER";case"right":case"justify-right":return"RIGHT";case"justify-all":case"justify-left":return"JUSTIFIED";default:return"LEFT"}}function pr(e){return!e||e.a<=0?[]:[{type:"SOLID",color:{r:e.r/255,g:e.g/255,b:e.b/255},opacity:h(e.a/255,0,1)}]}function hn(e){return e?e.kind==="solid"?pr(e.color):[]:[]}function yn(e,t,r,o){let n=Math.min(r,o)/2;e.cornerRadius=0,t.kind==="rounded-rect"&&(e.topLeftRadius=h(t.topLeftRadius,0,n),e.topRightRadius=h(t.topRightRadius,0,n),e.bottomRightRadius=h(t.bottomRightRadius,0,n),e.bottomLeftRadius=h(t.bottomLeftRadius,0,n))}function Sn(e,t){if(!t){e.strokes=[];return}e.strokes=[{type:"SOLID",color:{r:t.color.r/255,g:t.color.g/255,b:t.color.b/255},opacity:h(t.color.a/255,0,1)}],e.strokeWeight=Math.max(0,t.width),e.strokeAlign=t.position==="inside"?"INSIDE":t.position==="outside"?"OUTSIDE":"CENTER"}function ve(e,t,r){e.name=t.name||(t.kind==="group"?"Group":"Layer"),e.visible=t.visible,"opacity"in e&&typeof e.opacity=="number"&&(e.opacity=h(t.opacity,0,1)),"blendMode"in e&&(e.blendMode=J(t.blendMode,r)),bn(e,t.effects),Pn(e,t.strokeEffect),function(o,n){/*PIGMA_TEXT_IMPORT_GUARD::SOURCE_ID_TAGGING*/if(!o||typeof o.setPluginData!="function"||!n||n.id==null)return;try{o.setPluginData("__pigmaImportSourceId",String(n.id)),o.setPluginData("__pigmaImportSourceKind",String(n.kind||""))}catch(i){}}(e,t)}function bn(e,t){if(!("effects"in e))return;let r=e;r.effects=En(t)}function En(e){if(!e)return[];let t=[];for(let r of e)switch(r.style){case"drop-shadow":t.push({type:"DROP_SHADOW",color:ye(r.color),offset:{x:r.offsetX,y:r.offsetY},radius:r.blur,spread:r.spread,visible:!0,blendMode:J(r.blendMode,!1),showShadowBehindNode:r.showBehindTransparentAreas});break;case"inner-shadow":t.push({type:"INNER_SHADOW",color:ye(r.color),offset:{x:r.offsetX,y:r.offsetY},radius:r.blur,spread:r.spread,visible:!0,blendMode:J(r.blendMode,!1)});break;case"outer-glow":t.push({type:"DROP_SHADOW",color:ye(r.color),offset:{x:0,y:0},radius:r.blur,spread:r.spread,visible:!0,blendMode:J(r.blendMode,!1),showShadowBehindNode:!0});break;case"inner-glow":t.push({type:"INNER_SHADOW",color:ye(r.color),offset:{x:0,y:0},radius:r.blur,spread:r.spread,visible:!0,blendMode:J(r.blendMode,!1)});break;case"layer-blur":t.push({type:"LAYER_BLUR",blurType:"NORMAL",radius:r.blurType==="PROGRESSIVE"?Math.max(r.startRadius,r.radius):r.radius,visible:!0});break;case"background-blur":t.push({type:"BACKGROUND_BLUR",blurType:"NORMAL",radius:r.radius,visible:!0});break;case"noise":case"texture":break}return t}function ye(e){return{r:h(e.r/255,0,1),g:h(e.g/255,0,1),b:h(e.b/255,0,1),a:h(e.a/255,0,1)}}function Pn(e,t){if(!t||!("strokes"in e)||!("strokeWeight"in e)||!("strokeAlign"in e))return;let r=e;r.strokes=[{type:"SOLID",color:{r:t.color.r/255,g:t.color.g/255,b:t.color.b/255},opacity:h(t.color.a/255,0,1),blendMode:J(t.blendMode,!1)}],r.strokeWeight=Math.max(0,t.width),r.strokeAlign=t.position==="inside"?"INSIDE":t.position==="outside"?"OUTSIDE":"CENTER"}function J(e,t){switch(e){case"pass through":return t?"PASS_THROUGH":"NORMAL";case"darken":return"DARKEN";case"multiply":return"MULTIPLY";case"linear burn":return"LINEAR_BURN";case"color burn":return"COLOR_BURN";case"lighten":return"LIGHTEN";case"screen":return"SCREEN";case"linear dodge":return"LINEAR_DODGE";case"color dodge":return"COLOR_DODGE";case"overlay":return"OVERLAY";case"soft light":return"SOFT_LIGHT";case"hard light":return"HARD_LIGHT";case"difference":return"DIFFERENCE";case"exclusion":return"EXCLUSION";case"hue":return"HUE";case"saturation":return"SATURATION";case"color":return"COLOR";case"luminosity":return"LUMINOSITY";default:return"NORMAL"}}async function se(){var n,i,a;let e=be;if(!e)return;O=e.developerExportExperiments;let t=e.nextIndex;if(t>=e.rootCount){N({type:"export-finished",fileName:e.bundleFileName,rootCount:e.rootCount}),e.rootCount===1&&e.singlePayloadSummary?(n=S.notify)==null||n.call(S,w(P.locale,"PSD ready: ".concat(e.singlePayloadSummary.exportNodeCount," layers, ").concat(e.singlePayloadSummary.editableTextCount," text candidates"))):(i=S.notify)==null||i.call(S,w(P.locale,"".concat(e.rootCount," PSD files are ready. The download will be packaged as a ZIP archive."))),be=null,Qe(),le();return}let r=(e.roots||e.nodes)[t],o="node"in r?r.node:r,s="node"in r?r:null,u=f(o);ae("build-marker",{patch:"root-preserved-20260319-1949",main:"code.patched.js"});try{let l=await Dn(o,e.hiddenLayerMode,e.settings,t+1,e.rootCount,e.includeCompositePng,s);e.rootCount===1&&(e.singlePayloadSummary={exportNodeCount:l.exportNodeCount,editableTextCount:l.editableTextCount});let c=Xe(l);e.nextIndex+=1,N({type:"export-root-ready",fileName:e.bundleFileName,rootIndex:t+1,rootCount:e.rootCount,payload:c}),qe(l),e.nextIndex>=e.rootCount&&await se()}catch(l){let c=await Nn(o,e.hiddenLayerMode,e.settings,t+1,e.rootCount,e.includeCompositePng,l,s);if(c){e.rootCount===1&&(e.singlePayloadSummary={exportNodeCount:c.exportNodeCount,editableTextCount:c.editableTextCount});let p=Xe(c);e.nextIndex+=1,N({type:"export-root-ready",fileName:e.bundleFileName,rootIndex:t+1,rootCount:e.rootCount,payload:p}),qe(c),e.nextIndex>=e.rootCount&&await se();return}let g=await Tn(o,e.hiddenLayerMode,e.settings,t+1,e.rootCount,e.includeCompositePng,l,s);if(g){e.rootCount===1&&(e.singlePayloadSummary={exportNodeCount:g.exportNodeCount,editableTextCount:g.editableTextCount});let p=Xe(g);e.nextIndex+=1,N({type:"export-root-ready",fileName:e.bundleFileName,rootIndex:t+1,rootCount:e.rootCount,payload:p}),qe(g),e.nextIndex>=e.rootCount&&await se();return}be=null,Qe(),le();let y=w(P.locale,l instanceof Error?e.rootCount>1?'Export failed for "'.concat(u,'" (').concat(t+1,"/").concat(e.rootCount,"): ").concat(l.message):l.message:"An unknown error happened while building the PSD.");N({type:"export-error",message:y}),(a=S.notify)==null||a.call(S,y,{error:!0})}}async function Nn(e,t,r,o,n,i,a,s=null){let l=s?s.documentBounds:xe(e);if(!l)return null;let u=s?s.analysis:Ie(e,t);return u.exportNodeCount===0||!ir(l,u.containsHeavyEffects)?null:await fr(e,t,r,o,n,i,u,a instanceof Error&&a.message.trim().length>0?a.message.trim():null,s)}async function Tn(e,t,r,o,n,i,a,s=null){let l=s?s.documentBounds:xe(e);if(!l)return null;let u=s?s.analysis:Ie(e,t);if(u.exportNodeCount===0||!nr(l,u.containsHeavyEffects))return null;let c=f(e),p=d(l.width),g=d(l.height),y=new Set(u.warnings);y.add(Xo(c,p,g)),y.add(Ko(c,a instanceof Error&&a.message.trim().length>0?a.message.trim():"unknown error")),N({type:"export-started",rootName:c,rootIndex:o,rootCount:n,total:1}),N({type:"export-progress",rootName:c,rootIndex:o,rootCount:n,current:1,total:1,layerName:c});let m=await e.exportAsync({format:"PNG",useAbsoluteBounds:l.useAbsoluteBounds});return{fileName:He(e,r,o,n),rootName:e.name||"Untitled",documentWidth:p,documentHeight:g,compositePngBytes:i?m:null,nodes:[{kind:"bitmap",id:"".concat(e.id,":safe-root"),name:c,sourceType:"".concat(e.type,"_SAFE_ROOT"),opacity:1,visible:!0,blendMode:"normal",effects:null,strokeEffect:null,x:0,y:0,width:p,height:g,nodeTransform:null,pngBytes:m}],warnings:Array.from(y),exportNodeCount:1,editableTextCount:0,preservedGroupCount:0,hasEditableText:!1,backgroundDebug:[]}}async function Dn(e,t,r,o,n,i,a=null){let s=Date.now(),l=a?a.documentBounds:xe(e);if(!l)throw new Error("Unable to calculate document bounds for the selected root.");let u=a?a.analysis:Ie(e,t);if(u.exportNodeCount===0)throw new Error(t==="ignore-hidden"?"No exportable layers remain after ignoring hidden layers.":"There are no visible exportable layers inside this selection.");let c=lt(l,u.containsHeavyEffects);ae("payload-start",{rootName:f(e),rootIndex:o,rootCount:n,includeCompositePng:i,exportNodeCount:u.exportNodeCount,documentWidth:d(l.width),documentHeight:d(l.height),longFrameMode:c});let p={root:e,documentBounds:l,totalLeaves:u.exportNodeCount,currentLeaf:0,warnings:new Set(u.warnings),editableTextCount:0,preservedGroupCount:0,hiddenLayerMode:t,settings:r,backgroundDebug:[],rootName:f(e),rootIndex:o,rootCount:n,lastProgressPostedAt:0,longFrameMode:c};c&&p.warnings.add(ut(d(l.width),d(l.height),u.containsHeavyEffects)),N({type:"export-started",rootName:p.rootName,rootIndex:p.rootIndex,rootCount:p.rootCount,total:p.totalLeaves});let g=mt(e,t),y=[];for(let m of g){let T=await ct(m,p);T&&y.push(T)}if(!y.length)throw new Error("The exporter could not produce any PSD layers from this selection.");ae("payload-nodes-built",{rootName:p.rootName,nodeCount:y.length,warningCount:p.warnings.size,editableTextCount:p.editableTextCount,durationMs:Date.now()-s});let C=i?await e.exportAsync({format:"PNG",useAbsoluteBounds:l.useAbsoluteBounds}):null;return C&&ae("payload-composite-exported",{rootName:p.rootName,bytes:C.byteLength,durationMs:Date.now()-s}),{fileName:He(e,r,o,n),rootName:e.name||"Untitled",documentWidth:d(l.width),documentHeight:d(l.height),compositePngBytes:C,nodes:y,warnings:Array.from(p.warnings),exportNodeCount:p.totalLeaves,editableTextCount:p.editableTextCount,preservedGroupCount:p.preservedGroupCount,hasEditableText:p.editableTextCount>0,backgroundDebug:p.backgroundDebug}}async function fr(e,t,r,o,n,i,a,s=null,l=null){let u=l?l.documentBounds:xe(e);if(!u)throw new Error("Unable to calculate document bounds for the selected root.");let c=lt(u,a.containsHeavyEffects),p=f(e),g=d(u.width),y=d(u.height),m=new Set(a.warnings);m.add(Wo(p,g,y)),s&&m.add(Zo(p,s));let T={root:e,documentBounds:u,totalLeaves:a.exportNodeCount,currentLeaf:0,warnings:m,editableTextCount:0,preservedGroupCount:0,hiddenLayerMode:t,settings:r,backgroundDebug:[],rootName:p,rootIndex:o,rootCount:n,lastProgressPostedAt:0,longFrameMode:c};c&&T.warnings.add(ut(g,y,a.containsHeavyEffects)),ae("payload-safe-layered-start",{rootName:p,rootIndex:o,rootCount:n,includeCompositePng:i,exportNodeCount:a.exportNodeCount,documentWidth:g,documentHeight:y,longFrameMode:c}),N({type:"export-started",rootName:T.rootName,rootIndex:T.rootIndex,rootCount:T.rootCount,total:T.totalLeaves});let C=t==="ignore-hidden"&&!q(e)?[]:[e];ae("payload-safe-layered-entry",{rootName:p,entryCount:C.length,entryMode:"root-preserved"});let E=[];for(let R of C){let wt=await mr(R,T);wt&&E.push(wt)}if(!E.length)throw new Error("The exporter could not produce any PSD layers from this selection.");let k=i?await e.exportAsync({format:"PNG",useAbsoluteBounds:u.useAbsoluteBounds}):null;return{fileName:He(e,r,o,n),rootName:e.name||"Untitled",documentWidth:g,documentHeight:y,compositePngBytes:k,nodes:E,warnings:Array.from(T.warnings),exportNodeCount:T.currentLeaf,editableTextCount:T.editableTextCount,preservedGroupCount:T.preservedGroupCount,hasEditableText:T.editableTextCount>0,backgroundDebug:T.backgroundDebug}}async function mr(e,t){if(t.hiddenLayerMode==="ignore-hidden"&&!q(e))return null;if(Cr(e)){let r=await gr(e,t,Ut(e));if(r.length>0)return t.preservedGroupCount+=1,{kind:"group",id:e.id,name:f(e),sourceType:e.type,opacity:j(e),visible:e.visible,blendMode:K(e),effects:null,strokeEffect:null,mask:containerMask(e,t.documentBounds,t.root),children:r}}let r=e===t.root&&V(e)&&e.children.length>0&&Ur(e),o=r||hi(e);if(o){let n=await kn(e,t,Ut(e));if(n)return t.preservedGroupCount+=1,n;let i=await gr(e,t);if(i.length>0)return t.warnings.add("\"".concat(f(e),"\" could not separate its background cleanly, so it preserved the child layers without a synthetic background.")),t.preservedGroupCount+=1,{kind:"group",id:e.id,name:f(e),sourceType:e.type,opacity:j(e),visible:e.visible,blendMode:K(e),effects:null,strokeEffect:null,mask:containerMask(e,t.documentBounds,t.root),children:i};t.warnings.add("\"".concat(f(e),"\" could not separate its background cleanly, so it was flattened."))}return await xr(e,t)}function vn(e,t){if(!Cr(e))return!1;let r=ue(e,t);return r.length===0?!1:r.every(o=>o.kind==="node")}async function wn(e,t){let r=[],o=ue(e,t.hiddenLayerMode);for(let n of o){if(n.kind!=="node")return await xr(e,t);let i=await mr(n.node,t);i&&r.push(i)}return r.length===0?null:(t.preservedGroupCount+=1,{kind:"group",id:e.id,name:f(e),sourceType:e.type,opacity:j(e),visible:e.visible,blendMode:K(e),effects:null,strokeEffect:null,mask:containerMask(e,t.documentBounds,t.root),children:r})}async function xr(e,t){var n,i;let r=e.type==="TEXT"&&(n=ge(e,!1))!=null?n:v(e);if(!r)return t.warnings.add('"'.concat(f(e),'" was skipped because it has no exportable bounds.')),null;let a=oa(e),s=a!=null&&a.warning?a.warning:null;s&&t.warnings.add(s);let l=await hr(e,t,null),u=l.effects,c=_(u),p=me(e),g=progressiveBlurShouldRasterize(u),y=Re(e)?Nr(e):null,m=(e.type==="LINE"||e.type==="VECTOR")&&!!p&&!(y!=null&&y.fill),h=a||u||p||c?g?{normalizePaintOpacity:(a==null?void 0:a.normalizePaintOpacity)===!0,normalizePaintBlendMode:(a==null?void 0:a.normalizePaintBlendMode)===!0}:{normalizePaintOpacity:(a==null?void 0:a.normalizePaintOpacity)===!0,normalizePaintBlendMode:(a==null?void 0:a.normalizePaintBlendMode)===!0,removeSupportedEffects:l.removeSupportedEffects||!!c,removeSupportedStroke:!!p&&!m}:void 0,T=g?((i=v(e))!=null?i:r):a||u||p||c?((i=tt(e))!=null?i:r):r;if(t.longFrameMode&&pe(e)&&De(r)){t.currentLeaf+=1,Y(t,f(e));let C=await pt(e,r,h,t.documentBounds);return t.warnings.add(Te(f(e),C.length)),Be(e.id,f(e),e.type,a?a.effectiveOpacity:j(e),e.visible,at(a?a.effectiveBlendMode:K(e)),C)}g&&t.warnings.add('"'.concat(f(e),'" kept its progressive blur as a bitmap layer for closer Photoshop matching.'));let E=await Me(e,t,T,h);return E?{kind:"bitmap",id:e.id,name:f(e),sourceType:e.type,opacity:a?a.effectiveOpacity:j(e),visible:e.visible,blendMode:at(a?a.effectiveBlendMode:K(e)),effects:g?null:u,strokeEffect:g||m?null:p,x:E.x,y:E.y,width:E.width,height:E.height,nodeTransform:de(e,t.documentBounds,E.x,E.y),pngBytes:E.pngBytes}:null}function Xe(e){return B(b({},e),{warnings:e.warnings.map(t=>w(P.locale,t))})}async function ct(e,t,r=null){var i,a,s;if(t.hiddenLayerMode==="ignore-hidden"&&!q(e))return null;let o=e.type==="TEXT"?await Hn(e):null;if(o&&!o.ok)return t.warnings.add(o.reason),await Cn(e,t);let n=Fe(e);if(n==="group"){let l=e,u=await gr(l,t,(i=Ut(l))!=null?i:r);if(u.length>0)return t.preservedGroupCount+=1,{kind:"group",id:e.id,name:f(e),sourceType:e.type,opacity:j(e),visible:e.visible,blendMode:K(e),effects:null,strokeEffect:null,mask:containerMask(l,t.documentBounds,t.root),children:u}}if(n==="split"){let l=await kn(e,t,(a=Ut(e))!=null?a:r);if(l)return t.preservedGroupCount+=1,l;let u=await gr(e,t,r);if(u.length>0)return t.warnings.add("\"".concat(f(e),"\" could not separate its background cleanly, so it preserved the child layers without a synthetic background.")),t.preservedGroupCount+=1,{kind:"group",id:e.id,name:f(e),sourceType:e.type,opacity:j(e),visible:e.visible,blendMode:K(e),effects:null,strokeEffect:null,mask:containerMask(e,t.documentBounds,t.root),children:u};t.warnings.add("\"".concat(f(e),"\" could not separate its background cleanly, so it was flattened."))}if(progressiveBlurShouldRasterize(L(e,t.root)))return await qn(e,t,r);if(e.type==="TEXT"&&t.settings.textExportMode!=="rasterize-text"){let l=await Gn(e,t,r);if(l)return _(l.effects)||(t.editableTextCount+=1),l}if(Re(e)){let l=(s=ft(e))!=null?s:v(e),u=!t.longFrameMode?await pigmaExportMultiFillGroup(e,t,r,l):null;if(u)return t.preservedGroupCount+=1,u;if(t.longFrameMode&&!!l&&Ne(d(l.width),d(l.height),!1))t.warnings.add(jo(f(e)));else{let c=await Jn(e,t);if(c)return c;t.warnings.add("\"".concat(f(e),"\" could not keep its SVG/vector data, so it fell back to a bitmap layer."))}}if(V(e)&&e.children.length>0){let l=L(e);_(l)?t.warnings.add(Mr(e,"past")):ze(e)?t.warnings.add(Ir(e,"past")):$e(l)?t.warnings.add(Rr(e,"past")):Pt(l)?t.warnings.add(Ar(e,"past")):t.warnings.add(Br(e,"past"))}return await qn(e,t,r)}async function Cn(e,t){var a;let r=e.type==="TEXT"&&(a=ge(e,!1))!=null?a:v(e);if(!r)return t.warnings.add('"'.concat(f(e),'" was skipped because it has no exportable bounds.')),null;if(t.currentLeaf+=1,Y(t,f(e)),t.longFrameMode&&pe(e)&&De(r)){let s=await pt(e,r,void 0,t.documentBounds);return t.warnings.add(Te(f(e),s.length)),Be(e.id,f(e),e.type,1,e.visible,"normal",s)}let o=await e.exportAsync({format:"PNG",useAbsoluteBounds:r.useAbsoluteBounds}),n=x(r.x-t.documentBounds.x),i=x(r.y-t.documentBounds.y);return{kind:"bitmap",id:e.id,name:f(e),sourceType:e.type,opacity:1,visible:e.visible,blendMode:"normal",effects:null,strokeEffect:null,x:n,y:i,width:d(r.width),height:d(r.height),nodeTransform:de(e,t.documentBounds,n,i),pngBytes:o}}async function kn(e,t,r=null){let o=await gr(e,t,r),n=await pigmaExportMultiFillBackgroundGroup(e,t,r);if(n)return n.backgroundLayer&&(o.push(n.backgroundLayer)),{kind:"group",id:e.id,name:f(e),sourceType:e.type,opacity:j(e),visible:e.visible,blendMode:K(e),effects:n.groupEffects,strokeEffect:n.groupStrokeEffect,mask:containerMask(e,t.documentBounds,t.root),children:o};let i=L(e,t.root),a=me(e),s=await Rn(e,t),l=Bn(s,i,a);return!l.backgroundLayer&&o.length===0?null:(l.backgroundLayer&&(o.push(l.backgroundLayer),(l.backgroundLayer.kind==="bitmap"||l.backgroundLayer.kind==="shape")&&ha(t.backgroundDebug,ga(e,l.backgroundLayer,o.length-1,o.length))),{kind:"group",id:e.id,name:f(e),sourceType:e.type,opacity:j(e),visible:e.visible,blendMode:K(e),effects:l.groupEffects,strokeEffect:l.groupStrokeEffect,mask:containerMask(e,t.documentBounds,t.root),children:o})}function Bn(e,t,r){if(!e)return{backgroundLayer:null,groupEffects:t,groupStrokeEffect:r};let o=Hi(t),n=Vi(t);if(!o&&!r)return{backgroundLayer:e,groupEffects:n,groupStrokeEffect:null};if(e.kind==="group")return{backgroundLayer:e,groupEffects:null,groupStrokeEffect:null};let i=e.kind==="shape"&&e.stroke?null:r;return{backgroundLayer:B(b({},e),{effects:o,strokeEffect:i}),groupEffects:n,groupStrokeEffect:null}}async function gr(e,t,r=null){let o=[],n=ue(e,t.hiddenLayerMode);for(let i of n){let a=await Mn(i,t,r);a&&o.push(a)}return o}async function Mn(e,t,r=null){return e.kind==="node"?await ct(e.node,t,r):await In(e,t,r)}async function In(e,t,r=null){var a;let o=(a=Lr(e.maskNode,xt(e.maskNode)))!=null?a:r,n=[];for(let s of e.maskedNodes){let l=await ct(s,t,o);l&&n.push(l)}if(n.length===0)return null;let i=await Si(e.maskNode,t);return i?(t.preservedGroupCount+=1,{kind:"group",id:"".concat(e.maskNode.id,":mask-group"),name:f(e.maskNode),sourceType:"MASK_OBJECT",opacity:1,visible:e.maskNode.visible,blendMode:"pass through",effects:null,strokeEffect:null,mask:i,children:n}):(t.warnings.add('"'.concat(f(e.maskNode),'" could not be reconstructed as a PSD mask.')),null)}async function Rn(e,t){if(!Ln(e))return null;let r=An(e,t.documentBounds,t);if(r)return r;if(!Ur(e))return null;let o=Fn(e);if(!o)return null;if(!await preloadTreeFontsSafely(e))return null;let n=oa(e),i=n&&((n.normalizePaintOpacity===!0)||(n.normalizePaintBlendMode===!0))?n:null,a=!!L(e,t.root)||!!fe(e,t.root),s=me(e),l=e.clone();try{try{if(Ii(l),i&&to(l,i),bt(l,o),t.longFrameMode&&De(o)){let u=await Er(l,o,t.documentBounds);return t.warnings.add(Te("".concat(f(e)," background"),u.length)),Be("".concat(e.id,":background"),"Background","".concat(e.type,"_BACKGROUND"),i?i.effectiveOpacity:1,!0,at(i?i.effectiveBlendMode:"normal"),u)}let c=await Me(l,t,o,{normalizePaintOpacity:(i==null?void 0:i.normalizePaintOpacity)===!0,normalizePaintBlendMode:(i==null?void 0:i.normalizePaintBlendMode)===!0,removeSupportedEffects:a,removeSupportedStroke:!!s});return c?{kind:"bitmap",id:"".concat(e.id,":background"),name:"Background",sourceType:"".concat(e.type,"_BACKGROUND"),opacity:i?i.effectiveOpacity:1,visible:!0,blendMode:at(i?i.effectiveBlendMode:"normal"),effects:null,strokeEffect:null,x:c.x,y:c.y,width:c.width,height:c.height,nodeTransform:null,pngBytes:c.pngBytes}:null}catch(c){return null}}finally{l.removed||l.remove()}}function An(e,t,r){if(fe(e))return null;let o=Di(e),n=oa(e),i=n&&((n.normalizePaintOpacity===!0)||(n.normalizePaintBlendMode===!0))?n:null;if(!o)return null;let a=Fr(e,t);return!a||!o.fill&&!o.stroke?null:{kind:"shape",id:"".concat(e.id,":background-shape"),name:"Background",sourceType:"".concat(e.type,"_BACKGROUND_SHAPE"),opacity:i?i.effectiveOpacity:1,visible:!0,blendMode:at(i?i.effectiveBlendMode:"normal"),effects:null,strokeEffect:null,x:a.x,y:a.y,width:a.width,height:a.height,nodeTransform:null,shape:a,fill:o.fill,stroke:o.stroke}}function Ln(e){return X(e,"fills")||X(e,"strokes")?!0:te(e)}function Fn(e){let t=k(e);if(t&&t.width>0&&t.height>0)return{x:t.x,y:t.y,width:t.width,height:t.height,useAbsoluteBounds:!0};if("absoluteTransform"in e&&"width"in e&&"height"in e){let r=ce(e);if(r)return r}return v(e)}function tt(e){var r;let o=Zr(e)||re(e),n=o?v(e):null;if(e.type==="TEXT")return n!=null?n:v(e);if(Re(e))return n!=null?n:(r=ft(e))!=null?r:v(e);if(n)return n;let t=k(e);if(t&&t.width>0&&t.height>0)return{x:t.x,y:t.y,width:t.width,height:t.height,useAbsoluteBounds:!0};if("absoluteTransform"in e&&"width"in e&&"height"in e){let i=ce(e);if(i)return i}return v(e)}function Ut(e){if(!ht(e))return null;let t=k(e);if(t&&t.width>0&&t.height>0)return{x:t.x,y:t.y,width:t.width,height:t.height,useAbsoluteBounds:!0};if("absoluteTransform"in e&&"width"in e&&"height"in e){let r=ce(e);if(r)return r}return null}async function hr(e,t,r=null){let o=L(e,t.root);if(!_e(o))return{effects:o,removeSupportedEffects:!!o};if(t.longFrameMode){t.warnings.add($t(f(e)));let a=jt(o);return{effects:a,removeSupportedEffects:!!a}}let i=await Ri(e,t,r);if(!i){t.warnings.add($t(f(e)));let a=jt(o);return{effects:a,removeSupportedEffects:!!a}}return{effects:_i(o,i),removeSupportedEffects:!0}}async function Gn(e,t,r=null){var n;let o=e;try{try{o=(n=await $n(e))!=null?n:e}catch(y){t.warnings.add('"'.concat(f(e),'" could not prepare its editable text clone because Figma could not load one of its fonts, so export continued without the point-text auto-fix.')),o=e}let i=Tr(o,t.documentBounds);if(!i){let y=Pr(o);return y.supported||t.warnings.add(y.reason),null}let a=jr(o,i),s=await hr(e,t,r),l=s.effects,u=_(l),c=me(e);u&&t.warnings.add(eo(f(e)));let p=await zn(o,i,{riskScore:a,removeSupportedEffects:s.removeSupportedEffects||!!u,removeSupportedStroke:!!c});if(!p)return null;_n(i,p.bounds,t.documentBounds,p.usedVisualProbe);let g=await On(o,t,i,p.bounds,{removeSupportedEffects:s.removeSupportedEffects||!!u,removeSupportedStroke:!!c});return g?{kind:"text",id:e.id,name:f(e),sourceType:e.type,opacity:j(e),visible:e.visible,blendMode:ro(e),effects:l,strokeEffect:c,x:g.x,y:g.y,width:g.width,height:g.height,nodeTransform:de(o,t.documentBounds,g.x,g.y),pngBytes:g.pngBytes,text:i}:null}finally{o!==e&&!o.removed&&o.remove()}}async function On(e,t,r,o,n){t.currentLeaf+=1,Y(t,f(e));let i=yt(e)||(n==null?void 0:n.normalizePaintOpacity)===!0||(n==null?void 0:n.normalizePaintBlendMode)===!0||(n==null?void 0:n.removeAllEffects)===!0||(n==null?void 0:n.removeSupportedEffects)===!0||(n==null?void 0:n.removeSupportedStroke)===!0,a=Un(e,r.shapeType,o),s=r.shapeType==="point"||a?await Hr(e,o,n,i):i?await $r(e,o,t,n):await e.exportAsync({format:"PNG",useAbsoluteBounds:o.useAbsoluteBounds});return{x:x(o.x-t.documentBounds.x),y:x(o.y-t.documentBounds.y),width:d(o.width),height:d(o.height),pngBytes:s}}function Un(e,t,r){if(t==="point")return!0;let o=Ae(e,t);return o?Math.abs(o.x-r.x)>.5||Math.abs(o.y-r.y)>.5||Math.abs(o.width-r.width)>.5||Math.abs(o.height-r.height)>.5:!0}async function zn(e,t,r){var a,s;let o=Ae(e,t.shapeType);if(!o)return null;let n=((a=r==null?void 0:r.riskScore)!=null?a:0)>=No?Wr(t,(s=r==null?void 0:r.riskScore)!=null?s:0):null;if(t.shapeType!=="point"){let l=I(e);if(l&&l.width>0&&l.height>0){let u=Vt(o,{x:l.x,y:l.y,width:l.width,height:l.height,useAbsoluteBounds:!1});return{bounds:ie(u,Se(Ht(t),n)),usedVisualProbe:!1}}return{bounds:ie(o,Se(Ht(t),n)),usedVisualProbe:!1}}let i=await Li(e,o,r);if(i){let l=Se(it(e,t),n);return{bounds:ie(Vt(o,i),l),usedVisualProbe:!0}}return{bounds:ie(o,Se(it(e,t),n)),usedVisualProbe:!1}}function Se(e,t){return t?{left:Math.max(e.left,t.left),top:Math.max(e.top,t.top),right:Math.max(e.right,t.right),bottom:Math.max(e.bottom,t.bottom)}:e}function _n(e,t,r,o){let n=x(t.x-r.x),i=x(t.y-r.y),a=x(n+t.width),s=x(i+t.height);e.bounds={left:n,top:i,right:a,bottom:s},e.boundingBox={left:n,top:i,right:a,bottom:s},e.hasVisualBoundsProbe=o}async function $n(e){if(!Wn(e))return null;let t=Zn(e);if(!t)return null;await we(e);let r=e.clone();try{return figma.currentPage.appendChild(r),r.visible=!0,r.textAutoResize="NONE",r.resizeWithoutConstraints(d(t.width),d(t.height)),Xn(e,r,t.x,t.y),Kn(e,r),r}catch(o){throw r.removed||r.remove(),o}}async function we(e){if(!e.characters||e.characters.length===0)return;let t=new Map;for(let r of e.getStyledTextSegments(Kt)){let o=r.fontName,n=ke(o);t.has(n)||t.set(n,o)}await Promise.all(Array.from(t.values(),r=>Ce(r)))}async function dt(e){let t=[],r=[e];for(;r.length>0;){let o=r.pop();if(o){if(o.type==="TEXT"){t.push(o);continue}"children"in o&&r.push(...o.children)}}await Promise.all(t.map(o=>we(o)))}async function preloadTreeFontsSafely(e){try{return await dt(e),!0}catch(t){return!1}}async function outlineLongFrameFallbackTiles(e,t,r=null){let o="";try{o=await e.exportAsync({format:"SVG_STRING",useAbsoluteBounds:t.useAbsoluteBounds,svgOutlineText:!0,svgIdAttribute:!0,svgSimplifyStroke:!1})}catch(i){return null}if(!o||o.trim().length===0)return null;let n=figma.createNodeFromSvg(o);try{let i=("absoluteBoundingBox"in n?n.absoluteBoundingBox:null)||("absoluteRenderBounds"in n?n.absoluteRenderBounds:null);return i&&("x"in n&&(n.x=x(n.x+(t.x-i.x))),"y"in n&&(n.y=x(n.y+(t.y-i.y)))),await Er(n,t,r)}catch(i){return n.removed||n.remove(),null}}async function Hn(e){if(!e.characters||e.characters.length===0)return{ok:!0};let t=new Map;for(let o of e.getStyledTextSegments(Kt)){let n=o.fontName,i=ke(n);t.has(i)||t.set(i,n)}let r=await Vn();for(let[o,n]of t)if(!r.has(o))return{ok:!1,reason:'"'.concat(f(e),'" uses "').concat(yr(n),'", which is not available in this Figma session, so it fell back to a flattened bitmap layer.')};try{return await Promise.all(Array.from(t.values(),o=>Ce(o))),{ok:!0}}catch(o){return{ok:!1,reason:'"'.concat(f(e),'" uses a font that Figma could not prepare for text editing (').concat(jn(o),"), so it fell back to a flattened bitmap layer.")}}}async function Ce(e){let t=ke(e),r=je.get(t);if(r){await r;return}let o=figma.loadFontAsync(e).catch(n=>{throw je.delete(t),new Error('font "'.concat(yr(e),'": ').concat(Sr(n)))});je.set(t,o),await o}function ke(e){return"".concat(e.family,"\0").concat(e.style)}async function Vn(){return Ze||(Ze=dr().then(e=>new Set(e.map(t=>ke(t.fontName))))),await Ze}function yr(e){return"".concat(e.family," ").concat(e.style).trim()}function jn(e){let t=Sr(e);return t.length>0?t:"unknown font loading error"}function Sr(e){return e instanceof Error&&typeof e.message=="string"&&e.message.trim().length>0?e.message.trim():typeof e=="string"&&e.trim().length>0?e.trim():"unknown error"}function Wn(e){if(e.textAutoResize!=="WIDTH_AND_HEIGHT")return!1;let t=k(e),r=I(e);if(!t||!r)return!1;let o=br(t,r),n=Le(e),i=n.ok?n.baseStyle.fontSize:16,a=Math.max(2,d(i*.02));return o.left>=a||o.top>=a||o.right>=a||o.bottom>=a}function Zn(e){let t=k(e),r=I(e),o=t&&r?Yn(t,r):t!=null?t:r;if(!o)return null;let n=Le(e),i=n.ok?n.baseStyle.fontSize:16,a={left:d(Math.max(4,i*.04)),top:d(Math.max(4,i*.03)),right:d(Math.max(8,i*.1)),bottom:d(Math.max(10,i*.12))};return{x:o.x-a.left,y:o.y-a.top,width:o.width+a.left+a.right,height:o.height+a.top+a.bottom,useAbsoluteBounds:!1}}function Xn(e,t,r,o){if("relativeTransform"in t){t.relativeTransform=[[e.absoluteTransform[0][0],e.absoluteTransform[0][1],r],[e.absoluteTransform[1][0],e.absoluteTransform[1][1],o]];return}let n=t;n.x=r,n.y=o}function Kn(e,t){let r=I(e),o=I(t);if(!r||!o)return;let n=x(r.x-o.x),i=x(r.y-o.y);if(n===0&&i===0)return;if("relativeTransform"in t){let s=t.relativeTransform;t.relativeTransform=[[s[0][0],s[0][1],s[0][2]+n],[s[1][0],s[1][1],s[1][2]+i]];return}let a=t;a.x+=n,a.y+=i}function br(e,t){let r=e.x+e.width,o=e.y+e.height,n=t.x+t.width,i=t.y+t.height;return{left:Math.max(0,e.x-t.x),top:Math.max(0,e.y-t.y),right:Math.max(0,n-r),bottom:Math.max(0,i-o)}}function Yn(e,t){let r=Math.min(e.x,t.x),o=Math.min(e.y,t.y),n=Math.max(e.x+e.width,t.x+t.width),i=Math.max(e.y+e.height,t.y+t.height);return{x:r,y:o,width:n-r,height:i-o}}function Be(e,t,r,o,n,i,a){return{kind:"group",id:"".concat(e,":tiles"),name:t,sourceType:r,opacity:o,visible:n,blendMode:i,effects:null,strokeEffect:null,mask:null,children:a.map((s,l)=>({kind:"bitmap",id:"".concat(e,":tile:").concat(l+1),name:"".concat(t," Tile ").concat(l+1),sourceType:"".concat(r,"_TILE"),opacity:1,visible:!0,blendMode:"normal",effects:null,strokeEffect:null,x:s.x,y:s.y,width:s.width,height:s.height,nodeTransform:null,pngBytes:s.pngBytes}))}}async function pt(e,t,r,o=null){let n=(r==null?void 0:r.normalizePaintOpacity)===!0||(r==null?void 0:r.normalizePaintBlendMode)===!0||(r==null?void 0:r.removeAllEffects)===!0||(r==null?void 0:r.removeSupportedEffects)===!0||(r==null?void 0:r.removeSupportedStroke)===!0,i=await preloadTreeFontsSafely(e);if(!i){let a=await outlineLongFrameFallbackTiles(e,t,o);if(a)return a;return[{x:o?x(t.x-o.x):x(t.x),y:o?x(t.y-o.y):x(t.y),width:Math.max(1,d(t.width)),height:Math.max(1,d(t.height)),pngBytes:await e.exportAsync({format:"PNG",useAbsoluteBounds:t.useAbsoluteBounds})}]}let s=e.clone();try{return n&&Oe(s,r),await Er(s,t,o)}finally{s.removed||s.remove()}}async function Er(e,t,r=null){let o=figma.createFrame(),n=Math.max(1,d(t.width)),i=Math.max(1,d(t.height)),a=qo(n,i),s=[];try{o.clipsContent=!0,o.fills=[],o.strokes=[],o.name="__pigma-long-frame-tile__",o.resize(n,Math.min(a,i)),figma.currentPage.appendChild(o),o.appendChild(e);for(let l=0;l<i;l+=a){let u=Math.min(a,i-l),c={x:t.x,y:t.y+l,width:t.width,height:u,useAbsoluteBounds:!1},p=r?x(c.x-r.x):x(c.x),g=r?x(c.y-r.y):x(c.y);o.resize(n,Math.max(1,u)),o.x=x(c.x),o.y=x(c.y),_r(e,t,c),s.push({x:p,y:g,width:n,height:d(u),pngBytes:await o.exportAsync({format:"PNG",useAbsoluteBounds:!1})})}return s}finally{o.removed||o.remove(),e.removed||e.remove()}}async function qn(e,t,r=null){var g,y;let o=oa(e),n=e.type==="TEXT"?Gi(e,t.documentBounds):null,i=(g=n!=null?n:tt(e))!=null?g:v(e),a=o!=null&&o.warning?o.warning:null;if(a&&t.warnings.add(a),!t.longFrameMode){let T=await pigmaExportMultiFillGroup(e,t,r,i);if(T)return T}if(t.longFrameMode&&i&&pe(e)&&De(i)){t.currentLeaf+=1,Y(t,f(e));let T=await pt(e,i,{normalizePaintOpacity:(o==null?void 0:o.normalizePaintOpacity)===!0,normalizePaintBlendMode:(o==null?void 0:o.normalizePaintBlendMode)===!0});return t.warnings.add(Te(f(e),T.length)),Be(e.id,f(e),e.type,o?o.effectiveOpacity:j(e),e.visible,at(o?o.effectiveBlendMode:K(e)),T)}let s=await hr(e,t,r),l=s.effects,u=_(l),c=me(e),p=progressiveBlurShouldRasterize(l),d=Re(e)?Nr(e):null,m=(e.type==="LINE"||e.type==="VECTOR")&&!!c&&!(d!=null&&d.fill),h=o||l||c||u?p?{normalizePaintOpacity:(o==null?void 0:o.normalizePaintOpacity)===!0,normalizePaintBlendMode:(o==null?void 0:o.normalizePaintBlendMode)===!0}:{normalizePaintOpacity:(o==null?void 0:o.normalizePaintOpacity)===!0,normalizePaintBlendMode:(o==null?void 0:o.normalizePaintBlendMode)===!0,removeSupportedEffects:s.removeSupportedEffects||!!u,removeSupportedStroke:!!c&&!m}:void 0,Bounds=p?(n!=null?n:v(e)):n!=null?n:(o||l||c||u)&&(y=tt(e))!=null?y:void 0;p&&t.warnings.add('"'.concat(f(e),'" kept its progressive blur as a bitmap layer for closer Photoshop matching.'));let E=n&&e.type==="TEXT"?await Qn(e,t,n,h):await Me(e,t,Bounds,h);return E?{kind:"bitmap",id:e.id,name:f(e),sourceType:e.type,opacity:o?o.effectiveOpacity:j(e),visible:e.visible,blendMode:at(o?o.effectiveBlendMode:K(e)),effects:p?null:l,strokeEffect:p||m?null:c,x:E.x,y:E.y,width:E.width,height:E.height,nodeTransform:de(e,t.documentBounds,E.x,E.y),pngBytes:E.pngBytes}:null}async function Jn(e,t){if(O.forceBitmapVectorPreview)return null;let r=ft(e);if(!r)return null;let o=L(e,t.root),n=_(o),i=me(e),a=Nr(e),s=oa(e),l="fills"in e&&Array.isArray(e.fills)?e.fills.some(W):!1,u=(e.type==="LINE"||e.type==="VECTOR")&&!!i&&!l;if(u)return null;let c=!!i&&!(a!=null&&a.fill)&&!I(e)?Math.max(3,Math.ceil(i.width/2)+2):0,p=c?{x:r.x-c,y:r.y-c,width:r.width+c*2,height:r.height+c*2,useAbsoluteBounds:!1}:r,g=await Me(e,t,o||i||n||s?p:void 0,o||i||n||s?{normalizePaintOpacity:(s==null?void 0:s.normalizePaintOpacity)===!0,normalizePaintBlendMode:(s==null?void 0:s.normalizePaintBlendMode)===!0,removeSupportedEffects:!0,removeSupportedStroke:!!i&&!!a.fill}:void 0);if(!g)return null;let y=x(r.x-t.documentBounds.x),m=x(r.y-t.documentBounds.y),T=d(r.width),C=d(r.height),E=x(g.x-y),R=x(g.y-m),N="";try{N=await e.exportAsync({format:"SVG_STRING",useAbsoluteBounds:r.useAbsoluteBounds,svgOutlineText:!0,svgIdAttribute:!0,svgSimplifyStroke:!1})}catch(F){return null}if(!N||N.trim().length===0)return null;return{kind:"vector",id:e.id,name:f(e),sourceType:e.type,opacity:s?s.effectiveOpacity:j(e),visible:e.visible,blendMode:at(s?s.effectiveBlendMode:K(e)),effects:o,strokeEffect:a.fill?i:null,x:y,y:m,width:T,height:C,nodeTransform:de(e,t.documentBounds,y,m),pngBytes:g.pngBytes,strategy:a.strategy,svgString:N,fill:a.fill,previewOffsetX:E,previewOffsetY:R}}async function Qn(e,t,r,o){t.currentLeaf+=1,Y(t,f(e));let n=yt(e)||(o==null?void 0:o.normalizePaintOpacity)===!0||(o==null?void 0:o.normalizePaintBlendMode)===!0||(o==null?void 0:o.removeAllEffects)===!0||(o==null?void 0:o.removeSupportedEffects)===!0||(o==null?void 0:o.removeSupportedStroke)===!0,i=await Hr(e,r,o,n);return{x:x(r.x-t.documentBounds.x),y:x(r.y-t.documentBounds.y),width:d(r.width),height:d(r.height),pngBytes:i}}async function Me(e,t,r,o){let n=r!=null?r:v(e);if(!n)return t.warnings.add('"'.concat(f(e),'" was skipped because it has no exportable bounds.')),null;t.currentLeaf+=1,Y(t,f(e));let a=yt(e)||(o==null?void 0:o.normalizePaintOpacity)===!0||(o==null?void 0:o.normalizePaintBlendMode)===!0||(o==null?void 0:o.removeAllEffects)===!0||(o==null?void 0:o.removeSupportedEffects)===!0||(o==null?void 0:o.removeSupportedStroke)===!0?await $r(e,n,t,o):await e.exportAsync({format:"PNG",useAbsoluteBounds:n.useAbsoluteBounds});return{x:x(n.x-t.documentBounds.x),y:x(n.y-t.documentBounds.y),width:d(n.width),height:d(n.height),pngBytes:a}}function Y(e,t){let r=Date.now();!(e.currentLeaf>=e.totalLeaves)&&r-e.lastProgressPostedAt<Eo||(e.lastProgressPostedAt=r,N({type:"export-progress",rootName:e.rootName,rootIndex:e.rootIndex,rootCount:e.rootCount,current:e.currentLeaf,total:e.totalLeaves,layerName:t}))}function Ie(e,t){let r={exportNodeCount:0,editableTextCount:0,preservedGroupCount:0,containsHeavyEffects:!1,warnings:new Set},o=mt(e,t);for(let n of o)rt(n,r,t,e);return r}function rt(e,t,r,o){if(r==="ignore-hidden"&&!q(e))return;Yo(e,o)&&(t.containsHeavyEffects=!0),te(e,o)&&t.warnings.add(yi(e));let n=Fe(e);if(n==="group"){let i=ue(e,r);if(i.length>0){t.preservedGroupCount+=1;for(let a of i)zt(a,t,r,o);return}}if(n==="split"){t.preservedGroupCount+=1,t.exportNodeCount+=1;let i=ue(e,r);for(let a of i)zt(a,t,r,o);return}if(t.exportNodeCount+=1,t.exportNodeCount+=Wi(L(e,o)),e.type==="TEXT"){let i=Pr(e);i.supported?fe(e,o)?t.warnings.add(eo(f(e))):t.editableTextCount+=1:t.warnings.add(i.reason)}else if(Re(e))Nr(e).strategy==="smart-object"&&t.warnings.add('"'.concat(f(e),'" is a complex vector, so it will export as a smart object instead of a native PSD shape layer.'));else if(V(e)&&e.children.length>0){let i=L(e);_(i)?t.warnings.add(Mr(e,"future")):ze(e)?t.warnings.add(Ir(e,"future")):$e(i)?t.warnings.add(Rr(e,"future")):Pt(i)?t.warnings.add(Ar(e,"future")):t.warnings.add(Br(e,"future"))}re(e)&&t.warnings.add('"'.concat(f(e),'" uses masking and will export as a flattened bitmap layer.'))}function zt(e,t,r,o){if(e.kind==="node"){rt(e.node,t,r,o);return}t.preservedGroupCount+=1,t.exportNodeCount+=1;for(let n of e.maskedNodes)rt(n,t,r,o)}function Pr(e){if(!e.characters||e.characters.length===0)return{supported:!1,reason:'"'.concat(f(e),'" is empty, so it falls back to a bitmap layer.')};let t=Le(e);if(!t.ok)return{supported:!1,reason:'"'.concat(f(e),'" falls back to bitmap: ').concat(t.reason)};let r=Dr(e,t.baseStyle);return r.ok?{supported:!0}:{supported:!1,reason:'"'.concat(f(e),'" falls back to bitmap: ').concat(r.reason)}}function Re(e){return e.type==="VECTOR"||e.type==="BOOLEAN_OPERATION"||e.type==="RECTANGLE"||e.type==="ELLIPSE"||e.type==="POLYGON"||e.type==="STAR"||e.type==="LINE"}function Nr(e){if(re(e)||te(e)||fe(e))return{strategy:"smart-object",fill:null};let t=Ti(e);return t?{strategy:"shape",fill:t}:{strategy:"smart-object",fill:null}}function ft(e){let t=me(e),r=Re(e)?Nr(e):null,o=Re(e)&&!!t&&!(r!=null&&r.fill),n=o?I(e):null;if(n&&n.width>0&&n.height>0)return{x:n.x,y:n.y,width:n.width,height:n.height,useAbsoluteBounds:!1};let i=ce(e);if(!i)return v(e);if(!o)return{x:i.x,y:i.y,width:i.width,height:i.height,useAbsoluteBounds:!0};let a=Math.max(3,Math.ceil(t.width/2)+2);return{x:i.x-a,y:i.y-a,width:i.width+a*2,height:i.height+a*2,useAbsoluteBounds:!1}}function ce(e){let t=ei(e.absoluteTransform,e.width,e.height);if(t.length===0)return null;let r=t.map(l=>l.x),o=t.map(l=>l.y),n=Math.min(...r),i=Math.min(...o),a=Math.max(...r),s=Math.max(...o);return!Number.isFinite(n)||!Number.isFinite(i)||!Number.isFinite(a)||!Number.isFinite(s)?null:{x:n,y:i,width:a-n,height:s-i,useAbsoluteBounds:!0}}function ei(e,t,r){return[{x:0,y:0},{x:t,y:0},{x:t,y:r},{x:0,y:r}].map(n=>({x:e[0][0]*n.x+e[0][1]*n.y+e[0][2],y:e[1][0]*n.x+e[1][1]*n.y+e[1][2]}))}function de(e,t,r,o){if(!("absoluteTransform"in e)||!("width"in e)||!("height"in e))return null;let n=oo(e.absoluteTransform,t);return{matrix:[n[0],n[1],n[2],n[3],D(n[4]-r),D(n[5]-o)],width:d(e.width),height:d(e.height)}}function Tr(e,t){let r=Le(e);if(!r.ok)return null;let o=Dr(e,r.baseStyle);if(!o.ok)return null;let n=Ae(e,o.shapeType);if(!n)return null;let i=oo(e.absoluteTransform,t),a=x(n.x-t.x),s=x(n.y-t.y),l=x(a+n.width),u=x(s+n.height);return{value:r.value,transform:i,bounds:{left:a,top:s,right:l,bottom:u},boundingBox:{left:a,top:s,right:l,bottom:u},hasVisualBoundsProbe:!1,sizingMode:o.sizingMode,shapeType:o.shapeType,pointBase:o.pointBase,boxBounds:o.boxBounds,textTruncation:o.textTruncation,maxLines:o.maxLines,justification:ia(e.textAlignHorizontal),baseStyle:r.baseStyle,styleRuns:r.styleRuns}}function Dr(e,t){if(e.textAutoResize==="TRUNCATE")return{ok:!1,reason:"truncate mode is not mapped safely to editable Photoshop text yet"};if(e.textTruncation==="ENDING")return{ok:!1,reason:"ellipsis truncation is not mapped safely to editable Photoshop text yet"};let r=d(e.width),o=d(e.height),n=ti(e);return ri(e,t)?{ok:!0,sizingMode:n,shapeType:"point",pointBase:[0,0],boxBounds:null,textTruncation:"disabled",maxLines:e.maxLines}:e.textAutoResize==="HEIGHT"?{ok:!0,sizingMode:n,shapeType:"box",pointBase:null,boxBounds:[0,0,r,o],textTruncation:"disabled",maxLines:e.maxLines}:{ok:!0,sizingMode:n,shapeType:"box",pointBase:null,boxBounds:[0,0,r,o],textTruncation:"disabled",maxLines:e.maxLines}}function ti(e){return e.textAutoResize==="WIDTH_AND_HEIGHT"?"auto-width":e.textAutoResize==="HEIGHT"?"auto-height":"fixed"}function ri(e,t){return e.textAutoResize==="WIDTH_AND_HEIGHT"?!0:ni(e)?!1:oi(e,t)===1}function oi(e,t){let r=ai(e.characters);if(r>1)return r;let o=ii(t),n=d(e.height);if(!_t(n,o))return 2;let i=I(e);return i&&!_t(i.height,o)?2:1}function _t(e,t){return e<=t*1.45}function ni(e){let t=Math.max(1,d(e.width)),r=Math.max(1,d(e.height)),o=I(e);return o?o.width>t*1.2||o.height>r*1.05:!1}function ii(e){return e.lineHeightPx!==null&&e.lineHeightPx>0?e.lineHeightPx:Math.max(e.fontSize,e.fontSize*1.2)}function ai(e){return Math.max(1,e.replace(/\r\n?/g,"\n").split("\n").length)}function vr(e){return e.replace(/\r\n?/g,"\n").replace(/\s+/g,"").length}function Ae(e,t){return t==="point"?ge(e,!1):v(e)}function Le(e){let t=e.getStyledTextSegments([...bo]);if(t.length===0)return{ok:!1,reason:"the text node has no style segments"};let r=[],o="";for(let n of t){let i=si(n);if(!i)return{ok:!1,reason:"it uses unsupported fills or text styling for editable export"};o+=li(e.characters.slice(n.start,n.end),n.textCase),r.push({length:n.end-n.start,style:i})}return{ok:!0,value:o,baseStyle:r[0].style,styleRuns:r}}function si(e){let t=di(e.fills);return t?{photoshopFontName:sa(e.fontName),fontFamily:e.fontName.family,fontStyle:e.fontName.style,fontSize:Math.max(1,e.fontSize),fillColor:t,lineHeightPx:aa(e.lineHeight,e.fontSize),tracking:ci(e.letterSpacing,e.fontSize),fontCaps:ui(e.textCase),underline:e.textDecoration==="UNDERLINE",strikethrough:e.textDecoration==="STRIKETHROUGH"}:null}function li(e,t){switch(t){case"UPPER":return e.toLocaleUpperCase();case"LOWER":return e.toLocaleLowerCase();case"TITLE":return e.replace(new RegExp("\\b(\\p{L})(\\p{L}*)","gu"),(r,o,n)=>o.toLocaleUpperCase()+n.toLocaleLowerCase());default:return e}}function ui(e){switch(e){case"UPPER":return 2;case"SMALL_CAPS":case"SMALL_CAPS_FORCED":return 1;default:return 0}}function ci(e,t){return t<=0?0:e.unit==="PIXELS"?Math.round(e.value/t*1e3):Math.round(e.value/100*500)}function di(e){let t=e.filter(o=>W(o));if(t.length!==1)return null;let r=t[0];return r.type!=="SOLID"?null:{r:z(r.color.r*255),g:z(r.color.g*255),b:z(r.color.b*255),a:z((r.opacity!==void 0?r.opacity:1)*255)}}function mt(e,t){return t==="ignore-hidden"&&!q(e)?[]:!V(e)||e.children.length===0?[e]:Cr(e)||hi(e)?[e]:pi(e,t)}function pi(e,t){return ot(e).filter(o=>!(!he(o)||t==="ignore-hidden"&&!q(o)))}function ue(e,t){let r=fi(e).filter(n=>!(!he(n)||t==="ignore-hidden"&&!q(n))),o=[];for(let n=0;n<r.length;n+=1){let i=r[n];if(!re(i)){o.push({kind:"node",node:i});continue}let a=[],s=n+1;for(;s<r.length;s+=1){let l=r[s];if(mi(l))break;a.push(l)}if(a.length===0){o.push({kind:"node",node:i});continue}o.push({kind:"mask-group",maskNode:i,maskedNodes:a.reverse()}),n=s-1}return o.reverse()}function ot(e){let t=e.children.slice();return wr(e)?t:t.reverse()}function fi(e){let t=e.children.slice();return wr(e)?t.reverse():t}function wr(e){return"itemReverseZIndex"in e&&e.itemReverseZIndex===!0}function mi(e){return re(e)||xi(e)||gi(e)}function xi(e){return V(e)?e.children.some(t=>he(t)&&re(t)):!1}function gi(e){return"clipsContent"in e&&e.clipsContent===!0}function Fe(e){return!V(e)||e.children.length===0?null:!yo.has(e.type)||re(e)||"clipsContent"in e&&e.clipsContent&&!ht(e)?"flatten":kr(e)?ze(e)||$i(L(e))?"flatten":So.has(e.type)&&Ur(e)?"split":"flatten":"group"}function Cr(e){return Fe(e)==="group"}function hi(e){return Fe(e)==="split"}function kr(e){return X(e,"fills")||X(e,"strokes")||Zr(e)}function Br(e,t){let r=f(e),o=t==="future"?"will flatten into one bitmap layer":"was flattened";if((e.type==="INSTANCE"||e.type==="COMPONENT")&&kr(e)){let n=e.type==="INSTANCE"?"instance":"component";return'"'.concat(r,'" ').concat(o," because Photoshop cannot preserve Figma ").concat(n," structure once the container also renders its own appearance.")}return'"'.concat(r,'" ').concat(o," because the container renders its own appearance.")}function Mr(e,t){let r=t==="future"?"will flatten into one bitmap layer":"was flattened";return'"'.concat(f(e),'" ').concat(r," because Layer Blur on a container with children must apply to the whole group composite, and that editable group Smart Filter path is not implemented yet.")}function Ir(e,t){let r=t==="future"?"will flatten into one bitmap layer":"was flattened";return'"'.concat(f(e),'" ').concat(r," because Background Blur on a container with children must sample the whole backdrop behind the group composite, and that editable reconstruction path is not implemented yet.")}function Rr(e,t){let r=t==="future"?"will flatten into one bitmap layer":"was flattened";return'"'.concat(f(e),'" ').concat(r," because Photoshop does not reliably reopen container shadow/glow exported as folder layer effects, so this container is rasterized for compatibility.")}function Ar(e,t){let r=t==="future"?"will flatten into one bitmap layer":"was flattened";return'"'.concat(f(e),'" ').concat(r," because top-level Noise or Texture on a container with children must apply to the whole group composite, and that editable reconstruction path is not implemented yet.")}function yi(e){return Xr(e)?'"'.concat(f(e),'" uses Glass, which cannot stay editable in the PSD yet, so it will be baked into raster pixels.'):'"'.concat(f(e),'" uses Figma effects that cannot stay editable in the PSD, so they will be baked into raster pixels.')}function $t(e){return'"'.concat(e,'" uses Background Blur, but Pigma could not isolate a clean editable backdrop snapshot inside the selected export root, so that blur was baked into raster pixels.')}async function Si(e,t){let r=await bi(e,t);return r?{kind:"bitmap",mode:xt(e),x:r.x,y:r.y,width:r.width,height:r.height,pngBytes:r.pngBytes}:null}async function bi(e,t){let r=xt(e),o=Lr(e,r);if(!o)return t.warnings.add('"'.concat(f(e),'" could not provide mask bounds for export.')),null;t.currentLeaf+=1,Y(t,"".concat(f(e)," (Mask)"));let n=await Ei(e,o,t,r);return{x:x(o.x-t.documentBounds.x),y:x(o.y-t.documentBounds.y),width:d(o.width),height:d(o.height),pngBytes:n}}async function Ei(e,t,r,o){await dt(e);let n=e.clone(),i=null;try{if(Pi(n,o),"absoluteTransform"in e&&"relativeTransform"in n){i=figma.createFrame(),i.resize(Math.max(1,d(t.width)),Math.max(1,d(t.height))),i.clipsContent=!0,i.fills=[],i.strokes=[],i.name="__pigma-mask-preview__",i.x=t.x,i.y=t.y,figma.currentPage.appendChild(i),i.appendChild(n),Vr(e,n,t);return await i.exportAsync({format:"PNG",useAbsoluteBounds:!1})}return bt(n,t),await n.exportAsync({format:"PNG",useAbsoluteBounds:t.useAbsoluteBounds})}finally{i&&!i.removed&&i.remove(),n.removed||n.remove()}}function Pi(e,t){e.visible=!0,"isMask"in e&&(e.isMask=!1),t==="vector"&&("opacity"in e&&typeof e.opacity=="number"&&(e.opacity=1),"blendMode"in e&&(e.blendMode="NORMAL"),Qr(e),to(e,{normalizePaintOpacity:!0,normalizePaintBlendMode:!0}))}function xt(e){if(!("maskType"in e))return"alpha";switch(e.maskType){case"VECTOR":return"vector";case"LUMINANCE":return"luminance";default:return"alpha"}}function maskPreviewPaddingRadius(e){let t=L(e),r=0;if(t)for(let o of t)o&&o.style==="layer-blur"&&(r=Math.max(r,o.blurType==="PROGRESSIVE"?Math.max(o.startRadius,o.radius):o.radius));return r<=.01?0:Math.ceil(h(r*2.5+8,8,256))}function padExportBounds(e,t){return!e||t<=0?e:{x:e.x-t,y:e.y-t,width:e.width+t*2,height:e.height+t*2,useAbsoluteBounds:!1}}function Lr(e,t){let r=maskPreviewPaddingRadius(e),o=null;if(t!=="vector")return padExportBounds(v(e),r);let n=k(e);if(n&&n.width>0&&n.height>0)o={x:n.x,y:n.y,width:n.width,height:n.height,useAbsoluteBounds:!0};else if("absoluteTransform"in e&&"width"in e&&"height"in e){let i=ce(e);i&&(o=i)}return padExportBounds(o!=null?o:v(e),r)}function gt(e,t){return Fr(e,t,!0)}function Fr(e,t,r=!1){if(r&&!ht(e))return null;let o=k(e);if(!o||o.width<=0||o.height<=0)return null;let n=Ni(e,o.width,o.height);return{kind:"rounded-rect",x:x(o.x-t.x),y:x(o.y-t.y),width:d(o.width),height:d(o.height),topLeftRadius:n.topLeftRadius,topRightRadius:n.topRightRadius,bottomRightRadius:n.bottomRightRadius,bottomLeftRadius:n.bottomLeftRadius}}function redundantRootMask(e,t,r){if(e!==r)return!1;let o=gt(e,t);return!!o&&o.x===0&&o.y===0&&o.width===d(t.width)&&o.height===d(t.height)&&o.topLeftRadius===0&&o.topRightRadius===0&&o.bottomRightRadius===0&&o.bottomLeftRadius===0}function containerMask(e,t,r){return redundantRootMask(e,t,r)?null:gt(e,t)}function ht(e){if(!("clipsContent"in e)||e.clipsContent!==!0||!("width"in e)||!("height"in e))return!1;let t=k(e);return!!t&&t.width>0&&t.height>0}function Ni(e,t,r){let o=Math.min(t,r)/2,n={topLeftRadius:0,topRightRadius:0,bottomRightRadius:0,bottomLeftRadius:0};return!("topLeftRadius"in e)||!("topRightRadius"in e)||!("bottomRightRadius"in e)||!("bottomLeftRadius"in e)?n:{topLeftRadius:h(e.topLeftRadius,0,o),topRightRadius:h(e.topRightRadius,0,o),bottomRightRadius:h(e.bottomRightRadius,0,o),bottomLeftRadius:h(e.bottomLeftRadius,0,o)}}function Ti(e){return te(e)||X(e,"strokes")||!("fills"in e)||!Array.isArray(e.fills)?null:vi(e.fills)}function Di(e){if(te(e))return null;let t="fills"in e&&Array.isArray(e.fills)?wi(e.fills):null,r="strokes"in e&&Array.isArray(e.strokes)?Gr(e.strokes):null,o=null;if(r){let n=Jr(e);if(n===null)return null;o={kind:"solid",color:Ge(r),width:n,position:Or(e)}}return!t&&!o?null:{fill:t,stroke:o}}function vi(e){let t=e.filter(o=>W(o));if(t.length!==1)return null;let r=t[0];return r.type==="SOLID"?{kind:"solid",color:Ge(r)}:Ci(r)?ki(r):null}function wi(e){let t=e.filter(o=>W(o));if(t.length!==1)return null;let r=t[0];return r.type!=="SOLID"?null:{kind:"solid",color:Ge(r)}}function Gr(e){let t=e.filter(o=>W(o));if(t.length!==1)return null;let r=t[0];return r.type!=="SOLID"?null:r}function Ci(e){return e.type==="GRADIENT_LINEAR"||e.type==="GRADIENT_RADIAL"||e.type==="GRADIENT_ANGULAR"||e.type==="GRADIENT_DIAMOND"}function ki(e){var n;if(!Array.isArray(e.gradientStops)||e.gradientStops.length<2)return null;let t=Mi(e.gradientTransform);if(!t)return null;let r=h((n=e.opacity)!=null?n:1,0,1),o=e.gradientStops.slice().sort((i,a)=>i.position-a.position);return{kind:"gradient",gradientType:Bi(e.type),transform:t,colorStops:o.map(i=>({position:h(i.position,0,1),color:ee({r:i.color.r,g:i.color.g,b:i.color.b,a:1})})),opacityStops:o.map(i=>({position:h(i.position,0,1),opacity:h(i.color.a*r,0,1)}))}}function Bi(e){switch(e){case"GRADIENT_LINEAR":return"linear";case"GRADIENT_RADIAL":return"radial";case"GRADIENT_ANGULAR":return"angular";case"GRADIENT_DIAMOND":return"diamond";default:return"linear"}}function Mi(e){if(!Array.isArray(e)||e.length!==2||!Array.isArray(e[0])||!Array.isArray(e[1])||e[0].length!==3||e[1].length!==3)return null;let t=[D(e[0][0]),D(e[1][0]),D(e[0][1]),D(e[1][1]),D(e[0][2]),D(e[1][2])];return t.every(r=>Number.isFinite(r))?t:null}function Ge(e){return ee({r:e.color.r,g:e.color.g,b:e.color.b,a:e.opacity!==void 0?e.opacity:1})}function ee(e){return{r:z(e.r*255),g:z(e.g*255),b:z(e.b*255),a:z(e.a*255)}}function Or(e){if(!("strokeAlign"in e))return"center";switch(e.strokeAlign){case"INSIDE":return"inside";case"OUTSIDE":return"outside";default:return"center"}}function X(e,t){let r=Oi(e,t);return r==null?!1:Array.isArray(r)?r.some(o=>W(o)):!0}function Ur(e){return"clone"in e&&typeof e.clone=="function"}function pe(e){return"clone"in e&&typeof e.clone=="function"}function zr(e,t){let r=[],o=e;for(;o&&o!==t;){let n=o.parent&&"children"in o.parent?o.parent:null;if(!n)return null;let i=o.id,a=n.children.findIndex(s=>s.id===i);if(a<0)return null;r.unshift(a),o=n}return o===t?r:null}function Ii(e){"opacity"in e&&(e.opacity=1),"blendMode"in e&&(e.blendMode="NORMAL");for(let t of e.children)nt(t)}function nt(e){if("opacity"in e&&typeof e.opacity=="number"){e.opacity=0;return}e.visible=!1}async function Ri(e,t,r=null){var s;if(!qr(e,t.root)||!pe(t.root))return null;let o=(s=r!=null?r:tt(e))!=null?s:v(e);if(!o||Sa(o.width,o.height,To))return null;let n=zr(e,t.root);if(!n||n.length===0)return null;if(!await preloadTreeFontsSafely(t.root))return null;let i=t.root.clone(),a=figma.createFrame();try{return a.resize(d(o.width),d(o.height)),a.clipsContent=!0,a.fills=[],a.strokes=[],a.x=o.x,a.y=o.y,a.name="__pigma-background-blur-crop__",figma.currentPage.appendChild(a),a.appendChild(i),Ai(t.root,i,n)?(_r(i,t.documentBounds,o),await a.exportAsync({format:"PNG",useAbsoluteBounds:!1})):null}catch(l){return null}finally{a.removed||a.remove(),i.removed||i.remove()}}function Ai(e,t,r){let o=e,n=t;for(let i=0;i<r.length;i+=1){if(!("children"in o)||!("children"in n))return!1;let a=o.children[r[i]],s=n.children[r[i]];if(!a||!s)return!1;let l=ot(o),u=ot(n),c=l.findIndex(p=>p.id===a.id);if(c<0)return!1;for(let p=0;p<c;p+=1)nt(u[p]);if(i===r.length-1)return nt(s),!0;o=a,n=s}return!1}function _r(e,t,r){let o=x(t.x-r.x),n=x(t.y-r.y);if("relativeTransform"in e){let i=e,a=i.relativeTransform;i.relativeTransform=[[a[0][0],a[0][1],o],[a[1][0],a[1][1],n]];return}if("x"in e&&"y"in e){let i=e;i.x=o,i.y=n}}async function $r(e,t,r,o){await dt(e);let n=e.clone(),i=null,a=Re(e)?Nr(e):null,s=Re(e)&&!!me(e)&&!(a!=null&&a.fill)&&"relativeTransform"in n;try{return Oe(n,o),s?(i=figma.createFrame(),i.resize(Math.max(1,d(t.width)),Math.max(1,d(t.height))),i.clipsContent=!0,i.fills=[],i.strokes=[],i.name="__pigma-vector-preview__",i.x=t.x,i.y=t.y,figma.currentPage.appendChild(i),i.appendChild(n),Vr(e,n,t),await i.exportAsync({format:"PNG",useAbsoluteBounds:!1})):(bt(n,t),await n.exportAsync({format:"PNG",useAbsoluteBounds:t.useAbsoluteBounds}))}finally{i&&!i.removed&&i.remove(),n.removed||n.remove()}}async function Hr(e,t,r,o){await we(e);let n=e.clone(),i=figma.createFrame();try{return i.resize(d(t.width),d(t.height)),i.clipsContent=!0,i.fills=[],i.strokes=[],i.name="__pigma-text-preview-padding__",i.x=t.x,i.y=t.y,figma.currentPage.appendChild(i),i.appendChild(n),o&&Oe(n,r),Vr(e,n,t),await i.exportAsync({format:"PNG",useAbsoluteBounds:!1})}finally{i.removed||i.remove(),n.removed||n.remove()}}async function Li(e,t,r){await we(e);let o=e.clone(),n=figma.createFrame();try{n.resize(d(t.width),d(t.height)),n.clipsContent=!1,n.fills=[],n.strokes=[],n.name="__pigma-text-visual-probe__",n.x=t.x,n.y=t.y,figma.currentPage.appendChild(n),n.appendChild(o),Oe(o,r),Vr(e,o,t);let i=figma.flatten([o],n),a=v(i);return a||null}catch(i){return null}finally{n.removed||n.remove(),o.removed||o.remove()}}function yt(e){return!q(e)||Fi(e)}function Fi(e){return"opacity"in e&&typeof e.opacity=="number"&&!St(e.opacity,1)?!0:"blendMode"in e?e.blendMode!=="NORMAL"&&e.blendMode!=="PASS_THROUGH":!1}function Oe(e,t){e.visible=!0,"opacity"in e&&typeof e.opacity=="number"&&(e.opacity=1),"blendMode"in e&&(e.blendMode="NORMAL"),t!=null&&t.removeAllEffects&&Qr(e),t!=null&&t.removeSupportedEffects&&ta(e),t!=null&&t.removeSupportedStroke&&ra(e),(t!=null&&t.normalizePaintOpacity||t!=null&&t.normalizePaintBlendMode)&&to(e,t)}function q(e){let t=e;for(;t;){if("visible"in t&&t.visible===!1)return!1;t=t.parent}return!0}function St(e,t){return Math.abs(e-t)<1e-4}function bt(e,t){if(e.parent!==figma.currentPage&&figma.currentPage.appendChild(e),"relativeTransform"in e){let r=e,o=r.relativeTransform;r.relativeTransform=[[o[0][0],o[0][1],t.x],[o[1][0],o[1][1],t.y]];return}if("x"in e&&"y"in e){let r=e;r.x=t.x,r.y=t.y}}function Vr(e,t,r){if("relativeTransform"in t){t.relativeTransform=[[e.absoluteTransform[0][0],e.absoluteTransform[0][1],e.absoluteTransform[0][2]-r.x],[e.absoluteTransform[1][0],e.absoluteTransform[1][1],e.absoluteTransform[1][2]-r.y]];return}let o=t,n=e;o.x=n.x-r.x,o.y=n.y-r.y}function it(e,t){let r=Math.max(1,t.baseStyle.fontSize),o=k(e),n=I(e),i=o?o.x+o.width:null,a=o?o.y+o.height:null,s=n?n.x+n.width:null,l=n?n.y+n.height:null,u=o&&n?Math.max(0,o.x-n.x):0,c=o&&n?Math.max(0,o.y-n.y):0,p=i!==null&&s!==null?Math.max(0,s-i):0,g=a!==null&&l!==null?Math.max(0,l-a):0;return{left:d(h(r*.1+u,6,r*.45)),top:d(h(r*.08+c,6,r*.3)),right:d(h(r*.16+p,10,r*.55)),bottom:d(h(r*.24+g,12,r*.7))}}function Ht(e){let t=Math.max(1,e.baseStyle.fontSize),r=vr(e.value),o=r<=1?1.4:r<=3?1.1:1;return{left:d(t*.06*o),top:d(t*.05),right:d(t*.12*o),bottom:d(t*.11*o)}}function jr(e,t){let r=Math.max(1,t.baseStyle.fontSize),o=vr(t.value),i=Math.max(1,t.bounds.right-t.bounds.left)/r,a=t.value.replace(/\s+/g,""),s=0;r>=400?s+=35:r>=240?s+=22:r>=120&&(s+=10),o<=1?s+=25:o<=3&&(s+=14),i<=.3?s+=20:i<=.55&&(s+=10),t.shapeType==="point"&&(s+=8),/[fgjkpqty]/i.test(a)&&(s+=12),/[^\u0000-\u00ff]/.test(a)&&(s+=10);let l=k(e),u=I(e);if(l&&u){let c=br(l,u);(c.left>0||c.top>0||c.right>0||c.bottom>0)&&(s+=10)}return h(s,0,100)}function Gi(e,t){let r=Tr(e,t);if(!r)return null;let o=jr(e,r);if(o<Po)return null;let n=Ae(e,r.shapeType);if(!n)return null;let i=r.shapeType==="point"?it(e,r):{left:0,top:0,right:0,bottom:0},a=Wr(r,o);return ie(n,{left:Math.max(i.left,a.left),top:Math.max(i.top,a.top),right:Math.max(i.right,a.right),bottom:Math.max(i.bottom,a.bottom)})}function Wr(e,t){let r=Math.max(1,e.baseStyle.fontSize),o=h(t/100,0,1);return{left:d(r*(.05+o*.2)),top:d(r*(.04+o*.1)),right:d(r*(.08+o*.3)),bottom:d(r*(.12+o*.16))}}function ie(e,t){return{x:e.x-t.left,y:e.y-t.top,width:e.width+t.left+t.right,height:e.height+t.top+t.bottom,useAbsoluteBounds:!1}}function Vt(e,t){let r=Math.min(e.x,t.x),o=Math.min(e.y,t.y),n=Math.max(e.x+e.width,t.x+t.width),i=Math.max(e.y+e.height,t.y+t.height);return{x:r,y:o,width:n-r,height:i-o,useAbsoluteBounds:!1}}function Oi(e,t){return t==="fills"?"fills"in e?e.fills:null:"strokes"in e?e.strokes:null}function Ui(e){return"visible"in e&&e.visible===!1?!1:e.type==="LAYER_BLUR"?O.disableLayerBlur?!1:!(O.disableProgressiveLayerBlur&&e.blurType==="PROGRESSIVE"):e.type==="BACKGROUND_BLUR"?!O.disableBackgroundBlur:e.type==="NOISE"?!O.disableNoise:e.type==="TEXTURE"?!O.disableTexture:!0}function Ue(e){if(!("effects"in e))return null;let t=e.effects;return Array.isArray(t)?t.filter(r=>Ui(r)):null}function Zr(e){let t=Ue(e);return!!t&&t.length>0}function ze(e){let t=Ue(e);return t?t.some(r=>r.type==="BACKGROUND_BLUR"):!1}function Xr(e){let t=Ue(e);return t?t.some(r=>r.type==="GLASS"):!1}function L(e,t=null){let r=Ue(e);if(!r||r.length===0)return null;let o=[],n=r.filter(a=>a.type==="DROP_SHADOW"&&Ke(a)).length,i=r.filter(a=>a.type==="INNER_SHADOW"&&Ke(a)).length;for(let a of r){if(a.type==="LAYER_BLUR"){if(Kr(o))return null;let u=Ki(a);if(!u)return null;o.push(u);continue}if(a.type==="BACKGROUND_BLUR"){if(_e(o))return null;let u=Yi(a,e,t);if(!u)return null;o.push(u);continue}if(a.type==="NOISE"){let u=qi(a);if(!u)return null;o.push(u);continue}if(a.type==="TEXTURE"){let u=ea(a);if(!u)return null;o.push(u);continue}if(a.type!=="DROP_SHADOW"&&a.type!=="INNER_SHADOW")return null;if(Ke(a)&&(a.type==="DROP_SHADOW"&&n===1||a.type==="INNER_SHADOW"&&i===1)){let u=Xi(a);if(!u)return null;o.push(u);continue}let l=Zi(a);if(!l)return null;o.push(l)}return ji(o)&&o.length>0?o:null}function fe(e,t=null){return _(L(e,t))}function progressiveBlurShouldRasterize(e){let t=_(e);return!!t&&t.blurType==="PROGRESSIVE"}function _(e){let t=Kr(e);return t&&zi(t)>0?t:null}function Kr(e){var t;return e&&(t=e.find(r=>r.style==="layer-blur"))!=null?t:null}function zi(e){return e.blurType==="PROGRESSIVE"?Math.max(e.startRadius,e.radius):e.radius}function _e(e){var t;return e&&(t=e.find(r=>r.style==="background-blur"))!=null?t:null}function _i(e,t){return e?e.map(r=>r.style==="background-blur"?B(b({},r),{backdropPngBytes:t}):r):null}function jt(e){if(!e)return null;let t=e.filter(r=>r.style!=="background-blur");return t.length>0?t:null}function Et(e){return e?e.filter(t=>t.style==="noise"):[]}function Yr(e){return e?e.filter(t=>t.style==="texture"):[]}function Pt(e){return Et(e).length>0||Yr(e).length>0}function $i(e){return!!_(e)||!!_e(e)||Pt(e)}function $e(e){return!!(e!=null&&e.some(t=>t.style==="drop-shadow"||t.style==="inner-shadow"||t.style==="outer-glow"||t.style==="inner-glow"))}function Hi(e){if(!e)return null;let t=e.filter(r=>r.style==="drop-shadow"||r.style==="inner-shadow"||r.style==="outer-glow"||r.style==="inner-glow");return t.length>0?t:null}function Vi(e){if(!e)return null;let t=e.filter(r=>r.style!=="drop-shadow"&&r.style!=="inner-shadow"&&r.style!=="outer-glow"&&r.style!=="inner-glow");return t.length>0?t:null}function ji(e){let t=_(e),r=_e(e),o=Et(e),n=Yr(e);return!t&&!r&&o.length===0&&n.length===0?!0:r?e.length===1:!(t&&(o.length>0||n.length>0)||o.length>0&&n.length>0||n.some(i=>i.clipToShape!==!0)||(o.length>0||n.length>0)&&$e(e))}function Wi(e){return Et(e).length}function te(e,t=null){return Zr(e)&&L(e,t)===null}function Zi(e){return!e.color||!e.offset?null:{style:e.type==="DROP_SHADOW"?"drop-shadow":"inner-shadow",blendMode:oe(e.blendMode),color:ee(e.color),offsetX:x(e.offset.x),offsetY:x(e.offset.y),blur:M(Math.max(0,e.radius)),spread:M(typeof e.spread=="number"?e.spread:0),showBehindTransparentAreas:e.type==="DROP_SHADOW"&&e.showShadowBehindNode===!0}}function Xi(e){return e.color?{style:e.type==="DROP_SHADOW"?"outer-glow":"inner-glow",blendMode:oe(e.blendMode),color:ee(e.color),blur:M(Math.max(0,e.radius)),spread:M(typeof e.spread=="number"?e.spread:0)}:null}function Ki(e){return e.blurType==="PROGRESSIVE"?{style:"layer-blur",blurType:"PROGRESSIVE",radius:M(Math.max(0,e.radius)),startRadius:M(Math.max(0,e.startRadius)),startOffset:Zt(e.startOffset),endOffset:Zt(e.endOffset)}:e.blurType!=="NORMAL"?null:{style:"layer-blur",blurType:"NORMAL",radius:M(Math.max(0,e.radius))}}function Yi(e,t,r){return e.blurType!=="NORMAL"||!qr(t,r)?null:{style:"background-blur",radius:M(Math.max(0,e.radius)),backdropPngBytes:null}}function qi(e){let t={style:"noise",noiseType:e.noiseType.toLowerCase(),blendMode:oe(e.blendMode),primaryColor:ee(e.color),secondaryColor:"secondaryColor"in e?ee(e.secondaryColor):null,noiseSize:M(Math.max(0,e.noiseSize)),density:h(e.density,0,1),opacity:h("opacity"in e?e.opacity:e.color.a,0,1)};return Ji(t)}function Ji(e){let t=Lo[e.noiseType];return B(b({},e),{primaryColor:Wt(e.primaryColor,t.primaryAlphaScale),secondaryColor:e.secondaryColor?Wt(e.secondaryColor,t.secondaryAlphaScale):null,density:Qi(e.density),opacity:D(h(e.opacity*t.overlayOpacityScale,0,1))})}function Qi(e){return D(h(e-e*e*.12,0,1))}function Wt(e,t){return t===1?e:B(b({},e),{a:z(e.a*t)})}function ea(e){return{style:"texture",noiseSize:M(Math.max(0,e.noiseSize)),radius:M(Math.max(0,e.radius)),clipToShape:e.clipToShape===!0}}function qr(e,t){if(!t||e===t||!he(e)||Re(e)||V(e)&&e.children.length>0||!V(t)||!pe(t))return!1;let r=zr(e,t);return!!r&&r.length>0}function Ke(e){return Math.abs(e.offset.x)<.01&&Math.abs(e.offset.y)<.01}function me(e){if(!("strokes"in e)||!Array.isArray(e.strokes))return null;let t=Gr(e.strokes);if(!t)return null;let r=Jr(e);return r===null?null:{blendMode:oe(t.blendMode),color:Ge(t),width:r,position:Or(e)}}function Jr(e){if(!("strokeWeight"in e)||typeof e.strokeWeight!="number"||e.strokeWeight<=0)return null;if(!("strokeTopWeight"in e)||!("strokeBottomWeight"in e)||!("strokeLeftWeight"in e)||!("strokeRightWeight"in e))return M(e.strokeWeight);let t=[e.strokeTopWeight,e.strokeRightWeight,e.strokeBottomWeight,e.strokeLeftWeight];if(t.some(o=>typeof o!="number"||!Number.isFinite(o)||o<=0))return null;let r=t[0];return t.some(o=>Math.abs(o-r)>.01)||Math.abs(e.strokeWeight-r)>.01?null:M(r)}function ta(e){!("effects"in e)||!Array.isArray(e.effects)||(e.effects=e.effects.filter(t=>"visible"in t&&t.visible===!1?!0:t.type!=="DROP_SHADOW"&&t.type!=="INNER_SHADOW"&&t.type!=="LAYER_BLUR"&&t.type!=="BACKGROUND_BLUR"))}function Qr(e){!("effects"in e)||!Array.isArray(e.effects)||(e.effects=e.effects.filter(t=>"visible"in t&&t.visible===!1))}function eo(e){return'"'.concat(e,'" uses Layer Blur, so it will preserve the blur as a Photoshop Smart Filter and rasterize the text instead of keeping an editable text layer.')}function ra(e){if(!("strokes"in e)||!Array.isArray(e.strokes))return;let t=e;t.strokes=e.strokes.filter(r=>!W(r))}function W(e){return!("visible"in e)||e.visible!==!1}function re(e){return"isMask"in e&&e.isMask}function xe(e){let t=ho.has(e.type);return ge(e,t)}function v(e){let t=e.type==="TEXT";return ge(e,t)}function ge(e,t){let r=t?k(e):I(e),o=t?I(e):k(e),n=r!=null?r:o;return!n||n.width<=0||n.height<=0?null:{x:n.x,y:n.y,width:n.width,height:n.height,useAbsoluteBounds:t}}function k(e){return"absoluteBoundingBox"in e?e.absoluteBoundingBox:null}function I(e){return"absoluteRenderBounds"in e?e.absoluteRenderBounds:null}function he(e){return"exportAsync"in e}function V(e){return"children"in e}function j(e){return!("opacity"in e)||typeof e.opacity!="number"?1:h(e.opacity,0,1)}function oa(e){var u;if(!("fills"in e)||!Array.isArray(e.fills))return null;let t=e.fills.filter(c=>W(c));if(t.length!==1)return null;let r=t[0],o=r.type==="IMAGE"&&!!r.imageHash,n=o?h((u=r.opacity)!=null?u:1,0,1):1,i=o&&!St(n,1),a=!st(r.blendMode);if(!i&&!a)return null;let s="blendMode"in e?e.blendMode:void 0,l=!st(s),c=a,p=c?oe(r.blendMode):K(e),g=l&&c&&K(e)!==p;return{normalizePaintOpacity:i||c&&o,normalizePaintBlendMode:c,effectiveOpacity:o?h(j(e)*n,0,1):j(e),effectiveBlendMode:p,warning:g?'"'.concat(f(e),'" collapses Figma layer/fill blend modes into the fill blend for PSD export.'):null}}function pigmaVisibleFillEntries(e){return!("fills"in e)||!Array.isArray(e.fills)?[]:e.fills.map((t,r)=>({paint:t,index:r})).filter(t=>W(t.paint))}
 function pigmaFillOpacity(e){var t;return h((t=e.opacity)!=null?t:1,0,1)}
 function pigmaPaintNeedsDedicatedLayer(e){return!st(e.blendMode)||!St(pigmaFillOpacity(e),1)}
 function pigmaMultiFillBlendInfo(e,t=null){let r=pigmaVisibleFillEntries(e);if(r.length<2||e.type==="TEXT")return null;let o=te(e,t),n=r.filter(i=>pigmaPaintNeedsDedicatedLayer(i.paint));if(!o&&n.length===0)return null;return{entries:r,mode:o?"baked-fx":"split",warning:o?"\"".concat(f(e),"\" uses multiple visible fills plus unsupported effects, so PSD export kept separate fill layers and added one baked effects layer."):"\"".concat(f(e),"\" uses multiple visible fills with blend or opacity overrides, so PSD export split them into separate child layers.")}}
@@ -12,7 +12,7 @@ async function pigmaExportFillBitmapChild(e,t,r,o,n,i,a,s="node"){let l=e.clone(
 async function pigmaExportFxBitmapChild(e,t,r,o,n="node"){let i=e.clone();try{pigmaHideAllFillsOnClone(i),n==="background"&&"children"in i&&Ii(i),Oe(i,o),bt(i,r);let a=x(r.x-t.documentBounds.x),s=x(r.y-t.documentBounds.y),l=d(r.width),u=d(r.height);return{kind:"bitmap",id:"".concat(e.id,":").concat(n==="background"?"background-fx":"fx"),name:pigmaFxChildName(e,n),sourceType:"".concat(e.type,n==="background"?"_BACKGROUND_FX":"_FX"),opacity:1,visible:!0,blendMode:"normal",effects:null,strokeEffect:null,x:a,y:s,width:l,height:u,nodeTransform:de(e,t.documentBounds,a,s),pngBytes:await i.exportAsync({format:"PNG",useAbsoluteBounds:r.useAbsoluteBounds})}}finally{i.removed||i.remove()}}
 async function pigmaExportMultiFillGroup(e,t,r,o=null){let n=pigmaMultiFillBlendInfo(e,t.root);if(!n||t.longFrameMode)return null;let i=o!=null?o:tt(e),a=n.mode==="baked-fx"?tt(e):i,s=n.mode==="baked-fx"?pigmaBaseFillBounds(e,i):i;if(!a||!s)return null;let l=L(e,t.root);if(n.mode!=="baked-fx"&&progressiveBlurShouldRasterize(l))return null;let u=me(e),c=null,p=null,g={removeSupportedStroke:!!u},y=[];t.currentLeaf+=1,Y(t,f(e)),await dt(e),n.mode==="baked-fx"?g.removeAllEffects=!0:(c=await hr(e,t,r),p=c.effects,g.removeSupportedEffects=c.removeSupportedEffects||!!_(p));for(let m=0;m<n.entries.length;m+=1){let T=await pigmaExportFillBitmapChild(e,t,s,n.entries[m],m,n.entries.length>1,g,"node");T&&y.push(T)}if(n.mode==="baked-fx"){let m=await pigmaExportFxBitmapChild(e,t,a,{removeSupportedStroke:!!u},"node");m&&y.push(m)}let d=n.entries.length+(n.mode==="baked-fx"?1:0);return y.length<d?null:(n.warning&&t.warnings.add(n.warning),{kind:"group",id:e.id,name:f(e),sourceType:e.type,opacity:j(e),visible:e.visible,blendMode:K(e),effects:n.mode==="baked-fx"?null:p,strokeEffect:u,mask:null,children:y})}
 async function pigmaExportMultiFillBackgroundGroup(e,t,r){let o=pigmaMultiFillBlendInfo(e,t.root);if(!o||t.longFrameMode||!Ln(e)||!Ur(e))return null;let n=Fn(e),i=o.mode==="baked-fx"?tt(e):n;if(!n||!i)return null;let a=L(e,t.root);if(o.mode!=="baked-fx"&&progressiveBlurShouldRasterize(a))return null;let s=me(e),l=null,u=null,c={removeSupportedStroke:!!s},p=[];t.currentLeaf+=1,Y(t,"".concat(f(e)," Background")),await dt(e),o.mode==="baked-fx"?c.removeAllEffects=!0:(l=Hi(a),u=Vi(a),c.removeSupportedEffects=!!a);for(let g=0;g<o.entries.length;g+=1){let y=await pigmaExportFillBitmapChild(e,t,n,o.entries[g],g,o.entries.length>1,c,"background");y&&p.push(y)}if(o.mode==="baked-fx"){let g=await pigmaExportFxBitmapChild(e,t,i,{removeSupportedStroke:!!s},"background");g&&p.push(g)}let d=o.entries.length+(o.mode==="baked-fx"?1:0);return p.length<d?null:(o.warning&&t.warnings.add(o.warning),{backgroundLayer:{kind:"group",id:"".concat(e.id,":background-stack"),name:"Background",sourceType:"".concat(e.type,"_BACKGROUND_GROUP"),opacity:1,visible:!0,blendMode:"normal",effects:o.mode==="baked-fx"?null:l,strokeEffect:s,mask:null,children:p},groupEffects:o.mode==="baked-fx"?null:u,groupStrokeEffect:null})}
-function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.fills;r.fills=o.map(n=>na(n,t))}function na(e,t){if(!W(e))return e;let r=e;return t.normalizePaintOpacity&&e.opacity!==void 0&&!St(e.opacity,1)&&(r=B(b({},r),{opacity:1})),t.normalizePaintBlendMode&&e.blendMode!==void 0&&!st(e.blendMode)&&(r=B(b({},r),{blendMode:"NORMAL"})),r}function K(e){return"blendMode"in e?oe(e.blendMode):"normal"}function ro(e){return at(K(e))}function at(e){return e==="pass through"?"normal":e}function oe(e){switch(e){case"DARKEN":return"darken";case"MULTIPLY":return"multiply";case"LINEAR_BURN":return"linear burn";case"COLOR_BURN":return"color burn";case"LIGHTEN":return"lighten";case"SCREEN":return"screen";case"LINEAR_DODGE":return"linear dodge";case"COLOR_DODGE":return"color dodge";case"OVERLAY":return"overlay";case"SOFT_LIGHT":return"soft light";case"HARD_LIGHT":return"hard light";case"DIFFERENCE":return"difference";case"EXCLUSION":return"exclusion";case"HUE":return"hue";case"SATURATION":return"saturation";case"COLOR":return"color";case"LUMINOSITY":return"luminosity";case"PASS_THROUGH":return"pass through";default:return"normal"}}function st(e){return e===void 0||e==="NORMAL"||e==="PASS_THROUGH"}function ia(e){switch(e){case"CENTER":return"center";case"RIGHT":return"right";case"JUSTIFIED":return"justify-left";default:return"left"}}function aa(e,t){return e.unit==="AUTO"?null:e.unit==="PIXELS"?e.value:t*e.value/100}function oo(e,t){return[D(e[0][0]),D(e[1][0]),D(e[0][1]),D(e[1][1]),D(e[0][2]-t.x),D(e[1][2]-t.y)]}function sa(e){let t=la(e);if(t)return t;let r=e.family.replace(/[^A-Za-z0-9]/g,""),o=e.style.replace(/[^A-Za-z0-9]/g,"");return r==="Arial"?o==="Bold"?"Arial-BoldMT":o==="Italic"?"Arial-ItalicMT":o==="BoldItalic"?"Arial-BoldItalicMT":"ArialMT":r?!o||o==="Regular"?"".concat(r,"-Regular"):"".concat(r,"-").concat(o):"ArialMT"}function la(e){let t=e.family.trim().toLowerCase(),r=e.style.trim().toLowerCase();return t==="italianno"&&r==="regular"?"Italianno Regular":null}function Ye(e,t,r,o,n=[],i){let a=e.length,s=a>1,l=f(t);return{ready:!1,selectionId:s?null:t.id,selectionCount:a,selectionName:no(e),selectionType:io(e),summary:s?'"'.concat(l,'" is not ready for batch export.'):r,detail:s?"".concat(o,' Remove "').concat(l,'" from the selection or export it separately.'):o,documentWidth:s?null:i?d(i.width):null,documentHeight:s?null:i?d(i.height):null,exportNodeCount:0,editableTextCount:0,preservedGroupCount:0,warnings:n.map(u=>Nt(l,u,s))}}function no(e){return e.length===0?"":f(e[0])}function io(e){if(e.length===0)return null;let t=Array.from(new Set(e.map(r=>r.type)));return e.length===1?t[0]:t.length===1?"".concat(t[0]," x ").concat(e.length):"Mixed x ".concat(e.length)}function Nt(e,t,r){return r?"".concat(e,": ").concat(t):t}function ua(e,t){return t.textExportMode==="rasterize-text"?0:e}function ca(e,t,r,o){let n=da(e);return n?Nt(n.rootName,n.warning,t>1):o>0&&r.textExportMode==="rasterize-text"?"Text export is currently set to rasterize text, so text layers will export as bitmap layers until you change the export defaults.":t===1?"Editable text is preserved when fills and typography are compatible. Hidden layers can be ignored or included as hidden PSD layers.":"Each selected root is exported as its own PSD file. When more than one file is ready, the download is packaged as a ZIP archive."}function da(e){let t=null;for(let r of e)for(let o of r.analysis.warnings){let n=pa(o);if((!t||n<t.priority)&&(t={rootName:f(r.node),warning:o,priority:n},n===0))return t}return t}function pa(e){let t=e.toLowerCase();return t.includes("flatten into one bitmap layer")||t.includes("flattened bitmap layer")||t.includes("fell back to a bitmap layer")?0:t.includes("mask")?1:t.includes("smart object")?2:3}function fa(e,t,r=1){return r>1?"".concat(r," roots selected: ").concat(t.exportNodeCount," PSD layers, ").concat(t.editableTextCount," editable text layers, ").concat(t.preservedGroupCount," preserved groups."):'"'.concat(e,'" is ready: ').concat(t.exportNodeCount," PSD layers, ").concat(t.editableTextCount," editable text layers, ").concat(t.preservedGroupCount," preserved groups.")}function ma(e){return"pigma-export-".concat(e,"-files.zip")}function xa(e,t){return e.length===1?He(e[0],t,1,1):ma(e.length)}function f(e){return e.name&&e.name.length>0?e.name:e.type}function qe(e){for(let t of e.nodes)ao(t);e.nodes=[],e.compositePngBytes=null,e.backgroundDebug=[],e.warnings=[]}function ao(e){var t;if(e.kind==="group"){for(let r of e.children)ao(r);e.children=[],((t=e.mask)==null?void 0:t.kind)==="bitmap"&&(e.mask.pngBytes=new Uint8Array(0));return}if(e.kind!=="shape"&&(e.pngBytes=new Uint8Array(0)),e.kind==="vector"&&(e.svgString=""),e.effects)for(let r of e.effects)r.style==="background-blur"&&(r.backdropPngBytes=null)}function ga(e,t,r,o){return{stage:"plugin-export",sourceNodeId:e.id,sourceNodeName:f(e),sourceNodeType:e.type,backgroundNodeId:t.id,backgroundKind:t.kind,groupPath:ya(e),x:t.x,y:t.y,width:t.width,height:t.height,orderIndex:r,siblingCount:o,parentNodeId:e.id,parentNodeName:f(e),note:"컨테이너 fill에서 가상 배경을 만들고 내보내기 모델의 마지막 자식으로 추가했습니다."}}function ha(e,t){e.push(t),console.info("[background-trace][plugin-export]",t)}function ya(e){let t=[],r=e;for(;r&&r.type!=="PAGE"&&r.type!=="DOCUMENT";)"name"in r&&typeof r.name=="string"&&r.name.length>0&&t.unshift(r.name),r=r.parent;return t}function Je(e){let t=e.replace(/[<>:"/\\|?*]/g," "),r=Array.from(t,o=>o.charCodeAt(0)<32?" ":o).join("").trim();return r.length>0?r:"figma-export"}function Tt(e){return Ft(e)}function He(e,t,r,o){let n=Je(e.name||"figma-export"),i={"frame-name":n,"page-name":Je(figma.currentPage.name||"page"),index:o>1?String(r).padStart(2,"0"):String(r)},a=t.fileNamePattern.replace(/\{([a-z-]+)\}/gi,(l,u)=>{var p;let c=String(u).toLowerCase();return(p=i[c])!=null?p:l}),s=Je(a.replace(/\.psd$/i,"").trim()||n);return"".concat(s,".psd")}function Zt(e){return{x:D(h(e.x,0,1)),y:D(h(e.y,0,1))}}function z(e){return h(Math.round(e),0,255)}function d(e){return Math.max(1,Math.round(e))}function M(e){return Math.round(e*100)/100}function x(e){return Math.round(e)}function D(e){return Math.round(e*1e4)/1e4}function Sa(e,t,r){return e>0&&t>0&&e*t>r}function h(e,t,r){return Math.min(r,Math.max(t,e))}var ba=270,Ea=560,Pa=60;figma.showUI(__html__,{width:ba,height:Ea,themeColors:!0});var Dt=er({closePlugin:()=>{figma.closePlugin()},notify:(e,t)=>figma.notify(e,t),postToUi:e=>{figma.ui.postMessage(e)}}),Ve=null;function vt(e=!1){e&&Dt.invalidateSelectionCache(),Ve&&clearTimeout(Ve),Ve=setTimeout(()=>{Ve=null,Dt.postSelectionState()},Pa)}figma.on("selectionchange",()=>{vt()});figma.on("currentpagechange",()=>{vt(!0)});figma.ui.onmessage=e=>{Dt.handleUiMessage(e)};})();
+function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.fills;r.fills=o.map(n=>na(n,t))}function na(e,t){if(!W(e))return e;let r=e;return t.normalizePaintOpacity&&e.opacity!==void 0&&!St(e.opacity,1)&&(r=B(b({},r),{opacity:1})),t.normalizePaintBlendMode&&e.blendMode!==void 0&&!st(e.blendMode)&&(r=B(b({},r),{blendMode:"NORMAL"})),r}function K(e){return"blendMode"in e?oe(e.blendMode):"normal"}function ro(e){return at(K(e))}function at(e){return e==="pass through"?"normal":e}function oe(e){switch(e){case"DARKEN":return"darken";case"MULTIPLY":return"multiply";case"LINEAR_BURN":return"linear burn";case"COLOR_BURN":return"color burn";case"LIGHTEN":return"lighten";case"SCREEN":return"screen";case"LINEAR_DODGE":return"linear dodge";case"COLOR_DODGE":return"color dodge";case"OVERLAY":return"overlay";case"SOFT_LIGHT":return"soft light";case"HARD_LIGHT":return"hard light";case"DIFFERENCE":return"difference";case"EXCLUSION":return"exclusion";case"HUE":return"hue";case"SATURATION":return"saturation";case"COLOR":return"color";case"LUMINOSITY":return"luminosity";case"PASS_THROUGH":return"pass through";default:return"normal"}}function st(e){return e===void 0||e==="NORMAL"||e==="PASS_THROUGH"}function ia(e){switch(e){case"CENTER":return"center";case"RIGHT":return"right";case"JUSTIFIED":return"justify-left";default:return"left"}}function aa(e,t){return e.unit==="AUTO"?null:e.unit==="PIXELS"?e.value:t*e.value/100}function oo(e,t){return[D(e[0][0]),D(e[1][0]),D(e[0][1]),D(e[1][1]),D(e[0][2]-t.x),D(e[1][2]-t.y)]}function sa(e){let t=la(e);if(t)return t;let r=e.family.replace(/[^A-Za-z0-9]/g,""),o=e.style.replace(/[^A-Za-z0-9]/g,"");return r==="Arial"?o==="Bold"?"Arial-BoldMT":o==="Italic"?"Arial-ItalicMT":o==="BoldItalic"?"Arial-BoldItalicMT":"ArialMT":r?!o||o==="Regular"?"".concat(r,"-Regular"):"".concat(r,"-").concat(o):"ArialMT"}function la(e){let t=e.family.trim().toLowerCase(),r=e.style.trim().toLowerCase();return t==="italianno"&&r==="regular"?"Italianno Regular":null}function Ye(e,t,r,o,n=[],i){let a=e.length,s=a>1,l=f(t);return{ready:!1,selectionId:s?null:t.id,selectionCount:a,selectionName:no(e),selectionType:io(e),summary:s?'"'.concat(l,'" is not ready for batch export.'):r,detail:s?"".concat(o,' Remove "').concat(l,'" from the selection or export it separately.'):o,documentWidth:s?null:i?d(i.width):null,documentHeight:s?null:i?d(i.height):null,exportNodeCount:0,editableTextCount:0,preservedGroupCount:0,warnings:n.map(u=>Nt(l,u,s))}}function no(e){return e.length===0?"":f(e[0])}function io(e){if(e.length===0)return null;let t=Array.from(new Set(e.map(r=>r.type)));return e.length===1?t[0]:t.length===1?"".concat(t[0]," x ").concat(e.length):"Mixed x ".concat(e.length)}function Nt(e,t,r){return r?"".concat(e,": ").concat(t):t}function ua(e,t){return t.textExportMode==="rasterize-text"?0:e}function ca(e,t,r,o){let n=da(e);return n?Nt(n.rootName,n.warning,t>1):o>0&&r.textExportMode==="rasterize-text"?"Text export is currently set to rasterize text, so text layers will export as bitmap layers until you change the export defaults.":t===1?"Editable text is preserved when fills and typography are compatible. Hidden layers can be ignored or included as hidden PSD layers.":"Each selected root is exported as its own PSD file. When more than one file is ready, the download is packaged as a ZIP archive."}function da(e){let t=null;for(let r of e)for(let o of r.analysis.warnings){let n=pa(o);if((!t||n<t.priority)&&(t={rootName:f(r.node),warning:o,priority:n},n===0))return t}return t}function pa(e){let t=e.toLowerCase();return t.includes("flatten into one bitmap layer")||t.includes("flattened bitmap layer")||t.includes("fell back to a bitmap layer")?0:t.includes("mask")?1:t.includes("smart object")?2:3}function fa(e,t,r=1){return r>1?"".concat(r," roots selected: ").concat(t.exportNodeCount," PSD layers, ").concat(t.editableTextCount," editable text layers, ").concat(t.preservedGroupCount," preserved groups."):'"'.concat(e,'" is ready: ').concat(t.exportNodeCount," PSD layers, ").concat(t.editableTextCount," editable text layers, ").concat(t.preservedGroupCount," preserved groups.")}function ma(e){return"pigma-export-".concat(e,"-files.zip")}function xa(e,t){return e.length===1?He(e[0],t,1,1):ma(e.length)}function f(e){return e.name&&e.name.length>0?e.name:e.type}function qe(e){for(let t of e.nodes)ao(t);e.nodes=[],e.compositePngBytes=null,e.backgroundDebug=[],e.warnings=[]}function ao(e){var t;if(e.kind==="group"){for(let r of e.children)ao(r);e.children=[],((t=e.mask)==null?void 0:t.kind)==="bitmap"&&(e.mask.pngBytes=new Uint8Array(0));return}if(e.kind!=="shape"&&(e.pngBytes=new Uint8Array(0)),e.kind==="vector"&&(e.svgString=""),e.effects)for(let r of e.effects)r.style==="background-blur"&&(r.backdropPngBytes=null)}function ga(e,t,r,o){return{stage:"plugin-export",sourceNodeId:e.id,sourceNodeName:f(e),sourceNodeType:e.type,backgroundNodeId:t.id,backgroundKind:t.kind,groupPath:ya(e),x:t.x,y:t.y,width:t.width,height:t.height,orderIndex:r,siblingCount:o,parentNodeId:e.id,parentNodeName:f(e),note:"컨테이너 fill에서 가상 배경을 만들고 내보내기 모델의 마지막 자식으로 추가했습니다."}}function ha(e,t){e.push(t),console.info("[background-trace][plugin-export]",t)}function ya(e){let t=[],r=e;for(;r&&r.type!=="PAGE"&&r.type!=="DOCUMENT";)"name"in r&&typeof r.name=="string"&&r.name.length>0&&t.unshift(r.name),r=r.parent;return t}function Je(e){let t=e.replace(/[<>:"/\\|?*]/g," "),r=Array.from(t,o=>o.charCodeAt(0)<32?" ":o).join("").trim();return r.length>0?r:"figma-export"}function Tt(e){return Ft(e)}function He(e,t,r,o){let n=Je(e.name||"figma-export"),i={"frame-name":n,"page-name":Je(figma.currentPage.name||"page"),index:o>1?String(r).padStart(2,"0"):String(r)},a=t.fileNamePattern.replace(/\{([a-z-]+)\}/gi,(l,u)=>{var p;let c=String(u).toLowerCase();return(p=i[c])!=null?p:l}),s=Je(a.replace(/\.psd$/i,"").trim()||n);return"".concat(s,".psd")}function Zt(e){return{x:D(h(e.x,0,1)),y:D(h(e.y,0,1))}}function z(e){return h(Math.round(e),0,255)}function d(e){return Math.max(1,Math.round(e))}function M(e){return Math.round(e*100)/100}function x(e){return Math.round(e)}function D(e){return Math.round(e*1e4)/1e4}function Sa(e,t,r){return e>0&&t>0&&e*t>r}function h(e,t,r){return Math.min(r,Math.max(t,e))}var ba=270,Ea=560,Pa=60;figma.showUI(__html__,{width:ba,height:Ea,themeColors:!0});var Dt=er({closePlugin:()=>{figma.closePlugin()},notify:(e,t)=>figma.notify(e,t),postToUi:e=>{figma.ui.postMessage(e)}}),Ve=null;function vt(e=!1){e&&Dt.invalidateSelectionCache(),Ve&&clearTimeout(Ve),Ve=setTimeout(()=>{Ve=null,Dt.postSelectionState()},Pa)}figma.on("selectionchange",()=>{typeof pigmaEnsureSelectionAccess=="function"?pigmaEnsureSelectionAccess().finally(()=>vt(!0)):vt(!0)});figma.on("currentpagechange",()=>{typeof pigmaEnsureSelectionAccess=="function"?pigmaEnsureSelectionAccess().finally(()=>vt(!0)):vt(!0)});figma.ui.onmessage=e=>{Dt.handleUiMessage(e)};(typeof pigmaEnsureSelectionAccess=="function"?pigmaEnsureSelectionAccess():Promise.resolve()).finally(()=>{vt(!0);setTimeout(()=>{vt(!0)},250)});})();
 
 ;(()=>{
   // PIGMA_TEXT_IMPORT_GUARD::SOURCE_OF_TRUTH
@@ -1587,6 +1587,20 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     if (shouldApplyScopedTextFixes(payloadNodes, importRoot)) {
       applyTextFixes(payloadNodes, importRoot);
     }
+
+    materializeSingleImportArtboardFrames(importRoot, payload, payloadNodes);
+
+    const separatedArtboards = separateSingleImportArtboardRoot(importRoot, payload);
+    if (separatedArtboards.length > 0) {
+      separatedArtboards.forEach(node => setExpandedRecursively(node, true));
+      selectImportedNodes(separatedArtboards);
+      debugImportPostprocess(
+        "single-artboards",
+        `released=${separatedArtboards.length} | source=${safeNodeName(importRoot)}`
+      );
+      return;
+    }
+
     setExpandedRecursively(importRoot, true);
     selectImportedNodes([importRoot]);
   }
@@ -1931,8 +1945,281 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return candidates[0];
   }
 
-  function isNeutralSceneWrapper(node) {
-    if (!node || node.visible === false || node.clipsContent === true) {
+  function separateSingleImportArtboardRoot(root, payload) {
+    if (!shouldSeparateSingleImportArtboardRoot(root, payload)) {
+      return [];
+    }
+
+    const parentNode = root && root.parent && hasChildren(root.parent) ? root.parent : null;
+    if (!parentNode) {
+      return [];
+    }
+
+    const children = Array.from(root.children);
+    const rootIndex = Math.max(0, Array.from(parentNode.children).indexOf(root));
+    for (let index = 0; index < children.length; index += 1) {
+      reparentSceneNode(children[index], parentNode, rootIndex + index, 0, 0);
+    }
+
+    try {
+      root.remove();
+    } catch (error) {
+      console.warn("[pigma-import-text-fix] failed to remove single PSD artboard wrapper", error);
+    }
+
+    return children.filter(node => node && !node.removed);
+  }
+
+  function materializeSingleImportArtboardFrames(root, payload, payloadNodes) {
+    const targets = getSingleImportArtboardTargets(root);
+    if (targets.length < 2) {
+      return 0;
+    }
+
+    const specs = getPayloadArtboardSpecs(payloadNodes || getNormalizedPayloadNodes(payload));
+    if (specs.length < 2) {
+      return 0;
+    }
+
+    const specsByName = new Map();
+    specs.forEach(spec => {
+      if (!spec || !spec.normalizedName) {
+        return;
+      }
+
+      if (!specsByName.has(spec.normalizedName)) {
+        specsByName.set(spec.normalizedName, []);
+      }
+      specsByName.get(spec.normalizedName).push(spec);
+    });
+
+    const matchedTargets = targets
+      .map(target => {
+        const matches = specsByName.get(normalizeLayerName(target.node && target.node.name)) || [];
+        const spec = matches.shift() || null;
+        if (!spec) {
+          return null;
+        }
+
+        return Object.assign({}, target, { spec });
+      })
+      .filter(Boolean);
+
+    if (matchedTargets.length < 2 || matchedTargets.length !== targets.length) {
+      return 0;
+    }
+
+    const origin = getPayloadArtboardOrigin(matchedTargets.map(target => target.spec));
+    let materializedCount = 0;
+
+    for (const target of matchedTargets) {
+      if (!target.node || target.node.removed) {
+        continue;
+      }
+
+      const frame = target.node.type === "FRAME"
+        ? normalizeExistingImportArtboardFrame(target.node, target.spec, origin)
+        : replaceImportArtboardGroupWithFrame(target.node, target.spec, origin, root);
+
+      if (frame) {
+        setExpandedRecursively(frame, true);
+        materializedCount += 1;
+      }
+    }
+
+    if (materializedCount > 0) {
+      debugImportPostprocess("artboard-frames", `materialized=${materializedCount}`);
+    }
+
+    return materializedCount;
+  }
+
+  function normalizeExistingImportArtboardFrame(frame, spec, origin) {
+    if (!frame || frame.removed || frame.type !== "FRAME") {
+      return null;
+    }
+
+    resizeImportArtboardFrame(frame, spec);
+    frame.x = roundNumber((Number(spec.x) || 0) - origin.x);
+    frame.y = roundNumber((Number(spec.y) || 0) - origin.y);
+    return frame;
+  }
+
+  function replaceImportArtboardGroupWithFrame(group, spec, origin, root) {
+    if (!group || group.removed) {
+      return null;
+    }
+
+    const frame = createImportArtboardFrame(group.name, spec, origin);
+    const parentNode = group.parent && hasChildren(group.parent) ? group.parent : root;
+    const insertionIndex = Math.max(0, Array.from(parentNode.children).indexOf(group));
+    parentNode.insertChild(insertionIndex, frame);
+    frame.x = roundNumber((Number(spec.x) || 0) - origin.x);
+    frame.y = roundNumber((Number(spec.y) || 0) - origin.y);
+
+    if (hasChildren(group)) {
+      const children = Array.from(group.children);
+      for (const child of children) {
+        reparentSceneNode(child, frame, frame.children.length, 0, 0);
+      }
+    }
+
+    try {
+      group.remove();
+    } catch (error) {
+      console.warn("[pigma-import-text-fix] failed to remove PSD artboard group", error);
+    }
+
+    return frame;
+  }
+
+  function createImportArtboardFrame(name, spec, origin) {
+    const frame = figma.createFrame();
+    frame.name = typeof name === "string" && name.trim().length > 0 ? name.trim() : "PSD Artboard";
+    resizeImportArtboardFrame(frame, spec);
+    frame.x = roundNumber((Number(spec.x) || 0) - origin.x);
+    frame.y = roundNumber((Number(spec.y) || 0) - origin.y);
+    return frame;
+  }
+
+  function resizeImportArtboardFrame(frame, spec) {
+    const width = Math.max(1, roundNumber(spec && spec.width));
+    const height = Math.max(1, roundNumber(spec && spec.height));
+    frame.resize(width, height);
+    frame.clipsContent = true;
+    frame.fills = [];
+    frame.strokes = [];
+  }
+
+  function getSingleImportArtboardTargets(root) {
+    if (!hasChildren(root)) {
+      return [];
+    }
+
+    return Array.from(root.children)
+      .map(node => {
+        const size = parseLayerNameSize(node && node.name);
+        return size ? { node, size } : null;
+      })
+      .filter(Boolean);
+  }
+
+  function getPayloadArtboardSpecs(nodes) {
+    if (!Array.isArray(nodes)) {
+      return [];
+    }
+
+    return nodes
+      .map(node => {
+        if (!node || node.kind !== "group") {
+          return null;
+        }
+
+        const sizeFromName = parseLayerNameSize(node.name);
+        if (!sizeFromName) {
+          return null;
+        }
+
+        const width = dimensionsMatch(node.width, sizeFromName.width) ? Number(node.width) : sizeFromName.width;
+        const height = dimensionsMatch(node.height, sizeFromName.height) ? Number(node.height) : sizeFromName.height;
+        return {
+          name: node.name,
+          normalizedName: normalizeLayerName(node.name),
+          x: Number.isFinite(node.x) ? Number(node.x) : 0,
+          y: Number.isFinite(node.y) ? Number(node.y) : 0,
+          width,
+          height
+        };
+      })
+      .filter(Boolean);
+  }
+
+  function getPayloadArtboardOrigin(specs) {
+    if (!Array.isArray(specs) || specs.length === 0) {
+      return { x: 0, y: 0 };
+    }
+
+    let minX = Number.POSITIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    specs.forEach(spec => {
+      if (!spec) {
+        return;
+      }
+
+      minX = Math.min(minX, Number.isFinite(spec.x) ? spec.x : 0);
+      minY = Math.min(minY, Number.isFinite(spec.y) ? spec.y : 0);
+    });
+
+    return {
+      x: Number.isFinite(minX) ? minX : 0,
+      y: Number.isFinite(minY) ? minY : 0
+    };
+  }
+
+  function shouldSeparateSingleImportArtboardRoot(root, payload) {
+    if (!hasChildren(root) || !payload || payload.mode === "flatten-image") {
+      return false;
+    }
+
+    if (!isNeutralSceneWrapper(root, { allowClipsContent: true, allowFills: true })) {
+      return false;
+    }
+
+    const payloadName = normalizeLayerName(payload.rootName);
+    const rootName = normalizeLayerName(root.name);
+    if (payloadName.length > 0 && rootName.length > 0 && payloadName !== rootName) {
+      return false;
+    }
+
+    const children = Array.from(root.children).filter(node => node && !node.removed);
+    if (children.length < 2) {
+      return false;
+    }
+
+    const artboardLikeChildren = children.filter(isSceneArtboardLikeChild);
+    if (artboardLikeChildren.length < 2 || artboardLikeChildren.length !== children.length) {
+      return false;
+    }
+
+    return true;
+  }
+
+  function isSceneArtboardLikeChild(node) {
+    if (!node || node.visible === false || !isPositiveDimension(node.width) || !isPositiveDimension(node.height)) {
+      return false;
+    }
+
+    const sizeFromName = parseLayerNameSize(node.name);
+    if (!sizeFromName) {
+      return false;
+    }
+
+    return dimensionsMatch(node.width, sizeFromName.width) && dimensionsMatch(node.height, sizeFromName.height);
+  }
+
+  function parseLayerNameSize(value) {
+    const source = typeof value === "string" ? value : "";
+    const match = /(?:^|[^0-9])(\d{2,5})\s*[x×]\s*(\d{2,5})(?:[^0-9]|$)/i.exec(source);
+    if (!match) {
+      return null;
+    }
+
+    const width = Number(match[1]);
+    const height = Number(match[2]);
+    if (!isPositiveDimension(width) || !isPositiveDimension(height)) {
+      return null;
+    }
+
+    return {
+      width,
+      height
+    };
+  }
+
+  function isNeutralSceneWrapper(node, options) {
+    const allowClipsContent = !!(options && options.allowClipsContent);
+    const allowFills = !!(options && options.allowFills);
+    if (!node || node.visible === false || (!allowClipsContent && node.clipsContent === true)) {
       return false;
     }
 
@@ -1948,7 +2235,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       return false;
     }
 
-    if ("fills" in node && Array.isArray(node.fills) && node.fills.some(isVisibleSceneStyle)) {
+    if (!allowFills && "fills" in node && Array.isArray(node.fills) && node.fills.some(isVisibleSceneStyle)) {
       return false;
     }
 
@@ -12441,8 +12728,8 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       analyzedAt: new Date().toISOString(),
       selectionBounds: result.selectionBounds || null,
       summary: {
-        selectionLabel: summary.selectionLabel || "?좏깮",
-        contextLabel: summary.contextLabel || "?쇰컲 UI ?붾㈃",
+        selectionLabel: summary.selectionLabel || "선택",
+        contextLabel: summary.contextLabel || "일반 UI 화면",
         aiStatusLabel: "주석 정리",
         aiProviderLabel: "",
         aiModelLabel: "",
@@ -15309,6 +15596,10 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   const AI_REGROUP_RENAME_CACHE_KEY = "pigma:ai-regroup-rename-cache:v2";
   const PATCH_VERSION = 2;
   const DEFAULT_NAMING_MODE = "web";
+  const AI_RENAME_PAYLOAD_LIMIT = 24;
+  const AI_RENAME_DEEP_CONTEXT_LIMIT = 32;
+  const LARGE_HYBRID_SECTION_COUNT = 16;
+  let textSampleCache = new WeakMap();
   const NAMING_MODE_METADATA = {
     web: {
       id: "web",
@@ -15539,13 +15830,29 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         return;
       }
 
+      const namingMode = resolveNamingMode(message && message.namingMode);
+      const modeMeta = getNamingModeMeta(namingMode);
+      const isPreviewRequest = message.type === "request-ai-regroup-rename-preview";
+      const isPreviewApply = message.type === "apply-ai-regroup-rename-preview";
       await withExecutionLock(
         {
           status: "running",
-          message: getNamingModeMeta(resolveNamingMode(message && message.namingMode)).runningDescription,
-          namingMode: resolveNamingMode(message && message.namingMode),
+          message: isPreviewRequest
+            ? "\ub514\uc790\uc778 \uad6c\uc870 \ubbf8\ub9ac\ubcf4\uae30\ub97c \ub9cc\ub4dc\ub294 \uc911\uc785\ub2c8\ub2e4."
+            : isPreviewApply
+              ? "\uc120\ud0dd\ud55c \uad6c\uc870 \uc815\ub9ac\ub97c \uc801\uc6a9\ud558\ub294 \uc911\uc785\ub2c8\ub2e4."
+              : modeMeta.runningDescription,
+          namingMode,
         },
-        () => runRegroupRename(message)
+        () => {
+          if (isPreviewRequest) {
+            return runRegroupRenamePreview(message);
+          }
+          if (isPreviewApply) {
+            return runApplyRegroupRenamePreview(message);
+          }
+          return runRegroupRename(message);
+        }
       );
       return;
     }
@@ -15556,7 +15863,13 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   globalScope.__PIGMA_AI_REGROUP_RENAME_PATCH__ = true;
 
   function isAiRegroupRenameMessage(message) {
-    return !!message && (message.type === "request-ai-regroup-rename-cache" || message.type === "run-ai-regroup-rename");
+    return (
+      !!message &&
+      (message.type === "request-ai-regroup-rename-cache" ||
+        message.type === "run-ai-regroup-rename" ||
+        message.type === "request-ai-regroup-rename-preview" ||
+        message.type === "apply-ai-regroup-rename-preview")
+    );
   }
 
   async function withExecutionLock(execution, runner) {
@@ -15591,7 +15904,6 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     const modeMeta = getNamingModeMeta(namingMode);
     activeNamingMode = namingMode;
     postStatus("running", modeMeta.runningDescription, namingMode);
-    postStatus("running", "리그룹핑/리네이밍을 적용하는 중입니다.");
 
     try {
       const designReadResult = await readDesignReadCache();
@@ -15607,6 +15919,93 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       figma.notify(buildRegroupRenameToast(result), { timeout: 2200 });
     } catch (error) {
       const message = normalizeErrorMessage(error, "리그룹핑/리네이밍에 실패했습니다.");
+
+      figma.ui.postMessage({
+        type: "ai-regroup-rename-error",
+        message,
+        matchesCurrentSelection: matchesSelectionSignature(runSelectionSignature),
+      });
+
+      figma.notify(message, { error: true, timeout: 2200 });
+    }
+  }
+
+  async function runRegroupRenamePreview(message) {
+    const runSelectionSignature = getSelectionSignature(figma.currentPage.selection);
+    const namingMode = resolveNamingMode(message && message.namingMode);
+    activeNamingMode = namingMode;
+    postStatus("running", "\ub514\uc790\uc778 \uad6c\uc870 \ubbf8\ub9ac\ubcf4\uae30\ub97c \ub9cc\ub4dc\ub294 \uc911\uc785\ub2c8\ub2e4.", namingMode);
+
+    try {
+      const designReadResult = await readDesignReadCache();
+      const result = sanitizeRegroupRenameResult(
+        await applyRegroupRename(designReadResult, {
+          namingMode,
+          previewOnly: true,
+        })
+      );
+      await writeRegroupRenameCache(result);
+
+      figma.ui.postMessage({
+        type: "ai-regroup-rename-preview",
+        result,
+        matchesCurrentSelection: matchesSelectionSignature(result.selectionSignature || runSelectionSignature),
+      });
+
+      figma.notify("\ub514\uc790\uc778 \uad6c\uc870 \ubbf8\ub9ac\ubcf4\uae30\ub97c \ub9cc\ub4e4\uc5c8\uc2b5\ub2c8\ub2e4.", { timeout: 2200 });
+    } catch (error) {
+      const message = normalizeErrorMessage(error, "\ub514\uc790\uc778 \uad6c\uc870 \ubbf8\ub9ac\ubcf4\uae30\ub97c \ub9cc\ub4e4\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4.");
+
+      figma.ui.postMessage({
+        type: "ai-regroup-rename-error",
+        message,
+        matchesCurrentSelection: matchesSelectionSignature(runSelectionSignature),
+      });
+
+      figma.notify(message, { error: true, timeout: 2200 });
+    }
+  }
+
+  async function runApplyRegroupRenamePreview(message) {
+    const runSelectionSignature = getSelectionSignature(figma.currentPage.selection);
+    const namingMode = resolveNamingMode(message && message.namingMode);
+    const expectedSignature = typeof (message && message.selectionSignature) === "string" ? message.selectionSignature : "";
+    const renameIds = normalizeStringArray(message && message.renameIds, 80);
+    const regroupIds = normalizeStringArray(message && message.regroupIds, 80);
+
+    activeNamingMode = namingMode;
+    postStatus("running", "\uc120\ud0dd\ud55c \uad6c\uc870 \uc815\ub9ac\ub97c \uc801\uc6a9\ud558\ub294 \uc911\uc785\ub2c8\ub2e4.", namingMode);
+
+    try {
+      if (expectedSignature && expectedSignature !== runSelectionSignature) {
+        throw new Error("\uc120\ud0dd\uc774 \ubc14\ub00c\uc5c8\uc2b5\ub2c8\ub2e4. \ubbf8\ub9ac\ubcf4\uae30\ub97c \ub2e4\uc2dc \ub9cc\ub4e0 \ub4a4 \uc801\uc6a9\ud574 \uc8fc\uc138\uc694.");
+      }
+
+      if (!renameIds.length && !regroupIds.length) {
+        throw new Error("\uc801\uc6a9\ud560 \ud56d\ubaa9\uc744 \ud558\ub098 \uc774\uc0c1 \uc120\ud0dd\ud574 \uc8fc\uc138\uc694.");
+      }
+
+      const designReadResult = await readDesignReadCache();
+      const result = sanitizeRegroupRenameResult(
+        await applyRegroupRename(designReadResult, {
+          namingMode,
+          filters: {
+            renameIds,
+            regroupIds,
+          },
+        })
+      );
+      await writeRegroupRenameCache(result);
+
+      figma.ui.postMessage({
+        type: "ai-regroup-rename-result",
+        result,
+        matchesCurrentSelection: matchesSelectionSignature(result.selectionSignature || runSelectionSignature),
+      });
+
+      figma.notify(buildRegroupRenameToast(result), { timeout: 2200 });
+    } catch (error) {
+      const message = normalizeErrorMessage(error, "\uc120\ud0dd\ud55c \uad6c\uc870 \uc815\ub9ac\ub97c \uc801\uc6a9\ud558\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4.");
 
       figma.ui.postMessage({
         type: "ai-regroup-rename-error",
@@ -15676,6 +16075,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return {
       version: typeof result.version === "number" ? result.version : PATCH_VERSION,
       source: typeof result.source === "string" ? result.source : "local-heuristic",
+      preview: result.preview === true,
       namingMode: typeof result.namingMode === "string" ? result.namingMode : resolveNamingMode(activeNamingMode),
       namingModeLabel: typeof result.namingModeLabel === "string" ? result.namingModeLabel : "",
       selectionSignature: typeof result.selectionSignature === "string" ? result.selectionSignature : "",
@@ -15702,8 +16102,8 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         skippedCount: Math.max(0, Number(summary.skippedCount) || 0),
         aiOnlySkippedCount: Math.max(0, Number(summary.aiOnlySkippedCount) || 0),
       },
-      renamed: sanitizeRegroupRenameEntryList(result.renamed, ["id", "from", "to", "reason", "nameSource"], 24),
-      regrouped: sanitizeRegroupRenameEntryList(result.regrouped, ["id", "name", "parentName", "nodes", "reason"], 12),
+      renamed: sanitizeRegroupRenameEntryList(result.renamed, ["id", "operationId", "from", "to", "reason", "nameSource"], 24),
+      regrouped: sanitizeRegroupRenameEntryList(result.regrouped, ["id", "operationId", "groupKind", "name", "parentName", "nodes", "reason"], 12),
       suggestions: sanitizeRegroupRenameEntryList(result.suggestions, ["name", "parentName", "nodes", "reason"], 12),
       skipped: sanitizeRegroupRenameEntryList(result.skipped, ["label", "reason", "nameSource"], 12),
       insights: sanitizeStringList(result.insights, 6),
@@ -15778,6 +16178,31 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return items;
   }
 
+  function normalizeStringArray(values, limit) {
+    const rows = Array.isArray(values) ? values : [];
+    const max = typeof limit === "number" && limit > 0 ? limit : rows.length;
+    const items = [];
+    const seen = new Set();
+    for (const value of rows) {
+      if (typeof value !== "string") {
+        continue;
+      }
+
+      const item = value.trim();
+      if (!item || seen.has(item)) {
+        continue;
+      }
+
+      seen.add(item);
+      items.push(item);
+      if (items.length >= max) {
+        break;
+      }
+    }
+
+    return items;
+  }
+
   function matchesCurrentSelection(result) {
     return !!result && result.selectionSignature === getSelectionSignature(figma.currentPage.selection);
   }
@@ -15786,18 +16211,57 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return typeof selectionSignature === "string" && selectionSignature === getSelectionSignature(figma.currentPage.selection);
   }
 
+  function normalizeRegroupRenameFilters(filters) {
+    if (!filters || typeof filters !== "object") {
+      return null;
+    }
+
+    return {
+      renameIds: new Set(normalizeStringArray(filters.renameIds, 120)),
+      regroupIds: new Set(normalizeStringArray(filters.regroupIds, 120)),
+    };
+  }
+
+  function isRegroupRenameFilterSelected(filters, key, id) {
+    if (!filters || !(filters[key] instanceof Set)) {
+      return true;
+    }
+
+    return typeof id === "string" && filters[key].has(id);
+  }
+
+  function buildRegroupOperationId(kind, parent, nodes) {
+    const parentId = parent && typeof parent.id === "string" ? parent.id : "parent";
+    const nodeIds = Array.isArray(nodes)
+      ? nodes
+          .map((node) => (node && typeof node.id === "string" ? node.id : ""))
+          .filter(Boolean)
+          .join("|")
+      : "";
+    return `${kind}:${parentId}:${nodeIds}`;
+  }
+
   async function applyRegroupRename(designReadResult, options) {
+    textSampleCache = new WeakMap();
     const selection = Array.from(figma.currentPage.selection || []);
     if (!selection.length) {
       throw new Error("프레임, 그룹, 레이어를 먼저 선택하세요.");
     }
 
+    const previewOnly = options && options.previewOnly === true;
+    const filters = normalizeRegroupRenameFilters(options && options.filters);
     const selectionIds = selection.map((node) => node.id);
     const context = buildSelectionContext(selection, designReadResult, options);
-    const renameResult = await applyRenamePlan(selection, context);
-    const refreshedSelection = resolveNodeListByIds(selectionIds);
-    const regroupResult = applyRegroupPlan(refreshedSelection, context);
-    const suggestionResult = buildRegroupSuggestions(refreshedSelection, regroupResult.usedNodeIds, context);
+    const renameResult = await applyRenamePlan(selection, context, {
+      previewOnly,
+      filters,
+    });
+    const refreshedSelection = previewOnly ? selection : resolveNodeListByIds(selectionIds);
+    const regroupResult = applyRegroupPlan(refreshedSelection, context, {
+      previewOnly,
+      filters,
+    });
+    const suggestionResult = previewOnly ? [] : buildRegroupSuggestions(refreshedSelection, regroupResult.usedNodeIds, context);
     const skippedCount = renameResult.skipped.length + regroupResult.skipped.length;
     const insights = buildInsights(context, renameResult, regroupResult, suggestionResult);
     const aiRenameCount = renameResult.aiAppliedCount || 0;
@@ -15807,6 +16271,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return {
       version: PATCH_VERSION,
       source: aiRenameCount > 0 ? (localRenameCount > 0 ? "mixed" : "ai") : "local-heuristic",
+      preview: previewOnly,
       namingMode: context.namingMode,
       namingModeLabel: context.namingModeLabel,
       selectionSignature: getSelectionSignature(selection),
@@ -16027,7 +16492,42 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return hints;
   }
 
-  async function applyRenamePlan(selection, context) {
+  function isLargeHybridSectionSelection(selection, context) {
+    if (resolveNamingMode(context && context.namingMode) !== "hybrid") {
+      return false;
+    }
+
+    const selectedRoots = getContextSelectedRoots(context);
+    if (selectedRoots.length > 1) {
+      const selectedMajorCount = selectedRoots.filter((node) => isPotentialMajorHybridSection(node, context)).length;
+      return selectedMajorCount >= LARGE_HYBRID_SECTION_COUNT;
+    }
+
+    const container = getMajorHybridSectionContainer(context);
+    if (container) {
+      return getPotentialMajorHybridChildren(container, context).length >= LARGE_HYBRID_SECTION_COUNT;
+    }
+
+    const root = Array.isArray(selection) ? selection.find(Boolean) : null;
+    return root && hasChildren(root) ? getPotentialMajorHybridChildren(root, context).length >= LARGE_HYBRID_SECTION_COUNT : false;
+  }
+
+  function shouldBuildDeepAiRenameContext(state) {
+    const context = state && state.context;
+    if (resolveNamingMode(context && context.namingMode) !== "hybrid") {
+      return true;
+    }
+
+    if (state && state.largeHybridSelection) {
+      return state.forceAiRename === true || state.majorSection === true;
+    }
+
+    return state && (state.useHybridDisplayName === true || state.forceAiRename === true || state.majorSection === true);
+  }
+
+  async function applyRenamePlan(selection, context, options) {
+    const previewOnly = options && options.previewOnly === true;
+    const filters = options && options.filters;
     const allNodes = collectSceneNodes(selection);
     const nodesByParent = new Map();
     const parentNameCounts = new Map();
@@ -16044,6 +16544,8 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     let aiErrorMessage = "";
     let aiFailureType = "";
     const parentGroups = [];
+    const largeHybridSelection = isLargeHybridSectionSelection(selection, context);
+    let remainingDeepAiContextBudget = AI_RENAME_DEEP_CONTEXT_LIMIT;
 
     for (const node of allNodes) {
       if (!canRenameNode(node)) {
@@ -16133,16 +16635,31 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
           continue;
         }
 
+        const useDeepAiContext =
+          remainingDeepAiContextBudget > 0 &&
+          shouldBuildDeepAiRenameContext({
+            context,
+            largeHybridSelection,
+            forceAiRename,
+            majorSection,
+            useHybridDisplayName,
+          });
+        if (useDeepAiContext) {
+          remainingDeepAiContextBudget -= 1;
+        }
+
         const majorSectionSiblings = majorSection ? getMajorHybridSectionSiblings(node, context) : [];
         const majorSectionOrder = majorSection ? majorSectionSiblings.findIndex((entry) => entry && entry.id === node.id) + 1 : 0;
-        const deepTextSamples = collectNodeTexts(node, 8, 4).slice(0, 8);
+        const deepTextSamples = useDeepAiContext ? collectNodeTexts(node, 8, 4).slice(0, 8) : (textHint ? [textHint] : []);
         const aiOnlySectionName = useHybridDisplayName && majorSection;
         const sectionRoleAnalysis =
-          useHybridDisplayName && hasChildren(node)
+          useDeepAiContext && useHybridDisplayName && hasChildren(node)
             ? analyzeSectionRole(node, context, {
                 textHint,
               })
             : null;
+        const headingTexts = useDeepAiContext ? collectProminentTexts(node, 3) : [];
+        const actionTexts = useDeepAiContext ? collectActionTexts(node, 3) : [];
         candidates.push({
           nodeId: node.id,
           currentName,
@@ -16154,17 +16671,17 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
           textHint,
           textSamples: deepTextSamples.slice(0, 3),
           deepTextSamples,
-          headingTexts: collectProminentTexts(node, 3),
-          actionTexts: collectActionTexts(node, 3),
-          contentDigest: buildNodeContentDigest(node, context),
+          headingTexts,
+          actionTexts,
+          contentDigest: useDeepAiContext ? buildNodeContentDigest(node, context) : "",
           sectionNarrative: sectionRoleAnalysis ? sectionRoleAnalysis.summary : "",
           sectionRoleHint: sectionRoleAnalysis ? sectionRoleAnalysis.role : "",
           sectionRoleReason: sectionRoleAnalysis ? sectionRoleAnalysis.reason : "",
           topicHint: formatTopicLabel(detectTopicSlug(node, context, textHint)),
-          colorHint: getNodeColorHint(node),
+          colorHint: useDeepAiContext ? getNodeColorHint(node) : "",
           imageRole: isImageLikeNode(node) ? detectImageRole(node) : "",
           hasImageFill: hasImageFill(node),
-          allowAiOverride: true,
+          allowAiOverride: useDeepAiContext,
           nameMode: candidateNameMode,
           aiOnlySectionName,
           localFallbackAllowed: !aiOnlySectionName || isSafeLocalDisplayFallback(baseName, node, context),
@@ -16173,12 +16690,12 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
           majorSectionCount: majorSectionSiblings.length,
           needsIndex: shouldPrefixHybridDisplayOrdinal(node, context),
           positionHint: describeNodeSectionPosition(node, context),
-          siblingContext: buildSiblingContentContext(node, context),
+          siblingContext: useDeepAiContext ? buildSiblingContentContext(node, context) : "",
           currentNameSafeDisplay: currentNameSafeDisplay,
           baseNameSafeDisplay: baseNameSafeDisplay,
           currentNameSemanticallyWeak: semanticWeakCurrentName,
           baseNameSemanticallyWeak: baseNameSemanticallyWeak,
-          looksLikePricing: looksLikePricingSection(node),
+          looksLikePricing: useDeepAiContext ? looksLikePricingSection(node) : false,
           bounds: snapshotNodeBounds(node),
           sectionSlug: sectionSlug,
           contentSlug: contentSlug,
@@ -16210,6 +16727,11 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       const usedNames = group.usedNames;
       const candidates = group.candidates;
       for (const candidate of candidates) {
+        if (!isRegroupRenameFilterSelected(filters, "renameIds", candidate.nodeId)) {
+          usedNames.add(canonicalizeName(candidate.currentName));
+          continue;
+        }
+
         const aiSuggestion = candidate.allowAiOverride ? aiRenameMap.get(candidate.nodeId) : null;
         const renameDecision = resolveRenameDecision(candidate, aiSuggestion, aiRenameResult);
         if (!renameDecision) {
@@ -16242,9 +16764,12 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
             continue;
           }
 
-          liveNode.name = uniqueName;
+          if (!previewOnly) {
+            liveNode.name = uniqueName;
+          }
           applied.push({
             id: candidate.nodeId,
+            operationId: candidate.nodeId,
             from: candidate.currentName,
             to: uniqueName,
             reason: nextReason,
@@ -16401,7 +16926,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
           contentSummary: context.contentSummary,
           selectionTextSamples: context.selectionTextSamples,
           paletteHints: context.paletteHints,
-          candidates: candidates.slice(0, 24),
+          candidates: candidates.slice(0, AI_RENAME_PAYLOAD_LIMIT),
         },
       });
       const map = new Map();
@@ -16519,7 +17044,9 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return `리그룹핑/리네이밍 완료 (${parts.join(" · ")})`;
   }
 
-  function applySafeRegroup(selection, context) {
+  function applySafeRegroup(selection, context, options) {
+    const previewOnly = options && options.previewOnly === true;
+    const filters = options && options.filters;
     const parents = collectGroupableParents(selection);
     const applied = [];
     const skipped = [];
@@ -16528,7 +17055,34 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     for (const parent of parents) {
       const pairs = findIconLabelPairs(parent.children || [], usedNodeIds);
       for (const pair of pairs) {
+        const operationId = buildRegroupOperationId("icon-label", parent, [pair.icon, pair.label]);
+        if (!isRegroupRenameFilterSelected(filters, "regroupIds", operationId)) {
+          continue;
+        }
+
         try {
+          if (previewOnly) {
+            const groupName = ensureUniqueName(
+              buildGroupName(null, pair.label, context),
+              collectSiblingNameSet(parent, null)
+            );
+            applied.push({
+              id: operationId,
+              operationId,
+              groupKind: "icon-label",
+              name: groupName,
+              parentName: safeName(parent),
+              nodes: [
+                { id: pair.icon.id, name: safeName(pair.icon) },
+                { id: pair.label.id, name: safeName(pair.label) },
+              ],
+              reason: "媛源뚯슫 ?꾩씠肄섍낵 ?쇰꺼??臾띠뿀?듬땲??",
+            });
+            usedNodeIds.add(pair.icon.id);
+            usedNodeIds.add(pair.label.id);
+            continue;
+          }
+
           const group = figma.group([pair.icon, pair.label], parent);
           const groupName = ensureUniqueName(
             buildGroupName(group, pair.label, context),
@@ -16537,6 +17091,8 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
           group.name = groupName;
           applied.push({
             id: group.id,
+            operationId,
+            groupKind: "icon-label",
             name: groupName,
             parentName: safeName(parent),
             nodes: [safeName(pair.icon), safeName(pair.label)],
@@ -16561,13 +17117,13 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     };
   }
 
-  function applyRegroupPlan(selection, context) {
-    const baseResult = applySafeRegroup(selection, context);
+  function applyRegroupPlan(selection, context, options) {
+    const baseResult = applySafeRegroup(selection, context, options);
     if (!context.aggressiveRegroup) {
       return baseResult;
     }
 
-    const textBlockResult = applyTextBlockRegroup(selection, baseResult.usedNodeIds, context);
+    const textBlockResult = applyTextBlockRegroup(selection, baseResult.usedNodeIds, context, options);
     return {
       applied: [...baseResult.applied, ...textBlockResult.applied],
       skipped: [...baseResult.skipped, ...textBlockResult.skipped],
@@ -16575,7 +17131,9 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     };
   }
 
-  function applyTextBlockRegroup(selection, seedUsedNodeIds, context) {
+  function applyTextBlockRegroup(selection, seedUsedNodeIds, context, options) {
+    const previewOnly = options && options.previewOnly === true;
+    const filters = options && options.filters;
     const usedNodeIds = new Set(seedUsedNodeIds || []);
     const applied = [];
     const skipped = [];
@@ -16591,12 +17149,37 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
           continue;
         }
 
+        const operationId = buildRegroupOperationId("text-block", parent, nodes);
+        if (!isRegroupRenameFilterSelected(filters, "regroupIds", operationId)) {
+          continue;
+        }
+
         try {
+          if (previewOnly) {
+            const groupName = ensureUniqueName(
+              buildSuggestedTextBlockName(null, nodes[0], nodes[1], context),
+              collectSiblingNameSet(parent, null)
+            );
+            applied.push({
+              id: operationId,
+              operationId,
+              groupKind: "text-block",
+              name: groupName,
+              parentName: safeName(parent),
+              nodes: suggestion.nodes,
+              reason: suggestion.reason,
+            });
+            nodes.forEach((node) => usedNodeIds.add(node.id));
+            continue;
+          }
+
           const group = figma.group(nodes, parent);
           const groupName = ensureUniqueName(buildSuggestedTextBlockName(group, nodes[0], nodes[1], context), collectSiblingNameSet(parent, group));
           group.name = groupName;
           applied.push({
             id: group.id,
+            operationId,
+            groupKind: "text-block",
             name: groupName,
             parentName: safeName(parent),
             nodes: suggestion.nodes.map((entry) => entry.name),
@@ -16607,7 +17190,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         } catch (error) {
           skipped.push({
             label: suggestion.nodes.map((entry) => entry.name).join(" + "),
-            reason: normalizeErrorMessage(error, "由ш렇猷뱁븨???곸슜?섏? 紐삵뻽?듬땲??"),
+            reason: normalizeErrorMessage(error, "리그룹핑을 적용하지 못했습니다."),
           });
         }
       }
@@ -18133,15 +18716,48 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
     const selectedRoots = getContextSelectedRoots(context);
     if (selectedRoots.length > 1 && selectedRoots.some((entry) => entry.id === node.id)) {
-      return selectedRoots.filter((entry) => isPotentialMajorHybridSection(entry, context)).sort(compareBounds);
+      return getCachedMajorHybridSections(context, "selected-roots", () =>
+        selectedRoots.filter((entry) => isPotentialMajorHybridSection(entry, context)).sort(compareBounds)
+      );
     }
 
     const container = getMajorHybridSectionContainer(context);
     if (container && node.parent && node.parent.id === container.id) {
-      return getPotentialMajorHybridChildren(container, context);
+      return getCachedMajorHybridSections(context, `container:${container.id}`, () =>
+        getPotentialMajorHybridChildren(container, context)
+      );
     }
 
     return [];
+  }
+
+  function getCachedMajorHybridSections(context, key, resolver) {
+    if (!context || typeof resolver !== "function") {
+      return [];
+    }
+
+    if (!context.__majorHybridSectionCache) {
+      try {
+        Object.defineProperty(context, "__majorHybridSectionCache", {
+          value: new Map(),
+          enumerable: false,
+          configurable: true,
+        });
+      } catch (error) {
+        context.__majorHybridSectionCache = new Map();
+      }
+    }
+
+    const cache = context.__majorHybridSectionCache;
+    if (cache instanceof Map && cache.has(key)) {
+      return cache.get(key);
+    }
+
+    const sections = resolver() || [];
+    if (cache instanceof Map) {
+      cache.set(key, sections);
+    }
+    return sections;
   }
 
   function isPotentialMajorHybridSection(node, context) {
@@ -18449,6 +19065,21 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   }
 
   function collectNodeTexts(node, limit, maxDepth) {
+    if (!node || typeof node !== "object") {
+      return [];
+    }
+
+    const cacheKey = `${Math.max(0, Number(limit) || 0)}:${Math.max(0, Number(maxDepth) || 0)}`;
+    let nodeCache = null;
+    try {
+      nodeCache = textSampleCache.get(node) || null;
+    } catch (error) {
+      nodeCache = null;
+    }
+    if (nodeCache && nodeCache.has(cacheKey)) {
+      return nodeCache.get(cacheKey).slice();
+    }
+
     const texts = [];
     const stack = [{ node, depth: 0 }];
 
@@ -18473,6 +19104,14 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         stack.push({ node: current.node.children[index], depth: current.depth + 1 });
       }
     }
+
+    try {
+      if (!nodeCache) {
+        nodeCache = new Map();
+        textSampleCache.set(node, nodeCache);
+      }
+      nodeCache.set(cacheKey, texts.slice());
+    } catch (error) {}
 
     return texts;
   }
@@ -20132,9 +20771,11 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   const AI_TRANSLATE_MAX_CHUNK_ITEMS = 24;
   const AI_TRANSLATE_MAX_CHUNK_CHARS = 3600;
   const AI_TRANSLATE_MEMORY_LIMIT = 400;
+  const AI_TRANSLATE_PREVIEW_LIMIT = 120;
   const loadedFontPromiseCache = new Map();
   const pendingTextHighlightMeasureRequests = new Map();
   let textHighlightMeasureRequestSequence = 0;
+  let pendingTranslatePreviewState = null;
   const ANNOTATION_PREFIX = "[Ai 판단]";
   const LEGACY_ANNOTATION_PREFIXES = ["[AI Typo]", ANNOTATION_PREFIX, "[Pigma Ai Audit]"];
   const ANNOTATION_CATEGORY_LABEL = "Pigma Ai Audit";
@@ -20525,6 +21166,13 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         return;
       }
 
+      if (message.type === "apply-ai-translate-preview") {
+        await withTypoTaskLock("translate", async () => {
+          await runApplyAiTranslatePreview(message);
+        });
+        return;
+      }
+
       if (message.type === "apply-ai-text-highlight") {
         await withTypoTaskLock("highlight", async () => {
           await runTextHighlight(message);
@@ -20557,6 +21205,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         message.type === "run-ai-typo-clear" ||
         message.type === "request-ai-translate-cache" ||
         message.type === "run-ai-translate" ||
+        message.type === "apply-ai-translate-preview" ||
         message.type === "request-ai-text-highlight-source" ||
         message.type === "apply-ai-text-highlight" ||
         message.type === "measure-ai-text-highlight-alpha-bounds-result")
@@ -20593,7 +21242,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       return "현재 선택 범위에 남아 있는 AI 오타 주석을 정리하는 중입니다.";
     }
     if (task === "translate") {
-      return "선택한 화면의 텍스트를 선택한 언어로 AI 번역하고 있으며, 선택이 없으면 현재 페이지 전체를 번역합니다.";
+      return "선택한 화면의 텍스트를 번역 미리보기로 준비하고 있습니다. 선택이 없으면 전체 페이지 번역을 실행하지 않습니다.";
     }
     return "오타 후보를 찾고 Dev Mode 주석 또는 결과 패널로 정리하는 중입니다.";
   }
@@ -20769,11 +21418,46 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   async function runAiTranslate(message) {
     const runSelectionSignature = getSelectionSignature(figma.currentPage.selection);
     const targetLanguage = getTranslationLanguageMetadata(message && message.targetLanguage);
-    postTranslateStatus("running", `${targetLanguage.label}로 번역하는 중입니다.`);
+    postTranslateStatus("running", `${targetLanguage.label} 번역 미리보기를 준비하는 중입니다.`);
 
     try {
       const designReadResult = await readDesignReadCache();
       const result = await applyAiTranslation(designReadResult, targetLanguage);
+
+      figma.ui.postMessage({
+        type: "ai-translate-result",
+        result,
+        matchesCurrentSelection: matchesSelectionSignature(result.selectionSignature || runSelectionSignature),
+      });
+
+      figma.notify(
+        result.summary && result.summary.previewCount > 0
+          ? `번역 미리보기 준비 (${result.summary.previewCount}개 제안, ${result.summary.targetLanguageLabel})`
+          : `번역 미리보기 준비 (${result.summary.textNodeCount || 0}개 확인, 변경 없음)`,
+        { timeout: 2200 }
+      );
+    } catch (error) {
+      const messageText = normalizeErrorMessage(error, "AI 번역에 실패했습니다.");
+      figma.ui.postMessage({
+        type: "ai-translate-error",
+        message: messageText,
+        matchesCurrentSelection: matchesSelectionSignature(runSelectionSignature),
+      });
+      figma.notify(messageText, { error: true, timeout: 2200 });
+    }
+  }
+
+  async function runApplyAiTranslatePreview(message) {
+    const runSelectionSignature = getSelectionSignature(figma.currentPage.selection);
+    postTranslateStatus("running", "선택한 번역 제안을 적용하는 중입니다.");
+
+    try {
+      const selectedIds = normalizeTranslatePreviewSelection(message && message.selectedIds);
+      if (!selectedIds.length) {
+        throw new Error("적용할 번역 제안을 하나 이상 선택해주세요.");
+      }
+
+      const result = await applyAiTranslationPreviewSelection(selectedIds);
       await writeTranslateCache(result);
 
       figma.ui.postMessage({
@@ -20784,12 +21468,12 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
       figma.notify(
         result.summary && result.summary.translatedCount > 0
-          ? `번역 완료 (${result.summary.translatedCount}개 텍스트, ${result.summary.targetLanguageLabel})`
-          : `번역 완료 (${result.summary.textNodeCount || 0}개 확인, 변경 없음)`,
+          ? `번역 적용 완료 (${result.summary.translatedCount}개 텍스트)`
+          : "적용할 번역 변경이 없습니다.",
         { timeout: 2200 }
       );
     } catch (error) {
-      const messageText = normalizeErrorMessage(error, "AI 번역에 실패했습니다.");
+      const messageText = normalizeErrorMessage(error, "번역 제안을 적용하지 못했습니다.");
       figma.ui.postMessage({
         type: "ai-translate-error",
         message: messageText,
@@ -21953,7 +22637,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       return false;
     }
 
-    if (Array.isArray(kindLabels) && kindLabels.includes("臾몃쾿")) {
+    if (Array.isArray(kindLabels) && kindLabels.includes("문법")) {
       return false;
     }
 
@@ -22251,7 +22935,11 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
   async function applyAiTranslation(designReadResult, targetLanguage) {
     const selection = Array.from(figma.currentPage.selection || []);
-    const translationRoots = selection.length ? selection : [figma.currentPage];
+    if (!selection.length) {
+      pendingTranslatePreviewState = null;
+      throw new Error("번역할 프레임, 그룹, 텍스트 레이어를 먼저 선택해주세요. 안전을 위해 선택이 없을 때 전체 페이지 번역은 실행하지 않습니다.");
+    }
+    const translationRoots = selection;
 
     const proofingSettings = await readProofingSettings();
     const context = buildSelectionContext(translationRoots, designReadResult, proofingSettings);
@@ -22261,47 +22949,134 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
 
     const translationResult = await requestAiTranslations(textNodes, context, proofingSettings, targetLanguage);
-    const applied = await applyTranslatedText(textNodes, translationResult.issues, proofingSettings, targetLanguage);
+    const preview = buildTranslatedTextPreview(textNodes, translationResult.issues, proofingSettings, targetLanguage);
     const sourceLanguageLabel =
       context.languageHintLabel || context.detectedLanguageLabel || context.languageLabel || "자동 감지";
     const insights = buildTranslateInsights(
       context,
       textNodes,
-      applied,
+      {
+        applied: preview.preview,
+        appliedCount: preview.previewCount,
+        unchangedCount: preview.unchangedCount,
+        skipped: preview.skipped,
+      },
       translationResult.aiMeta,
       targetLanguage,
       translationResult.cacheStats
     );
-
-    return {
+    const result = {
       version: PATCH_VERSION,
-      source: "ai-translation-direct-edit",
-      mode: "direct-text-translation",
+      source: "ai-translation-preview",
+      mode: "preview-text-translation",
       selectionSignature: getSelectionSignature(selection),
       processedAt: new Date().toISOString(),
       summary: {
         selectionLabel: context.selectionLabel,
         contextLabel: context.contextLabel,
         textNodeCount: textNodes.length,
-        translatedCount: applied.appliedCount,
-        unchangedCount: applied.unchangedCount,
-        skippedCount: applied.skipped.length,
+        translatedCount: 0,
+        previewCount: preview.previewCount,
+        unchangedCount: preview.unchangedCount,
+        skippedCount: preview.skipped.length,
         reusedCount: translationResult.cacheStats ? translationResult.cacheStats.reusedCount : 0,
         requestedTextCount: translationResult.cacheStats ? translationResult.cacheStats.requestedCount : textNodes.length,
         uniqueRequestedTextCount: translationResult.cacheStats ? translationResult.cacheStats.uniqueRequestedCount : textNodes.length,
         sourceLanguageLabel,
         targetLanguageCode: targetLanguage.code,
         targetLanguageLabel: targetLanguage.label,
-        mode: "direct-text-translation",
-        modeLabel: "현재 선택 번역",
+        mode: "preview-text-translation",
+        modeLabel: "번역 미리보기",
+        requiresApply: true,
+        previewLimit: AI_TRANSLATE_PREVIEW_LIMIT,
         aiStatusLabel: translationResult.aiMeta ? translationResult.aiMeta.statusLabel : "AI 상태 미확인",
         aiProviderLabel: translationResult.aiMeta ? translationResult.aiMeta.providerLabel : "",
         aiModelLabel: translationResult.aiMeta ? translationResult.aiMeta.modelLabel : "",
       },
+      preview: preview.preview.slice(0, AI_TRANSLATE_PREVIEW_LIMIT),
+      applied: [],
+      skipped: preview.skipped.slice(0, 8),
+      insights: insights.slice(0, 6),
+    };
+
+    pendingTranslatePreviewState = {
+      selectionSignature: result.selectionSignature,
+      targetLanguage,
+      proofingSettings,
+      context,
+      textNodes,
+      issues: Array.isArray(translationResult.issues) ? translationResult.issues.slice() : [],
+      sourceLanguageLabel,
+      aiMeta: translationResult.aiMeta || null,
+      cacheStats: translationResult.cacheStats || null,
+    };
+
+    return result;
+  }
+
+  async function applyAiTranslationPreviewSelection(selectedIds) {
+    const state = pendingTranslatePreviewState;
+    if (!state || !Array.isArray(state.textNodes) || !Array.isArray(state.issues)) {
+      throw new Error("적용할 번역 미리보기가 없습니다. 먼저 번역 미리보기를 다시 생성해주세요.");
+    }
+
+    if (!matchesSelectionSignature(state.selectionSignature)) {
+      throw new Error("현재 선택이 미리보기 생성 시점과 다릅니다. 안전하게 다시 미리보기를 생성해주세요.");
+    }
+
+    const selectedIdSet = new Set(selectedIds);
+    const selectedIssues = state.issues.filter((issue) => {
+      return !!(issue && issue.node && selectedIdSet.has(issue.node.id));
+    });
+    if (!selectedIssues.length) {
+      throw new Error("선택한 항목에서 적용할 번역 제안을 찾지 못했습니다.");
+    }
+
+    const applied = await applyTranslatedText(state.textNodes, selectedIssues, state.proofingSettings, state.targetLanguage);
+    const insights = buildTranslateInsights(
+      state.context,
+      state.textNodes,
+      applied,
+      state.aiMeta,
+      state.targetLanguage,
+      state.cacheStats
+    );
+    const result = {
+      version: PATCH_VERSION,
+      source: "ai-translation-selected-apply",
+      mode: "direct-text-translation",
+      selectionSignature: state.selectionSignature,
+      processedAt: new Date().toISOString(),
+      summary: {
+        selectionLabel: state.context.selectionLabel,
+        contextLabel: state.context.contextLabel,
+        textNodeCount: state.textNodes.length,
+        selectedCount: selectedIssues.length,
+        translatedCount: applied.appliedCount,
+        previewCount: 0,
+        unchangedCount: applied.unchangedCount,
+        skippedCount: applied.skipped.length,
+        reusedCount: state.cacheStats ? state.cacheStats.reusedCount : 0,
+        requestedTextCount: state.cacheStats ? state.cacheStats.requestedCount : state.textNodes.length,
+        uniqueRequestedTextCount: state.cacheStats ? state.cacheStats.uniqueRequestedCount : state.textNodes.length,
+        sourceLanguageLabel: state.sourceLanguageLabel,
+        targetLanguageCode: state.targetLanguage.code,
+        targetLanguageLabel: state.targetLanguage.label,
+        mode: "direct-text-translation",
+        modeLabel: "선택 번역 적용",
+        requiresApply: false,
+        aiStatusLabel: state.aiMeta ? state.aiMeta.statusLabel : "AI 상태 미확인",
+        aiProviderLabel: state.aiMeta ? state.aiMeta.providerLabel : "",
+        aiModelLabel: state.aiMeta ? state.aiMeta.modelLabel : "",
+      },
+      preview: [],
       applied: applied.applied.slice(0, 12),
       skipped: applied.skipped.slice(0, 8),
       insights: insights.slice(0, 6),
     };
+
+    pendingTranslatePreviewState = null;
+    return result;
   }
 
   async function requestAiTranslations(textNodes, context, proofingSettings, targetLanguage) {
@@ -22762,6 +23537,105 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
 
     return true;
+  }
+
+  function normalizeTranslatePreviewSelection(value) {
+    const source = Array.isArray(value) ? value : [];
+    const selected = [];
+    const seen = new Set();
+
+    for (const item of source) {
+      const id = typeof item === "string" ? item.trim() : "";
+      if (!id || seen.has(id)) {
+        continue;
+      }
+      seen.add(id);
+      selected.push(id);
+    }
+
+    return selected;
+  }
+
+  function buildTranslatedTextPreview(textNodes, issues, proofingSettings, targetLanguage) {
+    const issuesByNode = new Map();
+    const preview = [];
+    const skipped = [];
+    let unchangedCount = 0;
+
+    for (const issue of Array.isArray(issues) ? issues : []) {
+      if (!issue || !issue.node || !issue.node.id) {
+        continue;
+      }
+
+      issuesByNode.set(issue.node.id, issue);
+    }
+
+    for (const node of Array.isArray(textNodes) ? textNodes : []) {
+      const currentText = getTextValue(node);
+      if (!currentText) {
+        unchangedCount += 1;
+        continue;
+      }
+
+      const issue = issuesByNode.get(node.id);
+      if (!issue) {
+        unchangedCount += 1;
+        continue;
+      }
+
+      const nextText = normalizeTranslatedSuggestion(currentText, issue.suggestion);
+      if (!nextText || nextText === currentText) {
+        unchangedCount += 1;
+        continue;
+      }
+
+      if (!issueRespectsProofingTerms(currentText, nextText, proofingSettings)) {
+        skipped.push({
+          label: safeName(node),
+          reason: "보호된 용어가 바뀔 수 있어 번역 적용을 건너뜁니다.",
+        });
+        unchangedCount += 1;
+        continue;
+      }
+
+      if (!translationPreservesCriticalTokens(currentText, nextText)) {
+        skipped.push({
+          label: safeName(node),
+          reason: "URL, 플레이스홀더, 코드 토큰이 바뀔 수 있어 번역 적용을 건너뜁니다.",
+        });
+        unchangedCount += 1;
+        continue;
+      }
+
+      if (countTextLines(currentText) > 1 && countNonEmptyLines(nextText) < Math.max(1, countNonEmptyLines(currentText) - 1)) {
+        skipped.push({
+          label: safeName(node),
+          reason: "여러 줄 텍스트 구조가 크게 바뀌어 번역 적용을 건너뜁니다.",
+        });
+        unchangedCount += 1;
+        continue;
+      }
+
+      preview.push(
+        formatIssueResult(
+          createIssue(
+            node,
+            currentText,
+            nextText,
+            "번역",
+            issue.reason || `${targetLanguage.label}로 번역합니다.`,
+            issue.source || "ai"
+          )
+        )
+      );
+    }
+
+    return {
+      preview,
+      skipped,
+      previewCount: preview.length,
+      unchangedCount,
+    };
   }
 
   async function applyTranslatedText(textNodes, issues, proofingSettings, targetLanguage) {
@@ -24399,7 +25273,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       baseIssue.node,
       baseText,
       mergedText,
-      accepted.some((entry) => entry.issue && entry.issue.kind === "臾몃쾿") ? "臾몃쾿" : baseIssue.kind,
+      accepted.some((entry) => entry.issue && entry.issue.kind === "문법") ? "문법" : baseIssue.kind,
       "같은 텍스트 노드의 여러 언어 교정 후보를 함께 병합했습니다.",
       accepted.some((entry) => entry.issue && entry.issue.source === "ai") ? "ai" : baseIssue.source || "local"
     );
@@ -24569,7 +25443,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     const instructions =
       "You review UI copy inside a Figma plugin. Detect only obvious spelling mistakes, broken words, malformed polite endings, spacing errors, punctuation errors, and clearly broken grammar. Be conservative: if a word is already a valid standard word in its language, keep it unless the surrounding sentence is clearly wrong with that exact word. Never replace one valid word with another valid word just because the spellings are similar. Example: keep 'optimal motion' unchanged and never change it to 'optional motion'. Preserve the original language, script, wording, product naming, and marketing intent of each string. Do not translate, localize, rewrite into the dominant language of the screen, unify terminology, smooth tone, or replace brand/product names unless the product name itself has an obvious typo. In mixed-language strings, preserve every language segment as-is and only fix the clearly broken part inside that same language segment. Some textNodes are full node strings, while others are single extracted lines from a multiline node. If an item is a single extracted line, return a corrected single line only and do not rewrite neighboring lines. If preferredLocaleHint is provided, use it only for Latin-script nodes or segments that actually fit that locale. Do not suppress Korean, English, or other script corrections just because another preferred locale is set. If latinLocaleHint is provided, keep corrections inside that locale only for matching Latin-script segments. Ignore cosmetic whitespace cleanup such as empty brackets, bracket spacing, or punctuation-only cleanup. Only flag spacing when a word is visibly broken into fragments, for example 'app le' -> 'apple'. Example: German copy with an English brand should stay mixed as needed: 'Find e deine perfekte Work-Life-Balanfce mit LG' -> 'Finde deine perfekte Work-Life-Balance mit LG', 'Jedtazt kaufenq' -> 'Jetzt kaufen', while keeping 'LG' untouched. Return the full corrected string in suggestion for the given item, never only a changed token. If the original text contains multiple lines, preserve every line and keep the same line count unless the user text itself clearly intends a merge. Never drop unrelated lower lines. Never edit any protectedTerms under any circumstances. Never mark userDictionary terms as mistakes. Example: '방갑스비난.' should be corrected to the full string '반갑습니다.' If the text looks fine, omit it. Return concise reasons in Korean when possible.";
     const payload = {
-      languageHint: context.languageHintLabel || context.detectedLanguageLabel || context.languageLabel || "?먮룞 媛먯?",
+      languageHint: context.languageHintLabel || context.detectedLanguageLabel || context.languageLabel || "자동 감지",
       preferredLocaleHint: context.proofingLocale || "",
       preferredLocaleLabel: context.proofingLocaleAiLabel || context.proofingLocaleLabel || "",
       languageFamilyHint: detectLanguageFamilyLabel(context.detectedLanguageLabel || context.languageLabel || ""),
@@ -29136,7 +30010,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
   function getPixelPerfectTaskRunningMessage(task) {
     if (task === "clear") {
-      return "Removing pixel-perfect Dev Mode annotations from the current selection.";
+      return "\uD604\uC7AC \uC120\uD0DD \uBC94\uC704\uC758 \uD53D\uC140 \uD37C\uD399\uD2B8 Dev Mode \uC8FC\uC11D\uC744 \uC815\uB9AC\uD558\uACE0 \uC788\uC2B5\uB2C8\uB2E4.";
     }
     return "소수점 보정 후보를 분석하고 정수 스냅 적용 중입니다.";
   }
@@ -29181,15 +30055,15 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       const appliedCount = summary.appliedCount || 0;
       const excludedCount = summary.excludedCount || 0;
       const annotationCount = summary.annotationCount || 0;
-      const annotationSuffix = annotationCount > 0 ? `, annotations ${annotationCount}` : "";
+      const annotationSuffix = annotationCount > 0 ? `, \uC8FC\uC11D ${annotationCount}\uAC74` : "";
       if (appliedCount > 0) {
-        figma.notify(`Pixel perfect complete (${appliedCount} applied, ${excludedCount} excluded${annotationSuffix})`, {
+        figma.notify(`\uD53D\uC140 \uAD50\uC815 \uC644\uB8CC (${appliedCount}\uAC74 \uC801\uC6A9, ${excludedCount}\uAC74 \uC81C\uC678${annotationSuffix})`, {
           timeout: 2200,
         });
       } else if ((summary.candidateCount || 0) === 0) {
         figma.notify("픽셀 퍼팩트 후보가 없습니다.", { timeout: 1800 });
       } else {
-        figma.notify(`Pixel perfect complete (0 applied, ${excludedCount} excluded${annotationSuffix})`, {
+        figma.notify(`\uD53D\uC140 \uAD50\uC815 \uC644\uB8CC (0\uAC74 \uC801\uC6A9, ${excludedCount}\uAC74 \uC81C\uC678${annotationSuffix})`, {
           timeout: 2200,
         });
       }
@@ -29206,7 +30080,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
   async function runPixelPerfectClear() {
     const runSelectionSignature = getSelectionSignature(figma.currentPage.selection);
-    postClearStatus("running", "Removing pixel-perfect Dev Mode annotations from the current selection.");
+    postClearStatus("running", "\uD604\uC7AC \uC120\uD0DD \uBC94\uC704\uC758 \uD53D\uC140 \uD37C\uD399\uD2B8 Dev Mode \uC8FC\uC11D\uC744 \uC815\uB9AC\uD558\uACE0 \uC788\uC2B5\uB2C8\uB2E4.");
 
     try {
       const result = await clearPixelPerfectAnnotations();
@@ -29221,14 +30095,14 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       const summary = result.summary || {};
       const removedAnnotationCount = summary.removedAnnotationCount || 0;
       if (removedAnnotationCount > 0) {
-        figma.notify(`Pixel perfect annotations cleared (${removedAnnotationCount} removed)`, {
+        figma.notify(`\uD53D\uC140 \uD37C\uD399\uD2B8 \uC8FC\uC11D \uC815\uB9AC \uC644\uB8CC (${removedAnnotationCount}\uAC74 \uC0AD\uC81C)`, {
           timeout: 2200,
         });
       } else {
-        figma.notify("No pixel-perfect annotations found in the current selection.", { timeout: 1800 });
+        figma.notify("\uD604\uC7AC \uC120\uD0DD \uBC94\uC704\uC5D0 \uC815\uB9AC\uD560 \uD53D\uC140 \uD37C\uD399\uD2B8 \uC8FC\uC11D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.", { timeout: 1800 });
       }
     } catch (error) {
-      const message = normalizeErrorMessage(error, "Failed to clear the pixel-perfect annotations.");
+      const message = normalizeErrorMessage(error, "\uD53D\uC140 \uD37C\uD399\uD2B8 \uC8FC\uC11D \uC815\uB9AC\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.");
       figma.ui.postMessage({
         type: "ai-pixel-perfect-clear-error",
         message,
@@ -30448,7 +31322,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       } catch (error) {
         skipped.push({
           label: safeName(node),
-          reason: normalizeErrorMessage(error, "Failed to add the pixel-perfect annotation."),
+          reason: normalizeErrorMessage(error, "\uD53D\uC140 \uD37C\uD399\uD2B8 \uC8FC\uC11D \uCD94\uAC00\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4."),
         });
       }
     }
@@ -30496,7 +31370,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
         skipped.push({
           label: safeName(node),
-          reason: normalizeErrorMessage(error, "Failed to clear the pixel-perfect annotation."),
+          reason: normalizeErrorMessage(error, "\uD53D\uC140 \uD37C\uD399\uD2B8 \uC8FC\uC11D \uC815\uB9AC\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4."),
         });
       }
     }
@@ -30896,6 +31770,1162 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
 ;(() => {
   const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
+  if (globalScope.__PIGMA_SKEW_TRANSFORM_PATCH__) {
+    return;
+  }
+
+  const originalOnMessage = figma.ui.onmessage;
+  const MAX_SKEW_DEGREES = 90;
+  const MAX_TANGENT_SKEW_DEGREES = 89.9;
+  const MAX_ROTATION_DEGREES = 180;
+  const TRANSFORM_PRECISION = 1000000;
+  const SKEW_PLUGIN_DATA_KEY = "__pigmaSkewTransform";
+  const SKEW_EPSILON_DEGREES = 0.05;
+  let activeSession = null;
+
+  if (typeof originalOnMessage !== "function") {
+    return;
+  }
+
+  figma.ui.onmessage = async (message) => {
+    if (isSkewTransformMessage(message)) {
+      await handleSkewTransformMessage(message);
+      return;
+    }
+
+    return originalOnMessage(message);
+  };
+
+  globalScope.__PIGMA_SKEW_TRANSFORM_PATCH__ = true;
+
+  function isSkewTransformMessage(message) {
+    return (
+      !!message &&
+      (message.type === "request-skew-transform-session" ||
+        message.type === "preview-skew-transform" ||
+        message.type === "apply-skew-transform" ||
+        message.type === "cancel-skew-transform")
+    );
+  }
+
+  async function handleSkewTransformMessage(message) {
+    const clientRequestId = typeof message.clientRequestId === "string" ? message.clientRequestId : "";
+    try {
+      if (message.type === "request-skew-transform-session") {
+        if (activeSession) {
+          restoreSkewSession(activeSession);
+          activeSession = null;
+        }
+        activeSession = createSkewSession();
+        figma.ui.postMessage({
+          type: "skew-transform-session-result",
+          clientRequestId,
+          session: serializeSkewSession(activeSession),
+        });
+        return;
+      }
+
+      const session = getActiveSkewSession(message.sessionId);
+      if (message.type === "preview-skew-transform") {
+        const result = applySkewToSession(
+          session,
+          message.horizontalDegrees,
+          message.verticalDegrees,
+          message.rotationDegrees
+        );
+        figma.ui.postMessage({
+          type: "skew-transform-preview-result",
+          clientRequestId,
+          sessionId: session.sessionId,
+          result,
+        });
+        return;
+      }
+
+      if (message.type === "apply-skew-transform") {
+        const result = applySkewToSession(
+          session,
+          message.horizontalDegrees,
+          message.verticalDegrees,
+          message.rotationDegrees
+        );
+        activeSession = null;
+        figma.ui.postMessage({
+          type: "skew-transform-apply-result",
+          clientRequestId,
+          sessionId: session.sessionId,
+          result,
+        });
+        figma.notify(buildSkewApplyToast(result), { timeout: 1800 });
+        return;
+      }
+
+      if (message.type === "cancel-skew-transform") {
+        const result = restoreSkewSession(session);
+        activeSession = null;
+        figma.ui.postMessage({
+          type: "skew-transform-cancel-result",
+          clientRequestId,
+          sessionId: session.sessionId,
+          result,
+        });
+      }
+    } catch (error) {
+      const messageText = normalizeSkewError(error, "스큐 조정을 처리하지 못했습니다.");
+      figma.ui.postMessage({
+        type: "skew-transform-error",
+        clientRequestId,
+        message: messageText,
+      });
+      figma.notify(messageText, { error: true, timeout: 2400 });
+    }
+  }
+
+  function createSkewSession() {
+    const selection = Array.from(figma.currentPage.selection || []);
+    if (!selection.length) {
+      throw new Error("스큐를 적용할 프레임, 그룹, 레이어를 먼저 선택해주세요.");
+    }
+
+    const targets = [];
+    const skipped = [];
+    const seen = {};
+    const selectedIds = buildSelectedSkewIdSet(selection);
+
+    for (let index = 0; index < selection.length; index += 1) {
+      const node = selection[index];
+      if (hasSelectedSkewAncestor(node, selectedIds)) {
+        skipped.push(buildSkippedSkewNode(node, "상위 선택에 포함되어 별도 적용하지 않았습니다."));
+        continue;
+      }
+      const result = collectSkewTargetsForSelectionNode(node, seen);
+      appendSkewTargetResult(result, targets, skipped);
+    }
+
+    if (!targets.length) {
+      const reason = skipped.length ? skipped[0].reason : "선택 항목에서 변형 가능한 레이어를 찾지 못했습니다.";
+      throw new Error(reason);
+    }
+
+    const initialValues = estimateSessionSkewValues(targets);
+    return {
+      sessionId: "skew-transform-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8),
+      selectionCount: selection.length,
+      targets,
+      skipped,
+      horizontalDegrees: initialValues.horizontalDegrees,
+      verticalDegrees: initialValues.verticalDegrees,
+      rotationDegrees: initialValues.rotationDegrees,
+      initialValues,
+    };
+  }
+
+  function buildSelectedSkewIdSet(selection) {
+    const result = {};
+    for (let index = 0; index < selection.length; index += 1) {
+      const node = selection[index];
+      if (node && typeof node.id === "string") {
+        result[node.id] = true;
+      }
+    }
+    return result;
+  }
+
+  function hasSelectedSkewAncestor(node, selectedIds) {
+    let current = node && node.parent ? node.parent : null;
+    while (current && current.type !== "PAGE" && current.type !== "DOCUMENT") {
+      if (current.id && selectedIds[current.id]) {
+        return true;
+      }
+      current = current.parent;
+    }
+    return false;
+  }
+
+  function appendSkewTargetResult(result, targets, skipped) {
+    if (!result) {
+      return;
+    }
+    if (Array.isArray(result.targets) && result.targets.length) {
+      for (let index = 0; index < result.targets.length; index += 1) {
+        targets.push(result.targets[index]);
+      }
+    }
+    if (Array.isArray(result.skipped) && result.skipped.length) {
+      for (let index = 0; index < result.skipped.length; index += 1) {
+        skipped.push(result.skipped[index]);
+      }
+    }
+  }
+
+  function collectSkewTargetsForSelectionNode(node, seen) {
+    const direct = buildSkewTarget(node, seen);
+    if (!direct.target) {
+      return {
+        targets: [],
+        skipped: direct.skipped ? [direct.skipped] : [],
+      };
+    }
+
+    if (hasMeaningfulSkewTarget(direct.target) || !isSkewContainerNode(node)) {
+      return {
+        targets: [direct.target],
+        skipped: [],
+      };
+    }
+
+    const nested = collectNestedSkewTargets(node, seen);
+    if (nested.targets.length) {
+      return nested;
+    }
+
+    return {
+      targets: [direct.target],
+      skipped: nested.skipped,
+    };
+  }
+
+  function collectNestedSkewTargets(root, seen) {
+    const targets = [];
+    const skipped = [];
+    const stack = [];
+    if (isSkewContainerNode(root)) {
+      for (let index = root.children.length - 1; index >= 0; index -= 1) {
+        stack.push(root.children[index]);
+      }
+    }
+
+    while (stack.length) {
+      const node = stack.pop();
+      if (!node) {
+        continue;
+      }
+
+      const result = buildSkewTarget(node, seen);
+      if (result.target && hasMeaningfulSkewTarget(result.target)) {
+        targets.push(result.target);
+        continue;
+      }
+      if (result.skipped) {
+        skipped.push(result.skipped);
+      }
+
+      if (isSkewContainerNode(node)) {
+        for (let index = node.children.length - 1; index >= 0; index -= 1) {
+          stack.push(node.children[index]);
+        }
+      }
+    }
+
+    return {
+      targets,
+      skipped,
+    };
+  }
+
+  function isSkewContainerNode(node) {
+    return !!(node && "children" in node && Array.isArray(node.children) && node.children.length);
+  }
+
+  function hasMeaningfulSkewTarget(target) {
+    if (!target) {
+      return false;
+    }
+    if (target.hasStoredSkewData) {
+      return true;
+    }
+    return hasMeaningfulSkewValues(target.initialValues);
+  }
+
+  function hasMeaningfulSkewValues(values) {
+    if (!values) {
+      return false;
+    }
+    return (
+      Math.abs(Number(values.horizontalDegrees) || 0) > SKEW_EPSILON_DEGREES ||
+      Math.abs(Number(values.verticalDegrees) || 0) > SKEW_EPSILON_DEGREES
+    );
+  }
+
+  function buildSkewTarget(node, seen) {
+    if (!node || node.removed || !node.id || seen[node.id]) {
+      return {};
+    }
+    seen[node.id] = true;
+
+    const nodeName = safeSkewName(node);
+    const nodeType = String(node.type || "UNKNOWN");
+    if (node.type === "PAGE" || node.type === "DOCUMENT") {
+      return {
+        skipped: buildSkippedSkewNode(node, "페이지나 문서는 스큐를 적용할 수 없습니다."),
+      };
+    }
+    if ("locked" in node && node.locked === true) {
+      return {
+        skipped: buildSkippedSkewNode(node, "잠긴 레이어입니다."),
+      };
+    }
+    if (hasLockedSkewAncestor(node)) {
+      return {
+        skipped: buildSkippedSkewNode(node, "상위 레이어가 잠겨 있습니다."),
+      };
+    }
+    if (!("relativeTransform" in node) || !Array.isArray(node.relativeTransform)) {
+      return {
+        skipped: buildSkippedSkewNode(node, "transform을 직접 수정할 수 없는 레이어입니다."),
+      };
+    }
+
+    const width = typeof node.width === "number" && Number.isFinite(node.width) ? node.width : 0;
+    const height = typeof node.height === "number" && Number.isFinite(node.height) ? node.height : 0;
+    if (!(width > 0) || !(height > 0)) {
+      return {
+        skipped: buildSkippedSkewNode(node, "레이어 크기가 비어 있습니다."),
+      };
+    }
+
+    const originalTransform = copySkewTransform(node.relativeTransform);
+    if (!originalTransform) {
+      return {
+        skipped: buildSkippedSkewNode(node, "기존 transform을 읽지 못했습니다."),
+      };
+    }
+
+    const target = {
+      node,
+      nodeId: node.id,
+      nodeName,
+      nodeType,
+      width,
+      height,
+      originalTransform,
+      baseTransform: null,
+      initialValues: {
+        horizontalDegrees: 0,
+        verticalDegrees: 0,
+        rotationDegrees: 0,
+      },
+    };
+    const storedState = readSkewPluginState(node);
+    target.baseTransform = buildDeskewedTransform(target);
+    target.initialValues = storedState ? normalizeStoredSkewValues(storedState) : estimateSkewValues(target);
+    target.hasStoredSkewData = !!storedState;
+
+    return {
+      target,
+    };
+  }
+
+  function hasLockedSkewAncestor(node) {
+    let current = node && node.parent ? node.parent : null;
+    while (current && current.type !== "PAGE" && current.type !== "DOCUMENT") {
+      if ("locked" in current && current.locked === true) {
+        return true;
+      }
+      current = current.parent;
+    }
+    return false;
+  }
+
+  function copySkewTransform(transform) {
+    if (!Array.isArray(transform) || transform.length < 2) {
+      return null;
+    }
+    const row0 = Array.isArray(transform[0]) ? transform[0] : null;
+    const row1 = Array.isArray(transform[1]) ? transform[1] : null;
+    if (!row0 || !row1 || row0.length < 3 || row1.length < 3) {
+      return null;
+    }
+    return [
+      [toFiniteSkewNumber(row0[0], 1), toFiniteSkewNumber(row0[1], 0), toFiniteSkewNumber(row0[2], 0)],
+      [toFiniteSkewNumber(row1[0], 0), toFiniteSkewNumber(row1[1], 1), toFiniteSkewNumber(row1[2], 0)],
+    ];
+  }
+
+  function getActiveSkewSession(sessionId) {
+    if (!activeSession) {
+      throw new Error("스큐 조정 세션이 만료되었습니다. 다시 실행해주세요.");
+    }
+    if (sessionId && sessionId !== activeSession.sessionId) {
+      throw new Error("다른 스큐 조정 세션이 실행 중입니다.");
+    }
+    return activeSession;
+  }
+
+  function applySkewToSession(session, horizontalDegrees, verticalDegrees, rotationDegrees) {
+    const horizontal = clampSkewDegrees(horizontalDegrees);
+    const vertical = clampSkewDegrees(verticalDegrees);
+    const rotation = clampRotationDegrees(rotationDegrees);
+    const applied = [];
+    const skipped = session.skipped.slice(0);
+
+    for (let index = 0; index < session.targets.length; index += 1) {
+      const target = session.targets[index];
+      if (!target.node || target.node.removed) {
+        skipped.push({
+          nodeId: target.nodeId,
+          nodeName: target.nodeName,
+          nodeType: target.nodeType,
+          reason: "레이어가 더 이상 존재하지 않습니다.",
+        });
+        continue;
+      }
+
+      try {
+        target.node.relativeTransform = buildSkewedTransform(target, horizontal, vertical, rotation);
+        writeSkewPluginState(target, horizontal, vertical, rotation);
+        applied.push({
+          nodeId: target.nodeId,
+          nodeName: target.nodeName,
+          nodeType: target.nodeType,
+        });
+      } catch (error) {
+        skipped.push({
+          nodeId: target.nodeId,
+          nodeName: target.nodeName,
+          nodeType: target.nodeType,
+          reason: normalizeSkewError(error, "이 레이어에는 스큐를 적용하지 못했습니다."),
+        });
+      }
+    }
+
+    session.horizontalDegrees = horizontal;
+    session.verticalDegrees = vertical;
+    session.rotationDegrees = rotation;
+    return buildSkewResult(session, applied, skipped);
+  }
+
+  function clearSkewInSession(session) {
+    const cleaned = [];
+    const skipped = session.skipped.slice(0);
+    for (let index = 0; index < session.targets.length; index += 1) {
+      const target = session.targets[index];
+      if (!target.node || target.node.removed) {
+        skipped.push({
+          nodeId: target.nodeId,
+          nodeName: target.nodeName,
+          nodeType: target.nodeType,
+          reason: "?덉씠?닿? ???댁긽 議댁옱?섏? ?딆뒿?덈떎.",
+        });
+        continue;
+      }
+
+      try {
+        target.node.relativeTransform = buildDeskewedTransform(target);
+        clearSkewPluginState(target.node);
+        cleaned.push({
+          nodeId: target.nodeId,
+          nodeName: target.nodeName,
+          nodeType: target.nodeType,
+        });
+      } catch (error) {
+        skipped.push({
+          nodeId: target.nodeId,
+          nodeName: target.nodeName,
+          nodeType: target.nodeType,
+          reason: normalizeSkewError(error, "?ㅽ걧 ?뺣━瑜??곸슜?섏? 紐삵뻽?듬땲??"),
+        });
+      }
+    }
+
+    return {
+      processedAt: new Date().toISOString(),
+      summary: {
+        selectionCount: session.selectionCount,
+        targetCount: session.targets.length,
+        cleanedCount: cleaned.length,
+        skippedCount: skipped.length,
+      },
+      cleaned: cleaned.slice(0, 24),
+      skipped: skipped.slice(0, 24),
+    };
+  }
+
+  function restoreSkewSession(session) {
+    const restored = [];
+    const skipped = [];
+    for (let index = 0; index < session.targets.length; index += 1) {
+      const target = session.targets[index];
+      if (!target.node || target.node.removed) {
+        skipped.push({
+          nodeId: target.nodeId,
+          nodeName: target.nodeName,
+          nodeType: target.nodeType,
+          reason: "레이어가 더 이상 존재하지 않습니다.",
+        });
+        continue;
+      }
+
+      try {
+        target.node.relativeTransform = copySkewTransform(target.originalTransform);
+        restored.push({
+          nodeId: target.nodeId,
+          nodeName: target.nodeName,
+          nodeType: target.nodeType,
+        });
+      } catch (error) {
+        skipped.push({
+          nodeId: target.nodeId,
+          nodeName: target.nodeName,
+          nodeType: target.nodeType,
+          reason: normalizeSkewError(error, "원래 transform으로 되돌리지 못했습니다."),
+        });
+      }
+    }
+
+    return {
+      processedAt: new Date().toISOString(),
+      summary: {
+        selectionCount: session.selectionCount,
+        targetCount: session.targets.length,
+        restoredCount: restored.length,
+        skippedCount: skipped.length,
+      },
+      restored,
+      skipped,
+    };
+  }
+
+  function buildSkewedTransform(target, horizontalDegrees, verticalDegrees, rotationDegrees) {
+    const original = target.baseTransform || target.originalTransform;
+    const kx = Math.tan((clampSkewTangentDegrees(horizontalDegrees) * Math.PI) / 180);
+    const ky = Math.tan((clampSkewTangentDegrees(verticalDegrees) * Math.PI) / 180);
+    const rotationDelta = ((clampRotationDegrees(rotationDegrees) - getTransformRotationDegrees(original)) * Math.PI) / 180;
+    const cos = Math.cos(rotationDelta);
+    const sin = Math.sin(rotationDelta);
+    const cx = target.width / 2;
+    const cy = target.height / 2;
+
+    const skew00 = 1 + kx * ky;
+    const skew01 = kx;
+    const skew10 = ky;
+    const skew11 = 1;
+    const local00 = cos * skew00 - sin * skew10;
+    const local01 = cos * skew01 - sin * skew11;
+    const local10 = sin * skew00 + cos * skew10;
+    const local11 = sin * skew01 + cos * skew11;
+    const local02 = cx - (local00 * cx + local01 * cy);
+    const local12 = cy - (local10 * cx + local11 * cy);
+
+    const a = original[0][0];
+    const c = original[0][1];
+    const tx = original[0][2];
+    const b = original[1][0];
+    const d = original[1][1];
+    const ty = original[1][2];
+
+    return [
+      [
+        roundSkewTransformValue(a * local00 + c * local10),
+        roundSkewTransformValue(a * local01 + c * local11),
+        roundSkewTransformValue(a * local02 + c * local12 + tx),
+      ],
+      [
+        roundSkewTransformValue(b * local00 + d * local10),
+        roundSkewTransformValue(b * local01 + d * local11),
+        roundSkewTransformValue(b * local02 + d * local12 + ty),
+      ],
+    ];
+  }
+
+  function buildDeskewedTransform(target) {
+    const original = target.originalTransform;
+    const a = original[0][0];
+    const c = original[0][1];
+    const tx = original[0][2];
+    const b = original[1][0];
+    const d = original[1][1];
+    const ty = original[1][2];
+    const cx = target.width / 2;
+    const cy = target.height / 2;
+    const centerX = a * cx + c * cy + tx;
+    const centerY = b * cx + d * cy + ty;
+    const xScale = Math.hypot(a, b);
+    const yScale = Math.hypot(c, d);
+    const epsilon = 0.000001;
+    if (xScale <= epsilon && yScale <= epsilon) {
+      throw new Error("?ㅽ걧 ?뺣━???꾪븳 蹂??異뺤쓣 怨꾩궛?섏? 紐삵뻽?듬땲??");
+    }
+
+    const determinant = a * d - b * c;
+    const orientation = determinant < 0 ? -1 : 1;
+    let nextA = 1;
+    let nextB = 0;
+    let nextC = 0;
+    let nextD = 1;
+
+    if (xScale > epsilon) {
+      const ux = a / xScale;
+      const uy = b / xScale;
+      nextA = ux * xScale;
+      nextB = uy * xScale;
+      nextC = -uy * yScale * orientation;
+      nextD = ux * yScale * orientation;
+    } else {
+      const vx = c / yScale;
+      const vy = d / yScale;
+      nextA = vy * xScale * orientation;
+      nextB = -vx * xScale * orientation;
+      nextC = vx * yScale;
+      nextD = vy * yScale;
+    }
+
+    return [
+      [
+        roundSkewTransformValue(nextA),
+        roundSkewTransformValue(nextC),
+        roundSkewTransformValue(centerX - nextA * cx - nextC * cy),
+      ],
+      [
+        roundSkewTransformValue(nextB),
+        roundSkewTransformValue(nextD),
+        roundSkewTransformValue(centerY - nextB * cx - nextD * cy),
+      ],
+    ];
+  }
+
+  function estimateSessionSkewValues(targets) {
+    if (!targets.length) {
+      return {
+        horizontalDegrees: 0,
+        verticalDegrees: 0,
+        rotationDegrees: 0,
+      };
+    }
+    let horizontalTotal = 0;
+    let verticalTotal = 0;
+    let rotationTotal = 0;
+    let count = 0;
+    for (let index = 0; index < targets.length; index += 1) {
+      const values = targets[index].initialValues;
+      if (!values) {
+        continue;
+      }
+      horizontalTotal += values.horizontalDegrees;
+      verticalTotal += values.verticalDegrees;
+      rotationTotal += values.rotationDegrees;
+      count += 1;
+    }
+    if (!count) {
+      return {
+        horizontalDegrees: 0,
+        verticalDegrees: 0,
+        rotationDegrees: 0,
+      };
+    }
+    return {
+      horizontalDegrees: clampSkewDegrees(horizontalTotal / count),
+      verticalDegrees: clampSkewDegrees(verticalTotal / count),
+      rotationDegrees: clampRotationDegrees(rotationTotal / count),
+    };
+  }
+
+  function estimateSkewValues(target) {
+    const local = multiplySkewTransforms(invertSkewTransform(target.baseTransform), target.originalTransform);
+    if (!local) {
+      return {
+        horizontalDegrees: 0,
+        verticalDegrees: 0,
+        rotationDegrees: getTransformRotationDegrees(target.baseTransform),
+      };
+    }
+    const horizontal = Math.atan(toFiniteSkewNumber(local[0][1], 0)) * (180 / Math.PI);
+    const vertical = Math.atan(toFiniteSkewNumber(local[1][0], 0)) * (180 / Math.PI);
+    return {
+      horizontalDegrees: clampSkewDegrees(horizontal),
+      verticalDegrees: clampSkewDegrees(vertical),
+      rotationDegrees: getTransformRotationDegrees(target.baseTransform),
+    };
+  }
+
+  function readSkewPluginState(node) {
+    if (!node || typeof node.getPluginData !== "function") {
+      return null;
+    }
+    let raw = "";
+    try {
+      raw = node.getPluginData(SKEW_PLUGIN_DATA_KEY);
+    } catch (error) {
+      return null;
+    }
+    if (!raw || typeof raw !== "string") {
+      return null;
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") {
+        return null;
+      }
+      const values = normalizeStoredSkewValues(parsed);
+      if (!hasMeaningfulSkewValues(values) && Math.abs(values.rotationDegrees) <= SKEW_EPSILON_DEGREES) {
+        return null;
+      }
+      return values;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function normalizeStoredSkewValues(state) {
+    const source = state && typeof state === "object" ? state : {};
+    return {
+      horizontalDegrees: clampSkewDegrees(source.horizontalDegrees),
+      verticalDegrees: clampSkewDegrees(source.verticalDegrees),
+      rotationDegrees: clampRotationDegrees(source.rotationDegrees),
+    };
+  }
+
+  function writeSkewPluginState(target, horizontalDegrees, verticalDegrees, rotationDegrees) {
+    const node = target && target.node ? target.node : null;
+    if (!node || typeof node.setPluginData !== "function") {
+      return;
+    }
+    const state = {
+      version: 1,
+      horizontalDegrees: clampSkewDegrees(horizontalDegrees),
+      verticalDegrees: clampSkewDegrees(verticalDegrees),
+      rotationDegrees: clampRotationDegrees(rotationDegrees),
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (!hasMeaningfulSkewValues(state) && Math.abs(state.rotationDegrees) <= SKEW_EPSILON_DEGREES) {
+      clearSkewPluginState(node);
+      return;
+    }
+
+    try {
+      node.setPluginData(SKEW_PLUGIN_DATA_KEY, JSON.stringify(state));
+    } catch (error) {
+      // Metadata is only used to restore the UI values; the transform itself was already applied.
+    }
+  }
+
+  function clearSkewPluginState(node) {
+    if (!node || typeof node.setPluginData !== "function") {
+      return;
+    }
+    try {
+      node.setPluginData(SKEW_PLUGIN_DATA_KEY, "");
+    } catch (error) {
+      // Ignore metadata cleanup failures.
+    }
+  }
+
+  function invertSkewTransform(transform) {
+    if (!transform) {
+      return null;
+    }
+    const a = transform[0][0];
+    const c = transform[0][1];
+    const tx = transform[0][2];
+    const b = transform[1][0];
+    const d = transform[1][1];
+    const ty = transform[1][2];
+    const determinant = a * d - b * c;
+    if (Math.abs(determinant) <= 0.000001) {
+      return null;
+    }
+    const nextA = d / determinant;
+    const nextC = -c / determinant;
+    const nextB = -b / determinant;
+    const nextD = a / determinant;
+    return [
+      [nextA, nextC, -(nextA * tx + nextC * ty)],
+      [nextB, nextD, -(nextB * tx + nextD * ty)],
+    ];
+  }
+
+  function multiplySkewTransforms(left, right) {
+    if (!left || !right) {
+      return null;
+    }
+    const a0 = left[0][0];
+    const c0 = left[0][1];
+    const tx0 = left[0][2];
+    const b0 = left[1][0];
+    const d0 = left[1][1];
+    const ty0 = left[1][2];
+    const a1 = right[0][0];
+    const c1 = right[0][1];
+    const tx1 = right[0][2];
+    const b1 = right[1][0];
+    const d1 = right[1][1];
+    const ty1 = right[1][2];
+    return [
+      [a0 * a1 + c0 * b1, a0 * c1 + c0 * d1, a0 * tx1 + c0 * ty1 + tx0],
+      [b0 * a1 + d0 * b1, b0 * c1 + d0 * d1, b0 * tx1 + d0 * ty1 + ty0],
+    ];
+  }
+
+  function buildSkewResult(session, applied, skipped) {
+    return {
+      processedAt: new Date().toISOString(),
+      summary: {
+        selectionCount: session.selectionCount,
+        targetCount: session.targets.length,
+        appliedCount: applied.length,
+        skippedCount: skipped.length,
+        horizontalDegrees: session.horizontalDegrees,
+        verticalDegrees: session.verticalDegrees,
+        rotationDegrees: session.rotationDegrees,
+      },
+      applied: applied.slice(0, 24),
+      skipped: skipped.slice(0, 24),
+    };
+  }
+
+  function serializeSkewSession(session) {
+    return {
+      sessionId: session.sessionId,
+      summary: {
+        selectionCount: session.selectionCount,
+        targetCount: session.targets.length,
+        skippedCount: session.skipped.length,
+      },
+      values: {
+        horizontalDegrees: session.horizontalDegrees,
+        verticalDegrees: session.verticalDegrees,
+        rotationDegrees: session.rotationDegrees,
+      },
+      targets: session.targets.slice(0, 24).map(function (target) {
+        return {
+          nodeId: target.nodeId,
+          nodeName: target.nodeName,
+          nodeType: target.nodeType,
+        };
+      }),
+      skipped: session.skipped.slice(0, 24),
+    };
+  }
+
+  function buildSkippedSkewNode(node, reason) {
+    return {
+      nodeId: node && typeof node.id === "string" ? node.id : "",
+      nodeName: safeSkewName(node),
+      nodeType: String((node && node.type) || "UNKNOWN"),
+      reason,
+    };
+  }
+
+  function clampSkewDegrees(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) {
+      return 0;
+    }
+    return Math.max(-MAX_SKEW_DEGREES, Math.min(MAX_SKEW_DEGREES, Math.round(number * 10) / 10));
+  }
+
+  function clampRotationDegrees(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) {
+      return 0;
+    }
+    return Math.max(-MAX_ROTATION_DEGREES, Math.min(MAX_ROTATION_DEGREES, Math.round(number * 10) / 10));
+  }
+
+  function clampSkewTangentDegrees(value) {
+    const number = clampSkewDegrees(value);
+    return Math.max(-MAX_TANGENT_SKEW_DEGREES, Math.min(MAX_TANGENT_SKEW_DEGREES, number));
+  }
+
+  function getTransformRotationDegrees(transform) {
+    if (!transform) {
+      return 0;
+    }
+    return clampRotationDegrees((Math.atan2(toFiniteSkewNumber(transform[1][0], 0), toFiniteSkewNumber(transform[0][0], 1)) * 180) / Math.PI);
+  }
+
+  function toFiniteSkewNumber(value, fallback) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : fallback;
+  }
+
+  function roundSkewTransformValue(value) {
+    return Math.round((Number(value) || 0) * TRANSFORM_PRECISION) / TRANSFORM_PRECISION;
+  }
+
+  function safeSkewName(node) {
+    if (node && typeof node.name === "string" && node.name.trim()) {
+      return node.name.trim();
+    }
+    return node && node.type ? String(node.type) : "Layer";
+  }
+
+  function normalizeSkewError(error, fallback) {
+    if (error && typeof error.message === "string" && error.message.trim()) {
+      return error.message.trim();
+    }
+    if (typeof error === "string" && error.trim()) {
+      return error.trim();
+    }
+    return fallback;
+  }
+
+  function buildSkewApplyToast(result) {
+    const summary = result && result.summary ? result.summary : {};
+    const appliedCount = Number(summary.appliedCount) || 0;
+    const skippedCount = Number(summary.skippedCount) || 0;
+    if (appliedCount <= 0) {
+      return "스큐를 적용할 수 있는 레이어가 없습니다.";
+    }
+    return skippedCount > 0
+      ? "스큐 조정 완료 (" + appliedCount + "개 적용, " + skippedCount + "개 제외)"
+      : "스큐 조정 완료 (" + appliedCount + "개 적용)";
+  }
+  function buildSkewClearToast(result) {
+    const summary = result && result.summary ? result.summary : {};
+    const cleanedCount = Number(summary.cleanedCount) || 0;
+    const skippedCount = Number(summary.skippedCount) || 0;
+    if (cleanedCount <= 0) {
+      return "정리할 수 있는 스큐 레이어가 없습니다.";
+    }
+    return skippedCount > 0
+      ? "스큐 정리 완료 (" + cleanedCount + "개 정리, " + skippedCount + "개 제외)"
+      : "스큐 정리 완료 (" + cleanedCount + "개 정리)";
+  }
+})();
+
+;(() => {
+  const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
+  if (globalScope.__PIGMA_UNLOCK_LOCKED_LAYERS_PATCH__) {
+    return;
+  }
+
+  const originalOnMessage = figma.ui.onmessage;
+  const RESULT_PREVIEW_LIMIT = 24;
+  let isRunning = false;
+
+  if (typeof originalOnMessage !== "function") {
+    return;
+  }
+
+  figma.ui.onmessage = async (message) => {
+    if (isUnlockLockedLayersMessage(message)) {
+      if (isRunning) {
+        postStatus("running", "잠긴 레이어 해제가 이미 진행 중입니다.");
+        return;
+      }
+
+      await runUnlockLockedLayers();
+      return;
+    }
+
+    return originalOnMessage(message);
+  };
+
+  globalScope.__PIGMA_UNLOCK_LOCKED_LAYERS_PATCH__ = true;
+
+  function isUnlockLockedLayersMessage(message) {
+    return !!message && message.type === "run-unlock-locked-layers";
+  }
+
+  async function runUnlockLockedLayers() {
+    isRunning = true;
+    postStatus("running", "현재 선택 안의 잠긴 레이어를 찾고 있습니다.");
+
+    try {
+      const result = unlockLockedLayersInSelection();
+      figma.ui.postMessage({
+        type: "unlock-locked-layers-result",
+        result,
+      });
+      notifyResult(result);
+    } catch (error) {
+      const message = normalizeErrorMessage(error, "잠긴 레이어 해제에 실패했습니다.");
+      figma.ui.postMessage({
+        type: "unlock-locked-layers-error",
+        message,
+      });
+      figma.notify(message, { error: true, timeout: 2400 });
+    } finally {
+      isRunning = false;
+    }
+  }
+
+  function unlockLockedLayersInSelection() {
+    const selection = Array.from(figma.currentPage.selection || []);
+    if (!selection.length) {
+      throw new Error("프레임, 그룹, 레이어를 먼저 선택하세요.");
+    }
+
+    const candidates = collectLockedNodes(selection);
+    if (!candidates.length) {
+      return buildResult({
+        selection,
+        unlocked: [],
+        skipped: [],
+        candidateCount: 0,
+      });
+    }
+
+    const unlocked = [];
+    const skipped = [];
+
+    for (const entry of candidates) {
+      const target = entry.node;
+      if (!target || target.removed) {
+        continue;
+      }
+
+      try {
+        target.locked = false;
+        unlocked.push({
+          nodeId: entry.nodeId,
+          nodeName: entry.nodeName,
+          nodeType: entry.nodeType,
+          path: entry.path,
+        });
+      } catch (error) {
+        skipped.push({
+          nodeId: entry.nodeId,
+          nodeName: entry.nodeName,
+          nodeType: entry.nodeType,
+          path: entry.path,
+          reason: normalizeErrorMessage(error, "해당 레이어의 잠금을 해제할 수 없습니다."),
+        });
+      }
+    }
+
+    return buildResult({
+      selection,
+      unlocked,
+      skipped,
+      candidateCount: candidates.length,
+    });
+  }
+
+  function collectLockedNodes(selection) {
+    const results = [];
+    const stack = [];
+
+    for (let rootIndex = selection.length - 1; rootIndex >= 0; rootIndex -= 1) {
+      const root = selection[rootIndex];
+      stack.push({
+        node: root,
+        path: safeName(root),
+      });
+    }
+
+    while (stack.length > 0) {
+      const current = stack.pop();
+      const node = current && current.node;
+      if (!node || node.removed) {
+        continue;
+      }
+
+      if ("locked" in node && node.locked === true) {
+        results.push({
+          node,
+          nodeId: node.id,
+          nodeName: safeName(node),
+          nodeType: String(node.type || "UNKNOWN"),
+          path: current.path,
+        });
+      }
+
+      if (!hasChildren(node)) {
+        continue;
+      }
+
+      for (let index = node.children.length - 1; index >= 0; index -= 1) {
+        const child = node.children[index];
+        stack.push({
+          node: child,
+          path: current.path + " / " + safeName(child),
+        });
+      }
+    }
+
+    return results;
+  }
+
+  function buildResult(options) {
+    const selection = Array.isArray(options.selection) ? options.selection : [];
+    const unlocked = Array.isArray(options.unlocked) ? options.unlocked : [];
+    const skipped = Array.isArray(options.skipped) ? options.skipped : [];
+    const candidateCount =
+      typeof options.candidateCount === "number" && Number.isFinite(options.candidateCount) ? options.candidateCount : 0;
+
+    return {
+      processedAt: new Date().toISOString(),
+      summary: {
+        selectionLabel: formatSelectionLabel(selection),
+        rootCount: selection.length,
+        candidateCount,
+        unlockedCount: unlocked.length,
+        skippedCount: skipped.length,
+      },
+      unlocked: unlocked.slice(0, RESULT_PREVIEW_LIMIT),
+      skipped: skipped.slice(0, RESULT_PREVIEW_LIMIT),
+    };
+  }
+
+  function notifyResult(result) {
+    const summary = result && result.summary ? result.summary : {};
+    const unlockedCount = summary.unlockedCount || 0;
+    const skippedCount = summary.skippedCount || 0;
+
+    if (unlockedCount === 0) {
+      figma.notify("해제할 잠긴 레이어가 없습니다.", { timeout: 1800 });
+      return;
+    }
+
+    const baseMessage = "잠긴 레이어 해제 완료 (" + unlockedCount + "개)";
+    const message = skippedCount > 0 ? baseMessage + ", " + skippedCount + "개 건너뜀" : baseMessage;
+    figma.notify(message, { timeout: 2200 });
+  }
+
+  function postStatus(status, message) {
+    figma.ui.postMessage({
+      type: "unlock-locked-layers-status",
+      status,
+      message,
+    });
+  }
+
+  function hasChildren(node) {
+    return !!node && "children" in node && Array.isArray(node.children) && node.children.length > 0;
+  }
+
+  function formatSelectionLabel(selection) {
+    if (!selection.length) {
+      return "선택 없음";
+    }
+
+    if (selection.length === 1) {
+      return safeName(selection[0]);
+    }
+
+    return safeName(selection[0]) + " 외 " + (selection.length - 1) + "개";
+  }
+
+  function safeName(node) {
+    if (node && typeof node.name === "string" && node.name.trim()) {
+      return node.name.trim();
+    }
+
+    if (node && typeof node.type === "string" && node.type.trim()) {
+      return node.type.trim();
+    }
+
+    return "Unnamed";
+  }
+
+  function normalizeErrorMessage(error, fallback) {
+    if (error && typeof error === "object" && typeof error.message === "string" && error.message.trim()) {
+      return error.message.trim();
+    }
+
+    if (typeof error === "string" && error.trim()) {
+      return error.trim();
+    }
+
+    return fallback;
+  }
+})();
+
+;(() => {
+  const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
   if (globalScope.__PIGMA_DELETE_HIDDEN_LAYERS_PATCH__) {
     return;
   }
@@ -30911,11 +32941,15 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   figma.ui.onmessage = async (message) => {
     if (isDeleteHiddenLayersMessage(message)) {
       if (isRunning) {
-        postStatus("running", "숨겨진 레이어 삭제가 이미 진행 중입니다.");
+        postStatus("running", "\uC228\uACA8\uC9C4 \uB808\uC774\uC5B4 \uC0AD\uC81C\uAC00 \uC774\uBBF8 \uC9C4\uD589 \uC911\uC785\uB2C8\uB2E4.");
         return;
       }
 
-      await runDeleteHiddenLayers();
+      if (message.type === "request-delete-hidden-layers-preview") {
+        await runDeleteHiddenLayersPreview();
+      } else {
+        await runDeleteHiddenLayers();
+      }
       return;
     }
 
@@ -30925,7 +32959,35 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   globalScope.__PIGMA_DELETE_HIDDEN_LAYERS_PATCH__ = true;
 
   function isDeleteHiddenLayersMessage(message) {
-    return !!message && message.type === "run-delete-hidden-layers";
+    return (
+      !!message &&
+      (message.type === "request-delete-hidden-layers-preview" || message.type === "run-delete-hidden-layers")
+    );
+  }
+
+  async function runDeleteHiddenLayersPreview() {
+    isRunning = true;
+    postStatus("running", "\uC0AD\uC81C\uD560 \uC228\uACA8\uC9C4 \uB808\uC774\uC5B4\uB97C \uD655\uC778\uD558\uACE0 \uC788\uC2B5\uB2C8\uB2E4.");
+
+    try {
+      const result = previewHiddenLayersInSelection();
+      figma.ui.postMessage({
+        type: "delete-hidden-layers-preview",
+        result,
+      });
+    } catch (error) {
+      const message = normalizeErrorMessage(
+        error,
+        "\uC228\uACA8\uC9C4 \uB808\uC774\uC5B4 \uD655\uC778\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4."
+      );
+      figma.ui.postMessage({
+        type: "delete-hidden-layers-preview-error",
+        message,
+      });
+      figma.notify(message, { error: true, timeout: 2200 });
+    } finally {
+      isRunning = false;
+    }
   }
 
   async function runDeleteHiddenLayers() {
@@ -31008,6 +33070,24 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     });
   }
 
+  function previewHiddenLayersInSelection() {
+    const selection = Array.from(figma.currentPage.selection || []);
+    if (!selection.length) {
+      throw new Error("\uD504\uB808\uC784, \uADF8\uB8F9, \uB808\uC774\uC5B4\uB97C \uBA3C\uC800 \uC120\uD0DD\uD558\uC138\uC694.");
+    }
+
+    const candidates = collectHiddenDescendants(selection);
+
+    return buildResult({
+      selection,
+      deleted: [],
+      skipped: [],
+      candidates,
+      candidateCount: candidates.length,
+      removedNodeCount: sumCandidateSubtreeSize(candidates),
+    });
+  }
+
   function collectHiddenDescendants(selection) {
     const results = [];
     const stack = [];
@@ -31068,6 +33148,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     const selection = Array.isArray(options.selection) ? options.selection : [];
     const deleted = Array.isArray(options.deleted) ? options.deleted : [];
     const skipped = Array.isArray(options.skipped) ? options.skipped : [];
+    const candidates = Array.isArray(options.candidates) ? options.candidates : [];
     const candidateCount =
       typeof options.candidateCount === "number" && Number.isFinite(options.candidateCount) ? options.candidateCount : 0;
     const removedNodeCount =
@@ -31085,6 +33166,13 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         skippedCount: skipped.length,
         removedNodeCount,
       },
+      candidates: candidates.slice(0, RESULT_PREVIEW_LIMIT).map((entry) => ({
+        nodeId: entry.nodeId,
+        nodeName: entry.nodeName,
+        nodeType: entry.nodeType,
+        path: entry.path,
+        removedLayerCount: entry.subtreeSize,
+      })),
       deleted: deleted.slice(0, RESULT_PREVIEW_LIMIT),
       skipped: skipped.slice(0, RESULT_PREVIEW_LIMIT),
     };
@@ -31143,6 +33231,18 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
 
     return count;
+  }
+
+  function sumCandidateSubtreeSize(candidates) {
+    if (!Array.isArray(candidates) || !candidates.length) {
+      return 0;
+    }
+
+    return candidates.reduce((total, entry) => {
+      const subtreeSize =
+        entry && typeof entry.subtreeSize === "number" && Number.isFinite(entry.subtreeSize) ? entry.subtreeSize : 0;
+      return total + subtreeSize;
+    }, 0);
   }
 
   function formatSelectionLabel(selection) {
@@ -31211,6 +33311,16 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       return;
     }
 
+    if (isCopyPrototypeLinkMessage(message)) {
+      if (isRunning) {
+        postPrototypeStatus("running", "\uD504\uB85C\uD1A0\uD0C0\uC785 \uB9C1\uD06C\uB97C \uC900\uBE44 \uC911\uC785\uB2C8\uB2E4.");
+        return;
+      }
+
+      await runCopyPrototypeLink();
+      return;
+    }
+
     return originalOnMessage(message);
   };
 
@@ -31218,6 +33328,10 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
   function isShortenRequestMessage(message) {
     return !!message && message.type === "run-shorten-figma-url";
+  }
+
+  function isCopyPrototypeLinkMessage(message) {
+    return !!message && message.type === "run-copy-prototype-link";
   }
 
   async function runShortenFigmaUrl() {
@@ -31253,9 +33367,49 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
   }
 
+  async function runCopyPrototypeLink() {
+    isRunning = true;
+    postPrototypeStatus("running", "\uD504\uB85C\uD1A0\uD0C0\uC785 \uB9C1\uD06C\uB97C \uC900\uBE44 \uC911\uC785\uB2C8\uB2E4.");
+
+    try {
+      await ensureCurrentPageLoaded();
+      const target = collectTargetNode();
+      const prototypeUrl = buildPrototypeLink(target);
+      figma.ui.postMessage({
+        type: "copy-prototype-link-result",
+        result: {
+          selectionId: target.node.id,
+          shareNodeId: target.shareNode.id,
+          selectionLabel: safeName(target.node),
+          selectionType: safeNodeType(target.node),
+          prototypeUrl: prototypeUrl,
+          longUrl: prototypeUrl,
+        },
+      });
+      figma.notify("\uD504\uB85C\uD1A0\uD0C0\uC785 \uB9C1\uD06C\uB97C \uC900\uBE44\uD588\uC2B5\uB2C8\uB2E4.", { timeout: 1800 });
+    } catch (error) {
+      const message = normalizeErrorMessage(error, "\uD504\uB85C\uD1A0\uD0C0\uC785 \uB9C1\uD06C \uAC00\uC838\uC624\uAE30\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.");
+      figma.ui.postMessage({
+        type: "copy-prototype-link-error",
+        message: message,
+      });
+      figma.notify(message, { error: true, timeout: 2600 });
+    } finally {
+      isRunning = false;
+    }
+  }
+
   function postStatus(status, message) {
     figma.ui.postMessage({
       type: "shorten-figma-url-status",
+      status: status,
+      message: message,
+    });
+  }
+
+  function postPrototypeStatus(status, message) {
+    figma.ui.postMessage({
+      type: "copy-prototype-link-status",
       status: status,
       message: message,
     });
@@ -31277,7 +33431,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
 
     if (node.type !== "FRAME" && node.type !== "SECTION") {
-      throw new Error("프레임 또는 섹션 1개를 선택한 경우에만 주소 줄이기를 사용할 수 있습니다.");
+      throw new Error("프레임 또는 섹션 1개를 선택한 경우에만 사용할 수 있습니다.");
     }
 
     const shareNode = resolvePrototypeShareNode(node);
@@ -33285,6 +35439,10 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   const PROMPT_TARGET_EXPORT_EMPTY_MESSAGE = "The selected layer export for prompt edit/generation was empty.";
   const PROMPT_PLACEMENT_APPLY_ERROR_MESSAGE = "Failed to place the generated prompt image.";
   const PROMPT_TEXT_ANCHOR_GAP = 24;
+  const IMAGE_MERGE_FAST_EXPORT_TIMEOUT_MS = 6000;
+  const IMAGE_MERGE_EXPORT_TIMEOUT_MS = 30000;
+  const IMAGE_MERGE_PREFERRED_EXPORT_SCALE = 2;
+  const IMAGE_MERGE_MAX_EXPORT_PIXEL_COUNT = 16000000;
 
   if (typeof originalOnMessage !== "function") {
     return;
@@ -33479,14 +35637,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         preparedAt: new Date().toISOString(),
       };
 
-      figma.ui.postMessage({
-        type: "ai-image-upscale-source-ready",
-        sessionId: sessionId,
-        clientRequestId: pendingSession.clientRequestId,
-        image: source.image,
-        summary: source.summary,
-        composite: source.composite || null,
-      });
+      figma.ui.postMessage(buildAiImageSourceReadyPayload(sessionId, pendingSession, source));
     } catch (error) {
       pendingSession = null;
       postPrepareError(
@@ -33608,30 +35759,11 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         originalHash: target.entry.imageHash,
         expand: expand,
         imageBounds: target.imageBounds,
+        placementMode: target.placementMode || "underlay",
         preparedAt: new Date().toISOString(),
       };
 
-      figma.ui.postMessage({
-        type: "image-extend-source-ready",
-        sessionId: sessionId,
-        clientRequestId: pendingImageExtendSession.clientRequestId,
-        image: target.image,
-        summary: {
-          selectionLabel: pendingImageExtendSession.selectionLabel,
-          targetNodeName: target.entry.nodeName,
-          captureMode: "image-bounds",
-          currentWidth: target.currentWidth,
-          currentHeight: target.currentHeight,
-          targetWidth: target.currentWidth + expand.left + expand.right,
-          targetHeight: target.currentHeight + expand.top + expand.bottom,
-          expandTop: expand.top,
-          expandRight: expand.right,
-          expandBottom: expand.bottom,
-          expandLeft: expand.left,
-          expansionSource: expand.source || "prompt",
-          byteLength: target.image.bytes.length,
-        },
-      });
+      figma.ui.postMessage(buildImageExtendSourceReadyPayload(sessionId, pendingImageExtendSession, target, expand));
     } catch (error) {
       pendingImageExtendSession = null;
       postImageExtendSourceError(
@@ -33751,39 +35883,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         preparedAt: new Date().toISOString(),
       };
 
-      figma.ui.postMessage({
-        type: "image-composite-source-ready",
-        sessionId: sessionId,
-        clientRequestId: pendingCompositeSession.clientRequestId,
-        layers: collection.layers.map(function (layer) {
-          return {
-            nodeId: layer.nodeId,
-            nodeName: layer.nodeName,
-            role: layer.role,
-            orderIndex: layer.orderIndex,
-            fileName: layer.fileName,
-            mimeType: layer.mimeType,
-            bytes: layer.bytes,
-            layerKind: layer.layerKind || "image",
-            nodeType: layer.nodeType || "",
-            textContent: layer.textContent || "",
-            offsetX: layer.offsetX,
-            offsetY: layer.offsetY,
-            width: layer.visibleRect.width,
-            height: layer.visibleRect.height,
-          };
-        }),
-        summary: {
-          selectionLabel: pendingCompositeSession.selectionLabel,
-          layerCount: collection.layers.length,
-          skippedCount: collection.skipped.length,
-          backgroundNodeName:
-            pendingCompositeSession.selectedRootNodeName || (collection.layers[0] ? collection.layers[0].nodeName : ""),
-          foregroundCount: Math.max(0, collection.layers.length - 1),
-          canvasWidth: collection.unionRect.width,
-          canvasHeight: collection.unionRect.height,
-        },
-      });
+      figma.ui.postMessage(buildImageCompositeSourceReadyPayload(sessionId, pendingCompositeSession, collection));
     } catch (error) {
       pendingCompositeSession = null;
       postImageCompositeSourceError(
@@ -34022,14 +36122,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
     try {
       const source = await collectPromptDraftSourceFromSelection();
-      figma.ui.postMessage({
-        type: "ai-image-prompt-draft-source-ready",
-        clientRequestId: sanitizeClientRequestId(message && message.clientRequestId),
-        sourceType: source.sourceType,
-        text: source.text || "",
-        image: source.image || null,
-        summary: source.summary || {},
-      });
+      figma.ui.postMessage(buildPromptDraftSourcePayload(source, message));
     } catch (error) {
       postPromptDraftSourceError(
         normalizeErrorMessage(error, PROMPT_DRAFT_SOURCE_PREPARE_ERROR_MESSAGE),
@@ -34038,6 +36131,221 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     } finally {
       isPromptDraftPreparing = false;
     }
+  }
+
+  function buildPromptDraftSourcePayload(source, message) {
+    return {
+      type: "ai-image-prompt-draft-source-ready",
+      clientRequestId: sanitizeClientRequestId(message && message.clientRequestId),
+      sourceType:
+        source && typeof source.sourceType === "string" && source.sourceType ? source.sourceType : "image",
+      text: source && typeof source.text === "string" ? source.text : "",
+      image: sanitizePromptDraftImagePayload(source && source.image),
+      summary: sanitizePromptDraftSummaryPayload(source && source.summary),
+    };
+  }
+
+  function buildAiImageSourceReadyPayload(sessionId, session, source) {
+    return {
+      type: "ai-image-upscale-source-ready",
+      sessionId: typeof sessionId === "string" ? sessionId : "",
+      clientRequestId: session && session.clientRequestId ? session.clientRequestId : "",
+      image: sanitizeImageMessagePayload(source && source.image),
+      summary: sanitizeImageMessageSummaryPayload(source && source.summary),
+      composite: sanitizeCompositeMessagePayload(source && source.composite),
+    };
+  }
+
+  function buildImageExtendSourceReadyPayload(sessionId, session, target, expand) {
+    const sourceImage = target && target.image ? target.image : null;
+    const currentWidth = Number(target && target.currentWidth) || 0;
+    const currentHeight = Number(target && target.currentHeight) || 0;
+    const safeExpand = sanitizeImageExtendExpandPayload(expand);
+    return {
+      type: "image-extend-source-ready",
+      sessionId: typeof sessionId === "string" ? sessionId : "",
+      clientRequestId: session && session.clientRequestId ? session.clientRequestId : "",
+      image: sanitizeImageMessagePayload(sourceImage),
+      summary: sanitizeImageMessageSummaryPayload({
+        selectionLabel: session && session.selectionLabel ? session.selectionLabel : "",
+        targetNodeName: target && target.entry && target.entry.nodeName ? target.entry.nodeName : "",
+        captureMode: "image-bounds",
+        currentWidth: currentWidth,
+        currentHeight: currentHeight,
+        targetWidth: currentWidth + safeExpand.left + safeExpand.right,
+        targetHeight: currentHeight + safeExpand.top + safeExpand.bottom,
+        expandTop: safeExpand.top,
+        expandRight: safeExpand.right,
+        expandBottom: safeExpand.bottom,
+        expandLeft: safeExpand.left,
+        expansionSource: safeExpand.source,
+        byteLength: sourceImage && sourceImage.bytes ? sourceImage.bytes.length : 0,
+      }),
+    };
+  }
+
+  function buildImageCompositeSourceReadyPayload(sessionId, session, collection) {
+    const layers = collection && Array.isArray(collection.layers) ? collection.layers : [];
+    const skipped = collection && Array.isArray(collection.skipped) ? collection.skipped : [];
+    const unionRect = collection && collection.unionRect ? collection.unionRect : {};
+    return {
+      type: "image-composite-source-ready",
+      sessionId: typeof sessionId === "string" ? sessionId : "",
+      clientRequestId: session && session.clientRequestId ? session.clientRequestId : "",
+      layers: layers.map(sanitizeCompositeLayerMessagePayload).filter(Boolean),
+      summary: sanitizeImageMessageSummaryPayload({
+        selectionLabel: session && session.selectionLabel ? session.selectionLabel : "",
+        layerCount: layers.length,
+        skippedCount: skipped.length,
+        backgroundNodeName:
+          session && session.selectedRootNodeName
+            ? session.selectedRootNodeName
+            : layers[0] && layers[0].nodeName
+              ? layers[0].nodeName
+              : "",
+        foregroundCount: Math.max(0, layers.length - 1),
+        canvasWidth: unionRect.width,
+        canvasHeight: unionRect.height,
+      }),
+    };
+  }
+
+  function sanitizePromptDraftImagePayload(image) {
+    return sanitizeImageMessagePayload(image);
+  }
+
+  function sanitizeImageMessagePayload(image) {
+    if (!image || typeof image !== "object") {
+      return null;
+    }
+
+    const bytes = normalizeBytes(image.bytes);
+    if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
+      return null;
+    }
+
+    return {
+      bytes: bytes,
+      mimeType: typeof image.mimeType === "string" && image.mimeType ? image.mimeType : "image/png",
+      fileName: typeof image.fileName === "string" && image.fileName ? image.fileName : "figma-image.png",
+    };
+  }
+
+  function sanitizePromptDraftSummaryPayload(summary) {
+    return sanitizeImageMessageSummaryPayload(summary);
+  }
+
+  function sanitizeImageMessageSummaryPayload(summary) {
+    if (!summary || typeof summary !== "object") {
+      return {};
+    }
+
+    const payload = {};
+    const textKeys = [
+      "selectionLabel",
+      "targetNodeName",
+      "captureMode",
+      "requestMode",
+      "pipelineMode",
+      "placementMode",
+      "textMode",
+      "imageHash",
+      "expansionSource",
+      "backgroundNodeName",
+    ];
+    const numberKeys = [
+      "targetFillCount",
+      "targetWidth",
+      "targetHeight",
+      "sourceWidth",
+      "sourceHeight",
+      "currentWidth",
+      "currentHeight",
+      "byteLength",
+      "textLength",
+      "expandTop",
+      "expandRight",
+      "expandBottom",
+      "expandLeft",
+      "layerCount",
+      "skippedCount",
+      "foregroundCount",
+      "canvasWidth",
+      "canvasHeight",
+    ];
+
+    for (let index = 0; index < textKeys.length; index += 1) {
+      const key = textKeys[index];
+      if (typeof summary[key] === "string") {
+        payload[key] = summary[key];
+      }
+    }
+
+    for (let index = 0; index < numberKeys.length; index += 1) {
+      const key = numberKeys[index];
+      const value = Number(summary[key]);
+      if (Number.isFinite(value)) {
+        payload[key] = value;
+      }
+    }
+
+    return payload;
+  }
+
+  function sanitizeCompositeMessagePayload(composite) {
+    if (!composite || typeof composite !== "object") {
+      return null;
+    }
+
+    const layers = Array.isArray(composite.layers)
+      ? composite.layers.map(sanitizeCompositeLayerMessagePayload).filter(Boolean)
+      : [];
+    if (!layers.length) {
+      return null;
+    }
+
+    return {
+      layers: layers,
+      summary: sanitizeImageMessageSummaryPayload(composite.summary),
+    };
+  }
+
+  function sanitizeCompositeLayerMessagePayload(layer) {
+    if (!layer || typeof layer !== "object") {
+      return null;
+    }
+
+    const bytes = normalizeBytes(layer.bytes);
+    if (!bytes.length) {
+      return null;
+    }
+
+    return {
+      nodeId: typeof layer.nodeId === "string" ? layer.nodeId : "",
+      nodeName: typeof layer.nodeName === "string" ? layer.nodeName : "",
+      role: typeof layer.role === "string" ? layer.role : "",
+      orderIndex: Number.isFinite(Number(layer.orderIndex)) ? Number(layer.orderIndex) : 0,
+      fileName: typeof layer.fileName === "string" && layer.fileName ? layer.fileName : "figma-image.png",
+      mimeType: typeof layer.mimeType === "string" && layer.mimeType ? layer.mimeType : "image/png",
+      bytes: bytes,
+      layerKind: typeof layer.layerKind === "string" && layer.layerKind ? layer.layerKind : "image",
+      nodeType: typeof layer.nodeType === "string" ? layer.nodeType : "",
+      textContent: typeof layer.textContent === "string" ? layer.textContent : "",
+      offsetX: Number.isFinite(Number(layer.offsetX)) ? Number(layer.offsetX) : 0,
+      offsetY: Number.isFinite(Number(layer.offsetY)) ? Number(layer.offsetY) : 0,
+      width: Number.isFinite(Number(layer.width)) ? Number(layer.width) : 0,
+      height: Number.isFinite(Number(layer.height)) ? Number(layer.height) : 0,
+    };
+  }
+
+  function sanitizeImageExtendExpandPayload(expand) {
+    return {
+      top: sanitizeImageExtendPaddingValue(expand && expand.top),
+      right: sanitizeImageExtendPaddingValue(expand && expand.right),
+      bottom: sanitizeImageExtendPaddingValue(expand && expand.bottom),
+      left: sanitizeImageExtendPaddingValue(expand && expand.left),
+      source: typeof (expand && expand.source) === "string" && expand.source ? expand.source : "prompt",
+    };
   }
 
   async function prepareImageTextOverlaySource(message) {
@@ -34425,6 +36733,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       },
       targetWidth: roundBoundsFitMetric(node.width),
       targetHeight: roundBoundsFitMetric(node.height),
+      placementMode: hasChildren(node) ? "outside-reference" : "inside-target",
     };
   }
 
@@ -34544,55 +36853,6 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       throw new Error(PROMPT_TARGET_EXPORT_ERROR_MESSAGE);
     }
 
-    let composite = null;
-    let collection = null;
-    if (hasChildren(node)) {
-      try {
-        collection = await collectImageCompositeTargetsFromSelection([node]);
-      } catch (error) {
-        collection = null;
-      }
-      if (collection && Array.isArray(collection.layers)) {
-        const imageLayerCount = collection.layers.filter(function (layer) {
-          return !!layer && layer.layerKind === "image";
-        }).length;
-        if (imageLayerCount >= 2) {
-          throw new Error(PROMPT_MULTI_IMAGE_CONTAINER_MESSAGE);
-        }
-        if (collection.layers.length >= 2 && collection.unionRect) {
-          composite = {
-            layers: collection.layers.map(function (layer) {
-              return {
-                nodeId: layer.nodeId,
-                nodeName: layer.nodeName,
-                role: layer.role,
-                orderIndex: layer.orderIndex,
-                fileName: layer.fileName,
-                mimeType: layer.mimeType,
-                bytes: layer.bytes,
-                layerKind: layer.layerKind || "image",
-                nodeType: layer.nodeType || "",
-                textContent: layer.textContent || "",
-                offsetX: layer.offsetX,
-                offsetY: layer.offsetY,
-                width: layer.visibleRect.width,
-                height: layer.visibleRect.height,
-              };
-            }),
-            summary: {
-              selectionLabel: formatSelectionLabel(target.selection),
-              layerCount: collection.layers.length,
-              skippedCount: Array.isArray(collection.skipped) ? collection.skipped.length : 0,
-              backgroundNodeName: safeName(node),
-              foregroundCount: Math.max(0, collection.layers.length - 1),
-              canvasWidth: collection.unionRect.width,
-              canvasHeight: collection.unionRect.height,
-            },
-          };
-        }
-      }
-    }
-
     const bytes = await node.exportAsync({
       format: "PNG",
       useAbsoluteBounds: false,
@@ -34621,9 +36881,9 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         targetHeight: roundBoundsFitMetric(node.height),
         requestMode: "image-edit",
         byteLength: bytes.length,
-        pipelineMode: composite ? "composite" : "upscale",
+        pipelineMode: target.placementMode === "outside-reference" ? "reference-placement" : "upscale",
+        placementMode: target.placementMode || "",
       },
-      composite: composite,
     };
   }
 
@@ -34932,10 +37192,6 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       throw new Error("The selected layer could not be read.");
     }
 
-    if (hasChildren(node)) {
-      throw new Error("Image extend does not support frames, groups, or layers with children yet.");
-    }
-
     if ("locked" in node && node.locked) {
       throw new Error("Locked layers are not supported for image extend.");
     }
@@ -34945,7 +37201,10 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
 
     if (!hasSimpleVisibleImagePaint(node)) {
-      throw new Error("Image extend requires a layer with exactly one visible IMAGE fill.");
+      if (isImageExtendReferencePlacementNode(node)) {
+        return await collectImageExtendReferencePlacementTarget(node, selection);
+      }
+      throw new Error("Image extend requires one image layer, text layer, or composite frame.");
     }
 
     if (!node.parent || !canUseImageExtendParent(node.parent)) {
@@ -34998,6 +37257,61 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
           {
             nodeName: safeName(node),
             imageHash: fill.imageHash || node.id,
+          },
+          "png"
+        ),
+      },
+    };
+  }
+
+  function isImageExtendReferencePlacementNode(node) {
+    return (
+      !!node &&
+      !node.removed &&
+      (node.type === "TEXT" || hasChildren(node)) &&
+      typeof node.exportAsync === "function" &&
+      typeof node.width === "number" &&
+      typeof node.height === "number" &&
+      node.width > 0 &&
+      node.height > 0
+    );
+  }
+
+  async function collectImageExtendReferencePlacementTarget(node, selection) {
+    const width = typeof node.width === "number" && Number.isFinite(node.width) ? node.width : 0;
+    const height = typeof node.height === "number" && Number.isFinite(node.height) ? node.height : 0;
+    if (!(width > 0) || !(height > 0)) {
+      throw new Error("Could not determine the current layer size.");
+    }
+
+    const imageBounds = buildImageExtendFullLocalBounds(width, height);
+    const bytes = await node.exportAsync({
+      format: "PNG",
+      useAbsoluteBounds: false,
+    });
+    if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
+      throw new Error("Could not export the selected layer as PNG.");
+    }
+
+    return {
+      selection: selection,
+      placementMode: "outside-reference",
+      entry: {
+        nodeId: node.id,
+        nodeName: safeName(node),
+        imageHash: "",
+      },
+      currentWidth: imageBounds.width,
+      currentHeight: imageBounds.height,
+      imageBounds: imageBounds,
+      boundsPadding: { top: 0, right: 0, bottom: 0, left: 0 },
+      image: {
+        bytes: bytes,
+        mimeType: "image/png",
+        fileName: buildFileName(
+          {
+            nodeName: safeName(node),
+            imageHash: node.id,
           },
           "png"
         ),
@@ -35275,20 +37589,24 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       return buildImageExtendApplyResult(session, null, byteLength, skipped);
     }
 
-    if (!node.parent || !canUseImageExtendParent(node.parent)) {
-      skipped.push({
-        nodeId: node.id,
-        nodeName: safeName(node),
-        reason: "The current parent container does not support inserting the extended background.",
-      });
-      return buildImageExtendApplyResult(session, null, byteLength, skipped);
-    }
-
     if ("rotation" in node && typeof node.rotation === "number" && Math.abs(node.rotation) > 0.01) {
       skipped.push({
         nodeId: node.id,
         nodeName: safeName(node),
         reason: "Rotated image layers are not supported yet.",
+      });
+      return buildImageExtendApplyResult(session, null, byteLength, skipped);
+    }
+
+    if (session && session.placementMode === "outside-reference") {
+      return applyImageExtendOutsideReference(session, node, newImageHash, byteLength, skipped);
+    }
+
+    if (!node.parent || !canUseImageExtendParent(node.parent)) {
+      skipped.push({
+        nodeId: node.id,
+        nodeName: safeName(node),
+        reason: "The current parent container does not support inserting the extended background.",
       });
       return buildImageExtendApplyResult(session, null, byteLength, skipped);
     }
@@ -35360,6 +37678,72 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
   }
 
+  function applyImageExtendOutsideReference(session, targetNode, newImageHash, byteLength, skipped) {
+    let resultNode = null;
+    try {
+      const localBounds = getImageExtendLocalBounds(targetNode);
+      const absoluteRect = getBoundsFitNodeRect(targetNode);
+      const expand = session.expand || { top: 0, right: 0, bottom: 0, left: 0 };
+      const imageBounds = normalizeImageExtendLocalBounds(
+        session.imageBounds,
+        localBounds && localBounds.width > 0 ? localBounds.width : targetNode.width,
+        localBounds && localBounds.height > 0 ? localBounds.height : targetNode.height
+      );
+      const nextWidth = Math.max(1, roundBoundsFitMetric(imageBounds.width + expand.left + expand.right));
+      const nextHeight = Math.max(1, roundBoundsFitMetric(imageBounds.height + expand.top + expand.bottom));
+
+      resultNode = figma.createRectangle();
+      resultNode.name = safeName(targetNode) + " / extended";
+      resultNode.resize(nextWidth, nextHeight);
+      resultNode.fills = [buildVisibleImageFill(newImageHash)];
+      resultNode.strokes = [];
+      if ("cornerRadius" in resultNode) {
+        resultNode.cornerRadius = 0;
+      }
+
+      if (
+        targetNode.parent &&
+        canUseImageExtendParent(targetNode.parent) &&
+        !isAutoLayoutNode(targetNode.parent) &&
+        localBounds
+      ) {
+        const parent = targetNode.parent;
+        const insertIndex = findNodeChildIndex(parent, targetNode.id);
+        if (insertIndex >= 0) {
+          parent.insertChild(insertIndex + 1, resultNode);
+        } else {
+          parent.insertChild(parent.children.length, resultNode);
+        }
+        setImageExtendNodePosition(resultNode, localBounds.x + localBounds.width + PROMPT_TEXT_ANCHOR_GAP, localBounds.y);
+      } else if (absoluteRect) {
+        figma.currentPage.appendChild(resultNode);
+        resultNode.x = roundBoundsFitMetric(absoluteRect.x + absoluteRect.width + PROMPT_TEXT_ANCHOR_GAP);
+        resultNode.y = roundBoundsFitMetric(absoluteRect.y);
+      } else {
+        const viewportCenter = figma.viewport && figma.viewport.center ? figma.viewport.center : { x: 0, y: 0 };
+        figma.currentPage.appendChild(resultNode);
+        resultNode.x = roundBoundsFitMetric(viewportCenter.x - resultNode.width / 2);
+        resultNode.y = roundBoundsFitMetric(viewportCenter.y - resultNode.height / 2);
+      }
+
+      figma.currentPage.selection = [resultNode];
+      if (typeof figma.viewport.scrollAndZoomIntoView === "function") {
+        figma.viewport.scrollAndZoomIntoView([resultNode]);
+      }
+      return buildImageExtendApplyResult(session, resultNode, byteLength, skipped);
+    } catch (error) {
+      if (resultNode && !resultNode.removed && resultNode.parent) {
+        resultNode.remove();
+      }
+      skipped.push({
+        nodeId: targetNode && targetNode.id ? targetNode.id : session.targetNodeId,
+        nodeName: targetNode ? safeName(targetNode) : session.targetNodeName,
+        reason: normalizeErrorMessage(error, "Failed to place the generated image extend result."),
+      });
+      return buildImageExtendApplyResult(session, null, byteLength, skipped);
+    }
+  }
+
   function buildImageExtendApplyResult(session, group, byteLength, skipped) {
     const appliedCount = group ? 1 : 0;
     const groupName = group && typeof group.name === "string" ? group.name : "";
@@ -35398,6 +37782,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         resultNodeName: nodeName,
         placementMode: typeof placementMode === "string" ? placementMode : "",
         resultByteLength: byteLength,
+        exportScale: session && Number(session.exportScale) > 0 ? Number(session.exportScale) : 1,
       },
       skipped: Array.isArray(skipped) ? skipped.slice(0, 24) : [],
     };
@@ -35418,6 +37803,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
           selectedRootNodeId: source.selectedRootNodeId,
           selectedRootNodeName: source.selectedRootNodeName,
           unionRect: source.unionRect,
+          exportScale: source.exportScale,
           preserveSelectedRootTransform: source.preserveSelectedRootTransform,
           selectedRootWidth: source.selectedRootWidth,
           selectedRootHeight: source.selectedRootHeight,
@@ -35426,14 +37812,26 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         source.bytes.length
       );
 
+      const appliedCount = result && result.summary && Number(result.summary.appliedCount) > 0 ? 1 : 0;
+      if (!appliedCount) {
+        const failureMessage = buildImageMergeFailureMessage(result);
+        figma.ui.postMessage({
+          type: "image-merge-error",
+          clientRequestId: clientRequestId,
+          message: failureMessage,
+          result: result,
+        });
+        figma.notify(failureMessage, { error: true, timeout: 3200 });
+        return;
+      }
+
       figma.ui.postMessage({
         type: "image-merge-result",
         clientRequestId: clientRequestId,
         result: result,
       });
 
-      const appliedCount = result && result.summary && Number(result.summary.appliedCount) > 0 ? 1 : 0;
-      figma.notify(appliedCount ? "이미지 병합 레이어를 만들었습니다." : "이미지 병합 레이어를 만들지 못했습니다.", {
+      figma.notify("이미지 병합 레이어를 만들었습니다.", {
         timeout: 2200,
       });
     } catch (error) {
@@ -35447,17 +37845,76 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
   }
 
+  function buildImageMergeFailureMessage(result) {
+    const skipped = result && Array.isArray(result.skipped) ? result.skipped : [];
+    for (let index = 0; index < skipped.length; index += 1) {
+      const reason = skipped[index] && typeof skipped[index].reason === "string" ? skipped[index].reason.trim() : "";
+      if (reason) {
+        return "이미지 병합 레이어를 만들지 못했습니다: " + reason;
+      }
+    }
+
+    const summary = result && result.summary ? result.summary : {};
+    const byteLength = Number(summary.resultByteLength) || 0;
+    if (byteLength > 0) {
+      return "이미지 병합 PNG는 생성됐지만 새 레이어로 배치하지 못했습니다.";
+    }
+
+    return "이미지 병합 레이어를 만들지 못했습니다.";
+  }
+
+  function withImageMergeTimeout(promise, timeoutMs, label) {
+    const ms = Number(timeoutMs) || 0;
+    if (ms <= 0 || typeof setTimeout !== "function" || typeof clearTimeout !== "function") {
+      return Promise.resolve(promise);
+    }
+
+    let settled = false;
+    let timerId = null;
+    const taskLabel = typeof label === "string" && label.trim() ? label.trim() : "이미지 병합";
+    return new Promise(function (resolve, reject) {
+      timerId = setTimeout(function () {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        reject(new Error(taskLabel + " 시간이 초과되었습니다. 선택 범위를 줄이거나 복잡한 마스크 그룹은 프레임 단위로 다시 시도해주세요."));
+      }, ms);
+
+      Promise.resolve(promise).then(
+        function (value) {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          clearTimeout(timerId);
+          resolve(value);
+        },
+        function (error) {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          clearTimeout(timerId);
+          reject(error);
+        }
+      );
+    });
+  }
+
   async function exportImageMergeSelection() {
     const selection = Array.from(figma.currentPage.selection || []).filter(function (node) {
-      return !!node && !node.removed && typeof node.exportAsync === "function";
+      return isImageMergeExportableNode(node);
     });
     if (!selection.length) {
       throw new Error("이미지로 병합할 프레임, 그룹, 레이어를 먼저 선택해주세요.");
     }
 
-    const rects = selection
+    const exportSelection = resolveImageMergeExportSelection(selection);
+
+    const rects = exportSelection
       .map(function (node) {
-        return getBoundsFitNodeRect(node);
+        return getImageMergeNodeRect(node);
       })
       .filter(Boolean);
     const unionRect = unionAbsoluteRects(rects);
@@ -35465,17 +37922,12 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       throw new Error("선택한 항목의 병합 영역을 계산하지 못했습니다.");
     }
 
-    const exportSettings = {
-      format: "PNG",
-      useAbsoluteBounds: true,
-    };
+    const exportScale = resolveImageMergeExportScale(unionRect);
+    const exportSettings = buildImageMergeExportSettings(exportScale);
 
-    let bytes = null;
-    if (selection.length === 1) {
-      bytes = await selection[0].exportAsync(exportSettings);
-    } else {
-      bytes = await exportImageMergeMultipleSelection(selection, unionRect, exportSettings);
-    }
+    const bytes =
+      (await tryExportImageMergeDirectSelection(exportSelection, exportSettings)) ||
+      (await exportImageMergeFrameSelection(exportSelection, unionRect, exportSettings));
 
     if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
       throw new Error("이미지 병합 PNG가 비어 있습니다.");
@@ -35483,23 +37935,232 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
     return {
       selectionLabel: formatSelectionLabel(selection),
-      selectedRootNodeId: selection.length === 1 && selection[0] && typeof selection[0].id === "string" ? selection[0].id : "",
-      selectedRootNodeName: selection.length === 1 ? safeName(selection[0]) : "",
-      preserveSelectedRootTransform: selection.length === 1,
+      selectedRootNodeId:
+        exportSelection.length === 1 && exportSelection[0] && typeof exportSelection[0].id === "string"
+          ? exportSelection[0].id
+          : "",
+      selectedRootNodeName: exportSelection.length === 1 ? safeName(exportSelection[0]) : "",
+      preserveSelectedRootTransform: exportSelection.length === 1,
       selectedRootWidth:
-        selection.length === 1 && typeof selection[0].width === "number" && Number.isFinite(selection[0].width)
-          ? selection[0].width
+        exportSelection.length === 1 &&
+        typeof exportSelection[0].width === "number" &&
+        Number.isFinite(exportSelection[0].width)
+          ? exportSelection[0].width
           : 0,
       selectedRootHeight:
-        selection.length === 1 && typeof selection[0].height === "number" && Number.isFinite(selection[0].height)
-          ? selection[0].height
+        exportSelection.length === 1 &&
+        typeof exportSelection[0].height === "number" &&
+        Number.isFinite(exportSelection[0].height)
+          ? exportSelection[0].height
           : 0,
       unionRect: unionRect,
+      exportScale: exportScale,
       bytes: bytes,
     };
   }
 
-  async function exportImageMergeMultipleSelection(selection, unionRect, exportSettings) {
+  function buildImageMergeExportSettings(exportScale) {
+    const settings = {
+      format: "PNG",
+      useAbsoluteBounds: true,
+    };
+    const scale = Number(exportScale) || 1;
+    if (Math.abs(scale - 1) > 0.01) {
+      settings.constraint = {
+        type: "SCALE",
+        value: scale,
+      };
+    }
+    return settings;
+  }
+
+  function resolveImageMergeExportScale(unionRect) {
+    const width = unionRect && Number(unionRect.width) > 0 ? Number(unionRect.width) : 0;
+    const height = unionRect && Number(unionRect.height) > 0 ? Number(unionRect.height) : 0;
+    const area = width * height;
+    if (!(area > 0) || !Number.isFinite(area)) {
+      return 1;
+    }
+
+    const maxScale = Math.sqrt(IMAGE_MERGE_MAX_EXPORT_PIXEL_COUNT / area);
+    const scale = Math.min(IMAGE_MERGE_PREFERRED_EXPORT_SCALE, maxScale);
+    if (scale >= 1.75) {
+      return 2;
+    }
+    if (scale >= 1.35) {
+      return 1.5;
+    }
+    return 1;
+  }
+
+  function resolveImageMergeExportSelection(selection) {
+    if (!Array.isArray(selection) || !selection.length) {
+      return [];
+    }
+
+    const result = [];
+    const seen = {};
+    for (let index = 0; index < selection.length; index += 1) {
+      const node = selection[index];
+      const exportNode = findImageMergeMaskContainer(node) || node;
+      if (!isImageMergeExportableNode(exportNode) || seen[exportNode.id]) {
+        continue;
+      }
+      seen[exportNode.id] = true;
+      result.push(exportNode);
+    }
+
+    return result.length ? result : selection;
+  }
+
+  function isImageMergeExportableNode(node) {
+    return (
+      !!node &&
+      !node.removed &&
+      node.type !== "PAGE" &&
+      node.type !== "DOCUMENT" &&
+      typeof node.exportAsync === "function"
+    );
+  }
+
+  async function tryExportImageMergeDirectSelection(selection, exportSettings) {
+    if (!Array.isArray(selection) || selection.length !== 1 || !isImageMergeExportableNode(selection[0])) {
+      return null;
+    }
+
+    try {
+      const bytes = await withImageMergeTimeout(
+        selection[0].exportAsync(exportSettings),
+        IMAGE_MERGE_FAST_EXPORT_TIMEOUT_MS,
+        "이미지 병합 빠른 export"
+      );
+      return bytes && typeof bytes.length === "number" && bytes.length > 0 ? bytes : null;
+    } catch (error) {
+      console.warn("[pigma] image merge direct export fallback:", normalizeErrorMessage(error, "direct export failed"));
+      return null;
+    }
+  }
+
+  function hasImageMergeChildren(node) {
+    return !!node && "children" in node && Array.isArray(node.children) && node.children.length > 0;
+  }
+
+  function findImageMergeMaskContainer(node) {
+    let current = node;
+    while (current && current.parent && current.parent.type !== "DOCUMENT") {
+      if (isImageMergeExportableNode(current) && hasImageMergeDirectMaskChild(current)) {
+        return current;
+      }
+
+      const parent = current.parent;
+      if (!parent || parent.type === "PAGE" || parent.type === "DOCUMENT") {
+        break;
+      }
+
+      if (isImageMergeExportableNode(parent) && hasImageMergeDirectMaskChild(parent)) {
+        return parent;
+      }
+
+      current = parent;
+    }
+
+    return null;
+  }
+
+  function hasImageMergeDirectMaskChild(node) {
+    if (!node || !("children" in node) || !Array.isArray(node.children)) {
+      return false;
+    }
+
+    for (let index = 0; index < node.children.length; index += 1) {
+      const child = node.children[index];
+      if (child && child.isMask === true) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  function hasImageMergeMaskDescendant(node, depth) {
+    if (!node || depth > 8 || !hasImageMergeChildren(node)) {
+      return false;
+    }
+
+    for (let index = 0; index < node.children.length; index += 1) {
+      const child = node.children[index];
+      if (!child || child.removed) {
+        continue;
+      }
+      if (child.isMask === true || hasImageMergeMaskDescendant(child, depth + 1)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  function getImageMergeNodeRect(node) {
+    return getBoundsFitNodeRect(node) || getImageMergeChildrenUnionRect(node, 0);
+  }
+
+  function getImageMergeChildrenUnionRect(node, depth) {
+    if (!node || depth > 8 || !("children" in node) || !Array.isArray(node.children)) {
+      return null;
+    }
+
+    const rects = [];
+    for (let index = 0; index < node.children.length; index += 1) {
+      const child = node.children[index];
+      if (!child || child.removed || child.visible === false) {
+        continue;
+      }
+
+      const rect = getBoundsFitNodeRect(child) || getImageMergeChildrenUnionRect(child, depth + 1);
+      if (rect) {
+        rects.push(rect);
+      }
+    }
+
+    return unionAbsoluteRects(rects);
+  }
+
+  function positionImageMergePreviewClone(sourceNode, clonedNode, unionRect, fallbackRect) {
+    if (
+      "relativeTransform" in clonedNode &&
+      Array.isArray(clonedNode.relativeTransform) &&
+      Array.isArray(sourceNode.absoluteTransform) &&
+      sourceNode.absoluteTransform.length >= 2
+    ) {
+      const row0 = Array.isArray(sourceNode.absoluteTransform[0]) ? sourceNode.absoluteTransform[0] : null;
+      const row1 = Array.isArray(sourceNode.absoluteTransform[1]) ? sourceNode.absoluteTransform[1] : null;
+      if (row0 && row1 && row0.length >= 3 && row1.length >= 3) {
+        clonedNode.relativeTransform = [
+          [
+            Number(row0[0]) || 0,
+            Number(row0[1]) || 0,
+            roundBoundsFitMetric((Number(row0[2]) || 0) - unionRect.x),
+          ],
+          [
+            Number(row1[0]) || 0,
+            Number(row1[1]) || 0,
+            roundBoundsFitMetric((Number(row1[2]) || 0) - unionRect.y),
+          ],
+        ];
+        return;
+      }
+    }
+
+    if ("x" in clonedNode && typeof clonedNode.x === "number" && "y" in clonedNode && typeof clonedNode.y === "number") {
+      clonedNode.x = roundBoundsFitMetric(fallbackRect.x - unionRect.x);
+      clonedNode.y = roundBoundsFitMetric(fallbackRect.y - unionRect.y);
+      return;
+    }
+
+    throw new Error("Could not position the preview clone for image merge.");
+  }
+
+  async function exportImageMergeFrameSelection(selection, unionRect, exportSettings) {
     const preview = figma.createFrame();
     const clones = [];
     try {
@@ -35515,26 +38176,28 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       const orderedSelection = selection.slice().sort(compareSceneNodeCanvasOrder);
       for (let index = 0; index < orderedSelection.length; index += 1) {
         const node = orderedSelection[index];
-        const rect = getBoundsFitNodeRect(node);
+        if (!isImageMergeExportableNode(node)) {
+          continue;
+        }
+        const rect = getImageMergeNodeRect(node);
         if (!rect) {
           continue;
         }
         const clone = node.clone();
         preview.appendChild(clone);
         clones.push(clone);
-        if ("x" in clone && typeof clone.x === "number") {
-          clone.x = roundBoundsFitMetric(rect.x - unionRect.x);
-        }
-        if ("y" in clone && typeof clone.y === "number") {
-          clone.y = roundBoundsFitMetric(rect.y - unionRect.y);
-        }
+        positionImageMergePreviewClone(node, clone, unionRect, rect);
       }
 
       if (!clones.length) {
         throw new Error("병합 가능한 선택 레이어를 찾지 못했습니다.");
       }
 
-      return await preview.exportAsync(exportSettings);
+      return await withImageMergeTimeout(
+        preview.exportAsync(exportSettings),
+        IMAGE_MERGE_EXPORT_TIMEOUT_MS,
+        "이미지 병합 preview export"
+      );
     } finally {
       for (let index = 0; index < clones.length; index += 1) {
         if (clones[index] && !clones[index].removed) {
@@ -35573,7 +38236,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
           ? Number(session.selectedRootHeight)
           : unionRect.height;
       resultNode.resize(resultWidth, resultHeight);
-      resultNode.fills = [buildVisibleImageFill(newImageHash)];
+      resultNode.fills = [buildImageCompositeFill(newImageHash)];
       resultNode.strokes = [];
       if ("cornerRadius" in resultNode) {
         resultNode.cornerRadius = 0;
@@ -35587,7 +38250,8 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
           !selectedRootNode.removed &&
           (!("locked" in selectedRootNode) || !selectedRootNode.locked)
         ) {
-          if (canUsePromptPlacementContainer(selectedRootNode)) {
+          const selectedRootHasMaskStack = hasImageMergeMaskDescendant(selectedRootNode, 0);
+          if (!selectedRootHasMaskStack && canUsePromptPlacementContainer(selectedRootNode)) {
             selectedRootNode.insertChild(selectedRootNode.children.length, resultNode);
             setImageExtendNodePosition(resultNode, 0, 0);
             placementMode = "inside-selected-root";
@@ -36830,7 +39494,9 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         }
 
         resultNode = createPromptPlacementResultNode(session, newImageHash);
-        if (canUsePromptPlacementContainer(targetNode)) {
+        if (session.placementMode === "outside-reference") {
+          placementMode = placePromptGeneratedNodeOutsideReference(targetNode, resultNode);
+        } else if (canUsePromptPlacementContainer(targetNode)) {
           targetNode.insertChild(targetNode.children.length, resultNode);
           setImageExtendNodePosition(resultNode, 0, 0);
           placementMode = "inside-target";
@@ -36883,6 +39549,43 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
 
     return buildPromptPlacementApplyResult(session, resultNode, byteLength, skipped, placementMode);
+  }
+
+  function placePromptGeneratedNodeOutsideReference(targetNode, resultNode) {
+    const gap = PROMPT_TEXT_ANCHOR_GAP;
+    if (
+      targetNode &&
+      targetNode.parent &&
+      canUsePromptPlacementContainer(targetNode.parent) &&
+      !isAutoLayoutNode(targetNode.parent)
+    ) {
+      const localBounds = getImageExtendLocalBounds(targetNode);
+      if (localBounds) {
+        const parent = targetNode.parent;
+        const insertIndex = findNodeChildIndex(parent, targetNode.id);
+        if (insertIndex >= 0) {
+          parent.insertChild(insertIndex + 1, resultNode);
+        } else {
+          parent.insertChild(parent.children.length, resultNode);
+        }
+        setImageExtendNodePosition(resultNode, localBounds.x + localBounds.width + gap, localBounds.y);
+        return "sibling-right";
+      }
+    }
+
+    const absoluteRect = getBoundsFitNodeRect(targetNode);
+    if (absoluteRect) {
+      figma.currentPage.appendChild(resultNode);
+      resultNode.x = roundBoundsFitMetric(absoluteRect.x + absoluteRect.width + gap);
+      resultNode.y = roundBoundsFitMetric(absoluteRect.y);
+      return "page-right";
+    }
+
+    const viewportCenter = figma.viewport && figma.viewport.center ? figma.viewport.center : { x: 0, y: 0 };
+    figma.currentPage.appendChild(resultNode);
+    resultNode.x = roundBoundsFitMetric(viewportCenter.x - resultNode.width / 2);
+    resultNode.y = roundBoundsFitMetric(viewportCenter.y - resultNode.height / 2);
+    return "viewport-center";
   }
 
   async function placePromptGeneratedNodeFromAnchor(session, resultNode) {
@@ -37028,9 +39731,21 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     };
   }
 
+  function buildImageCompositeFill(imageHash) {
+    return {
+      type: "IMAGE",
+      imageHash: imageHash,
+      scaleMode: "FILL",
+      visible: true,
+    };
+  }
+
   function resolveRenderedUpscaleScaleMode(fill) {
     const scaleMode = typeof (fill && fill.scaleMode) === "string" ? fill.scaleMode : "FILL";
-    if (scaleMode === "FIT" || scaleMode === "STRETCH" || scaleMode === "FILL") {
+    if (scaleMode === "STRETCH") {
+      return "FILL";
+    }
+    if (scaleMode === "FIT" || scaleMode === "FILL") {
       return scaleMode;
     }
     return "FIT";
@@ -37296,25 +40011,29 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   }
 
   function getSelectedTextRangeSnapshot() {
-    const page = figma.currentPage;
-    const selectedTextRange = page && "selectedTextRange" in page ? page.selectedTextRange : null;
-    if (!selectedTextRange || !selectedTextRange.node || selectedTextRange.node.removed || selectedTextRange.node.type !== "TEXT") {
+    try {
+      const page = figma.currentPage;
+      const selectedTextRange = page && "selectedTextRange" in page ? page.selectedTextRange : null;
+      if (!selectedTextRange || !selectedTextRange.node || selectedTextRange.node.removed || selectedTextRange.node.type !== "TEXT") {
+        return null;
+      }
+
+      const characters = typeof selectedTextRange.node.characters === "string" ? selectedTextRange.node.characters : "";
+      const start = Math.max(0, Math.floor(Number(selectedTextRange.start) || 0));
+      const end = Math.max(start, Math.floor(Number(selectedTextRange.end) || 0));
+      const text = normalizeReferenceText(characters.slice(start, end), 480);
+      if (!text) {
+        return null;
+      }
+
+      return {
+        text: text,
+        nodeName: safeName(selectedTextRange.node),
+        selectionLabel: safeName(selectedTextRange.node),
+      };
+    } catch (error) {
       return null;
     }
-
-    const characters = typeof selectedTextRange.node.characters === "string" ? selectedTextRange.node.characters : "";
-    const start = Math.max(0, Math.floor(Number(selectedTextRange.start) || 0));
-    const end = Math.max(start, Math.floor(Number(selectedTextRange.end) || 0));
-    const text = normalizeReferenceText(characters.slice(start, end), 480);
-    if (!text) {
-      return null;
-    }
-
-    return {
-      text: text,
-      nodeName: safeName(selectedTextRange.node),
-      selectionLabel: safeName(selectedTextRange.node),
-    };
   }
 
   function collectReferenceTextFromNodes(nodes, options) {
@@ -37433,11 +40152,11 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       throw new Error(PROMPT_DRAFT_SOURCE_NOT_FOUND_MESSAGE);
     }
 
-    const selectedRangeText = getSelectedTextRangeSnapshot();
-    const textPayload = collectPromptDraftTextPayload(selection, selectedRangeText);
     const visualNodes = selection.filter(function (node) {
       return !!node && !node.removed && node.type !== "TEXT";
     });
+    const selectedRangeText = visualNodes.length ? null : getSelectedTextRangeSnapshot();
+    const textPayload = collectPromptDraftTextPayload(selection, selectedRangeText);
 
     if (visualNodes.length > 1) {
       throw new Error(PROMPT_SMART_SELECTION_MESSAGE);
@@ -37514,23 +40233,6 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   async function buildPromptDraftVisualSource(node, selection) {
     if (!node || node.removed || typeof node.exportAsync !== "function") {
       throw new Error(PROMPT_TARGET_EXPORT_ERROR_MESSAGE);
-    }
-
-    if (hasChildren(node)) {
-      let collection = null;
-      try {
-        collection = await collectImageCompositeTargetsFromSelection([node]);
-      } catch (error) {
-        collection = null;
-      }
-      if (collection && Array.isArray(collection.layers)) {
-        const imageLayerCount = collection.layers.filter(function (layer) {
-          return !!layer && layer.layerKind === "image";
-        }).length;
-        if (imageLayerCount >= 2) {
-          throw new Error(PROMPT_MULTI_IMAGE_CONTAINER_MESSAGE);
-        }
-      }
     }
 
     const bytes = await node.exportAsync({
@@ -38309,17 +41011,44 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         return null;
       }
 
-      const axisAligned =
-        Math.abs(Number(transform[0][1]) || 0) <= 0.0001 && Math.abs(Number(transform[1][0]) || 0) <= 0.0001;
-      if (!axisAligned) {
+      const row0 = Array.isArray(transform[0]) ? transform[0] : null;
+      const row1 = Array.isArray(transform[1]) ? transform[1] : null;
+      if (!row0 || !row1 || row0.length < 3 || row1.length < 3) {
+        return null;
+      }
+
+      const a = Number(row0[0]) || 0;
+      const c = Number(row0[1]) || 0;
+      const tx = Number(row0[2]) || 0;
+      const b = Number(row1[0]) || 0;
+      const d = Number(row1[1]) || 0;
+      const ty = Number(row1[2]) || 0;
+      const points = [
+        { x: tx, y: ty },
+        { x: a * width + tx, y: b * width + ty },
+        { x: c * height + tx, y: d * height + ty },
+        { x: a * width + c * height + tx, y: b * width + d * height + ty },
+      ];
+      let left = Infinity;
+      let top = Infinity;
+      let right = -Infinity;
+      let bottom = -Infinity;
+      for (let index = 0; index < points.length; index += 1) {
+        const point = points[index];
+        left = Math.min(left, point.x);
+        top = Math.min(top, point.y);
+        right = Math.max(right, point.x);
+        bottom = Math.max(bottom, point.y);
+      }
+      if (!Number.isFinite(left) || !Number.isFinite(top) || !(right > left) || !(bottom > top)) {
         return null;
       }
 
       return {
-        x: roundBoundsFitMetric(Number(transform[0][2]) || 0),
-        y: roundBoundsFitMetric(Number(transform[1][2]) || 0),
-        width: roundBoundsFitMetric(width),
-        height: roundBoundsFitMetric(height),
+        x: roundBoundsFitMetric(left),
+        y: roundBoundsFitMetric(top),
+        width: roundBoundsFitMetric(right - left),
+        height: roundBoundsFitMetric(bottom - top),
       };
     } catch (error) {
       return null;
@@ -40279,7 +43008,8 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   }
 
   const originalOnMessage = figma.ui.onmessage;
-  const RESULT_PREVIEW_LIMIT = 24;
+  const RESULT_PREVIEW_LIMIT = 80;
+  const USAGE_PREVIEW_LIMIT = 12;
   let isRunning = false;
 
   if (typeof originalOnMessage !== "function") {
@@ -40293,7 +43023,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
           status: "running",
           currentCount: 0,
           totalCount: 0,
-          message: "원본 이미지 추출이 이미 진행 중입니다.",
+          message: "원본 이미지 찾기가 이미 진행 중입니다.",
         });
         return;
       }
@@ -40320,10 +43050,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
       if (!totalCount) {
         const emptyResult = buildResult({
-          selection: collection.selection,
-          totalFillCount: collection.totalFillCount,
-          duplicateFillCount: collection.duplicateFillCount,
-          uniqueCandidateCount: 0,
+          collection,
           downloadedFiles: [],
           skipped: collection.skipped,
         });
@@ -40332,13 +43059,14 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
           type: "original-image-download-result",
           result: emptyResult,
         });
-        figma.notify("선택 범위에서 추출할 원본 이미지가 없습니다.", { timeout: 2000 });
+        figma.notify("선택 범위에서 다운로드할 원본 이미지가 없습니다.", { timeout: 2000 });
         return;
       }
 
       figma.ui.postMessage({
         type: "original-image-download-start",
-        totalCount: totalCount,
+        totalCount,
+        totalImagePaintCount: collection.totalImagePaintCount,
       });
 
       const downloadedFiles = [];
@@ -40349,8 +43077,8 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         postStatus({
           status: "prepare",
           currentCount: index + 1,
-          totalCount: totalCount,
-          message: '"' + entry.displayName + '" 원본 이미지를 준비하는 중입니다.',
+          totalCount,
+          message: `"${entry.displayName}" 원본 이미지를 준비하는 중입니다.`,
         });
 
         try {
@@ -40363,34 +43091,21 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
           const extension = detectImageExtension(bytes);
           const mimeType = detectImageMimeType(extension);
           const fileName = buildFileName(entry, index, extension);
-          const fileRecord = {
+          const fileRecord = buildFileRecord(entry, {
             index: index + 1,
-            fileName: fileName,
-            mimeType: mimeType,
+            fileName,
+            mimeType,
             byteLength: bytes.length,
-            imageHash: entry.imageHash,
-            nodeId: entry.nodeId,
-            nodeName: entry.nodeName,
-            path: entry.path,
-            usageCount: entry.usageCount,
-          };
+          });
 
           downloadedFiles.push(fileRecord);
 
           figma.ui.postMessage({
             type: "original-image-download-file",
-            file: {
-              index: index + 1,
-              totalCount: totalCount,
-              fileName: fileName,
-              mimeType: mimeType,
-              imageHash: entry.imageHash,
-              nodeId: entry.nodeId,
-              nodeName: entry.nodeName,
-              usageCount: entry.usageCount,
-              byteLength: bytes.length,
-              bytes: bytes,
-            },
+            file: Object.assign({}, fileRecord, {
+              totalCount,
+              bytes,
+            }),
           });
         } catch (error) {
           skipped.push({
@@ -40404,24 +43119,21 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       }
 
       const result = buildResult({
-        selection: collection.selection,
-        totalFillCount: collection.totalFillCount,
-        duplicateFillCount: collection.duplicateFillCount,
-        uniqueCandidateCount: totalCount,
-        downloadedFiles: downloadedFiles,
-        skipped: skipped,
+        collection,
+        downloadedFiles,
+        skipped,
       });
 
       figma.ui.postMessage({
         type: "original-image-download-result",
-        result: result,
+        result,
       });
       notifyResult(result);
     } catch (error) {
-      const message = normalizeErrorMessage(error, "원본 이미지 추출에 실패했습니다.");
+      const message = normalizeErrorMessage(error, "원본 이미지 다운로드 준비에 실패했습니다.");
       figma.ui.postMessage({
         type: "original-image-download-error",
-        message: message,
+        message,
       });
       figma.notify(message, { error: true, timeout: 2400 });
     } finally {
@@ -40432,14 +43144,16 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   function collectOriginalImagesFromSelection() {
     const selection = Array.from(figma.currentPage.selection || []);
     if (!selection.length) {
-      throw new Error("프레임, 그룹, 레이어를 먼저 선택하세요.");
+      throw new Error("프레임, 그룹, 이미지 레이어를 먼저 선택해주세요.");
     }
 
     const uniqueEntries = [];
     const entriesByHash = {};
     const skipped = [];
     let totalFillCount = 0;
-    let duplicateFillCount = 0;
+    let totalStrokeCount = 0;
+    let totalImagePaintCount = 0;
+    let duplicateImagePaintCount = 0;
 
     for (let rootIndex = 0; rootIndex < selection.length; rootIndex += 1) {
       const root = selection[rootIndex];
@@ -40457,42 +43171,60 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
           continue;
         }
 
-        const fills = getNodeFills(node);
-        for (let fillIndex = 0; fillIndex < fills.length; fillIndex += 1) {
-          const fill = fills[fillIndex];
-          if (!fill || fill.type !== "IMAGE") {
-            continue;
+        const imagePaints = collectNodeImagePaintEntries(node);
+        for (let paintIndex = 0; paintIndex < imagePaints.length; paintIndex += 1) {
+          const paintEntry = imagePaints[paintIndex];
+          totalImagePaintCount += 1;
+          if (paintEntry.paintKind === "fill") {
+            totalFillCount += 1;
+          } else if (paintEntry.paintKind === "stroke") {
+            totalStrokeCount += 1;
           }
 
-          totalFillCount += 1;
+          const usage = {
+            nodeId: node.id,
+            nodeName: safeName(node),
+            path: current.path,
+            paintKind: paintEntry.paintKind,
+            paintIndex: paintEntry.paintIndex,
+          };
 
-          if (!fill.imageHash || typeof fill.imageHash !== "string") {
+          if (!paintEntry.imageHash || typeof paintEntry.imageHash !== "string") {
             skipped.push({
               nodeId: node.id,
               nodeName: safeName(node),
               imageHash: "",
               path: current.path,
-              reason: "IMAGE fill에 imageHash가 없어 건너뛰었습니다.",
+              paintKind: paintEntry.paintKind,
+              paintIndex: paintEntry.paintIndex,
+              reason: `${paintEntry.paintKind} IMAGE paint에 imageHash가 없어 건너뜁니다.`,
             });
             continue;
           }
 
-          if (entriesByHash[fill.imageHash]) {
-            entriesByHash[fill.imageHash].usageCount += 1;
-            duplicateFillCount += 1;
+          const existing = entriesByHash[paintEntry.imageHash];
+          if (existing) {
+            existing.usageCount += 1;
+            existing.usages.push(usage);
+            existing.layerNames = collectUniqueStrings(existing.layerNames.concat([usage.nodeName]));
+            existing.paintKinds = collectUniqueStrings(existing.paintKinds.concat([usage.paintKind]));
+            duplicateImagePaintCount += 1;
             continue;
           }
 
           const entry = {
-            imageHash: fill.imageHash,
+            imageHash: paintEntry.imageHash,
             nodeId: node.id,
             nodeName: safeName(node),
             displayName: safeName(node),
             path: current.path,
             usageCount: 1,
+            usages: [usage],
+            layerNames: [usage.nodeName],
+            paintKinds: [usage.paintKind],
           };
 
-          entriesByHash[fill.imageHash] = entry;
+          entriesByHash[paintEntry.imageHash] = entry;
           uniqueEntries.push(entry);
         }
 
@@ -40511,26 +43243,38 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
 
     return {
-      selection: selection,
-      totalFillCount: totalFillCount,
-      duplicateFillCount: duplicateFillCount,
-      uniqueEntries: uniqueEntries,
-      skipped: skipped,
+      selection,
+      totalFillCount,
+      totalStrokeCount,
+      totalImagePaintCount,
+      duplicateFillCount: duplicateImagePaintCount,
+      duplicateImagePaintCount,
+      uniqueEntries,
+      skipped,
+    };
+  }
+
+  function buildFileRecord(entry, options) {
+    const usages = Array.isArray(entry.usages) ? entry.usages : [];
+    return {
+      index: options.index,
+      fileName: options.fileName,
+      mimeType: options.mimeType,
+      byteLength: options.byteLength,
+      imageHash: entry.imageHash,
+      nodeId: entry.nodeId,
+      nodeName: entry.nodeName,
+      path: entry.path,
+      usageCount: entry.usageCount,
+      usages: usages.slice(0, USAGE_PREVIEW_LIMIT),
+      layerNames: collectUniqueStrings(entry.layerNames).slice(0, USAGE_PREVIEW_LIMIT),
+      paintKinds: collectUniqueStrings(entry.paintKinds),
     };
   }
 
   function buildResult(options) {
-    const selection = Array.isArray(options.selection) ? options.selection : [];
-    const totalFillCount =
-      typeof options.totalFillCount === "number" && Number.isFinite(options.totalFillCount) ? options.totalFillCount : 0;
-    const duplicateFillCount =
-      typeof options.duplicateFillCount === "number" && Number.isFinite(options.duplicateFillCount)
-        ? options.duplicateFillCount
-        : 0;
-    const uniqueCandidateCount =
-      typeof options.uniqueCandidateCount === "number" && Number.isFinite(options.uniqueCandidateCount)
-        ? options.uniqueCandidateCount
-        : 0;
+    const collection = options && options.collection ? options.collection : {};
+    const selection = Array.isArray(collection.selection) ? collection.selection : [];
     const downloadedFiles = Array.isArray(options.downloadedFiles) ? options.downloadedFiles : [];
     const skipped = Array.isArray(options.skipped) ? options.skipped : [];
 
@@ -40539,9 +43283,12 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       summary: {
         selectionLabel: formatSelectionLabel(selection),
         rootCount: selection.length,
-        totalFillCount: totalFillCount,
-        uniqueCandidateCount: uniqueCandidateCount,
-        duplicateFillCount: duplicateFillCount,
+        totalFillCount: normalizeCount(collection.totalFillCount),
+        totalStrokeCount: normalizeCount(collection.totalStrokeCount),
+        totalImagePaintCount: normalizeCount(collection.totalImagePaintCount),
+        uniqueCandidateCount: normalizeCount(collection.uniqueEntries && collection.uniqueEntries.length),
+        duplicateFillCount: normalizeCount(collection.duplicateImagePaintCount),
+        duplicateImagePaintCount: normalizeCount(collection.duplicateImagePaintCount),
         downloadedCount: downloadedFiles.length,
         skippedCount: skipped.length,
       },
@@ -40554,19 +43301,19 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     const summary = result && result.summary ? result.summary : {};
     const downloadedCount = summary.downloadedCount || 0;
     const skippedCount = summary.skippedCount || 0;
-    const duplicateFillCount = summary.duplicateFillCount || 0;
+    const duplicateCount = summary.duplicateImagePaintCount || summary.duplicateFillCount || 0;
 
     if (!downloadedCount) {
-      figma.notify("추출할 수 있는 원본 이미지가 없습니다.", { timeout: 2000 });
+      figma.notify("다운로드할 수 있는 원본 이미지가 없습니다.", { timeout: 2000 });
       return;
     }
 
-    let message = "원본 이미지 " + downloadedCount + "개를 준비했습니다.";
-    if (duplicateFillCount > 0) {
-      message += " 중복 사용 " + duplicateFillCount + "건은 한 번만 내려받습니다.";
+    let message = `원본 이미지 ${downloadedCount}개를 찾았습니다. 목록에서 다운로드할 수 있습니다.`;
+    if (duplicateCount > 0) {
+      message += ` 중복 사용 ${duplicateCount}건은 한 번만 준비했습니다.`;
     }
     if (skippedCount > 0) {
-      message += " " + skippedCount + "건은 건너뛰었습니다.";
+      message += ` ${skippedCount}건은 건너뜁니다.`;
     }
     figma.notify(message, { timeout: 2600 });
   }
@@ -40583,12 +43330,34 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     });
   }
 
-  function getNodeFills(node) {
-    if (!node || !("fills" in node) || !Array.isArray(node.fills)) {
+  function collectNodeImagePaintEntries(node) {
+    const entries = [];
+    appendImagePaintEntries(entries, getNodePaints(node, "fills"), "fill");
+    appendImagePaintEntries(entries, getNodePaints(node, "strokes"), "stroke");
+    return entries;
+  }
+
+  function appendImagePaintEntries(entries, paints, paintKind) {
+    for (let index = 0; index < paints.length; index += 1) {
+      const paint = paints[index];
+      if (!paint || paint.type !== "IMAGE") {
+        continue;
+      }
+
+      entries.push({
+        paintKind,
+        paintIndex: index,
+        imageHash: paint.imageHash,
+      });
+    }
+  }
+
+  function getNodePaints(node, propertyName) {
+    if (!node || !(propertyName in node) || !Array.isArray(node[propertyName])) {
       return [];
     }
 
-    return node.fills;
+    return node[propertyName];
   }
 
   function hasChildren(node) {
@@ -40667,10 +43436,10 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return "application/octet-stream";
   }
 
-  function buildFileName(entry, _index, extension) {
-    const baseName = sanitizeFileName(entry && entry.nodeName ? entry.nodeName : "figma-image");
+  function buildFileName(entry, index, extension) {
+    const baseName = sanitizeFileName(entry && entry.displayName ? entry.displayName : `figma-image-${index + 1}`);
     const hash = entry && typeof entry.imageHash === "string" ? entry.imageHash.slice(0, 8) : "image";
-    return baseName + "-" + hash + "." + extension;
+    return `${baseName}-${hash}.${extension}`;
   }
 
   function sanitizeFileName(value) {
@@ -40688,7 +43457,26 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       return safeName(selection[0]);
     }
 
-    return safeName(selection[0]) + " 외 " + (selection.length - 1) + "개";
+    return `${safeName(selection[0])} 외 ${selection.length - 1}개`;
+  }
+
+  function collectUniqueStrings(values) {
+    const result = [];
+    const seen = {};
+    const source = Array.isArray(values) ? values : [];
+    for (let index = 0; index < source.length; index += 1) {
+      const value = typeof source[index] === "string" ? source[index].trim() : "";
+      if (!value || seen[value]) {
+        continue;
+      }
+      seen[value] = true;
+      result.push(value);
+    }
+    return result;
+  }
+
+  function normalizeCount(value) {
+    return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
   }
 
   function safeName(node) {
@@ -40728,7 +43516,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   const TEXT_PREVIEW_LIMIT = 320;
   const TEXT_PREVIEW_EDGE_LENGTH = 10;
   const TEXT_CONTENT_LIMIT = 2400;
-  const SOURCE_EXPORT_EDGE = 1600;
+  const SOURCE_EXPORT_EDGE = 1536;
   const originalOnMessage = typeof figma.ui.onmessage === "function" ? figma.ui.onmessage : null;
 
   const designChatOnMessage = async (message) => {
@@ -40787,6 +43575,37 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       type: "ai-design-chat-selection",
       selection: selection,
     });
+    figma.ui.postMessage({
+      type: "selection-state",
+      state: buildPsdSelectionStateFromDesignChat(selection),
+    });
+  }
+
+  function buildPsdSelectionStateFromDesignChat(selection) {
+    const count = Math.max(0, Number(selection && selection.selectionCount) || 0);
+    const width = Math.max(0, Number(selection && selection.width) || 0);
+    const height = Math.max(0, Number(selection && selection.height) || 0);
+    const label = sanitizeText(selection && selection.selectionLabel);
+    const typeLabel = sanitizeText(selection && selection.selectionTypeLabel);
+    const ready = !!(selection && selection.ready && count > 0);
+    return {
+      ready,
+      selectionId: count === 1 ? sanitizeText(selection && selection.selectionSignature) : null,
+      selectionCount: count,
+      selectionName: ready ? label || "Selection" : "",
+      selectionType: ready ? typeLabel || "Selection" : null,
+      summary: ready ? `"${label || "Selection"}" is ready to export.` : "Select one or more frames, groups, or layers to export.",
+      detail: ready
+        ? "AI selection bridge loaded the current Figma selection for PSD export."
+        : "The exporter is waiting for a Figma selection.",
+      documentWidth: ready && width > 0 ? width : null,
+      documentHeight: ready && height > 0 ? height : null,
+      exportNodeCount: ready ? count : 0,
+      editableTextCount: 0,
+      preservedGroupCount: 0,
+      warnings: [],
+      analysisPending: ready,
+    };
   }
 
   async function handleSourceRequest(message) {

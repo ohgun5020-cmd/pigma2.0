@@ -27,6 +27,16 @@
       return;
     }
 
+    if (isCopyPrototypeLinkMessage(message)) {
+      if (isRunning) {
+        postPrototypeStatus("running", "\uD504\uB85C\uD1A0\uD0C0\uC785 \uB9C1\uD06C\uB97C \uC900\uBE44 \uC911\uC785\uB2C8\uB2E4.");
+        return;
+      }
+
+      await runCopyPrototypeLink();
+      return;
+    }
+
     return originalOnMessage(message);
   };
 
@@ -34,6 +44,10 @@
 
   function isShortenRequestMessage(message) {
     return !!message && message.type === "run-shorten-figma-url";
+  }
+
+  function isCopyPrototypeLinkMessage(message) {
+    return !!message && message.type === "run-copy-prototype-link";
   }
 
   async function runShortenFigmaUrl() {
@@ -69,9 +83,49 @@
     }
   }
 
+  async function runCopyPrototypeLink() {
+    isRunning = true;
+    postPrototypeStatus("running", "\uD504\uB85C\uD1A0\uD0C0\uC785 \uB9C1\uD06C\uB97C \uC900\uBE44 \uC911\uC785\uB2C8\uB2E4.");
+
+    try {
+      await ensureCurrentPageLoaded();
+      const target = collectTargetNode();
+      const prototypeUrl = buildPrototypeLink(target);
+      figma.ui.postMessage({
+        type: "copy-prototype-link-result",
+        result: {
+          selectionId: target.node.id,
+          shareNodeId: target.shareNode.id,
+          selectionLabel: safeName(target.node),
+          selectionType: safeNodeType(target.node),
+          prototypeUrl: prototypeUrl,
+          longUrl: prototypeUrl,
+        },
+      });
+      figma.notify("\uD504\uB85C\uD1A0\uD0C0\uC785 \uB9C1\uD06C\uB97C \uC900\uBE44\uD588\uC2B5\uB2C8\uB2E4.", { timeout: 1800 });
+    } catch (error) {
+      const message = normalizeErrorMessage(error, "\uD504\uB85C\uD1A0\uD0C0\uC785 \uB9C1\uD06C \uAC00\uC838\uC624\uAE30\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.");
+      figma.ui.postMessage({
+        type: "copy-prototype-link-error",
+        message: message,
+      });
+      figma.notify(message, { error: true, timeout: 2600 });
+    } finally {
+      isRunning = false;
+    }
+  }
+
   function postStatus(status, message) {
     figma.ui.postMessage({
       type: "shorten-figma-url-status",
+      status: status,
+      message: message,
+    });
+  }
+
+  function postPrototypeStatus(status, message) {
+    figma.ui.postMessage({
+      type: "copy-prototype-link-status",
       status: status,
       message: message,
     });
@@ -93,7 +147,7 @@
     }
 
     if (node.type !== "FRAME" && node.type !== "SECTION") {
-      throw new Error("프레임 또는 섹션 1개를 선택한 경우에만 주소 줄이기를 사용할 수 있습니다.");
+      throw new Error("프레임 또는 섹션 1개를 선택한 경우에만 사용할 수 있습니다.");
     }
 
     const shareNode = resolvePrototypeShareNode(node);

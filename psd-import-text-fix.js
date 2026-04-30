@@ -1571,6 +1571,20 @@
     if (shouldApplyScopedTextFixes(payloadNodes, importRoot)) {
       applyTextFixes(payloadNodes, importRoot);
     }
+
+    materializeSingleImportArtboardFrames(importRoot, payload, payloadNodes);
+
+    const separatedArtboards = separateSingleImportArtboardRoot(importRoot, payload);
+    if (separatedArtboards.length > 0) {
+      separatedArtboards.forEach(node => setExpandedRecursively(node, true));
+      selectImportedNodes(separatedArtboards);
+      debugImportPostprocess(
+        "single-artboards",
+        `released=${separatedArtboards.length} | source=${safeNodeName(importRoot)}`
+      );
+      return;
+    }
+
     setExpandedRecursively(importRoot, true);
     selectImportedNodes([importRoot]);
   }
@@ -1915,8 +1929,281 @@
     return candidates[0];
   }
 
-  function isNeutralSceneWrapper(node) {
-    if (!node || node.visible === false || node.clipsContent === true) {
+  function separateSingleImportArtboardRoot(root, payload) {
+    if (!shouldSeparateSingleImportArtboardRoot(root, payload)) {
+      return [];
+    }
+
+    const parentNode = root && root.parent && hasChildren(root.parent) ? root.parent : null;
+    if (!parentNode) {
+      return [];
+    }
+
+    const children = Array.from(root.children);
+    const rootIndex = Math.max(0, Array.from(parentNode.children).indexOf(root));
+    for (let index = 0; index < children.length; index += 1) {
+      reparentSceneNode(children[index], parentNode, rootIndex + index, 0, 0);
+    }
+
+    try {
+      root.remove();
+    } catch (error) {
+      console.warn("[pigma-import-text-fix] failed to remove single PSD artboard wrapper", error);
+    }
+
+    return children.filter(node => node && !node.removed);
+  }
+
+  function materializeSingleImportArtboardFrames(root, payload, payloadNodes) {
+    const targets = getSingleImportArtboardTargets(root);
+    if (targets.length < 2) {
+      return 0;
+    }
+
+    const specs = getPayloadArtboardSpecs(payloadNodes || getNormalizedPayloadNodes(payload));
+    if (specs.length < 2) {
+      return 0;
+    }
+
+    const specsByName = new Map();
+    specs.forEach(spec => {
+      if (!spec || !spec.normalizedName) {
+        return;
+      }
+
+      if (!specsByName.has(spec.normalizedName)) {
+        specsByName.set(spec.normalizedName, []);
+      }
+      specsByName.get(spec.normalizedName).push(spec);
+    });
+
+    const matchedTargets = targets
+      .map(target => {
+        const matches = specsByName.get(normalizeLayerName(target.node && target.node.name)) || [];
+        const spec = matches.shift() || null;
+        if (!spec) {
+          return null;
+        }
+
+        return Object.assign({}, target, { spec });
+      })
+      .filter(Boolean);
+
+    if (matchedTargets.length < 2 || matchedTargets.length !== targets.length) {
+      return 0;
+    }
+
+    const origin = getPayloadArtboardOrigin(matchedTargets.map(target => target.spec));
+    let materializedCount = 0;
+
+    for (const target of matchedTargets) {
+      if (!target.node || target.node.removed) {
+        continue;
+      }
+
+      const frame = target.node.type === "FRAME"
+        ? normalizeExistingImportArtboardFrame(target.node, target.spec, origin)
+        : replaceImportArtboardGroupWithFrame(target.node, target.spec, origin, root);
+
+      if (frame) {
+        setExpandedRecursively(frame, true);
+        materializedCount += 1;
+      }
+    }
+
+    if (materializedCount > 0) {
+      debugImportPostprocess("artboard-frames", `materialized=${materializedCount}`);
+    }
+
+    return materializedCount;
+  }
+
+  function normalizeExistingImportArtboardFrame(frame, spec, origin) {
+    if (!frame || frame.removed || frame.type !== "FRAME") {
+      return null;
+    }
+
+    resizeImportArtboardFrame(frame, spec);
+    frame.x = roundNumber((Number(spec.x) || 0) - origin.x);
+    frame.y = roundNumber((Number(spec.y) || 0) - origin.y);
+    return frame;
+  }
+
+  function replaceImportArtboardGroupWithFrame(group, spec, origin, root) {
+    if (!group || group.removed) {
+      return null;
+    }
+
+    const frame = createImportArtboardFrame(group.name, spec, origin);
+    const parentNode = group.parent && hasChildren(group.parent) ? group.parent : root;
+    const insertionIndex = Math.max(0, Array.from(parentNode.children).indexOf(group));
+    parentNode.insertChild(insertionIndex, frame);
+    frame.x = roundNumber((Number(spec.x) || 0) - origin.x);
+    frame.y = roundNumber((Number(spec.y) || 0) - origin.y);
+
+    if (hasChildren(group)) {
+      const children = Array.from(group.children);
+      for (const child of children) {
+        reparentSceneNode(child, frame, frame.children.length, 0, 0);
+      }
+    }
+
+    try {
+      group.remove();
+    } catch (error) {
+      console.warn("[pigma-import-text-fix] failed to remove PSD artboard group", error);
+    }
+
+    return frame;
+  }
+
+  function createImportArtboardFrame(name, spec, origin) {
+    const frame = figma.createFrame();
+    frame.name = typeof name === "string" && name.trim().length > 0 ? name.trim() : "PSD Artboard";
+    resizeImportArtboardFrame(frame, spec);
+    frame.x = roundNumber((Number(spec.x) || 0) - origin.x);
+    frame.y = roundNumber((Number(spec.y) || 0) - origin.y);
+    return frame;
+  }
+
+  function resizeImportArtboardFrame(frame, spec) {
+    const width = Math.max(1, roundNumber(spec && spec.width));
+    const height = Math.max(1, roundNumber(spec && spec.height));
+    frame.resize(width, height);
+    frame.clipsContent = true;
+    frame.fills = [];
+    frame.strokes = [];
+  }
+
+  function getSingleImportArtboardTargets(root) {
+    if (!hasChildren(root)) {
+      return [];
+    }
+
+    return Array.from(root.children)
+      .map(node => {
+        const size = parseLayerNameSize(node && node.name);
+        return size ? { node, size } : null;
+      })
+      .filter(Boolean);
+  }
+
+  function getPayloadArtboardSpecs(nodes) {
+    if (!Array.isArray(nodes)) {
+      return [];
+    }
+
+    return nodes
+      .map(node => {
+        if (!node || node.kind !== "group") {
+          return null;
+        }
+
+        const sizeFromName = parseLayerNameSize(node.name);
+        if (!sizeFromName) {
+          return null;
+        }
+
+        const width = dimensionsMatch(node.width, sizeFromName.width) ? Number(node.width) : sizeFromName.width;
+        const height = dimensionsMatch(node.height, sizeFromName.height) ? Number(node.height) : sizeFromName.height;
+        return {
+          name: node.name,
+          normalizedName: normalizeLayerName(node.name),
+          x: Number.isFinite(node.x) ? Number(node.x) : 0,
+          y: Number.isFinite(node.y) ? Number(node.y) : 0,
+          width,
+          height
+        };
+      })
+      .filter(Boolean);
+  }
+
+  function getPayloadArtboardOrigin(specs) {
+    if (!Array.isArray(specs) || specs.length === 0) {
+      return { x: 0, y: 0 };
+    }
+
+    let minX = Number.POSITIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    specs.forEach(spec => {
+      if (!spec) {
+        return;
+      }
+
+      minX = Math.min(minX, Number.isFinite(spec.x) ? spec.x : 0);
+      minY = Math.min(minY, Number.isFinite(spec.y) ? spec.y : 0);
+    });
+
+    return {
+      x: Number.isFinite(minX) ? minX : 0,
+      y: Number.isFinite(minY) ? minY : 0
+    };
+  }
+
+  function shouldSeparateSingleImportArtboardRoot(root, payload) {
+    if (!hasChildren(root) || !payload || payload.mode === "flatten-image") {
+      return false;
+    }
+
+    if (!isNeutralSceneWrapper(root, { allowClipsContent: true, allowFills: true })) {
+      return false;
+    }
+
+    const payloadName = normalizeLayerName(payload.rootName);
+    const rootName = normalizeLayerName(root.name);
+    if (payloadName.length > 0 && rootName.length > 0 && payloadName !== rootName) {
+      return false;
+    }
+
+    const children = Array.from(root.children).filter(node => node && !node.removed);
+    if (children.length < 2) {
+      return false;
+    }
+
+    const artboardLikeChildren = children.filter(isSceneArtboardLikeChild);
+    if (artboardLikeChildren.length < 2 || artboardLikeChildren.length !== children.length) {
+      return false;
+    }
+
+    return true;
+  }
+
+  function isSceneArtboardLikeChild(node) {
+    if (!node || node.visible === false || !isPositiveDimension(node.width) || !isPositiveDimension(node.height)) {
+      return false;
+    }
+
+    const sizeFromName = parseLayerNameSize(node.name);
+    if (!sizeFromName) {
+      return false;
+    }
+
+    return dimensionsMatch(node.width, sizeFromName.width) && dimensionsMatch(node.height, sizeFromName.height);
+  }
+
+  function parseLayerNameSize(value) {
+    const source = typeof value === "string" ? value : "";
+    const match = /(?:^|[^0-9])(\d{2,5})\s*[x×]\s*(\d{2,5})(?:[^0-9]|$)/i.exec(source);
+    if (!match) {
+      return null;
+    }
+
+    const width = Number(match[1]);
+    const height = Number(match[2]);
+    if (!isPositiveDimension(width) || !isPositiveDimension(height)) {
+      return null;
+    }
+
+    return {
+      width,
+      height
+    };
+  }
+
+  function isNeutralSceneWrapper(node, options) {
+    const allowClipsContent = !!(options && options.allowClipsContent);
+    const allowFills = !!(options && options.allowFills);
+    if (!node || node.visible === false || (!allowClipsContent && node.clipsContent === true)) {
       return false;
     }
 
@@ -1932,7 +2219,7 @@
       return false;
     }
 
-    if ("fills" in node && Array.isArray(node.fills) && node.fills.some(isVisibleSceneStyle)) {
+    if (!allowFills && "fills" in node && Array.isArray(node.fills) && node.fills.some(isVisibleSceneStyle)) {
       return false;
     }
 

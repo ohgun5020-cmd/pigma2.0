@@ -134,6 +134,13 @@ Not copied forward from `pigma1.7`:
 
 Runtime note: the active AI correction UI logic currently lives inline in `ui.html`, so replace old bootstrap blocks instead of stacking duplicate copies.
 
+### PSD Shadow Export Note
+
+- Figma nodes can use four outer shadows as a deliberate 360-degree product shadow system. Preserve each shadow's own X/Y, blur, spread, color, and opacity values.
+- Do not average or collapse those four shadows into one visual value as the primary export path; that destroys the design intent.
+- Photoshop did not reliably display `lmfx` multi-shadow blocks in local testing. For bitmap layers with multiple outer shadows, export a parent group containing the content layer plus `Drop Shadow 1..n` carrier layers. Each carrier keeps one native `lfx2` drop shadow so Photoshop shows the effect while preserving the four unique shadow values.
+- A single merged `lfx2` shadow is only a compatibility fallback, not the desired representation for multi-shadow product layers.
+
 ### White Screen Postmortem
 
 - Symptom we hit in `2.0`:

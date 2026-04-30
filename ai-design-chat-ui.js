@@ -211,12 +211,6 @@
     return `${label} / ${knownLabels[model] || model}`;
   }
 
-  function getAutoModelTitle() {
-    const resolved = parseModelKey(getPreferredModelKeyFromSettings());
-    const resolvedLabel = resolved ? getModelDisplayLabel(resolved.provider, resolved.model) : getModelDisplayLabel("openai", DEFAULT_OPENAI_MODEL);
-    return `Auto · 현재 설정: ${resolvedLabel}`;
-  }
-
   function readCurrentAiSettings() {
     const source = window.__PIGMA_AI_SETTINGS__ && typeof window.__PIGMA_AI_SETTINGS__ === "object" ? window.__PIGMA_AI_SETTINGS__ : {};
     return {
@@ -369,27 +363,6 @@
       }
       return 0;
     });
-  }
-
-  function getRequestModelOptions() {
-    const allOptions = buildModelOptions().filter((option) => option.provider === "openai" || option.provider === "gemini");
-    const ordered = [];
-    const seen = new Set();
-    const appendOption = (option) => {
-      if (!option || seen.has(option.key)) {
-        return;
-      }
-      seen.add(option.key);
-      ordered.push(option);
-    };
-    const selectedKey = normalizeModelKey(state.selectedModelKey);
-    if (selectedKey === AUTO_MODEL_KEY) {
-      appendOption(allOptions.find((option) => option.key === getPreferredModelKeyFromSettings()));
-    } else {
-      appendOption(allOptions.find((option) => option.key === selectedKey));
-    }
-    allOptions.forEach(appendOption);
-    return ordered;
   }
 
   function readSelectedModelKey() {
@@ -1603,35 +1576,6 @@
     };
   }
 
-  function applySelection(selectionPayload) {
-    const nextSelection = normalizeSelection(selectionPayload);
-    const previousSignature = state.selection.selectionSignature;
-    const signatureChanged = previousSignature !== nextSelection.selectionSignature;
-    state.selection = nextSelection;
-
-    if (signatureChanged) {
-      clearLiveAssistantMessage();
-      clearSourceState();
-      cancelPendingSource("선택이 바뀌어 이전 캡처를 정리했습니다.");
-      if (state.activeRun && state.activeRun.selectionSignature !== nextSelection.selectionSignature) {
-        abortActiveRun("선택이 바뀌어 이전 답변 생성을 멈췄습니다.");
-      }
-    }
-
-    if (!nextSelection.ready) {
-      clearSourceState();
-      setStatus("idle", nextSelection.hint);
-    } else if (signatureChanged) {
-      const existingCount = getCurrentMessages().length;
-      setStatus("ready", existingCount ? "현재 선택의 이전 대화를 불러왔습니다." : nextSelection.hint);
-    } else if (!state.activeRun && !state.pendingSource && !state.source) {
-      setStatus("ready", nextSelection.hint);
-    }
-
-    render();
-    scheduleAutoCapture();
-  }
-
   function formatSelectionMeta() {
     if (!state.selection.ready) {
       return "선택 없음";
@@ -1676,100 +1620,6 @@
       return "질문하거나 다시 캡처하면 현재 선택의 스냅샷을 갱신합니다.";
     }
     return `마지막 캡처 ${formatTime(state.source.capturedAt)} · ${state.selection.captureModeLabel}`;
-  }
-
-  function renderThread() {
-    elements.thread.replaceChildren();
-    const messages = getRenderableMessages();
-    messages.forEach((message) => {
-      const item = document.createElement("article");
-      item.className = "ai-design-chat-message";
-      item.dataset.role = message.role;
-      item.dataset.streaming = message.streaming ? "true" : "false";
-
-      const head = document.createElement("div");
-      head.className = "ai-design-chat-message-head";
-
-      const role = document.createElement("p");
-      role.className = "ai-design-chat-message-role";
-      role.textContent = message.role === "assistant" ? "AI" : "사용자";
-      head.appendChild(role);
-
-      const time = document.createElement("p");
-      time.className = "ai-design-chat-message-time";
-      time.textContent = formatTime(message.createdAt);
-      head.appendChild(time);
-
-      item.appendChild(head);
-
-      if (message.summary) {
-        const summary = document.createElement("p");
-        summary.className = "ai-design-chat-message-summary";
-        summary.textContent = message.summary;
-        item.appendChild(summary);
-      }
-
-      const body = document.createElement("p");
-      body.className = "ai-design-chat-message-body";
-      body.textContent = message.content || "답변을 정리하는 중입니다.";
-      item.appendChild(body);
-
-      if (message.role === "assistant" && message.annotationNote) {
-        const note = document.createElement("p");
-        note.className = "ai-design-chat-message-note";
-        note.textContent = message.annotationNote;
-        item.appendChild(note);
-      }
-
-      if (message.role === "assistant" && !message.streaming) {
-        const actions = document.createElement("div");
-        actions.className = "ai-design-chat-message-actions";
-
-        if (shouldOfferAnnotationAction(message)) {
-          const annotationButton = document.createElement("button");
-        annotationButton.className = "button-secondary";
-        annotationButton.type = "button";
-        const annotationDisabled =
-          !state.selection.ready || message.annotationState === "applying" || state.selection.annotationTargetCount <= 0;
-        annotationButton.disabled = annotationDisabled;
-        annotationButton.textContent =
-          message.annotationState === "applied"
-            ? "주석 완료"
-            : message.annotationState === "applying"
-              ? "주석 적용 중..."
-              : "주석으로 표시";
-        annotationButton.addEventListener("click", () => {
-          requestAnnotation(message.id);
-        });
-        actions.appendChild(annotationButton);
-        }
-
-        if (message.followups.length) {
-          const followups = document.createElement("div");
-          followups.className = "ai-design-chat-followups";
-          message.followups.forEach((followup) => {
-            const button = document.createElement("button");
-            button.className = "button-secondary ai-design-chat-followup";
-            button.type = "button";
-            button.textContent = followup;
-            button.addEventListener("click", () => {
-              elements.input.value = followup;
-              elements.input.focus();
-              syncControls();
-            });
-            followups.appendChild(button);
-          });
-          actions.appendChild(followups);
-        }
-
-        item.appendChild(actions);
-      }
-
-      elements.thread.appendChild(item);
-    });
-
-    elements.thread.setAttribute("aria-busy", state.activeRun ? "true" : "false");
-    elements.thread.scrollTop = elements.thread.scrollHeight;
   }
 
   function applySelection(selectionPayload) {
@@ -1846,159 +1696,6 @@
     }
 
     item.appendChild(entry);
-  }
-
-  function renderThread() {
-    elements.thread.replaceChildren();
-    const notice = getActiveThreadNotice();
-    if (notice) {
-      const banner = document.createElement("div");
-      banner.className = "ai-design-chat-thread-notice";
-      banner.dataset.tone = notice.tone || "info";
-      banner.textContent = notice.text;
-      elements.thread.appendChild(banner);
-    }
-
-    const messages = getRenderableMessages();
-    messages.forEach((message) => {
-      const item = document.createElement("article");
-      item.className = "ai-design-chat-message";
-      item.dataset.role = message.role;
-      item.dataset.streaming = message.streaming ? "true" : "false";
-
-      const head = document.createElement("div");
-      head.className = "ai-design-chat-message-head";
-
-      const role = document.createElement("p");
-      role.className = "ai-design-chat-message-role";
-      role.textContent =
-        message.role === "assistant" ? `AI${message.modelLabel ? ` - ${message.modelLabel}` : ""}` : "사용자";
-      head.appendChild(role);
-
-      const time = document.createElement("p");
-      time.className = "ai-design-chat-message-time";
-      time.textContent = formatTime(message.createdAt);
-      head.appendChild(time);
-
-      item.appendChild(head);
-
-      if (message.summary) {
-        const summary = document.createElement("p");
-        summary.className = "ai-design-chat-message-summary";
-        summary.textContent = message.summary;
-        item.appendChild(summary);
-      }
-
-      const body = document.createElement("p");
-      body.className = "ai-design-chat-message-body";
-      body.textContent = message.content || "응답을 정리하는 중입니다.";
-      item.appendChild(body);
-
-      if (message.role === "assistant" && shouldShowRouteReason(message)) {
-        const routeNote = document.createElement("p");
-        routeNote.className = "ai-design-chat-message-note";
-        routeNote.textContent = message.routeReason;
-        item.appendChild(routeNote);
-      }
-
-      if (message.role === "assistant" && message.checklistItems.length) {
-        const checklist = document.createElement("div");
-        checklist.className = "ai-design-chat-checklist";
-        message.checklistItems.forEach((checklistItem) => {
-          renderChecklist(checklist, checklistItem);
-        });
-        item.appendChild(checklist);
-      }
-
-      if (message.role === "assistant" && message.checklistNote) {
-        const checklistNote = document.createElement("p");
-        checklistNote.className = "ai-design-chat-message-note";
-        checklistNote.textContent = message.checklistNote;
-        item.appendChild(checklistNote);
-      }
-
-      if (message.role === "assistant" && message.annotationNote) {
-        const note = document.createElement("p");
-        note.className = "ai-design-chat-message-note";
-        note.textContent = message.annotationNote;
-        item.appendChild(note);
-      }
-
-      if (message.role === "assistant" && !message.streaming) {
-        const actions = document.createElement("div");
-        actions.className = "ai-design-chat-message-actions";
-
-        const checklistButton = document.createElement("button");
-        checklistButton.className = "button-secondary";
-        checklistButton.type = "button";
-        checklistButton.disabled = isBusy() || message.checklistState === "generating";
-        checklistButton.textContent =
-          message.checklistState === "ready"
-            ? "체크리스트 다시 만들기"
-            : message.checklistState === "generating"
-              ? "체크리스트 생성 중..."
-              : "수정 체크리스트";
-        checklistButton.addEventListener("click", () => {
-          requestChecklist(message.id);
-        });
-        actions.appendChild(checklistButton);
-
-        if (shouldOfferPromptDraft(message)) {
-          const promptButton = document.createElement("button");
-          promptButton.className = "button-secondary";
-          promptButton.type = "button";
-          promptButton.textContent = "프롬프트로 보내기";
-          promptButton.addEventListener("click", () => {
-            openPromptDraft(message.id);
-          });
-          actions.appendChild(promptButton);
-        }
-
-        if (shouldOfferAnnotationAction(message)) {
-        const annotationButton = document.createElement("button");
-        annotationButton.className = "button-secondary";
-        annotationButton.type = "button";
-        const annotationDisabled =
-          !state.selection.ready || message.annotationState === "applying" || state.selection.annotationTargetCount <= 0;
-        annotationButton.disabled = annotationDisabled;
-        annotationButton.textContent =
-          message.annotationState === "applied"
-            ? "주석 완료"
-            : message.annotationState === "applying"
-              ? "주석 적용 중..."
-              : "주석으로 표시";
-        annotationButton.addEventListener("click", () => {
-          requestAnnotation(message.id);
-        });
-        actions.appendChild(annotationButton);
-        }
-
-        if (message.followups.length) {
-          const followups = document.createElement("div");
-          followups.className = "ai-design-chat-followups";
-          message.followups.forEach((followup) => {
-            const button = document.createElement("button");
-            button.className = "button-secondary ai-design-chat-followup";
-            button.type = "button";
-            button.textContent = followup;
-            button.addEventListener("click", () => {
-              elements.input.value = followup;
-              elements.input.focus();
-              syncControls();
-            });
-            followups.appendChild(button);
-          });
-          actions.appendChild(followups);
-        }
-
-        item.appendChild(actions);
-      }
-
-      elements.thread.appendChild(item);
-    });
-
-    elements.thread.setAttribute("aria-busy", state.activeRun ? "true" : "false");
-    elements.thread.scrollTop = elements.thread.scrollHeight;
   }
 
   function renderThread() {
@@ -2246,42 +1943,6 @@
       base64: encodeBytesToBase64(bytes),
       mimeType: prepared.blob.type || "image/png",
     };
-  }
-
-  function buildProviderCandidates(settings) {
-    const candidates = [];
-    const seen = new Set();
-    const append = (provider, apiKey, label, model) => {
-      const key = typeof apiKey === "string" ? apiKey.trim() : "";
-      if (!key) {
-        return;
-      }
-      const candidateKey = `${provider}:${key}:${model}`;
-      if (seen.has(candidateKey)) {
-        return;
-      }
-      seen.add(candidateKey);
-      candidates.push({
-        provider,
-        apiKey: key,
-        label,
-        model,
-      });
-    };
-
-    const next = settings && typeof settings === "object" ? settings : {};
-    const providerKeys = {
-      openai: [next.openAiApiKey, next.provider === "openai" ? next.apiKey : ""],
-      gemini: [next.geminiApiKey, next.provider === "openai" ? "" : next.apiKey],
-    };
-    getRequestModelOptions().forEach((option) => {
-      const keys = providerKeys[option.provider] || [];
-      keys.forEach((key) => {
-        append(option.provider, key, option.label, option.model);
-      });
-    });
-
-    return candidates;
   }
 
   function buildProviderCandidates(settings, requestContext) {
@@ -2992,166 +2653,6 @@
     return parseStructuredDesignChatText(getGeminiText(await response.json()), payload.question);
   }
 
-  async function requestDesignChat(payload, signal, onProgress) {
-    const settings = requireReadySettings();
-    const candidates = buildProviderCandidates(settings);
-    if (!candidates.length) {
-      throw new Error("AI 설정에서 Gemini 또는 OpenAI API 키를 먼저 입력해 주세요.");
-    }
-
-    let lastError = null;
-    for (const providerInfo of candidates) {
-      try {
-        if (providerInfo.provider === "openai") {
-          return await requestOpenAiDesignChat(providerInfo, payload, signal, onProgress);
-        }
-        return await requestGeminiDesignChat(providerInfo, payload, signal);
-      } catch (error) {
-        lastError = error;
-      }
-    }
-
-    throw lastError || new Error("AI 답변을 생성하지 못했습니다.");
-  }
-
-  async function handleSend() {
-    const question = compactText(elements.input.value, false);
-    if (!question) {
-      return;
-    }
-    const annotationRequested = hasAnnotationIntentText(question);
-    if (!state.selection.ready) {
-      state.selection = Object.assign({}, state.selection, {
-        ready: true,
-      });
-    }
-    if (!state.selection.ready) {
-      setStatus("error", "프레임, 이미지, 텍스트를 먼저 선택해 주세요.");
-      return;
-    }
-
-    const userMessage = appendCurrentMessage({
-      id: buildId("user"),
-      role: "user",
-      content: question,
-      createdAt: Date.now(),
-      annotationState: "idle",
-      followups: [],
-    });
-    elements.input.value = "";
-    render();
-
-    let source;
-    try {
-      source = await ensureSelectionSource(false);
-    } catch (error) {
-      if (!isAbortError(error)) {
-        const message = normalizeErrorMessage(error, "선택 캡처를 준비하지 못했습니다.");
-        setStatus("error", message);
-        reportUiError(message);
-      }
-      return;
-    }
-
-    const history = buildHistoryForAi(getCurrentMessages());
-    const controller = new AbortController();
-    const runId = buildId("design-chat-run");
-    const liveMessageId = buildId("assistant-live");
-    setLiveAssistantMessage({
-      id: liveMessageId,
-      role: "assistant",
-      summary: "답변 작성 중",
-      content: "",
-      createdAt: Date.now(),
-      annotationText: "",
-      annotationState: "idle",
-      annotationNote: "실시간으로 답변을 이어 쓰는 중입니다.",
-      followups: [],
-    });
-    state.activeRun = {
-      id: runId,
-      controller,
-      selectionSignature: state.selection.selectionSignature,
-      userMessageId: userMessage ? userMessage.id : "",
-      liveMessageId,
-    };
-    setStatus("running", "AI가 현재 선택의 의도를 해석하는 중입니다.");
-    render();
-
-    try {
-      const result = await requestDesignChat(
-        {
-          selection: source.selection || state.selection,
-          image: source.image,
-          question,
-          history,
-        },
-        controller.signal,
-        (partialText) => {
-          if (!state.activeRun || state.activeRun.id !== runId) {
-            return;
-          }
-          const answer = extractStreamingAnswer(partialText);
-          updateLiveAssistantMessage({
-            summary: "답변 작성 중",
-            content: answer,
-            annotationNote: "실시간으로 답변을 이어 쓰는 중입니다.",
-          });
-          renderThread();
-          syncControls();
-        }
-      );
-
-      if (!state.activeRun || state.activeRun.id !== runId) {
-        return;
-      }
-
-      clearLiveAssistantMessage();
-      appendCurrentMessage({
-        id: buildId("assistant"),
-        role: "assistant",
-        summary: result.summary,
-        content: result.answer,
-        createdAt: Date.now(),
-        annotationText: result.annotation,
-        annotationState: "idle",
-        annotationNote: "필요하면 현재 선택에 같은 요약을 주석으로 남길 수 있습니다.",
-        followups: result.followups,
-      });
-      setStatus("ready", "AI 답변을 받았습니다.");
-    } catch (error) {
-      if (!isAbortError(error)) {
-        const partial = state.liveMessage && state.liveMessage.selectionSignature === state.selection.selectionSignature
-          ? state.liveMessage.message
-          : null;
-        clearLiveAssistantMessage();
-        if (partial && partial.content) {
-          appendCurrentMessage({
-            id: buildId("assistant"),
-            role: "assistant",
-            summary: "응답이 중단됨",
-            content: partial.content,
-            createdAt: partial.createdAt || Date.now(),
-            annotationText: clipText(partial.content, 120),
-            annotationState: "error",
-            annotationNote: "응답이 중간에 끊겨 일부 내용만 남았습니다.",
-            followups: [],
-          });
-        }
-        const message = normalizeErrorMessage(error, "AI 답변을 생성하지 못했습니다.");
-        setStatus("error", message);
-        reportUiError(message);
-      } else {
-        clearLiveAssistantMessage();
-      }
-    } finally {
-      if (state.activeRun && state.activeRun.id === runId) {
-        state.activeRun = null;
-      }
-      render();
-    }
-  }
-
   async function requestDesignChat(payload, signal, onProgress, onAttempt, options) {
     const settings = requireReadySettings();
     const requestOptions = options && typeof options === "object" ? options : {};
@@ -3221,7 +2722,7 @@
 
     let source;
     try {
-      source = await ensureSelectionSource(true);
+      source = await ensureSelectionSource(false);
     } catch (error) {
       if (!isAbortError(error)) {
         const message = normalizeErrorMessage(error, "선택 캡처를 준비하지 못했습니다.");
@@ -3451,39 +2952,6 @@
     } finally {
       render();
     }
-  }
-
-  function requestAnnotation(messageId, options) {
-    const nextOptions = options && typeof options === "object" ? options : {};
-    const message = getCurrentMessages().find((entry) => entry && entry.id === messageId);
-    if (!message || !state.selection.ready) {
-      return false;
-    }
-    const annotationText = buildAnnotationText(message);
-    if (!annotationText) {
-      setStatus("error", "주석으로 남길 요약을 만들지 못했습니다.");
-      return;
-    }
-
-    const requestId = buildId("design-chat-annotation");
-    pendingAnnotationRequests.set(requestId, {
-      requestId,
-      messageId,
-      selectionSignature: state.selection.selectionSignature,
-    });
-    updateMessage(messageId, {
-      annotationState: "applying",
-      annotationNote: "현재 선택에 주석을 추가하는 중입니다.",
-    });
-    render();
-
-    postPluginMessage({
-      type: "apply-ai-design-chat-annotation",
-      clientRequestId: requestId,
-      messageId,
-      selectionSignature: state.selection.selectionSignature,
-      annotationText,
-    });
   }
 
   function requestAnnotation(messageId, options) {

@@ -63,6 +63,10 @@
   const PROMPT_TARGET_EXPORT_EMPTY_MESSAGE = "The selected layer export for prompt edit/generation was empty.";
   const PROMPT_PLACEMENT_APPLY_ERROR_MESSAGE = "Failed to place the generated prompt image.";
   const PROMPT_TEXT_ANCHOR_GAP = 24;
+  const IMAGE_MERGE_FAST_EXPORT_TIMEOUT_MS = 6000;
+  const IMAGE_MERGE_EXPORT_TIMEOUT_MS = 30000;
+  const IMAGE_MERGE_PREFERRED_EXPORT_SCALE = 2;
+  const IMAGE_MERGE_MAX_EXPORT_PIXEL_COUNT = 16000000;
 
   if (typeof originalOnMessage !== "function") {
     return;
@@ -257,14 +261,7 @@
         preparedAt: new Date().toISOString(),
       };
 
-      figma.ui.postMessage({
-        type: "ai-image-upscale-source-ready",
-        sessionId: sessionId,
-        clientRequestId: pendingSession.clientRequestId,
-        image: source.image,
-        summary: source.summary,
-        composite: source.composite || null,
-      });
+      figma.ui.postMessage(buildAiImageSourceReadyPayload(sessionId, pendingSession, source));
     } catch (error) {
       pendingSession = null;
       postPrepareError(
@@ -386,30 +383,11 @@
         originalHash: target.entry.imageHash,
         expand: expand,
         imageBounds: target.imageBounds,
+        placementMode: target.placementMode || "underlay",
         preparedAt: new Date().toISOString(),
       };
 
-      figma.ui.postMessage({
-        type: "image-extend-source-ready",
-        sessionId: sessionId,
-        clientRequestId: pendingImageExtendSession.clientRequestId,
-        image: target.image,
-        summary: {
-          selectionLabel: pendingImageExtendSession.selectionLabel,
-          targetNodeName: target.entry.nodeName,
-          captureMode: "image-bounds",
-          currentWidth: target.currentWidth,
-          currentHeight: target.currentHeight,
-          targetWidth: target.currentWidth + expand.left + expand.right,
-          targetHeight: target.currentHeight + expand.top + expand.bottom,
-          expandTop: expand.top,
-          expandRight: expand.right,
-          expandBottom: expand.bottom,
-          expandLeft: expand.left,
-          expansionSource: expand.source || "prompt",
-          byteLength: target.image.bytes.length,
-        },
-      });
+      figma.ui.postMessage(buildImageExtendSourceReadyPayload(sessionId, pendingImageExtendSession, target, expand));
     } catch (error) {
       pendingImageExtendSession = null;
       postImageExtendSourceError(
@@ -529,39 +507,7 @@
         preparedAt: new Date().toISOString(),
       };
 
-      figma.ui.postMessage({
-        type: "image-composite-source-ready",
-        sessionId: sessionId,
-        clientRequestId: pendingCompositeSession.clientRequestId,
-        layers: collection.layers.map(function (layer) {
-          return {
-            nodeId: layer.nodeId,
-            nodeName: layer.nodeName,
-            role: layer.role,
-            orderIndex: layer.orderIndex,
-            fileName: layer.fileName,
-            mimeType: layer.mimeType,
-            bytes: layer.bytes,
-            layerKind: layer.layerKind || "image",
-            nodeType: layer.nodeType || "",
-            textContent: layer.textContent || "",
-            offsetX: layer.offsetX,
-            offsetY: layer.offsetY,
-            width: layer.visibleRect.width,
-            height: layer.visibleRect.height,
-          };
-        }),
-        summary: {
-          selectionLabel: pendingCompositeSession.selectionLabel,
-          layerCount: collection.layers.length,
-          skippedCount: collection.skipped.length,
-          backgroundNodeName:
-            pendingCompositeSession.selectedRootNodeName || (collection.layers[0] ? collection.layers[0].nodeName : ""),
-          foregroundCount: Math.max(0, collection.layers.length - 1),
-          canvasWidth: collection.unionRect.width,
-          canvasHeight: collection.unionRect.height,
-        },
-      });
+      figma.ui.postMessage(buildImageCompositeSourceReadyPayload(sessionId, pendingCompositeSession, collection));
     } catch (error) {
       pendingCompositeSession = null;
       postImageCompositeSourceError(
@@ -800,14 +746,7 @@
 
     try {
       const source = await collectPromptDraftSourceFromSelection();
-      figma.ui.postMessage({
-        type: "ai-image-prompt-draft-source-ready",
-        clientRequestId: sanitizeClientRequestId(message && message.clientRequestId),
-        sourceType: source.sourceType,
-        text: source.text || "",
-        image: source.image || null,
-        summary: source.summary || {},
-      });
+      figma.ui.postMessage(buildPromptDraftSourcePayload(source, message));
     } catch (error) {
       postPromptDraftSourceError(
         normalizeErrorMessage(error, PROMPT_DRAFT_SOURCE_PREPARE_ERROR_MESSAGE),
@@ -816,6 +755,221 @@
     } finally {
       isPromptDraftPreparing = false;
     }
+  }
+
+  function buildPromptDraftSourcePayload(source, message) {
+    return {
+      type: "ai-image-prompt-draft-source-ready",
+      clientRequestId: sanitizeClientRequestId(message && message.clientRequestId),
+      sourceType:
+        source && typeof source.sourceType === "string" && source.sourceType ? source.sourceType : "image",
+      text: source && typeof source.text === "string" ? source.text : "",
+      image: sanitizePromptDraftImagePayload(source && source.image),
+      summary: sanitizePromptDraftSummaryPayload(source && source.summary),
+    };
+  }
+
+  function buildAiImageSourceReadyPayload(sessionId, session, source) {
+    return {
+      type: "ai-image-upscale-source-ready",
+      sessionId: typeof sessionId === "string" ? sessionId : "",
+      clientRequestId: session && session.clientRequestId ? session.clientRequestId : "",
+      image: sanitizeImageMessagePayload(source && source.image),
+      summary: sanitizeImageMessageSummaryPayload(source && source.summary),
+      composite: sanitizeCompositeMessagePayload(source && source.composite),
+    };
+  }
+
+  function buildImageExtendSourceReadyPayload(sessionId, session, target, expand) {
+    const sourceImage = target && target.image ? target.image : null;
+    const currentWidth = Number(target && target.currentWidth) || 0;
+    const currentHeight = Number(target && target.currentHeight) || 0;
+    const safeExpand = sanitizeImageExtendExpandPayload(expand);
+    return {
+      type: "image-extend-source-ready",
+      sessionId: typeof sessionId === "string" ? sessionId : "",
+      clientRequestId: session && session.clientRequestId ? session.clientRequestId : "",
+      image: sanitizeImageMessagePayload(sourceImage),
+      summary: sanitizeImageMessageSummaryPayload({
+        selectionLabel: session && session.selectionLabel ? session.selectionLabel : "",
+        targetNodeName: target && target.entry && target.entry.nodeName ? target.entry.nodeName : "",
+        captureMode: "image-bounds",
+        currentWidth: currentWidth,
+        currentHeight: currentHeight,
+        targetWidth: currentWidth + safeExpand.left + safeExpand.right,
+        targetHeight: currentHeight + safeExpand.top + safeExpand.bottom,
+        expandTop: safeExpand.top,
+        expandRight: safeExpand.right,
+        expandBottom: safeExpand.bottom,
+        expandLeft: safeExpand.left,
+        expansionSource: safeExpand.source,
+        byteLength: sourceImage && sourceImage.bytes ? sourceImage.bytes.length : 0,
+      }),
+    };
+  }
+
+  function buildImageCompositeSourceReadyPayload(sessionId, session, collection) {
+    const layers = collection && Array.isArray(collection.layers) ? collection.layers : [];
+    const skipped = collection && Array.isArray(collection.skipped) ? collection.skipped : [];
+    const unionRect = collection && collection.unionRect ? collection.unionRect : {};
+    return {
+      type: "image-composite-source-ready",
+      sessionId: typeof sessionId === "string" ? sessionId : "",
+      clientRequestId: session && session.clientRequestId ? session.clientRequestId : "",
+      layers: layers.map(sanitizeCompositeLayerMessagePayload).filter(Boolean),
+      summary: sanitizeImageMessageSummaryPayload({
+        selectionLabel: session && session.selectionLabel ? session.selectionLabel : "",
+        layerCount: layers.length,
+        skippedCount: skipped.length,
+        backgroundNodeName:
+          session && session.selectedRootNodeName
+            ? session.selectedRootNodeName
+            : layers[0] && layers[0].nodeName
+              ? layers[0].nodeName
+              : "",
+        foregroundCount: Math.max(0, layers.length - 1),
+        canvasWidth: unionRect.width,
+        canvasHeight: unionRect.height,
+      }),
+    };
+  }
+
+  function sanitizePromptDraftImagePayload(image) {
+    return sanitizeImageMessagePayload(image);
+  }
+
+  function sanitizeImageMessagePayload(image) {
+    if (!image || typeof image !== "object") {
+      return null;
+    }
+
+    const bytes = normalizeBytes(image.bytes);
+    if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
+      return null;
+    }
+
+    return {
+      bytes: bytes,
+      mimeType: typeof image.mimeType === "string" && image.mimeType ? image.mimeType : "image/png",
+      fileName: typeof image.fileName === "string" && image.fileName ? image.fileName : "figma-image.png",
+    };
+  }
+
+  function sanitizePromptDraftSummaryPayload(summary) {
+    return sanitizeImageMessageSummaryPayload(summary);
+  }
+
+  function sanitizeImageMessageSummaryPayload(summary) {
+    if (!summary || typeof summary !== "object") {
+      return {};
+    }
+
+    const payload = {};
+    const textKeys = [
+      "selectionLabel",
+      "targetNodeName",
+      "captureMode",
+      "requestMode",
+      "pipelineMode",
+      "placementMode",
+      "textMode",
+      "imageHash",
+      "expansionSource",
+      "backgroundNodeName",
+    ];
+    const numberKeys = [
+      "targetFillCount",
+      "targetWidth",
+      "targetHeight",
+      "sourceWidth",
+      "sourceHeight",
+      "currentWidth",
+      "currentHeight",
+      "byteLength",
+      "textLength",
+      "expandTop",
+      "expandRight",
+      "expandBottom",
+      "expandLeft",
+      "layerCount",
+      "skippedCount",
+      "foregroundCount",
+      "canvasWidth",
+      "canvasHeight",
+    ];
+
+    for (let index = 0; index < textKeys.length; index += 1) {
+      const key = textKeys[index];
+      if (typeof summary[key] === "string") {
+        payload[key] = summary[key];
+      }
+    }
+
+    for (let index = 0; index < numberKeys.length; index += 1) {
+      const key = numberKeys[index];
+      const value = Number(summary[key]);
+      if (Number.isFinite(value)) {
+        payload[key] = value;
+      }
+    }
+
+    return payload;
+  }
+
+  function sanitizeCompositeMessagePayload(composite) {
+    if (!composite || typeof composite !== "object") {
+      return null;
+    }
+
+    const layers = Array.isArray(composite.layers)
+      ? composite.layers.map(sanitizeCompositeLayerMessagePayload).filter(Boolean)
+      : [];
+    if (!layers.length) {
+      return null;
+    }
+
+    return {
+      layers: layers,
+      summary: sanitizeImageMessageSummaryPayload(composite.summary),
+    };
+  }
+
+  function sanitizeCompositeLayerMessagePayload(layer) {
+    if (!layer || typeof layer !== "object") {
+      return null;
+    }
+
+    const bytes = normalizeBytes(layer.bytes);
+    if (!bytes.length) {
+      return null;
+    }
+
+    return {
+      nodeId: typeof layer.nodeId === "string" ? layer.nodeId : "",
+      nodeName: typeof layer.nodeName === "string" ? layer.nodeName : "",
+      role: typeof layer.role === "string" ? layer.role : "",
+      orderIndex: Number.isFinite(Number(layer.orderIndex)) ? Number(layer.orderIndex) : 0,
+      fileName: typeof layer.fileName === "string" && layer.fileName ? layer.fileName : "figma-image.png",
+      mimeType: typeof layer.mimeType === "string" && layer.mimeType ? layer.mimeType : "image/png",
+      bytes: bytes,
+      layerKind: typeof layer.layerKind === "string" && layer.layerKind ? layer.layerKind : "image",
+      nodeType: typeof layer.nodeType === "string" ? layer.nodeType : "",
+      textContent: typeof layer.textContent === "string" ? layer.textContent : "",
+      offsetX: Number.isFinite(Number(layer.offsetX)) ? Number(layer.offsetX) : 0,
+      offsetY: Number.isFinite(Number(layer.offsetY)) ? Number(layer.offsetY) : 0,
+      width: Number.isFinite(Number(layer.width)) ? Number(layer.width) : 0,
+      height: Number.isFinite(Number(layer.height)) ? Number(layer.height) : 0,
+    };
+  }
+
+  function sanitizeImageExtendExpandPayload(expand) {
+    return {
+      top: sanitizeImageExtendPaddingValue(expand && expand.top),
+      right: sanitizeImageExtendPaddingValue(expand && expand.right),
+      bottom: sanitizeImageExtendPaddingValue(expand && expand.bottom),
+      left: sanitizeImageExtendPaddingValue(expand && expand.left),
+      source: typeof (expand && expand.source) === "string" && expand.source ? expand.source : "prompt",
+    };
   }
 
   async function prepareImageTextOverlaySource(message) {
@@ -1203,6 +1357,7 @@
       },
       targetWidth: roundBoundsFitMetric(node.width),
       targetHeight: roundBoundsFitMetric(node.height),
+      placementMode: hasChildren(node) ? "outside-reference" : "inside-target",
     };
   }
 
@@ -1322,55 +1477,6 @@
       throw new Error(PROMPT_TARGET_EXPORT_ERROR_MESSAGE);
     }
 
-    let composite = null;
-    let collection = null;
-    if (hasChildren(node)) {
-      try {
-        collection = await collectImageCompositeTargetsFromSelection([node]);
-      } catch (error) {
-        collection = null;
-      }
-      if (collection && Array.isArray(collection.layers)) {
-        const imageLayerCount = collection.layers.filter(function (layer) {
-          return !!layer && layer.layerKind === "image";
-        }).length;
-        if (imageLayerCount >= 2) {
-          throw new Error(PROMPT_MULTI_IMAGE_CONTAINER_MESSAGE);
-        }
-        if (collection.layers.length >= 2 && collection.unionRect) {
-          composite = {
-            layers: collection.layers.map(function (layer) {
-              return {
-                nodeId: layer.nodeId,
-                nodeName: layer.nodeName,
-                role: layer.role,
-                orderIndex: layer.orderIndex,
-                fileName: layer.fileName,
-                mimeType: layer.mimeType,
-                bytes: layer.bytes,
-                layerKind: layer.layerKind || "image",
-                nodeType: layer.nodeType || "",
-                textContent: layer.textContent || "",
-                offsetX: layer.offsetX,
-                offsetY: layer.offsetY,
-                width: layer.visibleRect.width,
-                height: layer.visibleRect.height,
-              };
-            }),
-            summary: {
-              selectionLabel: formatSelectionLabel(target.selection),
-              layerCount: collection.layers.length,
-              skippedCount: Array.isArray(collection.skipped) ? collection.skipped.length : 0,
-              backgroundNodeName: safeName(node),
-              foregroundCount: Math.max(0, collection.layers.length - 1),
-              canvasWidth: collection.unionRect.width,
-              canvasHeight: collection.unionRect.height,
-            },
-          };
-        }
-      }
-    }
-
     const bytes = await node.exportAsync({
       format: "PNG",
       useAbsoluteBounds: false,
@@ -1399,9 +1505,9 @@
         targetHeight: roundBoundsFitMetric(node.height),
         requestMode: "image-edit",
         byteLength: bytes.length,
-        pipelineMode: composite ? "composite" : "upscale",
+        pipelineMode: target.placementMode === "outside-reference" ? "reference-placement" : "upscale",
+        placementMode: target.placementMode || "",
       },
-      composite: composite,
     };
   }
 
@@ -1710,10 +1816,6 @@
       throw new Error("The selected layer could not be read.");
     }
 
-    if (hasChildren(node)) {
-      throw new Error("Image extend does not support frames, groups, or layers with children yet.");
-    }
-
     if ("locked" in node && node.locked) {
       throw new Error("Locked layers are not supported for image extend.");
     }
@@ -1723,7 +1825,10 @@
     }
 
     if (!hasSimpleVisibleImagePaint(node)) {
-      throw new Error("Image extend requires a layer with exactly one visible IMAGE fill.");
+      if (isImageExtendReferencePlacementNode(node)) {
+        return await collectImageExtendReferencePlacementTarget(node, selection);
+      }
+      throw new Error("Image extend requires one image layer, text layer, or composite frame.");
     }
 
     if (!node.parent || !canUseImageExtendParent(node.parent)) {
@@ -1776,6 +1881,61 @@
           {
             nodeName: safeName(node),
             imageHash: fill.imageHash || node.id,
+          },
+          "png"
+        ),
+      },
+    };
+  }
+
+  function isImageExtendReferencePlacementNode(node) {
+    return (
+      !!node &&
+      !node.removed &&
+      (node.type === "TEXT" || hasChildren(node)) &&
+      typeof node.exportAsync === "function" &&
+      typeof node.width === "number" &&
+      typeof node.height === "number" &&
+      node.width > 0 &&
+      node.height > 0
+    );
+  }
+
+  async function collectImageExtendReferencePlacementTarget(node, selection) {
+    const width = typeof node.width === "number" && Number.isFinite(node.width) ? node.width : 0;
+    const height = typeof node.height === "number" && Number.isFinite(node.height) ? node.height : 0;
+    if (!(width > 0) || !(height > 0)) {
+      throw new Error("Could not determine the current layer size.");
+    }
+
+    const imageBounds = buildImageExtendFullLocalBounds(width, height);
+    const bytes = await node.exportAsync({
+      format: "PNG",
+      useAbsoluteBounds: false,
+    });
+    if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
+      throw new Error("Could not export the selected layer as PNG.");
+    }
+
+    return {
+      selection: selection,
+      placementMode: "outside-reference",
+      entry: {
+        nodeId: node.id,
+        nodeName: safeName(node),
+        imageHash: "",
+      },
+      currentWidth: imageBounds.width,
+      currentHeight: imageBounds.height,
+      imageBounds: imageBounds,
+      boundsPadding: { top: 0, right: 0, bottom: 0, left: 0 },
+      image: {
+        bytes: bytes,
+        mimeType: "image/png",
+        fileName: buildFileName(
+          {
+            nodeName: safeName(node),
+            imageHash: node.id,
           },
           "png"
         ),
@@ -2053,20 +2213,24 @@
       return buildImageExtendApplyResult(session, null, byteLength, skipped);
     }
 
-    if (!node.parent || !canUseImageExtendParent(node.parent)) {
-      skipped.push({
-        nodeId: node.id,
-        nodeName: safeName(node),
-        reason: "The current parent container does not support inserting the extended background.",
-      });
-      return buildImageExtendApplyResult(session, null, byteLength, skipped);
-    }
-
     if ("rotation" in node && typeof node.rotation === "number" && Math.abs(node.rotation) > 0.01) {
       skipped.push({
         nodeId: node.id,
         nodeName: safeName(node),
         reason: "Rotated image layers are not supported yet.",
+      });
+      return buildImageExtendApplyResult(session, null, byteLength, skipped);
+    }
+
+    if (session && session.placementMode === "outside-reference") {
+      return applyImageExtendOutsideReference(session, node, newImageHash, byteLength, skipped);
+    }
+
+    if (!node.parent || !canUseImageExtendParent(node.parent)) {
+      skipped.push({
+        nodeId: node.id,
+        nodeName: safeName(node),
+        reason: "The current parent container does not support inserting the extended background.",
       });
       return buildImageExtendApplyResult(session, null, byteLength, skipped);
     }
@@ -2138,6 +2302,72 @@
     }
   }
 
+  function applyImageExtendOutsideReference(session, targetNode, newImageHash, byteLength, skipped) {
+    let resultNode = null;
+    try {
+      const localBounds = getImageExtendLocalBounds(targetNode);
+      const absoluteRect = getBoundsFitNodeRect(targetNode);
+      const expand = session.expand || { top: 0, right: 0, bottom: 0, left: 0 };
+      const imageBounds = normalizeImageExtendLocalBounds(
+        session.imageBounds,
+        localBounds && localBounds.width > 0 ? localBounds.width : targetNode.width,
+        localBounds && localBounds.height > 0 ? localBounds.height : targetNode.height
+      );
+      const nextWidth = Math.max(1, roundBoundsFitMetric(imageBounds.width + expand.left + expand.right));
+      const nextHeight = Math.max(1, roundBoundsFitMetric(imageBounds.height + expand.top + expand.bottom));
+
+      resultNode = figma.createRectangle();
+      resultNode.name = safeName(targetNode) + " / extended";
+      resultNode.resize(nextWidth, nextHeight);
+      resultNode.fills = [buildVisibleImageFill(newImageHash)];
+      resultNode.strokes = [];
+      if ("cornerRadius" in resultNode) {
+        resultNode.cornerRadius = 0;
+      }
+
+      if (
+        targetNode.parent &&
+        canUseImageExtendParent(targetNode.parent) &&
+        !isAutoLayoutNode(targetNode.parent) &&
+        localBounds
+      ) {
+        const parent = targetNode.parent;
+        const insertIndex = findNodeChildIndex(parent, targetNode.id);
+        if (insertIndex >= 0) {
+          parent.insertChild(insertIndex + 1, resultNode);
+        } else {
+          parent.insertChild(parent.children.length, resultNode);
+        }
+        setImageExtendNodePosition(resultNode, localBounds.x + localBounds.width + PROMPT_TEXT_ANCHOR_GAP, localBounds.y);
+      } else if (absoluteRect) {
+        figma.currentPage.appendChild(resultNode);
+        resultNode.x = roundBoundsFitMetric(absoluteRect.x + absoluteRect.width + PROMPT_TEXT_ANCHOR_GAP);
+        resultNode.y = roundBoundsFitMetric(absoluteRect.y);
+      } else {
+        const viewportCenter = figma.viewport && figma.viewport.center ? figma.viewport.center : { x: 0, y: 0 };
+        figma.currentPage.appendChild(resultNode);
+        resultNode.x = roundBoundsFitMetric(viewportCenter.x - resultNode.width / 2);
+        resultNode.y = roundBoundsFitMetric(viewportCenter.y - resultNode.height / 2);
+      }
+
+      figma.currentPage.selection = [resultNode];
+      if (typeof figma.viewport.scrollAndZoomIntoView === "function") {
+        figma.viewport.scrollAndZoomIntoView([resultNode]);
+      }
+      return buildImageExtendApplyResult(session, resultNode, byteLength, skipped);
+    } catch (error) {
+      if (resultNode && !resultNode.removed && resultNode.parent) {
+        resultNode.remove();
+      }
+      skipped.push({
+        nodeId: targetNode && targetNode.id ? targetNode.id : session.targetNodeId,
+        nodeName: targetNode ? safeName(targetNode) : session.targetNodeName,
+        reason: normalizeErrorMessage(error, "Failed to place the generated image extend result."),
+      });
+      return buildImageExtendApplyResult(session, null, byteLength, skipped);
+    }
+  }
+
   function buildImageExtendApplyResult(session, group, byteLength, skipped) {
     const appliedCount = group ? 1 : 0;
     const groupName = group && typeof group.name === "string" ? group.name : "";
@@ -2176,6 +2406,7 @@
         resultNodeName: nodeName,
         placementMode: typeof placementMode === "string" ? placementMode : "",
         resultByteLength: byteLength,
+        exportScale: session && Number(session.exportScale) > 0 ? Number(session.exportScale) : 1,
       },
       skipped: Array.isArray(skipped) ? skipped.slice(0, 24) : [],
     };
@@ -2196,6 +2427,7 @@
           selectedRootNodeId: source.selectedRootNodeId,
           selectedRootNodeName: source.selectedRootNodeName,
           unionRect: source.unionRect,
+          exportScale: source.exportScale,
           preserveSelectedRootTransform: source.preserveSelectedRootTransform,
           selectedRootWidth: source.selectedRootWidth,
           selectedRootHeight: source.selectedRootHeight,
@@ -2204,14 +2436,26 @@
         source.bytes.length
       );
 
+      const appliedCount = result && result.summary && Number(result.summary.appliedCount) > 0 ? 1 : 0;
+      if (!appliedCount) {
+        const failureMessage = buildImageMergeFailureMessage(result);
+        figma.ui.postMessage({
+          type: "image-merge-error",
+          clientRequestId: clientRequestId,
+          message: failureMessage,
+          result: result,
+        });
+        figma.notify(failureMessage, { error: true, timeout: 3200 });
+        return;
+      }
+
       figma.ui.postMessage({
         type: "image-merge-result",
         clientRequestId: clientRequestId,
         result: result,
       });
 
-      const appliedCount = result && result.summary && Number(result.summary.appliedCount) > 0 ? 1 : 0;
-      figma.notify(appliedCount ? "이미지 병합 레이어를 만들었습니다." : "이미지 병합 레이어를 만들지 못했습니다.", {
+      figma.notify("이미지 병합 레이어를 만들었습니다.", {
         timeout: 2200,
       });
     } catch (error) {
@@ -2225,17 +2469,76 @@
     }
   }
 
+  function buildImageMergeFailureMessage(result) {
+    const skipped = result && Array.isArray(result.skipped) ? result.skipped : [];
+    for (let index = 0; index < skipped.length; index += 1) {
+      const reason = skipped[index] && typeof skipped[index].reason === "string" ? skipped[index].reason.trim() : "";
+      if (reason) {
+        return "이미지 병합 레이어를 만들지 못했습니다: " + reason;
+      }
+    }
+
+    const summary = result && result.summary ? result.summary : {};
+    const byteLength = Number(summary.resultByteLength) || 0;
+    if (byteLength > 0) {
+      return "이미지 병합 PNG는 생성됐지만 새 레이어로 배치하지 못했습니다.";
+    }
+
+    return "이미지 병합 레이어를 만들지 못했습니다.";
+  }
+
+  function withImageMergeTimeout(promise, timeoutMs, label) {
+    const ms = Number(timeoutMs) || 0;
+    if (ms <= 0 || typeof setTimeout !== "function" || typeof clearTimeout !== "function") {
+      return Promise.resolve(promise);
+    }
+
+    let settled = false;
+    let timerId = null;
+    const taskLabel = typeof label === "string" && label.trim() ? label.trim() : "이미지 병합";
+    return new Promise(function (resolve, reject) {
+      timerId = setTimeout(function () {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        reject(new Error(taskLabel + " 시간이 초과되었습니다. 선택 범위를 줄이거나 복잡한 마스크 그룹은 프레임 단위로 다시 시도해주세요."));
+      }, ms);
+
+      Promise.resolve(promise).then(
+        function (value) {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          clearTimeout(timerId);
+          resolve(value);
+        },
+        function (error) {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          clearTimeout(timerId);
+          reject(error);
+        }
+      );
+    });
+  }
+
   async function exportImageMergeSelection() {
     const selection = Array.from(figma.currentPage.selection || []).filter(function (node) {
-      return !!node && !node.removed && typeof node.exportAsync === "function";
+      return isImageMergeExportableNode(node);
     });
     if (!selection.length) {
       throw new Error("이미지로 병합할 프레임, 그룹, 레이어를 먼저 선택해주세요.");
     }
 
-    const rects = selection
+    const exportSelection = resolveImageMergeExportSelection(selection);
+
+    const rects = exportSelection
       .map(function (node) {
-        return getBoundsFitNodeRect(node);
+        return getImageMergeNodeRect(node);
       })
       .filter(Boolean);
     const unionRect = unionAbsoluteRects(rects);
@@ -2243,17 +2546,12 @@
       throw new Error("선택한 항목의 병합 영역을 계산하지 못했습니다.");
     }
 
-    const exportSettings = {
-      format: "PNG",
-      useAbsoluteBounds: true,
-    };
+    const exportScale = resolveImageMergeExportScale(unionRect);
+    const exportSettings = buildImageMergeExportSettings(exportScale);
 
-    let bytes = null;
-    if (selection.length === 1) {
-      bytes = await selection[0].exportAsync(exportSettings);
-    } else {
-      bytes = await exportImageMergeMultipleSelection(selection, unionRect, exportSettings);
-    }
+    const bytes =
+      (await tryExportImageMergeDirectSelection(exportSelection, exportSettings)) ||
+      (await exportImageMergeFrameSelection(exportSelection, unionRect, exportSettings));
 
     if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
       throw new Error("이미지 병합 PNG가 비어 있습니다.");
@@ -2261,23 +2559,232 @@
 
     return {
       selectionLabel: formatSelectionLabel(selection),
-      selectedRootNodeId: selection.length === 1 && selection[0] && typeof selection[0].id === "string" ? selection[0].id : "",
-      selectedRootNodeName: selection.length === 1 ? safeName(selection[0]) : "",
-      preserveSelectedRootTransform: selection.length === 1,
+      selectedRootNodeId:
+        exportSelection.length === 1 && exportSelection[0] && typeof exportSelection[0].id === "string"
+          ? exportSelection[0].id
+          : "",
+      selectedRootNodeName: exportSelection.length === 1 ? safeName(exportSelection[0]) : "",
+      preserveSelectedRootTransform: exportSelection.length === 1,
       selectedRootWidth:
-        selection.length === 1 && typeof selection[0].width === "number" && Number.isFinite(selection[0].width)
-          ? selection[0].width
+        exportSelection.length === 1 &&
+        typeof exportSelection[0].width === "number" &&
+        Number.isFinite(exportSelection[0].width)
+          ? exportSelection[0].width
           : 0,
       selectedRootHeight:
-        selection.length === 1 && typeof selection[0].height === "number" && Number.isFinite(selection[0].height)
-          ? selection[0].height
+        exportSelection.length === 1 &&
+        typeof exportSelection[0].height === "number" &&
+        Number.isFinite(exportSelection[0].height)
+          ? exportSelection[0].height
           : 0,
       unionRect: unionRect,
+      exportScale: exportScale,
       bytes: bytes,
     };
   }
 
-  async function exportImageMergeMultipleSelection(selection, unionRect, exportSettings) {
+  function buildImageMergeExportSettings(exportScale) {
+    const settings = {
+      format: "PNG",
+      useAbsoluteBounds: true,
+    };
+    const scale = Number(exportScale) || 1;
+    if (Math.abs(scale - 1) > 0.01) {
+      settings.constraint = {
+        type: "SCALE",
+        value: scale,
+      };
+    }
+    return settings;
+  }
+
+  function resolveImageMergeExportScale(unionRect) {
+    const width = unionRect && Number(unionRect.width) > 0 ? Number(unionRect.width) : 0;
+    const height = unionRect && Number(unionRect.height) > 0 ? Number(unionRect.height) : 0;
+    const area = width * height;
+    if (!(area > 0) || !Number.isFinite(area)) {
+      return 1;
+    }
+
+    const maxScale = Math.sqrt(IMAGE_MERGE_MAX_EXPORT_PIXEL_COUNT / area);
+    const scale = Math.min(IMAGE_MERGE_PREFERRED_EXPORT_SCALE, maxScale);
+    if (scale >= 1.75) {
+      return 2;
+    }
+    if (scale >= 1.35) {
+      return 1.5;
+    }
+    return 1;
+  }
+
+  function resolveImageMergeExportSelection(selection) {
+    if (!Array.isArray(selection) || !selection.length) {
+      return [];
+    }
+
+    const result = [];
+    const seen = {};
+    for (let index = 0; index < selection.length; index += 1) {
+      const node = selection[index];
+      const exportNode = findImageMergeMaskContainer(node) || node;
+      if (!isImageMergeExportableNode(exportNode) || seen[exportNode.id]) {
+        continue;
+      }
+      seen[exportNode.id] = true;
+      result.push(exportNode);
+    }
+
+    return result.length ? result : selection;
+  }
+
+  function isImageMergeExportableNode(node) {
+    return (
+      !!node &&
+      !node.removed &&
+      node.type !== "PAGE" &&
+      node.type !== "DOCUMENT" &&
+      typeof node.exportAsync === "function"
+    );
+  }
+
+  async function tryExportImageMergeDirectSelection(selection, exportSettings) {
+    if (!Array.isArray(selection) || selection.length !== 1 || !isImageMergeExportableNode(selection[0])) {
+      return null;
+    }
+
+    try {
+      const bytes = await withImageMergeTimeout(
+        selection[0].exportAsync(exportSettings),
+        IMAGE_MERGE_FAST_EXPORT_TIMEOUT_MS,
+        "이미지 병합 빠른 export"
+      );
+      return bytes && typeof bytes.length === "number" && bytes.length > 0 ? bytes : null;
+    } catch (error) {
+      console.warn("[pigma] image merge direct export fallback:", normalizeErrorMessage(error, "direct export failed"));
+      return null;
+    }
+  }
+
+  function hasImageMergeChildren(node) {
+    return !!node && "children" in node && Array.isArray(node.children) && node.children.length > 0;
+  }
+
+  function findImageMergeMaskContainer(node) {
+    let current = node;
+    while (current && current.parent && current.parent.type !== "DOCUMENT") {
+      if (isImageMergeExportableNode(current) && hasImageMergeDirectMaskChild(current)) {
+        return current;
+      }
+
+      const parent = current.parent;
+      if (!parent || parent.type === "PAGE" || parent.type === "DOCUMENT") {
+        break;
+      }
+
+      if (isImageMergeExportableNode(parent) && hasImageMergeDirectMaskChild(parent)) {
+        return parent;
+      }
+
+      current = parent;
+    }
+
+    return null;
+  }
+
+  function hasImageMergeDirectMaskChild(node) {
+    if (!node || !("children" in node) || !Array.isArray(node.children)) {
+      return false;
+    }
+
+    for (let index = 0; index < node.children.length; index += 1) {
+      const child = node.children[index];
+      if (child && child.isMask === true) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  function hasImageMergeMaskDescendant(node, depth) {
+    if (!node || depth > 8 || !hasImageMergeChildren(node)) {
+      return false;
+    }
+
+    for (let index = 0; index < node.children.length; index += 1) {
+      const child = node.children[index];
+      if (!child || child.removed) {
+        continue;
+      }
+      if (child.isMask === true || hasImageMergeMaskDescendant(child, depth + 1)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  function getImageMergeNodeRect(node) {
+    return getBoundsFitNodeRect(node) || getImageMergeChildrenUnionRect(node, 0);
+  }
+
+  function getImageMergeChildrenUnionRect(node, depth) {
+    if (!node || depth > 8 || !("children" in node) || !Array.isArray(node.children)) {
+      return null;
+    }
+
+    const rects = [];
+    for (let index = 0; index < node.children.length; index += 1) {
+      const child = node.children[index];
+      if (!child || child.removed || child.visible === false) {
+        continue;
+      }
+
+      const rect = getBoundsFitNodeRect(child) || getImageMergeChildrenUnionRect(child, depth + 1);
+      if (rect) {
+        rects.push(rect);
+      }
+    }
+
+    return unionAbsoluteRects(rects);
+  }
+
+  function positionImageMergePreviewClone(sourceNode, clonedNode, unionRect, fallbackRect) {
+    if (
+      "relativeTransform" in clonedNode &&
+      Array.isArray(clonedNode.relativeTransform) &&
+      Array.isArray(sourceNode.absoluteTransform) &&
+      sourceNode.absoluteTransform.length >= 2
+    ) {
+      const row0 = Array.isArray(sourceNode.absoluteTransform[0]) ? sourceNode.absoluteTransform[0] : null;
+      const row1 = Array.isArray(sourceNode.absoluteTransform[1]) ? sourceNode.absoluteTransform[1] : null;
+      if (row0 && row1 && row0.length >= 3 && row1.length >= 3) {
+        clonedNode.relativeTransform = [
+          [
+            Number(row0[0]) || 0,
+            Number(row0[1]) || 0,
+            roundBoundsFitMetric((Number(row0[2]) || 0) - unionRect.x),
+          ],
+          [
+            Number(row1[0]) || 0,
+            Number(row1[1]) || 0,
+            roundBoundsFitMetric((Number(row1[2]) || 0) - unionRect.y),
+          ],
+        ];
+        return;
+      }
+    }
+
+    if ("x" in clonedNode && typeof clonedNode.x === "number" && "y" in clonedNode && typeof clonedNode.y === "number") {
+      clonedNode.x = roundBoundsFitMetric(fallbackRect.x - unionRect.x);
+      clonedNode.y = roundBoundsFitMetric(fallbackRect.y - unionRect.y);
+      return;
+    }
+
+    throw new Error("Could not position the preview clone for image merge.");
+  }
+
+  async function exportImageMergeFrameSelection(selection, unionRect, exportSettings) {
     const preview = figma.createFrame();
     const clones = [];
     try {
@@ -2293,26 +2800,28 @@
       const orderedSelection = selection.slice().sort(compareSceneNodeCanvasOrder);
       for (let index = 0; index < orderedSelection.length; index += 1) {
         const node = orderedSelection[index];
-        const rect = getBoundsFitNodeRect(node);
+        if (!isImageMergeExportableNode(node)) {
+          continue;
+        }
+        const rect = getImageMergeNodeRect(node);
         if (!rect) {
           continue;
         }
         const clone = node.clone();
         preview.appendChild(clone);
         clones.push(clone);
-        if ("x" in clone && typeof clone.x === "number") {
-          clone.x = roundBoundsFitMetric(rect.x - unionRect.x);
-        }
-        if ("y" in clone && typeof clone.y === "number") {
-          clone.y = roundBoundsFitMetric(rect.y - unionRect.y);
-        }
+        positionImageMergePreviewClone(node, clone, unionRect, rect);
       }
 
       if (!clones.length) {
         throw new Error("병합 가능한 선택 레이어를 찾지 못했습니다.");
       }
 
-      return await preview.exportAsync(exportSettings);
+      return await withImageMergeTimeout(
+        preview.exportAsync(exportSettings),
+        IMAGE_MERGE_EXPORT_TIMEOUT_MS,
+        "이미지 병합 preview export"
+      );
     } finally {
       for (let index = 0; index < clones.length; index += 1) {
         if (clones[index] && !clones[index].removed) {
@@ -2351,7 +2860,7 @@
           ? Number(session.selectedRootHeight)
           : unionRect.height;
       resultNode.resize(resultWidth, resultHeight);
-      resultNode.fills = [buildVisibleImageFill(newImageHash)];
+      resultNode.fills = [buildImageCompositeFill(newImageHash)];
       resultNode.strokes = [];
       if ("cornerRadius" in resultNode) {
         resultNode.cornerRadius = 0;
@@ -2365,7 +2874,8 @@
           !selectedRootNode.removed &&
           (!("locked" in selectedRootNode) || !selectedRootNode.locked)
         ) {
-          if (canUsePromptPlacementContainer(selectedRootNode)) {
+          const selectedRootHasMaskStack = hasImageMergeMaskDescendant(selectedRootNode, 0);
+          if (!selectedRootHasMaskStack && canUsePromptPlacementContainer(selectedRootNode)) {
             selectedRootNode.insertChild(selectedRootNode.children.length, resultNode);
             setImageExtendNodePosition(resultNode, 0, 0);
             placementMode = "inside-selected-root";
@@ -3608,7 +4118,9 @@
         }
 
         resultNode = createPromptPlacementResultNode(session, newImageHash);
-        if (canUsePromptPlacementContainer(targetNode)) {
+        if (session.placementMode === "outside-reference") {
+          placementMode = placePromptGeneratedNodeOutsideReference(targetNode, resultNode);
+        } else if (canUsePromptPlacementContainer(targetNode)) {
           targetNode.insertChild(targetNode.children.length, resultNode);
           setImageExtendNodePosition(resultNode, 0, 0);
           placementMode = "inside-target";
@@ -3661,6 +4173,43 @@
     }
 
     return buildPromptPlacementApplyResult(session, resultNode, byteLength, skipped, placementMode);
+  }
+
+  function placePromptGeneratedNodeOutsideReference(targetNode, resultNode) {
+    const gap = PROMPT_TEXT_ANCHOR_GAP;
+    if (
+      targetNode &&
+      targetNode.parent &&
+      canUsePromptPlacementContainer(targetNode.parent) &&
+      !isAutoLayoutNode(targetNode.parent)
+    ) {
+      const localBounds = getImageExtendLocalBounds(targetNode);
+      if (localBounds) {
+        const parent = targetNode.parent;
+        const insertIndex = findNodeChildIndex(parent, targetNode.id);
+        if (insertIndex >= 0) {
+          parent.insertChild(insertIndex + 1, resultNode);
+        } else {
+          parent.insertChild(parent.children.length, resultNode);
+        }
+        setImageExtendNodePosition(resultNode, localBounds.x + localBounds.width + gap, localBounds.y);
+        return "sibling-right";
+      }
+    }
+
+    const absoluteRect = getBoundsFitNodeRect(targetNode);
+    if (absoluteRect) {
+      figma.currentPage.appendChild(resultNode);
+      resultNode.x = roundBoundsFitMetric(absoluteRect.x + absoluteRect.width + gap);
+      resultNode.y = roundBoundsFitMetric(absoluteRect.y);
+      return "page-right";
+    }
+
+    const viewportCenter = figma.viewport && figma.viewport.center ? figma.viewport.center : { x: 0, y: 0 };
+    figma.currentPage.appendChild(resultNode);
+    resultNode.x = roundBoundsFitMetric(viewportCenter.x - resultNode.width / 2);
+    resultNode.y = roundBoundsFitMetric(viewportCenter.y - resultNode.height / 2);
+    return "viewport-center";
   }
 
   async function placePromptGeneratedNodeFromAnchor(session, resultNode) {
@@ -3806,9 +4355,21 @@
     };
   }
 
+  function buildImageCompositeFill(imageHash) {
+    return {
+      type: "IMAGE",
+      imageHash: imageHash,
+      scaleMode: "FILL",
+      visible: true,
+    };
+  }
+
   function resolveRenderedUpscaleScaleMode(fill) {
     const scaleMode = typeof (fill && fill.scaleMode) === "string" ? fill.scaleMode : "FILL";
-    if (scaleMode === "FIT" || scaleMode === "STRETCH" || scaleMode === "FILL") {
+    if (scaleMode === "STRETCH") {
+      return "FILL";
+    }
+    if (scaleMode === "FIT" || scaleMode === "FILL") {
       return scaleMode;
     }
     return "FIT";
@@ -4074,25 +4635,29 @@
   }
 
   function getSelectedTextRangeSnapshot() {
-    const page = figma.currentPage;
-    const selectedTextRange = page && "selectedTextRange" in page ? page.selectedTextRange : null;
-    if (!selectedTextRange || !selectedTextRange.node || selectedTextRange.node.removed || selectedTextRange.node.type !== "TEXT") {
+    try {
+      const page = figma.currentPage;
+      const selectedTextRange = page && "selectedTextRange" in page ? page.selectedTextRange : null;
+      if (!selectedTextRange || !selectedTextRange.node || selectedTextRange.node.removed || selectedTextRange.node.type !== "TEXT") {
+        return null;
+      }
+
+      const characters = typeof selectedTextRange.node.characters === "string" ? selectedTextRange.node.characters : "";
+      const start = Math.max(0, Math.floor(Number(selectedTextRange.start) || 0));
+      const end = Math.max(start, Math.floor(Number(selectedTextRange.end) || 0));
+      const text = normalizeReferenceText(characters.slice(start, end), 480);
+      if (!text) {
+        return null;
+      }
+
+      return {
+        text: text,
+        nodeName: safeName(selectedTextRange.node),
+        selectionLabel: safeName(selectedTextRange.node),
+      };
+    } catch (error) {
       return null;
     }
-
-    const characters = typeof selectedTextRange.node.characters === "string" ? selectedTextRange.node.characters : "";
-    const start = Math.max(0, Math.floor(Number(selectedTextRange.start) || 0));
-    const end = Math.max(start, Math.floor(Number(selectedTextRange.end) || 0));
-    const text = normalizeReferenceText(characters.slice(start, end), 480);
-    if (!text) {
-      return null;
-    }
-
-    return {
-      text: text,
-      nodeName: safeName(selectedTextRange.node),
-      selectionLabel: safeName(selectedTextRange.node),
-    };
   }
 
   function collectReferenceTextFromNodes(nodes, options) {
@@ -4211,11 +4776,11 @@
       throw new Error(PROMPT_DRAFT_SOURCE_NOT_FOUND_MESSAGE);
     }
 
-    const selectedRangeText = getSelectedTextRangeSnapshot();
-    const textPayload = collectPromptDraftTextPayload(selection, selectedRangeText);
     const visualNodes = selection.filter(function (node) {
       return !!node && !node.removed && node.type !== "TEXT";
     });
+    const selectedRangeText = visualNodes.length ? null : getSelectedTextRangeSnapshot();
+    const textPayload = collectPromptDraftTextPayload(selection, selectedRangeText);
 
     if (visualNodes.length > 1) {
       throw new Error(PROMPT_SMART_SELECTION_MESSAGE);
@@ -4292,23 +4857,6 @@
   async function buildPromptDraftVisualSource(node, selection) {
     if (!node || node.removed || typeof node.exportAsync !== "function") {
       throw new Error(PROMPT_TARGET_EXPORT_ERROR_MESSAGE);
-    }
-
-    if (hasChildren(node)) {
-      let collection = null;
-      try {
-        collection = await collectImageCompositeTargetsFromSelection([node]);
-      } catch (error) {
-        collection = null;
-      }
-      if (collection && Array.isArray(collection.layers)) {
-        const imageLayerCount = collection.layers.filter(function (layer) {
-          return !!layer && layer.layerKind === "image";
-        }).length;
-        if (imageLayerCount >= 2) {
-          throw new Error(PROMPT_MULTI_IMAGE_CONTAINER_MESSAGE);
-        }
-      }
     }
 
     const bytes = await node.exportAsync({
@@ -5087,17 +5635,44 @@
         return null;
       }
 
-      const axisAligned =
-        Math.abs(Number(transform[0][1]) || 0) <= 0.0001 && Math.abs(Number(transform[1][0]) || 0) <= 0.0001;
-      if (!axisAligned) {
+      const row0 = Array.isArray(transform[0]) ? transform[0] : null;
+      const row1 = Array.isArray(transform[1]) ? transform[1] : null;
+      if (!row0 || !row1 || row0.length < 3 || row1.length < 3) {
+        return null;
+      }
+
+      const a = Number(row0[0]) || 0;
+      const c = Number(row0[1]) || 0;
+      const tx = Number(row0[2]) || 0;
+      const b = Number(row1[0]) || 0;
+      const d = Number(row1[1]) || 0;
+      const ty = Number(row1[2]) || 0;
+      const points = [
+        { x: tx, y: ty },
+        { x: a * width + tx, y: b * width + ty },
+        { x: c * height + tx, y: d * height + ty },
+        { x: a * width + c * height + tx, y: b * width + d * height + ty },
+      ];
+      let left = Infinity;
+      let top = Infinity;
+      let right = -Infinity;
+      let bottom = -Infinity;
+      for (let index = 0; index < points.length; index += 1) {
+        const point = points[index];
+        left = Math.min(left, point.x);
+        top = Math.min(top, point.y);
+        right = Math.max(right, point.x);
+        bottom = Math.max(bottom, point.y);
+      }
+      if (!Number.isFinite(left) || !Number.isFinite(top) || !(right > left) || !(bottom > top)) {
         return null;
       }
 
       return {
-        x: roundBoundsFitMetric(Number(transform[0][2]) || 0),
-        y: roundBoundsFitMetric(Number(transform[1][2]) || 0),
-        width: roundBoundsFitMetric(width),
-        height: roundBoundsFitMetric(height),
+        x: roundBoundsFitMetric(left),
+        y: roundBoundsFitMetric(top),
+        width: roundBoundsFitMetric(right - left),
+        height: roundBoundsFitMetric(bottom - top),
       };
     } catch (error) {
       return null;

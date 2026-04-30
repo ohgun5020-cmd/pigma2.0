@@ -10,7 +10,7 @@
   const TEXT_PREVIEW_LIMIT = 320;
   const TEXT_PREVIEW_EDGE_LENGTH = 10;
   const TEXT_CONTENT_LIMIT = 2400;
-  const SOURCE_EXPORT_EDGE = 1600;
+  const SOURCE_EXPORT_EDGE = 1536;
   const originalOnMessage = typeof figma.ui.onmessage === "function" ? figma.ui.onmessage : null;
 
   const designChatOnMessage = async (message) => {
@@ -69,6 +69,37 @@
       type: "ai-design-chat-selection",
       selection: selection,
     });
+    figma.ui.postMessage({
+      type: "selection-state",
+      state: buildPsdSelectionStateFromDesignChat(selection),
+    });
+  }
+
+  function buildPsdSelectionStateFromDesignChat(selection) {
+    const count = Math.max(0, Number(selection && selection.selectionCount) || 0);
+    const width = Math.max(0, Number(selection && selection.width) || 0);
+    const height = Math.max(0, Number(selection && selection.height) || 0);
+    const label = sanitizeText(selection && selection.selectionLabel);
+    const typeLabel = sanitizeText(selection && selection.selectionTypeLabel);
+    const ready = !!(selection && selection.ready && count > 0);
+    return {
+      ready,
+      selectionId: count === 1 ? sanitizeText(selection && selection.selectionSignature) : null,
+      selectionCount: count,
+      selectionName: ready ? label || "Selection" : "",
+      selectionType: ready ? typeLabel || "Selection" : null,
+      summary: ready ? `"${label || "Selection"}" is ready to export.` : "Select one or more frames, groups, or layers to export.",
+      detail: ready
+        ? "AI selection bridge loaded the current Figma selection for PSD export."
+        : "The exporter is waiting for a Figma selection.",
+      documentWidth: ready && width > 0 ? width : null,
+      documentHeight: ready && height > 0 ? height : null,
+      exportNodeCount: ready ? count : 0,
+      editableTextCount: 0,
+      preservedGroupCount: 0,
+      warnings: [],
+      analysisPending: ready,
+    };
   }
 
   async function handleSourceRequest(message) {
