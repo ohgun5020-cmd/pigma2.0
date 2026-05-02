@@ -35462,6 +35462,11 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         return;
       }
 
+      if (message.type === "request-ai-image-prompt-size-summary") {
+        await postPromptSizeSummary(message);
+        return;
+      }
+
       if (message.type === "apply-ai-image-upscaled-image") {
         await applyUpscaledImage(message);
         return;
@@ -35572,6 +35577,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       !!message &&
       (message.type === "request-ai-image-upscale-source" ||
         message.type === "request-ai-image-prompt-draft-source" ||
+        message.type === "request-ai-image-prompt-size-summary" ||
         message.type === "apply-ai-image-upscaled-image" ||
         message.type === "ai-image-upscale-report-error" ||
         message.type === "request-image-extend-source" ||
@@ -36151,6 +36157,121 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       image: sanitizePromptDraftImagePayload(source && source.image),
       summary: sanitizePromptDraftSummaryPayload(source && source.summary),
     };
+  }
+
+  async function postPromptSizeSummary(message) {
+    let summary = null;
+    try {
+      summary = await collectPromptSizeSummaryFromSelection();
+    } catch (error) {
+      summary = {
+        sourceKind: "none",
+        selectionCount: 0,
+        currentWidth: 0,
+        currentHeight: 0,
+        sourceWidth: 0,
+        sourceHeight: 0,
+        message: normalizeErrorMessage(error, ""),
+      };
+    }
+
+    figma.ui.postMessage({
+      type: "ai-image-prompt-size-summary-ready",
+      clientRequestId: sanitizeClientRequestId(message && message.clientRequestId),
+      summary: sanitizePromptSizeSummaryPayload(summary),
+    });
+  }
+
+  async function collectPromptSizeSummaryFromSelection() {
+    const selection = Array.from(figma.currentPage.selection || []).filter(Boolean);
+    const visualNodes = selection.filter(function (node) {
+      return !!node && !node.removed && node.type !== "TEXT";
+    });
+    const rects = [];
+
+    for (let index = 0; index < selection.length; index += 1) {
+      const rect = getBoundsFitNodeRect(selection[index]);
+      if (rect && Number(rect.width) > 0 && Number(rect.height) > 0) {
+        rects.push(rect);
+      }
+    }
+
+    const unionRect = rects.length ? unionAbsoluteRects(rects) : null;
+    const currentWidth = unionRect && Number(unionRect.width) > 0 ? roundBoundsFitMetric(unionRect.width) : 0;
+    const currentHeight = unionRect && Number(unionRect.height) > 0 ? roundBoundsFitMetric(unionRect.height) : 0;
+    let sourceWidth = currentWidth;
+    let sourceHeight = currentHeight;
+    let sourceKind = selection.length ? "selection" : "none";
+
+    if (visualNodes.length === 1) {
+      sourceKind = "visual-node";
+      const fillSize = await readPrimaryImageFillSourceSize(visualNodes[0]);
+      if (fillSize && fillSize.width > 0 && fillSize.height > 0) {
+        sourceKind = "image-fill";
+        sourceWidth = fillSize.width;
+        sourceHeight = fillSize.height;
+      }
+    } else if (visualNodes.length > 1) {
+      sourceKind = "multi-selection";
+    } else if (selection.length) {
+      sourceKind = "text-selection";
+    }
+
+    return {
+      sourceKind: sourceKind,
+      selectionCount: selection.length,
+      currentWidth: currentWidth,
+      currentHeight: currentHeight,
+      sourceWidth: sourceWidth,
+      sourceHeight: sourceHeight,
+    };
+  }
+
+  async function readPrimaryImageFillSourceSize(node) {
+    if (!node || node.removed || !hasSimpleVisibleImagePaint(node)) {
+      return null;
+    }
+    const fills = getNodeFills(node);
+    const fillIndex = getPrimaryVisibleImageFillIndex(fills);
+    if (fillIndex < 0 || !fills[fillIndex] || !fills[fillIndex].imageHash) {
+      return null;
+    }
+    const image = figma.getImageByHash(fills[fillIndex].imageHash);
+    if (!image || typeof image.getSizeAsync !== "function") {
+      return null;
+    }
+
+    try {
+      const size = await image.getSizeAsync();
+      const width = size && typeof size.width === "number" && Number.isFinite(size.width) ? Math.max(0, Math.round(size.width)) : 0;
+      const height =
+        size && typeof size.height === "number" && Number.isFinite(size.height) ? Math.max(0, Math.round(size.height)) : 0;
+      return width > 0 && height > 0 ? { width: width, height: height } : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function sanitizePromptSizeSummaryPayload(summary) {
+    const source = summary && typeof summary === "object" ? summary : {};
+    const text = typeof source.message === "string" ? source.message : "";
+    return {
+      sourceKind: typeof source.sourceKind === "string" && source.sourceKind ? source.sourceKind : "none",
+      selectionCount: sanitizePromptSizeNumber(source.selectionCount),
+      currentWidth: sanitizePromptSizeNumber(source.currentWidth),
+      currentHeight: sanitizePromptSizeNumber(source.currentHeight),
+      sourceWidth: sanitizePromptSizeNumber(source.sourceWidth),
+      sourceHeight: sanitizePromptSizeNumber(source.sourceHeight),
+      message: text.slice(0, 160),
+    };
+  }
+
+  function sanitizePromptSizeNumber(value) {
+    const numberValue = Number(value);
+    if (!Number.isFinite(numberValue) || numberValue <= 0) {
+      return 0;
+    }
+    return Math.round(numberValue);
   }
 
   function buildAiImageSourceReadyPayload(sessionId, session, source) {

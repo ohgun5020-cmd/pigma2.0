@@ -11,6 +11,8 @@
     openAiApiKey: "",
     geminiApiKey: "",
     dubApiKey: "",
+    promptDraftTotalTimeoutSec: 45,
+    promptDraftAttemptTimeoutSec: 22,
     proofingLocale: "",
     userDictionary: [],
     protectedTerms: []
@@ -86,6 +88,21 @@
           : DEFAULT_AI_SETTINGS.geminiApiKey;
     const dubApiKey =
       typeof source.dubApiKey === "string" ? sanitizeApiKey(source.dubApiKey) : DEFAULT_AI_SETTINGS.dubApiKey;
+    const promptDraftTotalTimeoutSec = normalizePromptDraftTimeoutSec(
+      source.promptDraftTotalTimeoutSec,
+      DEFAULT_AI_SETTINGS.promptDraftTotalTimeoutSec,
+      20,
+      120
+    );
+    const promptDraftAttemptTimeoutSec = Math.min(
+      normalizePromptDraftTimeoutSec(
+        source.promptDraftAttemptTimeoutSec,
+        DEFAULT_AI_SETTINGS.promptDraftAttemptTimeoutSec,
+        8,
+        60
+      ),
+      Math.max(8, promptDraftTotalTimeoutSec - 2)
+    );
     const preferredProvider = legacyProvider === "gemini" ? "gemini" : "openai";
     const fallbackProvider = preferredProvider === "gemini" ? "openai" : "gemini";
     const provider =
@@ -103,6 +120,8 @@
       openAiApiKey,
       geminiApiKey,
       dubApiKey,
+      promptDraftTotalTimeoutSec,
+      promptDraftAttemptTimeoutSec,
       proofingLocale: normalizeProofingLocale(source.proofingLocale),
       userDictionary: normalizeTermList(source.userDictionary),
       protectedTerms: normalizeTermList(source.protectedTerms)
@@ -117,6 +136,14 @@
       .replace(/^['"`]+|['"`]+$/g, "")
       .replace(/[^\x21-\x7E]/g, "")
       .trim();
+  }
+
+  function normalizePromptDraftTimeoutSec(value, fallback, min, max) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      return fallback;
+    }
+    return Math.max(min, Math.min(max, Math.round(numeric)));
   }
 
   function normalizeProofingLocale(value) {
