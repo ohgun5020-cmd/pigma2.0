@@ -16,6 +16,7 @@ $aiPixelPerfectPatch = Join-Path $root "ai-pixel-perfect.js"
 $skewTransformPatch = Join-Path $root "skew-transform.js"
 $unlockLockedLayersPatch = Join-Path $root "unlock-locked-layers.js"
 $deleteHiddenLayersPatch = Join-Path $root "delete-hidden-layers.js"
+$splitLongFramePatch = Join-Path $root "split-long-frame.js"
 $aiUrlShortenerPatch = Join-Path $root "ai-url-shortener.js"
 $aiColorExtractPatch = Join-Path $root "ai-color-extract.js"
 $originalImageDownloadPatch = Join-Path $root "original-image-download.js"
@@ -103,6 +104,10 @@ if (-not (Test-Path $unlockLockedLayersPatch)) {
 
 if (-not (Test-Path $deleteHiddenLayersPatch)) {
   throw "Missing hidden layer delete patch: $deleteHiddenLayersPatch"
+}
+
+if (-not (Test-Path $splitLongFramePatch)) {
+  throw "Missing long frame split patch: $splitLongFramePatch"
 }
 
 if (-not (Test-Path $aiUrlShortenerPatch)) {
@@ -1565,6 +1570,7 @@ $aiPixelPerfectPatchContent = [System.IO.File]::ReadAllText($aiPixelPerfectPatch
 $skewTransformPatchContent = [System.IO.File]::ReadAllText($skewTransformPatch, [System.Text.Encoding]::UTF8)
 $unlockLockedLayersPatchContent = [System.IO.File]::ReadAllText($unlockLockedLayersPatch, [System.Text.Encoding]::UTF8)
 $deleteHiddenLayersPatchContent = [System.IO.File]::ReadAllText($deleteHiddenLayersPatch, [System.Text.Encoding]::UTF8)
+$splitLongFramePatchContent = [System.IO.File]::ReadAllText($splitLongFramePatch, [System.Text.Encoding]::UTF8)
 $aiUrlShortenerPatchContent = [System.IO.File]::ReadAllText($aiUrlShortenerPatch, [System.Text.Encoding]::UTF8)
 $aiColorExtractPatchContent = [System.IO.File]::ReadAllText($aiColorExtractPatch, [System.Text.Encoding]::UTF8)
 $aiImageUpscalePatchContent = [System.IO.File]::ReadAllText($aiImageUpscalePatch, [System.Text.Encoding]::UTF8)
@@ -1588,6 +1594,7 @@ $patchedRuntimeParts = @(
   $skewTransformPatchContent,
   $unlockLockedLayersPatchContent,
   $deleteHiddenLayersPatchContent,
+  $splitLongFramePatchContent,
   $aiUrlShortenerPatchContent,
   $aiColorExtractPatchContent,
   $aiImageUpscalePatchContent

@@ -5,6 +5,7 @@
   // PIGMA_EXPORT_BOUNDARY::MESSAGE_TYPES
   // PIGMA_EXPORT_BOUNDARY::NORMALIZE_SETTINGS
   // PIGMA_EXPORT_BOUNDARY::LONG_EDITABLE_SEGMENTS
+  const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
   const originalOnMessage = figma.ui.onmessage;
   const originalPostMessage = figma.ui.postMessage.bind(figma.ui);
   const DEFAULT_EXPORT_SETTINGS = Object.freeze({
@@ -272,10 +273,13 @@
 
     const previousSelection = figma.currentPage.selection ? figma.currentPage.selection.slice() : [];
     const frames = [];
+    let splitMode = "fixed";
 
     try {
-      for (let index = 0; index < plan.segments.length; index += 1) {
-        frames.push(createLongEditableSegmentFrame(plan, plan.segments[index]));
+      const prepared = createLongEditableExportFrames(plan);
+      splitMode = prepared.mode;
+      for (let index = 0; index < prepared.frames.length; index += 1) {
+        frames.push(prepared.frames[index]);
       }
 
       activeEditableSegmentSession = {
@@ -284,7 +288,11 @@
       };
 
       figma.currentPage.selection = frames;
-      figma.notify("긴 PSD를 " + frames.length + "개 구간으로 나눠 순차 생성합니다.");
+      if (splitMode === "section") {
+        figma.notify("긴 PSD를 섹션 기준 " + frames.length + "개 프레임으로 나눠 순차 생성합니다.");
+      } else {
+        figma.notify("긴 PSD를 " + frames.length + "개 구간으로 나눠 순차 생성합니다.");
+      }
 
       const segmentedMessage = Object.assign({}, message, {
         longEditableSegmentActive: true,
@@ -300,6 +308,69 @@
       figma.ui.postMessage({ type: "export-error", message: messageText });
       figma.notify(messageText, { error: true });
     }
+  }
+
+  function createLongEditableExportFrames(plan) {
+    const sectionSplit = createLongEditableSectionSplitFrames(plan);
+    if (sectionSplit && sectionSplit.frames && sectionSplit.frames.length >= 2) {
+      return sectionSplit;
+    }
+
+    const frames = [];
+    for (let index = 0; index < plan.segments.length; index += 1) {
+      frames.push(createLongEditableSegmentFrame(plan, plan.segments[index]));
+    }
+
+    return {
+      frames: frames,
+      mode: "fixed"
+    };
+  }
+
+  function createLongEditableSectionSplitFrames(plan) {
+    const api = getSplitLongFrameApi();
+    if (!api || typeof api.createFramesForNode !== "function") {
+      return null;
+    }
+
+    try {
+      const output = api.createFramesForNode(plan.root, {
+        direction: "vertical",
+        outputOffset: 120,
+        outputGap: 48,
+        selectCreatedFrames: false,
+        scrollIntoView: false
+      });
+
+      if (!output || !Array.isArray(output.frames) || output.frames.length < 2) {
+        cleanupLongEditableSplitOutput(output);
+        return null;
+      }
+
+      return {
+        frames: output.frames,
+        mode: "section"
+      };
+    } catch (error) {
+      try {
+        console.warn("[pigma][long-editable-section-split]", error);
+      } catch (warnError) {
+      }
+      return null;
+    }
+  }
+
+  function getSplitLongFrameApi() {
+    const api = globalScope.__PIGMA_SPLIT_LONG_FRAME_API__;
+    return api && typeof api === "object" ? api : null;
+  }
+
+  function cleanupLongEditableSplitOutput(output) {
+    if (!output || !Array.isArray(output.frames)) {
+      return;
+    }
+
+    cleanupNodes(output.frames);
   }
 
   function createLongEditableSegmentFrame(plan, segment) {
