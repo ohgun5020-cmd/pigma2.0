@@ -38541,6 +38541,8 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
           preserveSelectedRootTransform: source.preserveSelectedRootTransform,
           selectedRootWidth: source.selectedRootWidth,
           selectedRootHeight: source.selectedRootHeight,
+          placementAnchorNodeId: source.placementAnchorNodeId,
+          placementAnchorNodeName: source.placementAnchorNodeName,
         },
         createdImage.hash,
         source.bytes.length
@@ -38669,6 +38671,9 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
     return {
       selectionLabel: formatSelectionLabel(selection),
+      placementAnchorNodeId:
+        selection.length === 1 && selection[0] && typeof selection[0].id === "string" ? selection[0].id : "",
+      placementAnchorNodeName: selection.length === 1 ? safeName(selection[0]) : "",
       selectedRootNodeId:
         exportSelection.length === 1 && exportSelection[0] && typeof exportSelection[0].id === "string"
           ? exportSelection[0].id
@@ -38956,6 +38961,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       return buildImageCompositeApplyResult(session, null, byteLength, skipped, "");
     }
     let resultNode = null;
+    let focusNode = null;
     let placementMode = "";
 
     try {
@@ -38977,39 +38983,50 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       }
 
       let placed = false;
-      if (session && session.selectedRootNodeId) {
-        const selectedRootNode = await figma.getNodeByIdAsync(session.selectedRootNodeId);
+      if (session && (session.placementAnchorNodeId || session.selectedRootNodeId)) {
+        const placementAnchorNode = await figma.getNodeByIdAsync(session.placementAnchorNodeId || session.selectedRootNodeId);
         if (
-          selectedRootNode &&
-          !selectedRootNode.removed &&
-          (!("locked" in selectedRootNode) || !selectedRootNode.locked)
+          placementAnchorNode &&
+          !placementAnchorNode.removed
         ) {
-          const selectedRootHasMaskStack = hasImageMergeMaskDescendant(selectedRootNode, 0);
-          if (!selectedRootHasMaskStack && canUsePromptPlacementContainer(selectedRootNode)) {
-            selectedRootNode.insertChild(selectedRootNode.children.length, resultNode);
-            setImageExtendNodePosition(resultNode, 0, 0);
-            placementMode = "inside-selected-root";
+          const directPlacement = placeImageCompositeResultNextToAnchor(resultNode, placementAnchorNode, unionRect, {
+            preserveTransform: !!(
+              session &&
+              session.preserveSelectedRootTransform &&
+              placementAnchorNode.id === session.selectedRootNodeId
+            ),
+            modePrefix: placementAnchorNode.id === session.selectedRootNodeId ? "selected-root-sibling" : "placement-anchor-sibling",
+          });
+          if (directPlacement) {
+            placementMode = directPlacement.placementMode;
+            focusNode = directPlacement.focusNode || resultNode;
             placed = true;
-          } else if (
-            selectedRootNode.parent &&
-            canUsePromptPlacementContainer(selectedRootNode.parent) &&
-            !isAutoLayoutNode(selectedRootNode.parent)
-          ) {
-            const localBounds = getImageExtendLocalBounds(selectedRootNode);
-            if (localBounds) {
-              const parent = selectedRootNode.parent;
-              const insertIndex = findNodeChildIndex(parent, selectedRootNode.id);
-              parent.insertChild(insertIndex >= 0 ? insertIndex + 1 : parent.children.length, resultNode);
-              if (
-                session &&
-                session.preserveSelectedRootTransform &&
-                copyNodeRelativeTransform(resultNode, selectedRootNode)
-              ) {
-                placementMode = "selected-root-sibling-transform";
-              } else {
-                setImageExtendNodePosition(resultNode, localBounds.x, localBounds.y);
-                placementMode = "selected-root-sibling";
+          } else {
+            const outerAnchorNode = findImageCompositeEditableOuterAnchor(placementAnchorNode);
+            if (outerAnchorNode && outerAnchorNode.id !== placementAnchorNode.id) {
+              const outerPlacement = placeImageCompositeResultNextToAnchor(resultNode, outerAnchorNode, unionRect, {
+                preserveTransform: false,
+                modePrefix: "outer-anchor-sibling",
+              });
+              if (outerPlacement) {
+                placementMode = outerPlacement.placementMode;
+                focusNode = outerPlacement.focusNode || resultNode;
+                placed = true;
               }
+            }
+          }
+
+          if (!placed) {
+            const selectedRootHasMaskStack = hasImageMergeMaskDescendant(placementAnchorNode, 0);
+            if (
+              !selectedRootHasMaskStack &&
+              (!("locked" in placementAnchorNode) || !placementAnchorNode.locked) &&
+              canUsePromptPlacementContainer(placementAnchorNode)
+            ) {
+              placementAnchorNode.insertChild(placementAnchorNode.children.length, resultNode);
+              setImageExtendNodePosition(resultNode, 0, 0);
+              placementMode = "inside-selected-root";
+              focusNode = resultNode;
               placed = true;
             }
           }
@@ -39021,24 +39038,149 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         resultNode.x = unionRect.x;
         resultNode.y = unionRect.y;
         placementMode = "page-overlay";
+        focusNode = resultNode;
       }
 
-      figma.currentPage.selection = [resultNode];
-      if (typeof figma.viewport.scrollAndZoomIntoView === "function") {
-        figma.viewport.scrollAndZoomIntoView([resultNode]);
+      const resultFocusNode = focusNode || resultNode;
+      try {
+        figma.currentPage.selection = [resultFocusNode];
+      } catch (error) {
       }
-      return buildImageCompositeApplyResult(session, resultNode, byteLength, skipped, placementMode);
+      try {
+        if (typeof figma.viewport.scrollAndZoomIntoView === "function") {
+          figma.viewport.scrollAndZoomIntoView([resultFocusNode]);
+        }
+      } catch (error) {
+      }
+      return buildImageCompositeApplyResult(session, resultFocusNode, byteLength, skipped, placementMode);
     } catch (error) {
       if (resultNode && !resultNode.removed && resultNode.parent) {
         resultNode.remove();
       }
       skipped.push({
-        nodeId: session && session.selectedRootNodeId ? session.selectedRootNodeId : "",
-        nodeName: session && session.selectedRootNodeName ? session.selectedRootNodeName : "",
+        nodeId:
+          session && session.placementAnchorNodeId
+            ? session.placementAnchorNodeId
+            : session && session.selectedRootNodeId
+              ? session.selectedRootNodeId
+              : "",
+        nodeName:
+          session && session.placementAnchorNodeName
+            ? session.placementAnchorNodeName
+            : session && session.selectedRootNodeName
+              ? session.selectedRootNodeName
+              : "",
         reason: normalizeErrorMessage(error, "Failed to place the generated composite image."),
       });
       return buildImageCompositeApplyResult(session, null, byteLength, skipped, placementMode);
     }
+  }
+
+  function placeImageCompositeResultNextToAnchor(resultNode, anchorNode, unionRect, options) {
+    if (!resultNode || !anchorNode || anchorNode.removed || !anchorNode.parent) {
+      return null;
+    }
+
+    const parent = anchorNode.parent;
+    if (!canUsePromptPlacementContainer(parent)) {
+      return null;
+    }
+
+    const insertIndex = findNodeChildIndex(parent, anchorNode.id);
+    if (insertIndex < 0) {
+      return null;
+    }
+
+    try {
+      parent.insertChild(insertIndex + 1, resultNode);
+      let placementMode = "";
+      const modePrefix = options && options.modePrefix ? options.modePrefix : "anchor-sibling";
+      if (options && options.preserveTransform === true && copyNodeRelativeTransform(resultNode, anchorNode)) {
+        placementMode = modePrefix + "-transform";
+      } else if (setImageCompositeNodePositionInParent(resultNode, parent, unionRect)) {
+        placementMode = modePrefix + "-absolute";
+      } else {
+        const localBounds = getImageExtendLocalBounds(anchorNode);
+        if (!localBounds) {
+          return null;
+        }
+        setImageExtendNodePosition(resultNode, localBounds.x, localBounds.y);
+        placementMode = modePrefix + "-local";
+      }
+
+      return {
+        focusNode: resultNode,
+        placementMode: placementMode,
+      };
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function findImageCompositeEditableOuterAnchor(node) {
+    let current = node;
+    let depth = 0;
+    while (current && current.parent && current.parent.type !== "DOCUMENT" && depth < 12) {
+      if (canUsePromptPlacementContainer(current.parent)) {
+        return current;
+      }
+      current = current.parent;
+      depth += 1;
+    }
+
+    return null;
+  }
+
+  function setImageCompositeNodePositionInParent(node, parent, absoluteRect) {
+    if (!node || !parent || !absoluteRect) {
+      return false;
+    }
+
+    const localPoint = convertImageCompositeAbsolutePointToParentLocal(parent, absoluteRect.x, absoluteRect.y);
+    if (!localPoint) {
+      return false;
+    }
+
+    setImageExtendNodePosition(node, localPoint.x, localPoint.y);
+    return true;
+  }
+
+  function convertImageCompositeAbsolutePointToParentLocal(parent, x, y) {
+    if (!parent || parent.type === "PAGE") {
+      return {
+        x: roundBoundsFitMetric(Number(x) || 0),
+        y: roundBoundsFitMetric(Number(y) || 0),
+      };
+    }
+
+    const transform = Array.isArray(parent.absoluteTransform) ? parent.absoluteTransform : null;
+    if (!transform || transform.length < 2) {
+      return null;
+    }
+
+    const row0 = Array.isArray(transform[0]) ? transform[0] : null;
+    const row1 = Array.isArray(transform[1]) ? transform[1] : null;
+    if (!row0 || !row1 || row0.length < 3 || row1.length < 3) {
+      return null;
+    }
+
+    const a = Number(row0[0]) || 0;
+    const c = Number(row0[1]) || 0;
+    const tx = Number(row0[2]) || 0;
+    const b = Number(row1[0]) || 0;
+    const d = Number(row1[1]) || 0;
+    const ty = Number(row1[2]) || 0;
+    const det = a * d - b * c;
+    if (!Number.isFinite(det) || Math.abs(det) < 0.000001) {
+      return null;
+    }
+
+    const dx = (Number(x) || 0) - tx;
+    const dy = (Number(y) || 0) - ty;
+    return {
+      x: roundBoundsFitMetric((d * dx - c * dy) / det),
+      y: roundBoundsFitMetric((-b * dx + a * dy) / det),
+    };
   }
 
   function getImageExtendLocalBounds(node) {
