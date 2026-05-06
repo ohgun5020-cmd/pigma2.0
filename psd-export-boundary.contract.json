@@ -5,18 +5,23 @@
   "requiredMarkers": [
     "PIGMA_EXPORT_BOUNDARY::SOURCE_OF_TRUTH",
     "PIGMA_EXPORT_BOUNDARY::MESSAGE_TYPES",
-    "PIGMA_EXPORT_BOUNDARY::NORMALIZE_SETTINGS"
+    "PIGMA_EXPORT_BOUNDARY::NORMALIZE_SETTINGS",
+    "PIGMA_EXPORT_BOUNDARY::LONG_EDITABLE_SEGMENTS"
   ],
   "requiredFunctions": [
     "isExportMessage",
     "normalizeExportMessage",
     "normalizeExportSettings",
-    "normalizeExportExperiments"
+    "normalizeExportExperiments",
+    "getLongEditableSegmentPlan",
+    "runLongEditableSegmentExport"
   ],
   "requiredSnippets": [
     "message.type === \"request-export\"",
     "message.type === \"request-next-export-root\"",
     "settings: normalizeExportSettings(message.settings)",
-    "developerExportExperiments: normalizeExportExperiments(message.developerExportExperiments)"
+    "developerExportExperiments: normalizeExportExperiments(message.developerExportExperiments)",
+    "value === \"psd-with-png\"",
+    "value === \"psd-with-jpg\""
   ]
 }

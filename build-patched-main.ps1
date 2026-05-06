@@ -293,6 +293,13 @@ function Collapse-RepeatedSnippetBeforeMarker {
 
 $bundle = [System.IO.File]::ReadAllText($source, [System.Text.Encoding]::UTF8)
 
+$bundle = Replace-Exact `
+  -Text $bundle `
+  -Find 'exportPackageMode:t.exportPackageMode==="bundle-with-rasters"||t.exportPackageMode==="psd-only"?t.exportPackageMode:A.exportPackageMode' `
+  -Replace 'exportPackageMode:t.exportPackageMode==="bundle-with-rasters"||t.exportPackageMode==="psd-with-png"?"psd-with-png":t.exportPackageMode==="psd-with-jpg"||t.exportPackageMode==="psd-only"?t.exportPackageMode:A.exportPackageMode' `
+  -ExpectedCount 1 `
+  -Label 'PSD export package mode variants'
+
 # Allow GROUP containers to reuse the same safe background-splitting path as
 # frames when their own appearance can be separated from editable children.
 $groupSplitEligibilityFind = 'So=new Set(["FRAME","SECTION","COMPONENT","INSTANCE"])'
@@ -373,7 +380,7 @@ if ($bundle.Contains($selectionPreviewLogicFind)) {
 }
 
 $selectionPreviewDispatchFind = 'function Ee(){let e=rr();N({type:"selection-state",state:tr(e.state)})}function le(){Qt+=1,F=null}'
-$selectionPreviewDispatchReplace = 'function pigmaSelectionDebugState(e){try{let t=figma.currentPage.selection||[],r=t[0],o=r?f(r):"",n=r?r.type:"",i=figma.currentPage&&figma.currentPage.name?figma.currentPage.name:"";return B(b({},e),{detail:"[debug 0429 selection api=".concat(t.length," page=").concat(i," first=").concat(o||"-"," type=").concat(n||"-","] ").concat(e.detail||""),warnings:e.warnings})}catch(t){return B(b({},e),{detail:"[debug 0429 selection read error] ".concat(e.detail||"")})}}function Ee(){let e=selectionResolutionForUi();N({type:"selection-state",state:pigmaSelectionDebugState(tr(e.state))})}function le(){Qt+=1,F=null,selectionPreviewCache=null}'
+$selectionPreviewDispatchReplace = 'function pigmaSelectionDebugState(e){try{let t=figma.currentPage.selection||[],r=t[0],o=r?f(r):"",n=r?r.type:"",i=figma.currentPage&&figma.currentPage.name?figma.currentPage.name:"";return B(b({},e),{detail:"[debug 0429 selection api=".concat(t.length," page=").concat(i," first=").concat(o||"-"," type=").concat(n||"-","] ").concat(e.detail||""),warnings:e.warnings})}catch(t){return B(b({},e),{detail:"[debug 0429 selection read error] ".concat(e.detail||"")})}}function Ee(){let e=selectionResolutionForUi();N({type:"selection-state",state:pigmaSelectionDebugState(tr(e.state))})}function le(){Qt+=1,F=null,selectionPreviewCache=null}function pigmaRefreshRuntimeCaches(){le(),be=null,je.clear(),We=null,Ze=null}'
 if ($bundle.Contains($selectionPreviewDispatchFind)) {
   $bundle = Replace-Exact `
     -Text $bundle `
@@ -400,6 +407,21 @@ if ($bundle.Contains($startupPreviewRequestFind)) {
   # Already patched in this bundle variant.
 } else {
   # Startup preview request guard changed in this bundle variant.
+}
+
+$runtimeCacheRefreshFind = 'if(e.type==="request-selection-sync"){await pigmaEnsureSelectionAccess(),Ee();return}if(e.type==="request-export"){await Qo('
+$runtimeCacheRefreshReplace = 'if(e.type==="request-selection-sync"){await pigmaEnsureSelectionAccess(),Ee();return}if(e.type==="request-runtime-cache-refresh"){pigmaRefreshRuntimeCaches(),Ee();return}if(e.type==="request-export"){pigmaRefreshRuntimeCaches(),await Qo('
+if ($bundle.Contains($runtimeCacheRefreshFind)) {
+  $bundle = Replace-Exact `
+    -Text $bundle `
+    -Find $runtimeCacheRefreshFind `
+    -Replace $runtimeCacheRefreshReplace `
+    -ExpectedCount 1 `
+    -Label 'runtime cache refresh before export'
+} elseif ($bundle.Contains($runtimeCacheRefreshReplace)) {
+  # Already patched in this bundle variant.
+} else {
+  # Runtime cache refresh request guard changed in this bundle variant.
 }
 
 $bundle = Replace-Exact `
