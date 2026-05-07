@@ -8107,7 +8107,12 @@
     const operationLabel = sanitizeOperationLabel(options && options.operationLabel);
 
     if (/(401|403|permission|forbidden|unauthori|auth|api key|credential)/i.test(text)) {
-      return provider + " image request permission was denied. Check your API key or credentials.";
+      const detail = text.length > 260 ? text.slice(0, 260).trim() + "..." : text;
+      return (
+        provider +
+        " 이미지 요청 권한이 거절되었습니다. API 키, 프로젝트, 결제 tier, 모델 접근 권한을 확인해 주세요." +
+        (detail ? " 원문: " + detail : "")
+      );
     }
 
     if (/(429|resource_exhausted|rate limit|quota|too many requests)/i.test(text)) {

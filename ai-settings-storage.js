@@ -11,6 +11,9 @@
     openAiApiKey: "",
     geminiApiKey: "",
     dubApiKey: "",
+    openAiImageModel: "gpt-image-1.5",
+    openAiImageModelPinned: false,
+    geminiImageModel: "gemini-3.1-flash-image-preview",
     promptDraftTotalTimeoutSec: 45,
     promptDraftAttemptTimeoutSec: 22,
     proofingLocale: "",
@@ -88,6 +91,19 @@
           : DEFAULT_AI_SETTINGS.geminiApiKey;
     const dubApiKey =
       typeof source.dubApiKey === "string" ? sanitizeApiKey(source.dubApiKey) : DEFAULT_AI_SETTINGS.dubApiKey;
+    const openAiImageModelPinned = source.openAiImageModelPinned === true;
+    const rawOpenAiImageModel =
+      typeof source.openAiImageModel === "string"
+        ? normalizeModelId(source.openAiImageModel, DEFAULT_AI_SETTINGS.openAiImageModel)
+        : DEFAULT_AI_SETTINGS.openAiImageModel;
+    const openAiImageModel =
+      !openAiImageModelPinned && rawOpenAiImageModel === "gpt-image-2"
+        ? DEFAULT_AI_SETTINGS.openAiImageModel
+        : rawOpenAiImageModel;
+    const geminiImageModel =
+      typeof source.geminiImageModel === "string"
+        ? normalizeModelId(source.geminiImageModel, DEFAULT_AI_SETTINGS.geminiImageModel)
+        : DEFAULT_AI_SETTINGS.geminiImageModel;
     const promptDraftTotalTimeoutSec = normalizePromptDraftTimeoutSec(
       source.promptDraftTotalTimeoutSec,
       DEFAULT_AI_SETTINGS.promptDraftTotalTimeoutSec,
@@ -120,6 +136,9 @@
       openAiApiKey,
       geminiApiKey,
       dubApiKey,
+      openAiImageModel,
+      openAiImageModelPinned,
+      geminiImageModel,
       promptDraftTotalTimeoutSec,
       promptDraftAttemptTimeoutSec,
       proofingLocale: normalizeProofingLocale(source.proofingLocale),
@@ -144,6 +163,14 @@
       return fallback;
     }
     return Math.max(min, Math.min(max, Math.round(numeric)));
+  }
+
+  function normalizeModelId(value, fallback) {
+    const next = String(value || "")
+      .replace(/[\u0000-\u001F\u007F-\u009F]/g, "")
+      .replace(/[\u200B-\u200D\uFEFF]/g, "")
+      .trim();
+    return next || fallback;
   }
 
   function normalizeProofingLocale(value) {

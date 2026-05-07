@@ -5,9 +5,12 @@
   }
 
   const originalOnMessage = figma.ui.onmessage;
-  const MAX_SEGMENT_AXIS = 8000;
+  const MAX_SEGMENT_AXIS = 3500;
+  const HARD_MAX_SEGMENT_AXIS = 4500;
   const MIN_SECTION_AXIS = 120;
   const MIN_SEGMENT_AXIS = 48;
+  const MIN_OUTPUT_SEGMENT_AXIS = 3500;
+  const CUT_SNAP_TOLERANCE = 20;
   const SECTION_OVERLAP_TOLERANCE = 1;
   const OUTPUT_OFFSET = 96;
   const OUTPUT_GAP = 48;
@@ -94,12 +97,18 @@
       throw new Error("\uB098\uB204\uAE30\uC5D0 \uC0AC\uC6A9\uD560 \uC790\uC2DD \uB808\uC774\uC5B4\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.");
     }
 
+    const boundaryEntries = collectNestedAnchorEntries(root, direction);
     let anchors = buildSectionAnchors(entries, rootAxis, rootCross);
     if (anchors.length < 2) {
-      anchors = buildSectionAnchors(collectNestedAnchorEntries(root, direction), rootAxis, rootCross);
+      anchors = buildSectionAnchors(boundaryEntries, rootAxis, rootCross);
     }
-    let segments = anchors.length >= 2 ? buildSectionSegments(anchors, rootAxis) : buildChunkSegments(rootAxis, maxSegmentAxis);
-    segments = expandLargeSegments(segments, maxSegmentAxis);
+    let segments =
+      anchors.length >= 2 ? buildSectionSegments(anchors, rootAxis) : buildChunkSegments(rootAxis, maxSegmentAxis, boundaryEntries);
+    if (anchors.length >= 2 && segmentsHaveUnsafeCuts(segments, boundaryEntries)) {
+      segments = buildChunkSegments(rootAxis, maxSegmentAxis, boundaryEntries);
+    }
+    segments = expandLargeSegments(segments, maxSegmentAxis, boundaryEntries);
+    segments = mergeSmallSegments(segments, maxSegmentAxis);
 
     if (segments.length < 2) {
       throw new Error("\uB098\uB20C \uC139\uC158\uC774 \uBD80\uC871\uD558\uAC70\uB098 \uC774\uBBF8 PSD\uC6A9\uC73C\uB85C \uCDA9\uBD84\uD788 \uC9E7\uC2B5\uB2C8\uB2E4.");
@@ -364,11 +373,23 @@
     return segments;
   }
 
-  function buildChunkSegments(rootAxis, maxSegmentAxis) {
+  function segmentsHaveUnsafeCuts(segments, entries) {
+    for (let index = 0; index < segments.length - 1; index += 1) {
+      if (!isSafeCut(segments[index].end, entries)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function buildChunkSegments(rootAxis, maxSegmentAxis, entries) {
     const segments = [];
+    const hardMaxSegmentAxis = getHardMaxSegmentAxis(maxSegmentAxis);
     let start = 0;
     while (start < rootAxis - 0.5) {
-      const end = Math.min(rootAxis, start + maxSegmentAxis);
+      const targetEnd = Math.min(rootAxis, start + maxSegmentAxis);
+      const hardEnd = Math.min(rootAxis, start + hardMaxSegmentAxis);
+      const end = chooseSegmentEnd(start, targetEnd, hardEnd, rootAxis, entries);
       appendSegment(segments, {
         start,
         end,
@@ -380,11 +401,12 @@
     return segments;
   }
 
-  function expandLargeSegments(segments, maxSegmentAxis) {
+  function expandLargeSegments(segments, maxSegmentAxis, entries) {
     const expanded = [];
+    const hardMaxSegmentAxis = getHardMaxSegmentAxis(maxSegmentAxis);
     for (let index = 0; index < segments.length; index += 1) {
       const segment = segments[index];
-      if (segment.length <= maxSegmentAxis) {
+      if (segment.length <= hardMaxSegmentAxis) {
         expanded.push(segment);
         continue;
       }
@@ -392,7 +414,9 @@
       let partStart = segment.start;
       let partIndex = 1;
       while (partStart < segment.end - 0.5) {
-        const partEnd = Math.min(segment.end, partStart + maxSegmentAxis);
+        const targetEnd = Math.min(segment.end, partStart + maxSegmentAxis);
+        const hardEnd = Math.min(segment.end, partStart + hardMaxSegmentAxis);
+        const partEnd = chooseSegmentEnd(partStart, targetEnd, hardEnd, segment.end, entries);
         appendSegment(expanded, {
           start: partStart,
           end: partEnd,
@@ -405,6 +429,163 @@
     }
 
     return expanded;
+  }
+
+  function mergeSmallSegments(segments, maxSegmentAxis) {
+    const minOutputAxis = getMinOutputSegmentAxis(maxSegmentAxis);
+    const hardMaxSegmentAxis = getHardMaxSegmentAxis(maxSegmentAxis);
+    const merged = segments.slice();
+    let changed = true;
+
+    while (changed) {
+      changed = false;
+      for (let index = 0; index < merged.length; index += 1) {
+        const segment = merged[index];
+        if (!segment || segment.length >= minOutputAxis || merged.length < 2) {
+          continue;
+        }
+
+        const previous = index > 0 ? merged[index - 1] : null;
+        const next = index < merged.length - 1 ? merged[index + 1] : null;
+        const canMergePrevious = canMergeSegments(previous, segment, hardMaxSegmentAxis);
+        const canMergeNext = canMergeSegments(segment, next, hardMaxSegmentAxis);
+        if (!canMergePrevious && !canMergeNext) {
+          continue;
+        }
+
+        if (canMergePrevious && (!canMergeNext || index === merged.length - 1 || previous.length <= next.length)) {
+          merged.splice(index - 1, 2, mergeAdjacentSegments(previous, segment));
+        } else {
+          merged.splice(index, 2, mergeAdjacentSegments(segment, next));
+        }
+        changed = true;
+        break;
+      }
+    }
+
+    return merged;
+  }
+
+  function canMergeSegments(first, second, hardMaxSegmentAxis) {
+    if (!first || !second) {
+      return false;
+    }
+    return second.end - first.start <= hardMaxSegmentAxis + 0.5;
+  }
+
+  function mergeAdjacentSegments(first, second) {
+    const start = first.start;
+    const end = second.end;
+    return {
+      start,
+      end,
+      length: end - start,
+      label: first.label || second.label || "\uC139\uC158",
+      mode: first.mode === second.mode ? first.mode : "merged",
+    };
+  }
+
+  function getHardMaxSegmentAxis(maxSegmentAxis) {
+    return Math.max(maxSegmentAxis, HARD_MAX_SEGMENT_AXIS);
+  }
+
+  function getMinOutputSegmentAxis(maxSegmentAxis) {
+    const preferredMin = Math.min(MIN_OUTPUT_SEGMENT_AXIS, Math.max(maxSegmentAxis, MIN_SEGMENT_AXIS));
+    return Math.min(preferredMin, getHardMaxSegmentAxis(maxSegmentAxis));
+  }
+
+  function chooseSegmentEnd(partStart, targetEnd, hardEnd, segmentEnd, entries) {
+    if (targetEnd >= segmentEnd - 0.5) {
+      return segmentEnd;
+    }
+
+    const snappedForward = findForwardSafeCut(targetEnd, hardEnd, segmentEnd, entries);
+    if (snappedForward > targetEnd + 0.5) {
+      return snappedForward;
+    }
+
+    const snappedBackward = findBackwardSafeCut(partStart, targetEnd, entries);
+    if (snappedBackward > partStart + MIN_SEGMENT_AXIS) {
+      return snappedBackward;
+    }
+
+    return targetEnd;
+  }
+
+  function findForwardSafeCut(targetEnd, hardEnd, segmentEnd, entries) {
+    let best = 0;
+    const limit = Math.min(hardEnd, segmentEnd);
+    const boundaries = getSafeCutBoundaries(entries);
+    for (let index = 0; index < boundaries.length; index += 1) {
+      const boundary = boundaries[index];
+      if (boundary <= targetEnd + CUT_SNAP_TOLERANCE || boundary > limit + CUT_SNAP_TOLERANCE) {
+        continue;
+      }
+      if (isSafeCut(boundary, entries)) {
+        best = boundary;
+        break;
+      }
+    }
+    return best;
+  }
+
+  function findBackwardSafeCut(partStart, targetEnd, entries) {
+    let best = 0;
+    const boundaries = getSafeCutBoundaries(entries);
+    for (let index = 0; index < boundaries.length; index += 1) {
+      const boundary = boundaries[index];
+      if (boundary <= partStart + MIN_SEGMENT_AXIS || boundary >= targetEnd - CUT_SNAP_TOLERANCE) {
+        continue;
+      }
+      if (isSafeCut(boundary, entries)) {
+        best = boundary;
+      }
+    }
+    return best;
+  }
+
+  function getSafeCutBoundaries(entries) {
+    const values = [];
+    for (let index = 0; index < entries.length; index += 1) {
+      const entry = entries[index];
+      if (!isCutSensitiveEntry(entry)) {
+        continue;
+      }
+      values.push(entry.mainStart);
+      values.push(entry.mainEnd);
+    }
+    values.sort((a, b) => a - b);
+    const unique = [];
+    for (let index = 0; index < values.length; index += 1) {
+      const value = values[index];
+      if (!isFiniteNumber(value)) {
+        continue;
+      }
+      if (!unique.length || Math.abs(unique[unique.length - 1] - value) > CUT_SNAP_TOLERANCE) {
+        unique.push(value);
+      }
+    }
+    return unique;
+  }
+
+  function isSafeCut(cut, entries) {
+    for (let index = 0; index < entries.length; index += 1) {
+      const entry = entries[index];
+      if (!isCutSensitiveEntry(entry)) {
+        continue;
+      }
+      if (entry.mainStart < cut - CUT_SNAP_TOLERANCE && entry.mainEnd > cut + CUT_SNAP_TOLERANCE) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function isCutSensitiveEntry(entry) {
+    if (!entry || entry.node.visible === false || entry.mainLength < MIN_SECTION_AXIS) {
+      return false;
+    }
+    return entry.mainLength <= HARD_MAX_SEGMENT_AXIS + CUT_SNAP_TOLERANCE;
   }
 
   function getMaxSegmentAxis(options) {
@@ -451,6 +632,25 @@
         continue;
       }
 
+      if (shouldInlineContainerForSegment(entry, segment)) {
+        const inlineEntries = collectInlineSegmentEntries(root, entry.node, segment, direction);
+        for (let inlineIndex = 0; inlineIndex < inlineEntries.length; inlineIndex += 1) {
+          clonedLayerCount += cloneSegmentEntry(frame, inlineEntries[inlineIndex], segment, direction, skipped, warnings);
+        }
+        continue;
+      }
+
+      clonedLayerCount += cloneSegmentEntry(frame, entry, segment, direction, skipped, warnings);
+    }
+
+    return {
+      clonedLayerCount,
+      skipped,
+      warnings,
+    };
+  }
+
+  function cloneSegmentEntry(frame, entry, segment, direction, skipped, warnings) {
       let clone = null;
       try {
         clone = entry.node.clone();
@@ -463,7 +663,14 @@
             reason: trimResult.warning,
           });
         }
-        clonedLayerCount += 1;
+        const pruneResult = pruneCloneOutsideFrame(clone, frame);
+        if (pruneResult.warning) {
+          warnings.push({
+            nodeName: entry.name,
+            reason: pruneResult.warning,
+          });
+        }
+        return 1;
       } catch (error) {
         removeNodeQuietly(clone);
         skipped.push({
@@ -472,14 +679,44 @@
           nodeType: String(entry.node.type || "UNKNOWN"),
           reason: normalizeErrorMessage(error, "\uD574\uB2F9 \uB808\uC774\uC5B4\uB97C \uBCF5\uC81C\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4."),
         });
+        return 0;
       }
+  }
+
+  function shouldInlineContainerForSegment(entry, segment) {
+    if (!entry || !hasChildren(entry.node) || !overlapsSegment(entry, segment)) {
+      return false;
+    }
+    if (!isStructuralContainerNode(entry.node)) {
+      return false;
+    }
+    return entry.mainStart < segment.start - 0.5 || entry.mainEnd > segment.end + 0.5;
+  }
+
+  function collectInlineSegmentEntries(root, container, segment, direction) {
+    const inlineEntries = [];
+    appendInlineSegmentEntries(root, container, segment, direction, inlineEntries);
+    return inlineEntries;
+  }
+
+  function appendInlineSegmentEntries(root, container, segment, direction, inlineEntries) {
+    if (!hasChildren(container)) {
+      return;
     }
 
-    return {
-      clonedLayerCount,
-      skipped,
-      warnings,
-    };
+    for (let index = 0; index < container.children.length; index += 1) {
+      const child = container.children[index];
+      const entry = createEntryFromNode(root, child, direction, inlineEntries.length);
+      if (!entry || !overlapsSegment(entry, segment)) {
+        continue;
+      }
+
+      if (shouldInlineContainerForSegment(entry, segment)) {
+        appendInlineSegmentEntries(root, child, segment, direction, inlineEntries);
+      } else {
+        inlineEntries.push(entry);
+      }
+    }
   }
 
   function removeNodeQuietly(node) {
@@ -494,6 +731,37 @@
 
   function overlapsSegment(entry, segment) {
     return entry.mainEnd > segment.start + 0.5 && entry.mainStart < segment.end - 0.5;
+  }
+
+  function createEntryFromNode(root, node, direction, order) {
+    if (!node || node.removed) {
+      return null;
+    }
+
+    const bounds = getLocalBounds(root, node);
+    if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
+      return null;
+    }
+
+    const mainStart = direction === "vertical" ? bounds.y : bounds.x;
+    const mainLength = direction === "vertical" ? bounds.height : bounds.width;
+    const crossStart = direction === "vertical" ? bounds.x : bounds.y;
+    const crossLength = direction === "vertical" ? bounds.width : bounds.height;
+    return {
+      node,
+      order,
+      name: safeName(node),
+      localX: bounds.x,
+      localY: bounds.y,
+      width: bounds.width,
+      height: bounds.height,
+      mainStart,
+      mainEnd: mainStart + mainLength,
+      mainLength,
+      crossStart,
+      crossEnd: crossStart + crossLength,
+      crossLength,
+    };
   }
 
   function positionClone(clone, entry, segment, direction) {
@@ -513,7 +781,9 @@
   }
 
   function trimCloneToSegmentIfNeeded(clone, entry, segment, direction) {
-    if (entry.mainLength <= segment.length + 1) {
+    const protrudesBefore = entry.mainStart < segment.start - 0.5;
+    const protrudesAfter = entry.mainEnd > segment.end + 0.5;
+    if (!protrudesBefore && !protrudesAfter) {
       return {};
     }
 
@@ -553,6 +823,87 @@
     }
 
     return {};
+  }
+
+  function pruneCloneOutsideFrame(clone, frame) {
+    const frameBox = getAbsoluteBox(frame);
+    if (!frameBox || !hasChildren(clone)) {
+      return {};
+    }
+
+    const result = pruneChildrenOutsideBox(clone, frameBox);
+    if (result.failedCount > 0) {
+      return {
+        warning: "\uD504\uB808\uC784 \uBC16 \uD558\uC704 \uB808\uC774\uC5B4 \uC77C\uBD80\uB97C \uC815\uB9AC\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.",
+      };
+    }
+    return {};
+  }
+
+  function pruneChildrenOutsideBox(parent, frameBox) {
+    if (!hasChildren(parent)) {
+      return {
+        removedCount: 0,
+        failedCount: 0,
+      };
+    }
+
+    let removedCount = 0;
+    let failedCount = 0;
+    const children = Array.from(parent.children);
+    for (let index = children.length - 1; index >= 0; index -= 1) {
+      const child = children[index];
+      if (!child || child.removed) {
+        continue;
+      }
+
+      const childBox = getAbsoluteBox(child);
+      if (childBox && !boxesOverlap(childBox, frameBox)) {
+        if (removeChildForPrune(child)) {
+          removedCount += 1;
+        } else {
+          failedCount += 1;
+        }
+        continue;
+      }
+
+      if (hasChildren(child)) {
+        const childResult = pruneChildrenOutsideBox(child, frameBox);
+        removedCount += childResult.removedCount;
+        failedCount += childResult.failedCount;
+        if (hasChildren(child) && child.children.length === 0 && isEmptyStructuralContainerNode(child)) {
+          if (removeChildForPrune(child)) {
+            removedCount += 1;
+          } else {
+            failedCount += 1;
+          }
+        }
+      }
+    }
+
+    return {
+      removedCount,
+      failedCount,
+    };
+  }
+
+  function removeChildForPrune(node) {
+    try {
+      if (node && !node.removed) {
+        node.remove();
+        return true;
+      }
+    } catch (error) {
+      return false;
+    }
+    return false;
+  }
+
+  function boxesOverlap(first, second) {
+    return first.x + first.width > second.x + 0.5 &&
+      first.x < second.x + second.width - 0.5 &&
+      first.y + first.height > second.y + 0.5 &&
+      first.y < second.y + second.height - 0.5;
   }
 
   function shiftCloneChildren(clone, cropOffset, direction) {
@@ -641,6 +992,41 @@
 
   function hasChildren(node) {
     return !!node && Array.isArray(node.children);
+  }
+
+  function isStructuralContainerNode(node) {
+    if (!hasChildren(node) || !isEmptyStructuralContainerNode(node)) {
+      return false;
+    }
+    const type = String(node.type || "");
+    return type === "GROUP" || type === "FRAME" || type === "SECTION";
+  }
+
+  function isEmptyStructuralContainerNode(node) {
+    if (!node || readProperty(node, "isMask") === true || readProperty(node, "clipsContent") === true) {
+      return false;
+    }
+    const type = String(node.type || "");
+    if (type === "INSTANCE" || type === "COMPONENT" || type === "COMPONENT_SET" || type === "BOOLEAN_OPERATION") {
+      return false;
+    }
+    if (hasVisibleArrayProperty(node, "fills") || hasVisibleArrayProperty(node, "strokes") || hasVisibleArrayProperty(node, "effects")) {
+      return false;
+    }
+    const opacity = readProperty(node, "opacity");
+    if (typeof opacity === "number" && opacity < 0.999) {
+      return false;
+    }
+    const blendMode = String(readProperty(node, "blendMode") || "NORMAL");
+    return blendMode === "NORMAL" || blendMode === "PASS_THROUGH";
+  }
+
+  function hasVisibleArrayProperty(node, key) {
+    const value = readProperty(node, key);
+    if (!Array.isArray(value)) {
+      return false;
+    }
+    return value.some((item) => item && item.visible !== false);
   }
 
   function hasUsableSize(node) {
@@ -780,20 +1166,19 @@
   }
 
   function buildFrameName(root, segment, index, total) {
-    const number = String(index + 1).padStart(2, "0");
-    const label = sanitizeName(segment.label || "\uC139\uC158");
-    return safeName(root) + " / split " + number + "-" + String(total).padStart(2, "0") + " " + label;
+    const number = String(index + 1).padStart(3, "0");
+    return number + "_" + sanitizeGeneratedFrameBaseName(safeName(root));
   }
 
-  function sanitizeName(name) {
+  function sanitizeGeneratedFrameBaseName(name) {
     const cleaned = String(name || "")
       .replace(/[\\/:*?"<>|]+/g, " ")
       .replace(/\s+/g, " ")
       .trim();
     if (!cleaned) {
-      return "\uC139\uC158";
+      return "\uC774\uB984 \uC5C6\uC74C";
     }
-    return cleaned.length > 42 ? cleaned.slice(0, 42).trim() : cleaned;
+    return cleaned.length > 120 ? cleaned.slice(0, 120).trim() : cleaned;
   }
 
   function buildResult(root, direction, segments, createdFrames, skipped, warnings, anchorCount, maxSegmentAxis) {

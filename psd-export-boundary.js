@@ -16,14 +16,23 @@
     exportPackageMode: "psd-only",
     fileNamePattern: "{frame-name}.psd"
   });
-  const LONG_EDITABLE_SEGMENT_HEIGHT = 10000;
+  const LONG_EDITABLE_SEGMENT_HEIGHT = 4500;
   const LONG_EDITABLE_SEGMENT_AREA = 10000000;
-  const LONG_EDITABLE_SEGMENT_MIN_HEIGHT = 1200;
+  const LONG_EDITABLE_SEGMENT_MIN_HEIGHT = 3500;
   const LONG_EDITABLE_COMPLEX_NODE_COUNT = 80;
   const LONG_EDITABLE_COMPLEX_TEXT_COUNT = 25;
   const LONG_EDITABLE_COMPLEX_IMAGE_COUNT = 4;
   const LONG_EDITABLE_COMPLEX_EFFECT_COUNT = 8;
   const LONG_EDITABLE_ANALYSIS_LIMIT = 2500;
+  const PIGMA_EXPORT_TEMP_NODE_NAMES = Object.freeze([
+    "__pigma-mask-preview__",
+    "__pigma-background-blur-crop__",
+    "__pigma-vector-preview__",
+    "__pigma-text-preview-padding__",
+    "__pigma-text-visual-probe__",
+    "__pigma-long-frame-tile__"
+  ]);
+  const PIGMA_EXPORT_TEMP_NODE_NAME_SET = new Set(PIGMA_EXPORT_TEMP_NODE_NAMES);
   let activeEditableSegmentSession = null;
 
   if (typeof originalOnMessage !== "function") {
@@ -34,7 +43,7 @@
     figma.ui.postMessage = message => {
       const result = originalPostMessage(message);
       if (message && (message.type === "export-finished" || message.type === "export-error")) {
-        cleanupEditableSegmentSession();
+        cleanupExportMemory("after-export");
       }
       return result;
     };
@@ -54,6 +63,8 @@
     const normalizedMessage = normalizeExportMessage(message);
 
     if (normalizedMessage.type === "request-export") {
+      cleanupExportMemory("before-export");
+
       const segmentPlan = getLongEditableSegmentPlan(normalizedMessage);
       if (segmentPlan && normalizedMessage.longEditableSegmentConsent !== true) {
         figma.ui.postMessage({
@@ -224,9 +235,14 @@
     const height = Math.max(1, Math.round(bounds.height));
     const byHeight = Math.ceil(height / LONG_EDITABLE_SEGMENT_HEIGHT);
     const byArea = Math.ceil(width * height / LONG_EDITABLE_SEGMENT_AREA);
-    const count = Math.max(2, byHeight, byArea);
-    const maxByMinHeight = Math.max(1, Math.floor(height / LONG_EDITABLE_SEGMENT_MIN_HEIGHT));
-    return Math.max(2, Math.min(count, maxByMinHeight || count));
+    let count = Math.max(2, byHeight, byArea);
+    while (count > 2 && height / (count - 1) <= LONG_EDITABLE_SEGMENT_HEIGHT) {
+      if (height / count >= LONG_EDITABLE_SEGMENT_MIN_HEIGHT) {
+        break;
+      }
+      count -= 1;
+    }
+    return count;
   }
 
   function buildLongEditableSegments(bounds, count) {
@@ -269,7 +285,7 @@
   }
 
   async function runLongEditableSegmentExport(message, plan) {
-    cleanupEditableSegmentSession();
+    cleanupExportMemory("before-long-editable");
 
     const previousSelection = figma.currentPage.selection ? figma.currentPage.selection.slice() : [];
     const frames = [];
@@ -377,7 +393,7 @@
     const root = plan.root;
     const bounds = plan.bounds;
     const frame = figma.createFrame();
-    frame.name = plan.rootName + " part " + String(segment.index + 1).padStart(2, "0");
+    frame.name = buildNumberedSegmentFrameName(plan.rootName, segment.index);
     frame.clipsContent = true;
     frame.fills = [];
     frame.strokes = [];
@@ -398,14 +414,30 @@
       for (let index = 0; index < root.children.length; index += 1) {
         const child = root.children[index];
         if (nodeIntersectsRectDeep(child, segment.rect)) {
-          appendSegmentClone(child, frame, segment.rect, frameRect);
+          appendSegmentNodeForFrame(child, frame, segment.rect, frameRect);
         }
       }
     } else if (nodeIntersectsRectDeep(root, segment.rect)) {
-      appendSegmentClone(root, frame, segment.rect, frameRect);
+      appendSegmentNodeForFrame(root, frame, segment.rect, frameRect);
     }
 
     return frame;
+  }
+
+  function buildNumberedSegmentFrameName(rootName, index) {
+    const number = String(index + 1).padStart(3, "0");
+    return number + "_" + sanitizeGeneratedFrameBaseName(rootName);
+  }
+
+  function sanitizeGeneratedFrameBaseName(name) {
+    const cleaned = String(name || "")
+      .replace(/[\\/:*?"<>|]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!cleaned) {
+      return "\uC774\uB984 \uC5C6\uC74C";
+    }
+    return cleaned.length > 120 ? cleaned.slice(0, 120).trim() : cleaned;
   }
 
   function appendRootVisualBackground(root, frame, bounds, segment) {
@@ -424,6 +456,43 @@
     copyScalarProperty(root, background, "strokeAlign");
     copyScalarProperty(root, background, "opacity");
     frame.appendChild(background);
+  }
+
+  function appendSegmentNodeForFrame(source, frame, sourceRect, frameRect) {
+    if (shouldInlineSegmentContainer(source, sourceRect)) {
+      appendInlineSegmentChildren(source, frame, sourceRect, frameRect);
+      return null;
+    }
+
+    return appendSegmentClone(source, frame, sourceRect, frameRect);
+  }
+
+  function appendInlineSegmentChildren(container, frame, sourceRect, frameRect) {
+    if (!container || !("children" in container)) {
+      return;
+    }
+
+    for (let index = 0; index < container.children.length; index += 1) {
+      const child = container.children[index];
+      if (!nodeIntersectsRectDeep(child, sourceRect)) {
+        continue;
+      }
+
+      appendSegmentNodeForFrame(child, frame, sourceRect, frameRect);
+    }
+  }
+
+  function shouldInlineSegmentContainer(node, rect) {
+    if (!isStructuralSegmentContainer(node)) {
+      return false;
+    }
+
+    const bounds = getNodeBounds(node);
+    if (!bounds) {
+      return true;
+    }
+
+    return !rectContainsRect(rect, bounds);
   }
 
   function appendSegmentClone(source, frame, sourceRect, frameRect) {
@@ -462,6 +531,9 @@
         removeOrHideSegmentChild(child);
       } else {
         pruneCloneToSegment(child, rect);
+        if ("children" in child && child.children.length === 0 && isEmptyStructuralSegmentContainer(child)) {
+          removeOrHideSegmentChild(child);
+        }
       }
     }
   }
@@ -546,6 +618,13 @@
     return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
   }
 
+  function rectContainsRect(outer, inner) {
+    return inner.x >= outer.x - 0.5 &&
+      inner.y >= outer.y - 0.5 &&
+      inner.x + inner.width <= outer.x + outer.width + 0.5 &&
+      inner.y + inner.height <= outer.y + outer.height + 0.5;
+  }
+
   function getNodeBounds(node) {
     if (node && "absoluteBoundingBox" in node && isUsableBounds(node.absoluteBoundingBox)) {
       return normalizeBounds(node.absoluteBoundingBox);
@@ -625,6 +704,45 @@
     return false;
   }
 
+  function isStructuralSegmentContainer(node) {
+    if (!node || !("children" in node) || !Array.isArray(node.children) || !isEmptyStructuralSegmentContainer(node)) {
+      return false;
+    }
+
+    const type = String(node.type || "");
+    return type === "GROUP" || type === "FRAME" || type === "SECTION";
+  }
+
+  function isEmptyStructuralSegmentContainer(node) {
+    if (!node || node.isMask === true || node.clipsContent === true) {
+      return false;
+    }
+
+    const type = String(node.type || "");
+    if (type === "INSTANCE" || type === "COMPONENT" || type === "COMPONENT_SET" || type === "BOOLEAN_OPERATION") {
+      return false;
+    }
+
+    if (hasVisibleArrayProperty(node, "fills") || hasVisibleArrayProperty(node, "strokes") || hasVisibleArrayProperty(node, "effects")) {
+      return false;
+    }
+
+    if (typeof node.opacity === "number" && node.opacity < 0.999) {
+      return false;
+    }
+
+    const blendMode = String(node.blendMode || "NORMAL");
+    return blendMode === "NORMAL" || blendMode === "PASS_THROUGH";
+  }
+
+  function hasVisibleArrayProperty(node, property) {
+    if (!node || !(property in node) || !Array.isArray(node[property])) {
+      return false;
+    }
+
+    return node[property].some(item => item && item.visible !== false);
+  }
+
   function copyPaintProperty(source, target, property) {
     if (source && target && property in source && property in target && Array.isArray(source[property])) {
       try {
@@ -650,8 +768,105 @@
 
     const session = activeEditableSegmentSession;
     activeEditableSegmentSession = null;
+    const shouldRestoreSelection = shouldRestoreEditableSegmentSelection(session);
     cleanupNodes(session.frames);
-    restoreSelection(session.previousSelection);
+    if (shouldRestoreSelection) {
+      restoreSelection(session.previousSelection);
+    }
+  }
+
+  function shouldRestoreEditableSegmentSelection(session) {
+    try {
+      const currentSelection = figma.currentPage && Array.isArray(figma.currentPage.selection)
+        ? figma.currentPage.selection
+        : [];
+      if (!currentSelection.length) {
+        return true;
+      }
+
+      const frames = Array.isArray(session.frames) ? session.frames : [];
+      const frameIds = new Set(frames.map(node => node && node.id).filter(Boolean));
+      if (!frameIds.size) {
+        return true;
+      }
+
+      return currentSelection.some(node => node && frameIds.has(node.id));
+    } catch (error) {
+      return true;
+    }
+  }
+
+  function cleanupExportMemory(reason) {
+    cleanupEditableSegmentSession();
+    cleanupOrphanPigmaExportNodes(reason);
+  }
+
+  function cleanupOrphanPigmaExportNodes(reason) {
+    let removedCount = 0;
+    try {
+      const pages = figma.currentPage ? [figma.currentPage] : [];
+      for (let index = 0; index < pages.length; index += 1) {
+        removedCount += cleanupPigmaExportTempDescendants(pages[index]);
+      }
+    } catch (error) {
+    }
+
+    if (removedCount > 0) {
+      try {
+        console.info("[pigma][export-memory-cleanup]", reason || "export", "removed", removedCount);
+      } catch (error) {
+      }
+    }
+  }
+
+  function cleanupPigmaExportTempDescendants(parent) {
+    try {
+      if (!parent || !("children" in parent) || !Array.isArray(parent.children)) {
+        return 0;
+      }
+
+      let removedCount = 0;
+      const children = Array.from(parent.children);
+      for (let index = 0; index < children.length; index += 1) {
+        const child = children[index];
+        if (!child || child.removed) {
+          continue;
+        }
+
+        if (isPigmaExportTempNode(child)) {
+          if (removeNodeSafely(child)) {
+            removedCount += 1;
+          }
+          continue;
+        }
+
+        removedCount += cleanupPigmaExportTempDescendants(child);
+      }
+
+      return removedCount;
+    } catch (error) {
+      return 0;
+    }
+  }
+
+  function isPigmaExportTempNode(node) {
+    try {
+      const name = node && typeof node.name === "string" ? node.name : "";
+      return PIGMA_EXPORT_TEMP_NODE_NAME_SET.has(name);
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function removeNodeSafely(node) {
+    try {
+      if (node && !node.removed) {
+        node.remove();
+        return true;
+      }
+    } catch (error) {
+    }
+    return false;
   }
 
   function cleanupNodes(nodes) {
@@ -661,12 +876,7 @@
 
     for (let index = 0; index < nodes.length; index += 1) {
       const node = nodes[index];
-      if (node && !node.removed) {
-        try {
-          node.remove();
-        } catch (error) {
-        }
-      }
+      removeNodeSafely(node);
     }
   }
 
