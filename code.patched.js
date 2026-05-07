@@ -2788,6 +2788,9 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   const LONG_EDITABLE_COMPLEX_IMAGE_COUNT = 4;
   const LONG_EDITABLE_COMPLEX_EFFECT_COUNT = 8;
   const LONG_EDITABLE_ANALYSIS_LIMIT = 2500;
+  const LONG_EDITABLE_WHITESPACE_CAPTURE_MIN = 8;
+  const LONG_EDITABLE_WHITESPACE_CAPTURE_MAX = 160;
+  const LONG_EDITABLE_WHITESPACE_EDGE_TOLERANCE = 4;
   const PIGMA_EXPORT_TEMP_NODE_NAMES = Object.freeze([
     "__pigma-mask-preview__",
     "__pigma-background-blur-crop__",
@@ -2962,7 +2965,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       bounds: bounds,
       complexity: complexity,
       segmentCount: segmentCount,
-      segments: buildLongEditableSegments(bounds, segmentCount)
+      segments: buildLongEditableSegments(root, bounds, segmentCount)
     };
   }
 
@@ -3009,7 +3012,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return count;
   }
 
-  function buildLongEditableSegments(bounds, count) {
+  function buildLongEditableSegments(root, bounds, count) {
     const segments = [];
     const height = Math.max(1, Math.round(bounds.height));
     for (let index = 0; index < count; index += 1) {
@@ -3027,7 +3030,211 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         }
       });
     }
-    return segments;
+    return includeLongEditableAdjacentWhitespaceAroundSegments(segments, root, bounds);
+  }
+
+  function includeLongEditableAdjacentWhitespaceAroundSegments(segments, root, bounds) {
+    const intervals = getLongEditableContentIntervals(root);
+    if (!intervals.length) {
+      return segments;
+    }
+
+    const maxAllowedHeight = LONG_EDITABLE_SEGMENT_HEIGHT + LONG_EDITABLE_WHITESPACE_CAPTURE_MAX;
+    const adjusted = segments.map(segment => includeLongEditableWhitespaceAroundSegment(segment, intervals, bounds, maxAllowedHeight));
+    return removeLongEditableSegmentOverlap(adjusted);
+  }
+
+  function includeLongEditableWhitespaceAroundSegment(segment, intervals, rootBounds, maxAllowedHeight) {
+    const contentRange = getLongEditableSegmentContentRange(segment, intervals);
+    if (!contentRange) {
+      return segment;
+    }
+
+    let nextY = segment.rect.y;
+    let nextEnd = segment.rect.y + segment.rect.height;
+
+    if (Math.abs(contentRange.start - segment.rect.y) <= LONG_EDITABLE_WHITESPACE_EDGE_TOLERANCE) {
+      const previousEnd = findPreviousLongEditableContentEnd(intervals, contentRange.start);
+      if (previousEnd !== null) {
+        const gap = contentRange.start - previousEnd;
+        if (gap >= LONG_EDITABLE_WHITESPACE_CAPTURE_MIN && gap <= LONG_EDITABLE_WHITESPACE_CAPTURE_MAX) {
+          nextY = previousEnd;
+        }
+      } else {
+        const gap = contentRange.start - rootBounds.y;
+        if (gap >= LONG_EDITABLE_WHITESPACE_CAPTURE_MIN && gap <= LONG_EDITABLE_WHITESPACE_CAPTURE_MAX) {
+          nextY = rootBounds.y;
+        }
+      }
+    }
+
+    if (Math.abs(contentRange.end - (segment.rect.y + segment.rect.height)) <= LONG_EDITABLE_WHITESPACE_EDGE_TOLERANCE) {
+      const nextStart = findNextLongEditableContentStart(intervals, contentRange.end);
+      if (nextStart !== null) {
+        const gap = nextStart - contentRange.end;
+        if (gap >= LONG_EDITABLE_WHITESPACE_CAPTURE_MIN && gap <= LONG_EDITABLE_WHITESPACE_CAPTURE_MAX) {
+          nextEnd = nextStart;
+        }
+      } else {
+        const rootEnd = rootBounds.y + rootBounds.height;
+        const gap = rootEnd - contentRange.end;
+        if (gap >= LONG_EDITABLE_WHITESPACE_CAPTURE_MIN && gap <= LONG_EDITABLE_WHITESPACE_CAPTURE_MAX) {
+          nextEnd = rootEnd;
+        }
+      }
+    }
+
+    if (nextEnd - nextY > maxAllowedHeight) {
+      return segment;
+    }
+
+    return buildLongEditableSegmentFromAbsoluteRange(segment.index, rootBounds, nextY, nextEnd);
+  }
+
+  function buildLongEditableSegmentFromAbsoluteRange(index, rootBounds, y, end) {
+    const offsetY = Math.max(0, Math.round(y - rootBounds.y));
+    const height = Math.max(1, Math.round(end - y));
+    return {
+      index: index,
+      offsetY: offsetY,
+      height: height,
+      rect: {
+        x: rootBounds.x,
+        y: rootBounds.y + offsetY,
+        width: rootBounds.width,
+        height: height
+      }
+    };
+  }
+
+  function getLongEditableSegmentContentRange(segment, intervals) {
+    const segmentStart = segment.rect.y;
+    const segmentEnd = segment.rect.y + segment.rect.height;
+    let start = Infinity;
+    let end = -Infinity;
+    for (let index = 0; index < intervals.length; index += 1) {
+      const interval = intervals[index];
+      if (interval.end <= segmentStart + 0.5 || interval.start >= segmentEnd - 0.5) {
+        continue;
+      }
+      start = Math.min(start, interval.start);
+      end = Math.max(end, interval.end);
+    }
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+      return null;
+    }
+    return { start: start, end: end };
+  }
+
+  function getLongEditableContentIntervals(root) {
+    const intervals = [];
+    const stack = [];
+    if (root && "children" in root && Array.isArray(root.children)) {
+      for (let index = root.children.length - 1; index >= 0; index -= 1) {
+        stack.push(root.children[index]);
+      }
+    }
+
+    while (stack.length > 0) {
+      const node = stack.pop();
+      if (!node || node.removed || node.visible === false) {
+        continue;
+      }
+
+      const bounds = getNodeBounds(node);
+      if (bounds && isLongEditableWhitespaceContentNode(node, bounds)) {
+        intervals.push({
+          start: bounds.y,
+          end: bounds.y + bounds.height
+        });
+      }
+
+      if ("children" in node && Array.isArray(node.children)) {
+        for (let index = node.children.length - 1; index >= 0; index -= 1) {
+          stack.push(node.children[index]);
+        }
+      }
+    }
+
+    intervals.sort((a, b) => a.start - b.start || a.end - b.end);
+    return mergeLongEditableContentIntervals(intervals);
+  }
+
+  function isLongEditableWhitespaceContentNode(node, bounds) {
+    if (!bounds || bounds.height <= 0.5) {
+      return false;
+    }
+    if ("children" in node && Array.isArray(node.children) && isStructuralSegmentContainer(node)) {
+      return false;
+    }
+    return bounds.height <= LONG_EDITABLE_SEGMENT_HEIGHT + LONG_EDITABLE_WHITESPACE_CAPTURE_MAX;
+  }
+
+  function mergeLongEditableContentIntervals(intervals) {
+    const merged = [];
+    for (let index = 0; index < intervals.length; index += 1) {
+      const interval = intervals[index];
+      const previous = merged.length > 0 ? merged[merged.length - 1] : null;
+      if (previous && interval.start <= previous.end + 0.5) {
+        previous.end = Math.max(previous.end, interval.end);
+      } else {
+        merged.push({
+          start: interval.start,
+          end: interval.end
+        });
+      }
+    }
+    return merged;
+  }
+
+  function findPreviousLongEditableContentEnd(intervals, contentStart) {
+    let previousEnd = null;
+    for (let index = 0; index < intervals.length; index += 1) {
+      const interval = intervals[index];
+      if (interval.end >= contentStart - 0.5) {
+        break;
+      }
+      previousEnd = interval.end;
+    }
+    return previousEnd;
+  }
+
+  function findNextLongEditableContentStart(intervals, contentEnd) {
+    for (let index = 0; index < intervals.length; index += 1) {
+      const interval = intervals[index];
+      if (interval.start > contentEnd + 0.5) {
+        return interval.start;
+      }
+    }
+    return null;
+  }
+
+  function removeLongEditableSegmentOverlap(segments) {
+    const resolved = segments.map(segment => buildLongEditableSegmentFromAbsoluteRange(
+      segment.index,
+      {
+        x: segment.rect.x,
+        y: segment.rect.y - segment.offsetY,
+        width: segment.rect.width,
+        height: 0
+      },
+      segment.rect.y,
+      segment.rect.y + segment.rect.height
+    ));
+
+    for (let index = 1; index < resolved.length; index += 1) {
+      const previous = resolved[index - 1];
+      const current = resolved[index];
+      if (!previous || !current || previous.rect.y + previous.rect.height <= current.rect.y + 0.5) {
+        continue;
+      }
+
+      const boundary = current.rect.y;
+      previous.height = Math.max(1, Math.round(boundary - previous.rect.y));
+      previous.rect.height = previous.height;
+    }
+
+    return resolved;
   }
 
   function serializeLongEditableSegmentPlan(plan) {
@@ -34153,6 +34360,9 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   const MIN_SEGMENT_AXIS = 48;
   const MIN_OUTPUT_SEGMENT_AXIS = 3500;
   const CUT_SNAP_TOLERANCE = 20;
+  const SEGMENT_WHITESPACE_CAPTURE_MIN = 8;
+  const SEGMENT_WHITESPACE_CAPTURE_MAX = 160;
+  const SEGMENT_WHITESPACE_EDGE_TOLERANCE = 4;
   const SECTION_OVERLAP_TOLERANCE = 1;
   const OUTPUT_OFFSET = 96;
   const OUTPUT_GAP = 48;
@@ -34251,6 +34461,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
     segments = expandLargeSegments(segments, maxSegmentAxis, boundaryEntries);
     segments = mergeSmallSegments(segments, maxSegmentAxis);
+    segments = includeAdjacentWhitespaceAroundSegments(segments, boundaryEntries, rootAxis, maxSegmentAxis);
 
     if (segments.length < 2) {
       throw new Error("\uB098\uB20C \uC139\uC158\uC774 \uBD80\uC871\uD558\uAC70\uB098 \uC774\uBBF8 PSD\uC6A9\uC73C\uB85C \uCDA9\uBD84\uD788 \uC9E7\uC2B5\uB2C8\uB2E4.");
@@ -34625,6 +34836,187 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       label: first.label || second.label || "\uC139\uC158",
       mode: first.mode === second.mode ? first.mode : "merged",
     };
+  }
+
+  function includeAdjacentWhitespaceAroundSegments(segments, entries, rootAxis, maxSegmentAxis) {
+    const intervals = getWhitespaceContentIntervals(entries);
+    if (!intervals.length) {
+      return segments;
+    }
+
+    const maxAllowedLength = getHardMaxSegmentAxis(maxSegmentAxis) + SEGMENT_WHITESPACE_CAPTURE_MAX;
+    const adjusted = segments.map(segment => includeAdjacentWhitespaceAroundSegment(segment, intervals, rootAxis, maxAllowedLength));
+    return removeAdjacentWhitespaceOverlap(adjusted);
+  }
+
+  function includeAdjacentWhitespaceAroundSegment(segment, intervals, rootAxis, maxAllowedLength) {
+    const contentRange = getSegmentContentRange(segment, intervals);
+    if (!contentRange) {
+      return segment;
+    }
+
+    let nextStart = segment.start;
+    let nextEnd = segment.end;
+
+    if (Math.abs(contentRange.start - segment.start) <= SEGMENT_WHITESPACE_EDGE_TOLERANCE) {
+      const previousEnd = findPreviousContentEnd(intervals, contentRange.start);
+      if (previousEnd !== null) {
+        const gap = contentRange.start - previousEnd;
+        if (gap >= SEGMENT_WHITESPACE_CAPTURE_MIN && gap <= SEGMENT_WHITESPACE_CAPTURE_MAX) {
+          nextStart = previousEnd;
+        }
+      } else {
+        const gap = contentRange.start;
+        if (gap >= SEGMENT_WHITESPACE_CAPTURE_MIN && gap <= SEGMENT_WHITESPACE_CAPTURE_MAX) {
+          nextStart = 0;
+        }
+      }
+    }
+
+    if (Math.abs(contentRange.end - segment.end) <= SEGMENT_WHITESPACE_EDGE_TOLERANCE) {
+      const nextContentStart = findNextContentStart(intervals, contentRange.end);
+      if (nextContentStart !== null) {
+        const gap = nextContentStart - contentRange.end;
+        if (gap >= SEGMENT_WHITESPACE_CAPTURE_MIN && gap <= SEGMENT_WHITESPACE_CAPTURE_MAX) {
+          nextEnd = nextContentStart;
+        }
+      } else {
+        const gap = rootAxis - contentRange.end;
+        if (gap >= SEGMENT_WHITESPACE_CAPTURE_MIN && gap <= SEGMENT_WHITESPACE_CAPTURE_MAX) {
+          nextEnd = rootAxis;
+        }
+      }
+    }
+
+    if (nextEnd - nextStart > maxAllowedLength) {
+      return segment;
+    }
+
+    return {
+      start: nextStart,
+      end: nextEnd,
+      length: nextEnd - nextStart,
+      label: segment.label,
+      mode: segment.mode,
+    };
+  }
+
+  function getSegmentContentRange(segment, intervals) {
+    let start = Infinity;
+    let end = -Infinity;
+    for (let index = 0; index < intervals.length; index += 1) {
+      const interval = intervals[index];
+      if (interval.end <= segment.start + 0.5 || interval.start >= segment.end - 0.5) {
+        continue;
+      }
+
+      start = Math.min(start, interval.start);
+      end = Math.max(end, interval.end);
+    }
+
+    if (!isFiniteNumber(start) || !isFiniteNumber(end) || end <= start) {
+      return null;
+    }
+
+    return { start, end };
+  }
+
+  function getWhitespaceContentIntervals(entries) {
+    const intervals = [];
+    for (let index = 0; index < entries.length; index += 1) {
+      const entry = entries[index];
+      if (!isWhitespaceContentEntry(entry)) {
+        continue;
+      }
+
+      intervals.push({
+        start: Math.min(entry.mainStart, entry.mainEnd),
+        end: Math.max(entry.mainStart, entry.mainEnd),
+      });
+    }
+
+    intervals.sort((a, b) => a.start - b.start || a.end - b.end);
+    return mergeContentIntervals(intervals);
+  }
+
+  function isWhitespaceContentEntry(entry) {
+    if (!entry || entry.node.visible === false || entry.mainLength <= 0.5) {
+      return false;
+    }
+    if (hasChildren(entry.node) && isStructuralContainerNode(entry.node)) {
+      return false;
+    }
+    return entry.mainLength <= HARD_MAX_SEGMENT_AXIS + SEGMENT_WHITESPACE_CAPTURE_MAX;
+  }
+
+  function mergeContentIntervals(intervals) {
+    const merged = [];
+    for (let index = 0; index < intervals.length; index += 1) {
+      const interval = intervals[index];
+      const previous = merged.length > 0 ? merged[merged.length - 1] : null;
+      if (previous && interval.start <= previous.end + 0.5) {
+        previous.end = Math.max(previous.end, interval.end);
+      } else {
+        merged.push({
+          start: interval.start,
+          end: interval.end,
+        });
+      }
+    }
+    return merged;
+  }
+
+  function findPreviousContentEnd(intervals, contentStart) {
+    let previousEnd = null;
+    for (let index = 0; index < intervals.length; index += 1) {
+      const interval = intervals[index];
+      if (interval.end >= contentStart - 0.5) {
+        break;
+      }
+      previousEnd = interval.end;
+    }
+    return previousEnd;
+  }
+
+  function findNextContentStart(intervals, contentEnd) {
+    for (let index = 0; index < intervals.length; index += 1) {
+      const interval = intervals[index];
+      if (interval.start > contentEnd + 0.5) {
+        return interval.start;
+      }
+    }
+    return null;
+  }
+
+  function removeAdjacentWhitespaceOverlap(segments) {
+    const resolved = segments.map(segment => ({
+      start: segment.start,
+      end: segment.end,
+      length: segment.length,
+      label: segment.label,
+      mode: segment.mode,
+    }));
+
+    for (let index = 1; index < resolved.length; index += 1) {
+      const previous = resolved[index - 1];
+      const current = resolved[index];
+      if (!previous || !current || previous.end <= current.start + 0.5) {
+        continue;
+      }
+
+      let boundary = current.start;
+      const minPreviousEnd = previous.start + MIN_SEGMENT_AXIS;
+      if (boundary < minPreviousEnd) {
+        boundary = minPreviousEnd;
+        current.start = boundary;
+        current.length = current.end - current.start;
+      }
+
+      previous.end = boundary;
+      previous.length = previous.end - previous.start;
+    }
+
+    return resolved;
   }
 
   function getHardMaxSegmentAxis(maxSegmentAxis) {

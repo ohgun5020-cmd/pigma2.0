@@ -11,6 +11,9 @@
   const MIN_SEGMENT_AXIS = 48;
   const MIN_OUTPUT_SEGMENT_AXIS = 3500;
   const CUT_SNAP_TOLERANCE = 20;
+  const SEGMENT_WHITESPACE_CAPTURE_MIN = 8;
+  const SEGMENT_WHITESPACE_CAPTURE_MAX = 160;
+  const SEGMENT_WHITESPACE_EDGE_TOLERANCE = 4;
   const SECTION_OVERLAP_TOLERANCE = 1;
   const OUTPUT_OFFSET = 96;
   const OUTPUT_GAP = 48;
@@ -109,6 +112,7 @@
     }
     segments = expandLargeSegments(segments, maxSegmentAxis, boundaryEntries);
     segments = mergeSmallSegments(segments, maxSegmentAxis);
+    segments = includeAdjacentWhitespaceAroundSegments(segments, boundaryEntries, rootAxis, maxSegmentAxis);
 
     if (segments.length < 2) {
       throw new Error("\uB098\uB20C \uC139\uC158\uC774 \uBD80\uC871\uD558\uAC70\uB098 \uC774\uBBF8 PSD\uC6A9\uC73C\uB85C \uCDA9\uBD84\uD788 \uC9E7\uC2B5\uB2C8\uB2E4.");
@@ -483,6 +487,187 @@
       label: first.label || second.label || "\uC139\uC158",
       mode: first.mode === second.mode ? first.mode : "merged",
     };
+  }
+
+  function includeAdjacentWhitespaceAroundSegments(segments, entries, rootAxis, maxSegmentAxis) {
+    const intervals = getWhitespaceContentIntervals(entries);
+    if (!intervals.length) {
+      return segments;
+    }
+
+    const maxAllowedLength = getHardMaxSegmentAxis(maxSegmentAxis) + SEGMENT_WHITESPACE_CAPTURE_MAX;
+    const adjusted = segments.map(segment => includeAdjacentWhitespaceAroundSegment(segment, intervals, rootAxis, maxAllowedLength));
+    return removeAdjacentWhitespaceOverlap(adjusted);
+  }
+
+  function includeAdjacentWhitespaceAroundSegment(segment, intervals, rootAxis, maxAllowedLength) {
+    const contentRange = getSegmentContentRange(segment, intervals);
+    if (!contentRange) {
+      return segment;
+    }
+
+    let nextStart = segment.start;
+    let nextEnd = segment.end;
+
+    if (Math.abs(contentRange.start - segment.start) <= SEGMENT_WHITESPACE_EDGE_TOLERANCE) {
+      const previousEnd = findPreviousContentEnd(intervals, contentRange.start);
+      if (previousEnd !== null) {
+        const gap = contentRange.start - previousEnd;
+        if (gap >= SEGMENT_WHITESPACE_CAPTURE_MIN && gap <= SEGMENT_WHITESPACE_CAPTURE_MAX) {
+          nextStart = previousEnd;
+        }
+      } else {
+        const gap = contentRange.start;
+        if (gap >= SEGMENT_WHITESPACE_CAPTURE_MIN && gap <= SEGMENT_WHITESPACE_CAPTURE_MAX) {
+          nextStart = 0;
+        }
+      }
+    }
+
+    if (Math.abs(contentRange.end - segment.end) <= SEGMENT_WHITESPACE_EDGE_TOLERANCE) {
+      const nextContentStart = findNextContentStart(intervals, contentRange.end);
+      if (nextContentStart !== null) {
+        const gap = nextContentStart - contentRange.end;
+        if (gap >= SEGMENT_WHITESPACE_CAPTURE_MIN && gap <= SEGMENT_WHITESPACE_CAPTURE_MAX) {
+          nextEnd = nextContentStart;
+        }
+      } else {
+        const gap = rootAxis - contentRange.end;
+        if (gap >= SEGMENT_WHITESPACE_CAPTURE_MIN && gap <= SEGMENT_WHITESPACE_CAPTURE_MAX) {
+          nextEnd = rootAxis;
+        }
+      }
+    }
+
+    if (nextEnd - nextStart > maxAllowedLength) {
+      return segment;
+    }
+
+    return {
+      start: nextStart,
+      end: nextEnd,
+      length: nextEnd - nextStart,
+      label: segment.label,
+      mode: segment.mode,
+    };
+  }
+
+  function getSegmentContentRange(segment, intervals) {
+    let start = Infinity;
+    let end = -Infinity;
+    for (let index = 0; index < intervals.length; index += 1) {
+      const interval = intervals[index];
+      if (interval.end <= segment.start + 0.5 || interval.start >= segment.end - 0.5) {
+        continue;
+      }
+
+      start = Math.min(start, interval.start);
+      end = Math.max(end, interval.end);
+    }
+
+    if (!isFiniteNumber(start) || !isFiniteNumber(end) || end <= start) {
+      return null;
+    }
+
+    return { start, end };
+  }
+
+  function getWhitespaceContentIntervals(entries) {
+    const intervals = [];
+    for (let index = 0; index < entries.length; index += 1) {
+      const entry = entries[index];
+      if (!isWhitespaceContentEntry(entry)) {
+        continue;
+      }
+
+      intervals.push({
+        start: Math.min(entry.mainStart, entry.mainEnd),
+        end: Math.max(entry.mainStart, entry.mainEnd),
+      });
+    }
+
+    intervals.sort((a, b) => a.start - b.start || a.end - b.end);
+    return mergeContentIntervals(intervals);
+  }
+
+  function isWhitespaceContentEntry(entry) {
+    if (!entry || entry.node.visible === false || entry.mainLength <= 0.5) {
+      return false;
+    }
+    if (hasChildren(entry.node) && isStructuralContainerNode(entry.node)) {
+      return false;
+    }
+    return entry.mainLength <= HARD_MAX_SEGMENT_AXIS + SEGMENT_WHITESPACE_CAPTURE_MAX;
+  }
+
+  function mergeContentIntervals(intervals) {
+    const merged = [];
+    for (let index = 0; index < intervals.length; index += 1) {
+      const interval = intervals[index];
+      const previous = merged.length > 0 ? merged[merged.length - 1] : null;
+      if (previous && interval.start <= previous.end + 0.5) {
+        previous.end = Math.max(previous.end, interval.end);
+      } else {
+        merged.push({
+          start: interval.start,
+          end: interval.end,
+        });
+      }
+    }
+    return merged;
+  }
+
+  function findPreviousContentEnd(intervals, contentStart) {
+    let previousEnd = null;
+    for (let index = 0; index < intervals.length; index += 1) {
+      const interval = intervals[index];
+      if (interval.end >= contentStart - 0.5) {
+        break;
+      }
+      previousEnd = interval.end;
+    }
+    return previousEnd;
+  }
+
+  function findNextContentStart(intervals, contentEnd) {
+    for (let index = 0; index < intervals.length; index += 1) {
+      const interval = intervals[index];
+      if (interval.start > contentEnd + 0.5) {
+        return interval.start;
+      }
+    }
+    return null;
+  }
+
+  function removeAdjacentWhitespaceOverlap(segments) {
+    const resolved = segments.map(segment => ({
+      start: segment.start,
+      end: segment.end,
+      length: segment.length,
+      label: segment.label,
+      mode: segment.mode,
+    }));
+
+    for (let index = 1; index < resolved.length; index += 1) {
+      const previous = resolved[index - 1];
+      const current = resolved[index];
+      if (!previous || !current || previous.end <= current.start + 0.5) {
+        continue;
+      }
+
+      let boundary = current.start;
+      const minPreviousEnd = previous.start + MIN_SEGMENT_AXIS;
+      if (boundary < minPreviousEnd) {
+        boundary = minPreviousEnd;
+        current.start = boundary;
+        current.length = current.end - current.start;
+      }
+
+      previous.end = boundary;
+      previous.length = previous.end - previous.start;
+    }
+
+    return resolved;
   }
 
   function getHardMaxSegmentAxis(maxSegmentAxis) {
