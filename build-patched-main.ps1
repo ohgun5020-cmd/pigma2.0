@@ -672,6 +672,101 @@ if ($bundle.Contains('invalidateTextLayers:t&&e.hasEditableText')) {
 
 $uiBundle = [System.IO.File]::ReadAllText($uiSource, [System.Text.Encoding]::UTF8)
 $originalUiBundle = $uiBundle
+
+# Release large PSD/ZIP buffers before the prepared download click. The Figma
+# plugin iframe can otherwise hold root PSD bytes, ZIP stream chunks, and the
+# final Blob URL at the same time, which is enough to crash large batch exports
+# when the ZIP download starts.
+$uiDirectPsdDownloadFind = 'Yi(new Blob([Eu(e.bytes)],{type:"image/vnd.adobe.photoshop"}),e.fileName,e.rootName,t,n)'
+$uiDirectPsdDownloadReplace = 'let r=new Blob([Eu(e.bytes)],{type:"image/vnd.adobe.photoshop"});br([e]),Yi(r,e.fileName,e.rootName,t,n)'
+if ($uiBundle.Contains($uiDirectPsdDownloadFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiDirectPsdDownloadFind `
+    -Replace $uiDirectPsdDownloadReplace `
+    -ExpectedCount 1 `
+    -Label 'ui direct PSD pre-download buffer release'
+} elseif ($uiBundle.Contains($uiDirectPsdDownloadReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI direct PSD pre-download buffer release.'
+}
+
+$uiLegacyZipDownloadFind = 'Yi(new Blob([Eu(a)],{type:"application/zip"}),e,'
+$uiLegacyZipDownloadReplace = 'n={},br(t);let s=new Blob([Eu(a)],{type:"application/zip"});a=new Uint8Array(0),Yi(s,e,'
+if ($uiBundle.Contains($uiLegacyZipDownloadFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiLegacyZipDownloadFind `
+    -Replace $uiLegacyZipDownloadReplace `
+    -ExpectedCount 1 `
+    -Label 'ui legacy ZIP pre-download buffer release'
+} elseif ($uiBundle.Contains($uiLegacyZipDownloadReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI legacy ZIP pre-download buffer release.'
+}
+
+$uiStreamZipFinalizeFind = 'function Wo(){let e,t,n,r=new Promise((i,a)=>{e=i,t=a});return n={zip:new Op((i,a,o)=>{if(i){n.settled||(n.settled=!0,n.rejectFinal(i));return}a&&a.length>0&&n.parts.push(Eu(a)),o&&!n.settled&&(n.settled=!0,n.resolveFinal(new Blob(n.parts,{type:"application/zip"})))}),parts:[],finalBlob:r,resolveFinal:e,rejectFinal:t,settled:!1,ended:!1,usedNames:new Set},n}'
+$uiStreamZipFinalizeReplace = 'function Wo(){let e,t,n,r=new Promise((i,a)=>{e=i,t=a});return n={zip:new Op((i,a,o)=>{if(i){n.settled||(n.settled=!0,n.rejectFinal(i));return}a&&a.length>0&&n.parts.push(Eu(a)),o&&!n.settled&&(n.settled=!0,(()=>{let s=new Blob(n.parts,{type:"application/zip"});n.parts=[],n.resolveFinal(s)})())}),parts:[],finalBlob:r,resolveFinal:e,rejectFinal:t,settled:!1,ended:!1,usedNames:new Set},n}'
+if ($uiBundle.Contains($uiStreamZipFinalizeFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiStreamZipFinalizeFind `
+    -Replace $uiStreamZipFinalizeReplace `
+    -ExpectedCount 1 `
+    -Label 'ui streaming ZIP chunk release'
+} elseif ($uiBundle.Contains($uiStreamZipFinalizeReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI streaming ZIP chunk release.'
+}
+
+$uiStreamZipFinalBlobFind = 'async function gm(e){return e.ended||(e.ended=!0,e.zip.end()),await e.finalBlob}'
+$uiStreamZipFinalBlobReplace = 'async function gm(e){e.ended||(e.ended=!0,e.zip.end());try{return await e.finalBlob}finally{Vo(e)}}'
+if ($uiBundle.Contains($uiStreamZipFinalBlobFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiStreamZipFinalBlobFind `
+    -Replace $uiStreamZipFinalBlobReplace `
+    -ExpectedCount 1 `
+    -Label 'ui streaming ZIP finalizer release'
+} elseif ($uiBundle.Contains($uiStreamZipFinalBlobReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI streaming ZIP finalizer release.'
+}
+
+$uiPreparedDownloadBlobFind = 'function Yi(e,t,n,r,i){let a=URL.createObjectURL(e);S0(),D.downloadUrl=a,D.downloadName=t,D.downloadSourceName=n,D.downloadMessage=r,At.href=a,At.download=t,TS.hidden=!1,D.busy=!1,D.statusTone="ready",D.statusMessage=i,pigmaTriggerPreparedDownload(a,t)}'
+$uiPreparedDownloadBlobReplace = 'function Yi(e,t,n,r,i){let a=URL.createObjectURL(e);e=null;S0(),D.downloadUrl=a,D.downloadName=t,D.downloadSourceName=n,D.downloadMessage=r,At.href=a,At.download=t,TS.hidden=!1,D.busy=!1,D.statusTone="ready",D.statusMessage=i,pigmaTriggerPreparedDownload(a,t)}'
+if ($uiBundle.Contains($uiPreparedDownloadBlobFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiPreparedDownloadBlobFind `
+    -Replace $uiPreparedDownloadBlobReplace `
+    -ExpectedCount 1 `
+    -Label 'ui prepared download local blob release'
+} elseif ($uiBundle.Contains($uiPreparedDownloadBlobReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI prepared download local blob release.'
+}
+
+$uiBatchZipBuiltFilesFind = 'let n=t.builtFiles.reduce((i,a)=>i+(a.usedFallback?1:0),0),r=await gm(t.archive);if(Vo(t.archive),t.archive=null,t.includeRasterBundle){'
+$uiBatchZipBuiltFilesReplace = 'let n=t.builtFiles.reduce((i,a)=>i+(a.usedFallback?1:0),0),r=await gm(t.archive);if(Vo(t.archive),t.archive=null,br(t.builtFiles),t.includeRasterBundle){'
+if ($uiBundle.Contains($uiBatchZipBuiltFilesFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiBatchZipBuiltFilesFind `
+    -Replace $uiBatchZipBuiltFilesReplace `
+    -ExpectedCount 1 `
+    -Label 'ui batch ZIP built file release'
+} elseif ($uiBundle.Contains($uiBatchZipBuiltFilesReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI batch ZIP built file release.'
+}
+
 $editableTextParagraphRunsHelper = 'function editableTextParagraphRuns(e,t){let r=(e||"").replace(/\\r\\n?/g,"\\n").split("\\n"),o=[];for(let n=0;n<r.length;n++){let i=r[n],a=i.length+(n<r.length-1?1:0);a>0&&o.push({length:a,style:{justification:t}})}return o}'
 $editableTextEngineMetadataReplacement = $editableTextParagraphRunsHelper + 'function g1(e){let t=E1(e),n=w1(e,t),r=ym(e),i=yh(e.text.bounds,r),a=yh(e.text.boundingBox,r),o=e.text.boxBounds?bm(e,i):null,s=v1(e,n,i,a,o),l=editableTextParagraphRuns(e.text.value,e.text.justification),u={text:e.text.value,transform:n,antiAlias:"smooth",orientation:"horizontal",gridding:"none",useFractionalGlyphWidths:!0,left:s.layerBounds.left,top:s.layerBounds.top,right:s.layerBounds.right,bottom:s.layerBounds.bottom,bounds:{left:{value:s.textBounds.left,units:"Pixels"},top:{value:s.textBounds.top,units:"Pixels"},right:{value:s.textBounds.right,units:"Pixels"},bottom:{value:s.textBounds.bottom,units:"Pixels"}},boundingBox:{left:{value:s.boundingBox.left,units:"Pixels"},top:{value:s.boundingBox.top,units:"Pixels"},right:{value:s.boundingBox.right,units:"Pixels"},bottom:{value:s.boundingBox.bottom,units:"Pixels"}},paragraphStyle:{justification:e.text.justification},paragraphStyleRuns:l,style:kh(e.text.baseStyle,t.boxBaselineShift),styleRuns:e.text.styleRuns.map(c=>({length:c.length,style:kh(c.style,t.boxBaselineShift)}))};return u.shapeType=e.text.shapeType,e.text.pointBase&&(u.pointBase=e.text.pointBase.slice()),o&&(u.boxBounds=o),u}'
 $editableTextPreflightSerializeCallLegacy = 'Il.serializeEngineData(qf.encodeEngineData(T.text))'
