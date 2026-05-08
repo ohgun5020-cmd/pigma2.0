@@ -320,14 +320,6 @@
         title: "현재 선택 범위에 남아 있는 접근성/디자인 일관성 검수 주석을 함께 정리합니다.",
         ariaLabel: "검수 주석 정리. 현재 선택 범위에 남아 있는 접근성/디자인 일관성 검수 주석을 함께 정리합니다.",
       },
-      aiRegroupRenameButton: {
-        title: "웹용 기준으로 이름과 그룹을 정리합니다.",
-        ariaLabel: "그룹과 이름 수정 웹용. 웹용 기준으로 이름과 그룹을 정리합니다.",
-      },
-      aiRegroupRenameHybridButton: {
-        title: "맥락을 이해하고 디자인용 구조 기준으로 그룹과 이름을 수정합니다.",
-        ariaLabel: "그룹과 이름 수정 디자인용. 맥락을 이해하고 디자인용 구조 기준으로 그룹과 이름을 수정합니다.",
-      },
       aiTypoAuditButton: {
         title: "오타 후보를 주석 또는 결과 패널에 남깁니다.",
         ariaLabel: "오타 검수. 오타 후보를 주석 또는 결과 패널에 남깁니다.",
@@ -338,7 +330,7 @@
       },
       aiPixelPerfectButton: {
         title: "소수점 보정 대상을 정수로 교정합니다.",
-        ariaLabel: "픽셀 교정. 소수점 보정 대상을 정수로 교정합니다.",
+        ariaLabel: "정수 픽셀 정렬 교정. 소수점 보정 대상을 정수 픽셀로 교정합니다.",
       },
       aiDeleteHiddenLayersButton: {
         title: "현재 선택 내부의 숨겨진 레이어를 정리하기 위한 준비 단계입니다.",
@@ -950,10 +942,6 @@
       title: "AI로 디자인을 전반적으로 이해하고 데이터를 캐시에 저장합니다.",
       ariaLabel: "디자인 읽기. AI로 디자인을 전반적으로 이해하고 데이터를 캐시에 저장합니다.",
     },
-    aiRegroupRenameButton: {
-      title: "웹용 기준으로 이름과 그룹을 정리합니다.",
-      ariaLabel: "그룹과 이름 수정 웹용. 웹용 기준으로 이름과 그룹을 정리합니다.",
-    },
     aiTypoAuditButton: {
       title: "오타 후보를 주석 또는 결과 패널에 남깁니다.",
       ariaLabel: "오타 검수. 오타 후보를 주석 또는 결과 패널에 남깁니다.",
@@ -964,7 +952,7 @@
     },
     aiPixelPerfectButton: {
       title: "소수점 보정 대상을 정수로 교정합니다.",
-      ariaLabel: "픽셀 교정. 소수점 보정 대상을 정수로 교정합니다.",
+      ariaLabel: "정수 픽셀 정렬 교정. 소수점 보정 대상을 정수 픽셀로 교정합니다.",
     },
     aiDeleteHiddenLayersButton: {
       title: "현재 선택 내부의 숨겨진 레이어를 정리하기 위한 준비 단계입니다.",
@@ -2209,364 +2197,6 @@
   };
 })();
 
-(() => {
-  if (window.__PIGMA_AI_CORRECTION_REGROUP_RENAME__) {
-    return;
-  }
-
-  const rootElement = document.documentElement;
-  const postPluginMessage = (message) => {
-    parent.postMessage({ pluginMessage: message }, "*");
-  };
-  const PANEL_STATE_KEY = "pigma:ai-regroup-rename-open:v1";
-  const elements = {
-    panel: document.getElementById("aiRegroupRenamePanel"),
-    panelTitle: document.getElementById("aiRegroupRenamePanelTitle"),
-    panelCopy: document.getElementById("aiRegroupRenamePanelCopy"),
-    statusPill: document.getElementById("aiRegroupRenameStatusPill"),
-    processedAt: document.getElementById("aiRegroupRenameProcessedAt"),
-    selectionSummary: document.getElementById("aiRegroupRenameSelectionSummary"),
-    selectionNote: document.getElementById("aiRegroupRenameSelectionNote"),
-    renameCount: document.getElementById("aiRegroupRenameCount"),
-    groupCount: document.getElementById("aiRegroupGroupCount"),
-    suggestionCount: document.getElementById("aiRegroupSuggestionCount"),
-    skippedCount: document.getElementById("aiRegroupSkippedCount"),
-    contextValue: document.getElementById("aiRegroupContextValue"),
-    renamePreview: document.getElementById("aiRegroupRenamePreview"),
-    regroupPreview: document.getElementById("aiRegroupPreviewValue"),
-    changeMeta: document.getElementById("aiRegroupChangeMeta"),
-    changeList: document.getElementById("aiRegroupChangeList"),
-    button: document.getElementById("aiRegroupRenameButton"),
-  };
-
-  if (
-    !(elements.panel instanceof HTMLDetailsElement) ||
-    !(elements.panelTitle instanceof HTMLElement) ||
-    !(elements.panelCopy instanceof HTMLElement) ||
-    !(elements.statusPill instanceof HTMLElement) ||
-    !(elements.processedAt instanceof HTMLElement) ||
-    !(elements.selectionSummary instanceof HTMLElement) ||
-    !(elements.selectionNote instanceof HTMLElement) ||
-    !(elements.renameCount instanceof HTMLElement) ||
-    !(elements.groupCount instanceof HTMLElement) ||
-    !(elements.suggestionCount instanceof HTMLElement) ||
-    !(elements.skippedCount instanceof HTMLElement) ||
-    !(elements.contextValue instanceof HTMLElement) ||
-    !(elements.renamePreview instanceof HTMLElement) ||
-    !(elements.regroupPreview instanceof HTMLElement) ||
-    !(elements.changeMeta instanceof HTMLElement) ||
-    !(elements.changeList instanceof HTMLElement) ||
-    !(elements.button instanceof HTMLButtonElement)
-  ) {
-    return;
-  }
-
-  let isApplying = false;
-  let lastRenderedResult = null;
-
-  const requestCachedResult = () => {
-    postPluginMessage({ type: "request-ai-regroup-rename-cache" });
-  };
-
-  const readStoredPanelState = () => {
-    try {
-      return window.localStorage.getItem(PANEL_STATE_KEY) === "true";
-    } catch (error) {
-      return false;
-    }
-  };
-
-  const persistPanelState = () => {
-    try {
-      window.localStorage.setItem(PANEL_STATE_KEY, elements.panel.open ? "true" : "false");
-    } catch (error) {}
-  };
-
-  const setButtonBusy = (busy) => {
-    isApplying = busy;
-    elements.button.disabled = busy;
-    elements.button.textContent = busy ? "그룹과 이름 수정 중..." : "그룹과 이름 수정 (웹용)";
-    elements.button.setAttribute("aria-busy", busy ? "true" : "false");
-  };
-
-  const setStatus = (tone, label) => {
-    elements.statusPill.dataset.tone = tone;
-    elements.statusPill.textContent = label;
-    elements.statusPill.classList.toggle("active", tone === "ready" || tone === "running");
-  };
-
-  const fillMetric = (element, value) => {
-    element.textContent = String(value);
-  };
-
-  const formatProcessedAt = (isoString) => {
-    if (typeof isoString !== "string" || !isoString) {
-      return "마지막 실행 없음";
-    }
-
-    const date = new Date(isoString);
-    if (!Number.isFinite(date.getTime())) {
-      return "마지막 실행 없음";
-    }
-
-    return `마지막 실행 ${date.toLocaleString("ko-KR", {
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    })}`;
-  };
-
-  const truncateText = (value, limit = 56) => {
-    const normalized = String(value || "").replace(/\s+/g, " ").trim();
-    if (!normalized) {
-      return "";
-    }
-
-    return normalized.length > limit ? `${normalized.slice(0, limit - 3)}...` : normalized;
-  };
-
-  const renderNameSourceLabel = (source) => {
-    if (source === "ai") {
-      return "AI";
-    }
-    if (source === "local") {
-      return "Local";
-    }
-    if (source === "kept") {
-      return "Kept";
-    }
-    return "";
-  };
-
-  const renderChangeList = (result) => {
-    elements.changeList.replaceChildren();
-
-    const rows = [];
-    (Array.isArray(result?.renamed) ? result.renamed : []).slice(0, 3).forEach((entry) => {
-      const sourceLabel = renderNameSourceLabel(entry?.nameSource);
-      rows.push({
-        title: "이름 변경",
-        detail: `${sourceLabel ? `[${sourceLabel}] ` : ""}${entry.from} -> ${entry.to} · ${entry.reason}`,
-      });
-    });
-    (Array.isArray(result?.regrouped) ? result.regrouped : []).slice(0, 2).forEach((entry) => {
-      rows.push({
-        title: "리그룹핑 적용",
-        detail: `${entry.name} · ${entry.reason}`,
-      });
-    });
-    (Array.isArray(result?.suggestions) ? result.suggestions : []).slice(0, 2).forEach((entry) => {
-      rows.push({
-        title: "추가 후보",
-        detail: `${entry.name} · ${entry.reason}`,
-      });
-    });
-    (Array.isArray(result?.skipped) ? result.skipped : []).slice(0, 1).forEach((entry) => {
-      rows.push({
-        title: "건너뜀",
-        detail: `${entry.label} · ${entry.reason}`,
-      });
-    });
-
-    if (!rows.length) {
-      const item = document.createElement("li");
-      const title = document.createElement("strong");
-      const detail = document.createElement("span");
-      title.className = "list-title";
-      detail.className = "list-detail";
-      title.textContent = "결과 대기";
-      detail.textContent = "버튼을 실행하면 적용된 이름 변경과 리그룹핑 내역이 여기에 표시됩니다.";
-      item.append(title, detail);
-      elements.changeList.append(item);
-      return;
-    }
-
-    rows.forEach((row) => {
-      const item = document.createElement("li");
-      const title = document.createElement("strong");
-      const detail = document.createElement("span");
-      title.className = "list-title";
-      detail.className = "list-detail";
-      title.textContent = row.title;
-      detail.textContent = truncateText(row.detail, 96);
-      item.append(title, detail);
-      elements.changeList.append(item);
-    });
-  };
-
-  const renderEmptyState = () => {
-    lastRenderedResult = null;
-    setButtonBusy(false);
-    setStatus("idle", "대기");
-    elements.panelTitle.textContent = "그룹과 이름 수정 준비";
-    elements.panelCopy.textContent = "웹용 기준으로 이름과 그룹을 정리합니다.";
-    elements.processedAt.textContent = "마지막 실행 없음";
-    elements.selectionSummary.textContent = "그룹과 이름 수정을 실행하면 결과가 여기에 표시됩니다.";
-    elements.selectionNote.textContent = "웹용은 안전한 조합 위주로 그룹과 이름을 정리합니다.";
-    fillMetric(elements.renameCount, 0);
-    fillMetric(elements.groupCount, 0);
-    fillMetric(elements.suggestionCount, 0);
-    fillMetric(elements.skippedCount, 0);
-    elements.contextValue.textContent = "맥락 대기";
-    elements.renamePreview.textContent = "이름 변경 대기";
-    elements.regroupPreview.textContent = "리그룹핑 대기";
-    elements.changeMeta.textContent = "로컬 분석";
-    renderChangeList(null);
-  };
-
-  const renderErrorState = (message) => {
-    setButtonBusy(false);
-    setStatus("error", "오류");
-    elements.panelTitle.textContent = "그룹과 이름 수정 실패";
-    elements.panelCopy.textContent = message || "그룹과 이름 수정에 실패했습니다.";
-    elements.selectionSummary.textContent = message || "선택을 확인한 뒤 다시 시도하세요.";
-    elements.selectionNote.textContent = "잠긴 레이어, 인스턴스 내부, 구조 제한이 있으면 일부 항목은 건너뜁니다.";
-
-    if (!lastRenderedResult) {
-      fillMetric(elements.renameCount, 0);
-      fillMetric(elements.groupCount, 0);
-      fillMetric(elements.suggestionCount, 0);
-      fillMetric(elements.skippedCount, 0);
-      elements.contextValue.textContent = "재시도 필요";
-      elements.renamePreview.textContent = "재시도 필요";
-      elements.regroupPreview.textContent = "재시도 필요";
-      elements.changeMeta.textContent = "재시도 필요";
-      renderChangeList({
-        skipped: [{ label: "실행 실패", reason: message || "선택을 다시 확인해 주세요." }],
-      });
-    }
-  };
-
-  const renderResult = (result, matchesCurrentSelection) => {
-    if (!result || typeof result !== "object") {
-      renderEmptyState();
-      return;
-    }
-
-    const summary = result.summary || {};
-    const renamed = Array.isArray(result.renamed) ? result.renamed : [];
-    const regrouped = Array.isArray(result.regrouped) ? result.regrouped : [];
-    const suggestions = Array.isArray(result.suggestions) ? result.suggestions : [];
-    lastRenderedResult = result;
-    setButtonBusy(false);
-    setStatus(matchesCurrentSelection ? "ready" : "stale", matchesCurrentSelection ? "완료" : "캐시");
-    elements.panelTitle.textContent = matchesCurrentSelection ? "그룹과 이름 수정 완료" : "최근 결과 불러옴";
-    elements.panelCopy.textContent = matchesCurrentSelection
-      ? "웹용 기준으로 이름과 그룹을 정리했습니다."
-      : "최근에 실행한 그룹과 이름 수정 결과를 보여주고 있습니다.";
-    elements.processedAt.textContent = `${formatProcessedAt(result.processedAt)} · 로컬 적용`;
-    elements.selectionSummary.textContent = `${summary.selectionLabel || "선택"} · ${summary.contextLabel || "일반 UI 화면"}`;
-    elements.selectionNote.textContent = `이름 변경 ${summary.renameCount || 0}건 · 리그룹핑 ${
-      summary.regroupCount || 0
-    }건 · 추가 후보 ${summary.suggestionCount || 0}건`;
-    fillMetric(elements.renameCount, summary.renameCount || 0);
-    fillMetric(elements.groupCount, summary.regroupCount || 0);
-    fillMetric(elements.suggestionCount, summary.suggestionCount || 0);
-    fillMetric(elements.skippedCount, summary.skippedCount || 0);
-    elements.contextValue.textContent = summary.contextLabel || "일반 UI 화면";
-    elements.renamePreview.textContent = renamed.length
-      ? truncateText(
-          `${renderNameSourceLabel(renamed[0].nameSource) ? `[${renderNameSourceLabel(renamed[0].nameSource)}] ` : ""}${renamed[0].from} -> ${renamed[0].to}`,
-          60
-        )
-      : "적용 없음";
-    elements.regroupPreview.textContent = regrouped.length
-      ? truncateText(regrouped[0].name, 60)
-      : suggestions.length
-        ? truncateText(`후보: ${suggestions[0].name}`, 60)
-        : "적용 없음";
-    const appliedCount = (summary.renameCount || 0) + (summary.regroupCount || 0);
-    const aiRenameCount = summary.aiRenameCount || 0;
-    const localRenameCount = summary.localRenameCount || 0;
-    const aiOnlySkippedCount = summary.aiOnlySkippedCount || 0;
-    const aiStatusLabel = typeof summary.aiStatusLabel === "string" ? summary.aiStatusLabel.trim() : "";
-    const aiErrorMessage = typeof summary.aiErrorMessage === "string" ? summary.aiErrorMessage.trim() : "";
-    const metaParts = ["적용 결과", `적용 ${appliedCount}건`];
-    if ((summary.renameCount || 0) > 0 || aiRenameCount > 0 || localRenameCount > 0) {
-      metaParts.push(`AI ${aiRenameCount}건`);
-      metaParts.push(`Local ${localRenameCount}건`);
-    }
-    if (aiStatusLabel) {
-      metaParts.push(aiStatusLabel);
-    }
-    if (summary.aiFailed === true && aiErrorMessage) {
-      metaParts.push(truncateText(aiErrorMessage, 42));
-    }
-    if (aiOnlySkippedCount > 0) {
-      metaParts.push(`AI 보류 ${aiOnlySkippedCount}건`);
-    }
-    elements.changeMeta.textContent = metaParts.join(" · ");
-    renderChangeList(result);
-  };
-
-  elements.button.addEventListener("click", () => {
-    if (isApplying) {
-      return;
-    }
-
-    setButtonBusy(true);
-    setStatus("running", "적용 중");
-    elements.panelTitle.textContent = "그룹과 이름 수정 진행 중";
-    elements.panelCopy.textContent = "웹용 기준으로 이름과 그룹 후보를 확인하고 있습니다.";
-    postPluginMessage({ type: "run-ai-regroup-rename", namingMode: "hybrid" });
-  });
-
-  window.addEventListener("message", (event) => {
-    const message = event.data?.pluginMessage;
-    if (!message || typeof message !== "object") {
-      return;
-    }
-
-    if (message.type === "ai-regroup-rename-cache") {
-      if (message.result) {
-        renderResult(message.result, message.matchesCurrentSelection === true);
-      } else if (!lastRenderedResult) {
-        renderEmptyState();
-      }
-      return;
-    }
-
-    if (message.type === "ai-regroup-rename-status") {
-      if (message.status === "running") {
-        setStatus("running", "적용 중");
-      }
-      return;
-    }
-
-    if (message.type === "ai-regroup-rename-result") {
-      renderResult(message.result, message.matchesCurrentSelection !== false);
-      return;
-    }
-
-    if (message.type === "ai-regroup-rename-error") {
-      if (message.matchesCurrentSelection === false) {
-        setButtonBusy(false);
-        return;
-      }
-      renderErrorState(message.message);
-    }
-  });
-
-  elements.panel.open = readStoredPanelState();
-  elements.panel.addEventListener("toggle", persistPanelState);
-  renderEmptyState();
-  requestCachedResult();
-
-  const rootObserver = new MutationObserver(() => {
-    if (rootElement.dataset.aiCorrectionTab === "active") {
-      requestCachedResult();
-    }
-  });
-  rootObserver.observe(rootElement, {
-    attributes: true,
-    attributeFilter: ["data-ai-correction-tab"],
-  });
-
-window.__PIGMA_AI_CORRECTION_REGROUP_RENAME__ = {
-  requestCachedResult,
-};
-})();
 
 (() => {
   if (
@@ -3356,7 +2986,7 @@ window.__PIGMA_AI_CORRECTION_TYPO_FIX__ = {
   const setButtonBusy = (busy) => {
     isApplying = busy;
     elements.button.disabled = busy;
-    elements.button.textContent = busy ? "픽셀 교정 중..." : "픽셀 교정";
+    elements.button.textContent = busy ? "정수 픽셀 정렬 교정 중..." : "정수 픽셀 정렬 교정";
     elements.button.setAttribute("aria-busy", busy ? "true" : "false");
   };
 
@@ -3450,11 +3080,11 @@ window.__PIGMA_AI_CORRECTION_TYPO_FIX__ = {
     lastRenderedResult = null;
     setButtonBusy(false);
     setStatus("idle", "대기");
-    elements.panelTitle.textContent = "픽셀 교정 준비";
+    elements.panelTitle.textContent = "정수 픽셀 정렬 교정 준비";
     elements.panelCopy.textContent =
       "0.5 예외는 유지하고 나머지는 정수로 교정합니다.";
     elements.processedAt.textContent = "마지막 실행 없음";
-    elements.selectionSummary.textContent = "픽셀 교정을 실행하면 결과가 여기에 표시됩니다.";
+    elements.selectionSummary.textContent = "정수 픽셀 정렬 교정을 실행하면 결과가 여기에 표시됩니다.";
     elements.selectionNote.textContent =
       "AI가 보정 방향을 판단하고 제외 항목은 결과에 남깁니다.";
     fillMetric(elements.candidateCount, 0);
@@ -3472,8 +3102,8 @@ window.__PIGMA_AI_CORRECTION_TYPO_FIX__ = {
   const renderErrorState = (message) => {
     setButtonBusy(false);
     setStatus("error", "오류");
-    elements.panelTitle.textContent = "픽셀 교정 실패";
-    elements.panelCopy.textContent = message || "픽셀 교정에 실패했습니다.";
+    elements.panelTitle.textContent = "정수 픽셀 정렬 교정 실패";
+    elements.panelCopy.textContent = message || "정수 픽셀 정렬 교정에 실패했습니다.";
     elements.selectionSummary.textContent = message || "선택 대상을 확인하고 다시 시도해 주세요.";
     elements.selectionNote.textContent = "선택이 비어 있거나 속성 쓰기가 불가능한 경우 오류가 표시됩니다.";
 
@@ -3509,14 +3139,14 @@ window.__PIGMA_AI_CORRECTION_TYPO_FIX__ = {
     lastRenderedResult = result;
     setButtonBusy(false);
     setStatus(matchesCurrentSelection ? "ready" : "stale", matchesCurrentSelection ? "완료" : "캐시");
-    elements.panelTitle.textContent = matchesCurrentSelection ? "픽셀 교정 완료" : "최근 결과 불러옴";
+    elements.panelTitle.textContent = matchesCurrentSelection ? "정수 픽셀 정렬 교정 완료" : "최근 결과 불러옴";
     elements.panelCopy.textContent = matchesCurrentSelection
       ? summary.appliedCount > 0
         ? "소수점 후보를 정수 스냅으로 보정하고, 0.5 예외값은 유지했습니다."
         : summary.candidateCount > 0
           ? "후보는 찾았지만 실제 적용까지 이어진 항목은 없었습니다."
           : "보정이 필요한 소수점 후보를 찾지 못했습니다."
-      : "최근 실행한 픽셀 교정 결과를 보여주고 있습니다.";
+      : "최근 실행한 정수 픽셀 정렬 교정 결과를 보여주고 있습니다.";
     elements.processedAt.textContent = formatProcessedAt(result.processedAt);
     elements.selectionSummary.textContent = `${summary.selectionLabel || "선택"} · ${summary.contextLabel || "일반 UI 화면"}`;
     elements.selectionNote.textContent = `후보 ${summary.candidateCount || 0}건 · 적용 ${summary.appliedCount || 0}건 · 예외 유지 ${
@@ -3551,7 +3181,7 @@ window.__PIGMA_AI_CORRECTION_TYPO_FIX__ = {
 
     setButtonBusy(true);
     setStatus("running", "적용 중");
-    elements.panelTitle.textContent = "픽셀 교정 진행 중";
+    elements.panelTitle.textContent = "정수 픽셀 정렬 교정 진행 중";
     elements.panelCopy.textContent =
       "현재 선택에서 소수점 후보를 찾고, 0.5 stroke/blur 예외값을 제외한 뒤 AI 판독으로 정수 스냅을 적용하고 있습니다.";
     postPluginMessage({ type: "run-ai-pixel-perfect" });

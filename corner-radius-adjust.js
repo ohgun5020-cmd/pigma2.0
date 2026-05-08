@@ -67,7 +67,7 @@
         figma.notify(buildCornerRadiusToast(result), { timeout: 1800 });
       }
     } catch (error) {
-      const messageText = normalizeCornerRadiusError(error, "라운드 값 조정에 실패했습니다.");
+      const messageText = normalizeCornerRadiusError(error, "모서리 둥글기 조정에 실패했습니다.");
       figma.ui.postMessage({
         type: "corner-radius-adjust-error",
         clientRequestId,

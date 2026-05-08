@@ -127,7 +127,7 @@
       });
       notifyResult(result);
     } catch (error) {
-      const message = normalizeErrorMessage(error, "원본 이미지 다운로드 준비에 실패했습니다.");
+      const message = normalizeErrorMessage(error, "원본 이미지 저장 준비에 실패했습니다.");
       figma.ui.postMessage({
         type: "original-image-download-error",
         message,

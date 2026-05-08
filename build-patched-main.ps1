@@ -10,7 +10,6 @@ $aiDesignReadPatch = Join-Path $root "ai-design-read.js"
 $aiDesignChatPatch = Join-Path $root "ai-design-chat.js"
 $aiAccessibilityDiagnosisPatch = Join-Path $root "ai-accessibility-diagnosis.js"
 $aiDesignConsistencyPatch = Join-Path $root "ai-design-consistency.js"
-$aiRegroupRenamePatch = Join-Path $root "ai-regroup-rename.js"
 $aiTypoAuditPatch = Join-Path $root "ai-typo-audit.js"
 $aiPixelPerfectPatch = Join-Path $root "ai-pixel-perfect.js"
 $skewTransformPatch = Join-Path $root "skew-transform.js"
@@ -83,10 +82,6 @@ if (-not (Test-Path $aiAccessibilityDiagnosisPatch)) {
 
 if (-not (Test-Path $aiDesignConsistencyPatch)) {
   throw "Missing AI design consistency patch: $aiDesignConsistencyPatch"
-}
-
-if (-not (Test-Path $aiRegroupRenamePatch)) {
-  throw "Missing AI regroup/rename patch: $aiRegroupRenamePatch"
 }
 
 if (-not (Test-Path $aiTypoAuditPatch)) {
@@ -241,7 +236,6 @@ $runtimeSyntaxSourceFiles = @(
   $aiDesignChatPatch,
   $aiAccessibilityDiagnosisPatch,
   $aiDesignConsistencyPatch,
-  $aiRegroupRenamePatch,
   $aiTypoAuditPatch,
   $aiPixelPerfectPatch,
   $skewTransformPatch,
@@ -1582,7 +1576,6 @@ $aiLlmClientPatchContent = [System.IO.File]::ReadAllText($aiLlmClientPatch, [Sys
 $aiDesignChatPatchContent = [System.IO.File]::ReadAllText($aiDesignChatPatch, [System.Text.Encoding]::UTF8)
 $aiAccessibilityDiagnosisPatchContent = [System.IO.File]::ReadAllText($aiAccessibilityDiagnosisPatch, [System.Text.Encoding]::UTF8)
 $aiDesignConsistencyPatchContent = [System.IO.File]::ReadAllText($aiDesignConsistencyPatch, [System.Text.Encoding]::UTF8)
-$aiRegroupRenamePatchContent = [System.IO.File]::ReadAllText($aiRegroupRenamePatch, [System.Text.Encoding]::UTF8)
 $aiTypoAuditPatchContent = [System.IO.File]::ReadAllText($aiTypoAuditPatch, [System.Text.Encoding]::UTF8)
 $aiPixelPerfectPatchContent = [System.IO.File]::ReadAllText($aiPixelPerfectPatch, [System.Text.Encoding]::UTF8)
 $skewTransformPatchContent = [System.IO.File]::ReadAllText($skewTransformPatch, [System.Text.Encoding]::UTF8)
@@ -1609,7 +1602,6 @@ $patchedRuntimeParts = @(
   $aiLlmClientPatchContent,
   $aiAccessibilityDiagnosisPatchContent,
   $aiDesignConsistencyPatchContent,
-  $aiRegroupRenamePatchContent,
   $aiTypoAuditPatchContent,
   $aiPixelPerfectPatchContent,
   $skewTransformPatchContent,

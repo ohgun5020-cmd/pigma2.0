@@ -83,8 +83,6 @@ Safe implementation order:
   - Source of truth for provider-aware OpenAI/Gemini API requests and JSON parsing.
 - `ai-design-read.js`
   - Source of truth for the `디자인 읽기` plugin-side analysis and cache pipeline.
-- `ai-regroup-rename.js`
-  - Source of truth for the second AI button's safe regroup/rename apply pipeline and cache.
 - `ai-typo-audit.js`
   - Source of truth for the third AI button's typo audit and Figma annotation apply pipeline.
   - Keep this audit conservative: skip cosmetic bracket/spacing cleanup and only keep spacing issues when a word is visibly broken into fragments, such as `app le -> apple`.

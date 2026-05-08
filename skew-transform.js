@@ -103,7 +103,7 @@
         });
       }
     } catch (error) {
-      const messageText = normalizeSkewError(error, "스큐 조정을 처리하지 못했습니다.");
+      const messageText = normalizeSkewError(error, "기울기 보정을 처리하지 못했습니다.");
       figma.ui.postMessage({
         type: "skew-transform-error",
         clientRequestId,
@@ -116,7 +116,7 @@
   function createSkewSession() {
     const selection = Array.from(figma.currentPage.selection || []);
     if (!selection.length) {
-      throw new Error("스큐를 적용할 프레임, 그룹, 레이어를 먼저 선택해주세요.");
+      throw new Error("기울기를 적용할 프레임, 그룹, 레이어를 먼저 선택해주세요.");
     }
 
     const targets = [];
@@ -289,7 +289,7 @@
     const nodeType = String(node.type || "UNKNOWN");
     if (node.type === "PAGE" || node.type === "DOCUMENT") {
       return {
-        skipped: buildSkippedSkewNode(node, "페이지나 문서는 스큐를 적용할 수 없습니다."),
+        skipped: buildSkippedSkewNode(node, "페이지나 문서는 기울기를 적용할 수 없습니다."),
       };
     }
     if ("locked" in node && node.locked === true) {
@@ -377,10 +377,10 @@
 
   function getActiveSkewSession(sessionId) {
     if (!activeSession) {
-      throw new Error("스큐 조정 세션이 만료되었습니다. 다시 실행해주세요.");
+      throw new Error("기울기 보정 세션이 만료되었습니다. 다시 실행해주세요.");
     }
     if (sessionId && sessionId !== activeSession.sessionId) {
-      throw new Error("다른 스큐 조정 세션이 실행 중입니다.");
+      throw new Error("다른 기울기 보정 세션이 실행 중입니다.");
     }
     return activeSession;
   }
@@ -420,7 +420,7 @@
           nodeId: target.nodeId,
           nodeName: target.nodeName,
           nodeType: target.nodeType,
-          reason: normalizeSkewError(error, "이 레이어에는 스큐를 적용하지 못했습니다."),
+          reason: normalizeSkewError(error, "이 레이어에는 기울기를 적용하지 못했습니다."),
         });
       }
     }
@@ -915,21 +915,21 @@
     const appliedCount = Number(summary.appliedCount) || 0;
     const skippedCount = Number(summary.skippedCount) || 0;
     if (appliedCount <= 0) {
-      return "스큐를 적용할 수 있는 레이어가 없습니다.";
+      return "기울기를 적용할 수 있는 레이어가 없습니다.";
     }
     return skippedCount > 0
-      ? "스큐 조정 완료 (" + appliedCount + "개 적용, " + skippedCount + "개 제외)"
-      : "스큐 조정 완료 (" + appliedCount + "개 적용)";
+      ? "기울기 보정 완료 (" + appliedCount + "개 적용, " + skippedCount + "개 제외)"
+      : "기울기 보정 완료 (" + appliedCount + "개 적용)";
   }
   function buildSkewClearToast(result) {
     const summary = result && result.summary ? result.summary : {};
     const cleanedCount = Number(summary.cleanedCount) || 0;
     const skippedCount = Number(summary.skippedCount) || 0;
     if (cleanedCount <= 0) {
-      return "정리할 수 있는 스큐 레이어가 없습니다.";
+      return "정리할 수 있는 기울기 보정 대상이 없습니다.";
     }
     return skippedCount > 0
-      ? "스큐 정리 완료 (" + cleanedCount + "개 정리, " + skippedCount + "개 제외)"
-      : "스큐 정리 완료 (" + cleanedCount + "개 정리)";
+      ? "기울기 정리 완료 (" + cleanedCount + "개 정리, " + skippedCount + "개 제외)"
+      : "기울기 정리 완료 (" + cleanedCount + "개 정리)";
   }
 })();

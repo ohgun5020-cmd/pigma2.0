@@ -14,7 +14,6 @@ const defaultFiles = [
   "ai-design-read.js",
   "ai-accessibility-diagnosis.js",
   "ai-design-consistency.js",
-  "ai-regroup-rename.js",
   "ai-typo-audit.js",
   "ai-pixel-perfect.js",
   "button-text-auto-size.js",

@@ -19,7 +19,7 @@
   figma.ui.onmessage = async (message) => {
     if (isShortenRequestMessage(message)) {
       if (isRunning) {
-        postStatus("running", "주소 줄이기를 이미 진행 중입니다.");
+        postStatus("running", "링크 짧게 만들기를 이미 진행 중입니다.");
         return;
       }
 
@@ -72,7 +72,7 @@
       });
       figma.notify("단축 주소를 준비했습니다.", { timeout: 1800 });
     } catch (error) {
-      const message = normalizeErrorMessage(error, "주소 줄이기에 실패했습니다.");
+      const message = normalizeErrorMessage(error, "링크 짧게 만들기에 실패했습니다.");
       figma.ui.postMessage({
         type: "shorten-figma-url-error",
         message: message,

@@ -1243,7 +1243,7 @@
 
   async function runImageOriginalSizeFit(message) {
     const clientRequestId = sanitizeClientRequestId(message && message.clientRequestId);
-    const operationLabel = sanitizeOperationLabel(message && message.operationLabel) || "원본 크기로 맞추기";
+    const operationLabel = sanitizeOperationLabel(message && message.operationLabel) || "원본 크기 맞춤";
     if (
       isPreparing ||
       isApplying ||
@@ -1422,7 +1422,7 @@
       message,
       ORIGINAL_SIZE_FIT_APPLY_ERROR_MESSAGE,
       {
-        operationLabel: "원본 크기로 맞추기",
+        operationLabel: "원본 크기 맞춤",
         operationKind: "original-size-fit",
       }
     );
@@ -2602,7 +2602,7 @@
       const source = await exportImageMergeSelection();
       const createdImage = figma.createImage(source.bytes);
       if (!createdImage || !createdImage.hash) {
-        throw new Error("이미지 병합 결과를 Figma 이미지로 만들지 못했습니다.");
+        throw new Error("이미지 합치기 결과를 Figma 이미지로 만들지 못했습니다.");
       }
 
       const result = await applyImageCompositeToSelection(
@@ -2641,11 +2641,11 @@
         result: result,
       });
 
-      figma.notify("이미지 병합 레이어를 만들었습니다.", {
+      figma.notify("이미지 합치기 레이어를 만들었습니다.", {
         timeout: 2200,
       });
     } catch (error) {
-      const messageText = normalizeErrorMessage(error, "이미지 병합에 실패했습니다.");
+      const messageText = normalizeErrorMessage(error, "이미지 합치기에 실패했습니다.");
       figma.ui.postMessage({
         type: "image-merge-error",
         clientRequestId: clientRequestId,
@@ -2660,17 +2660,17 @@
     for (let index = 0; index < skipped.length; index += 1) {
       const reason = skipped[index] && typeof skipped[index].reason === "string" ? skipped[index].reason.trim() : "";
       if (reason) {
-        return "이미지 병합 레이어를 만들지 못했습니다: " + reason;
+        return "이미지 합치기 레이어를 만들지 못했습니다: " + reason;
       }
     }
 
     const summary = result && result.summary ? result.summary : {};
     const byteLength = Number(summary.resultByteLength) || 0;
     if (byteLength > 0) {
-      return "이미지 병합 PNG는 생성됐지만 새 레이어로 배치하지 못했습니다.";
+      return "이미지 합치기 PNG는 생성됐지만 새 레이어로 배치하지 못했습니다.";
     }
 
-    return "이미지 병합 레이어를 만들지 못했습니다.";
+    return "이미지 합치기 레이어를 만들지 못했습니다.";
   }
 
   function withImageMergeTimeout(promise, timeoutMs, label) {
@@ -2681,7 +2681,7 @@
 
     let settled = false;
     let timerId = null;
-    const taskLabel = typeof label === "string" && label.trim() ? label.trim() : "이미지 병합";
+    const taskLabel = typeof label === "string" && label.trim() ? label.trim() : "이미지 합치기";
     return new Promise(function (resolve, reject) {
       timerId = setTimeout(function () {
         if (settled) {
@@ -2740,7 +2740,7 @@
       (await exportImageMergeFrameSelection(exportSelection, unionRect, exportSettings));
 
     if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
-      throw new Error("이미지 병합 PNG가 비어 있습니다.");
+      throw new Error("이미지 합치기 PNG가 비어 있습니다.");
     }
 
     return {
@@ -2845,7 +2845,7 @@
       const bytes = await withImageMergeTimeout(
         selection[0].exportAsync(exportSettings),
         IMAGE_MERGE_FAST_EXPORT_TIMEOUT_MS,
-        "이미지 병합 빠른 export"
+        "이미지 합치기 빠른 export"
       );
       return bytes && typeof bytes.length === "number" && bytes.length > 0 ? bytes : null;
     } catch (error) {
@@ -3009,7 +3009,7 @@
       return await withImageMergeTimeout(
         preview.exportAsync(exportSettings),
         IMAGE_MERGE_EXPORT_TIMEOUT_MS,
-        "이미지 병합 preview export"
+        "이미지 합치기 preview export"
       );
     } finally {
       for (let index = 0; index < clones.length; index += 1) {
@@ -7914,7 +7914,7 @@
       typeof summary.unchangedCount === "number" && Number.isFinite(summary.unchangedCount) ? summary.unchangedCount : 0;
     const skippedCount =
       typeof summary.skippedCount === "number" && Number.isFinite(summary.skippedCount) ? summary.skippedCount : 0;
-    const label = operationLabel || "원본 크기로 맞추기";
+    const label = operationLabel || "원본 크기 맞춤";
 
     if (!appliedCount && unchangedCount > 0 && skippedCount === 0) {
       figma.notify("선택한 이미지는 이미 원본 크기입니다.", { timeout: 2200 });
