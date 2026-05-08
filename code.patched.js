@@ -2791,6 +2791,15 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   const LONG_EDITABLE_WHITESPACE_CAPTURE_MIN = 8;
   const LONG_EDITABLE_WHITESPACE_CAPTURE_MAX = 160;
   const LONG_EDITABLE_WHITESPACE_EDGE_TOLERANCE = 4;
+  const PSD_WORKSPACE_PAGE_LONG_HEIGHT = 4500;
+  const PSD_WORKSPACE_PAGE_BATCH_ROOT_COUNT = 8;
+  const PSD_WORKSPACE_PAGE_BATCH_AREA = 15000000;
+  const PSD_WORKSPACE_PAGE_BANNER_ROOT_COUNT = 4;
+  const PSD_WORKSPACE_PAGE_BANNER_RATIO = 1.25;
+  const PSD_WORKSPACE_PAGE_BANNER_MIN_WIDTH = 480;
+  const PSD_WORKSPACE_PAGE_BANNER_MIN_HEIGHT = 120;
+  const PSD_WORKSPACE_PAGE_BANNER_MAX_HEIGHT = 1800;
+  const PSD_WORKSPACE_PAGE_GAP = 160;
   const PIGMA_EXPORT_TEMP_NODE_NAMES = Object.freeze([
     "__pigma-mask-preview__",
     "__pigma-background-blur-crop__",
@@ -2801,6 +2810,8 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   ]);
   const PIGMA_EXPORT_TEMP_NODE_NAME_SET = new Set(PIGMA_EXPORT_TEMP_NODE_NAMES);
   let activeEditableSegmentSession = null;
+  let activeWorkspacePageSession = null;
+  let activeWorkspaceCleanupPromise = null;
 
   if (typeof originalOnMessage !== "function") {
     return;
@@ -2810,7 +2821,10 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     figma.ui.postMessage = message => {
       const result = originalPostMessage(message);
       if (message && (message.type === "export-finished" || message.type === "export-error")) {
-        cleanupExportMemory("after-export");
+        const cleanupResult = cleanupExportMemory("after-export");
+        if (cleanupResult && typeof cleanupResult.catch === "function") {
+          cleanupResult.catch(() => {});
+        }
       }
       return result;
     };
@@ -2830,7 +2844,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     const normalizedMessage = normalizeExportMessage(message);
 
     if (normalizedMessage.type === "request-export") {
-      cleanupExportMemory("before-export");
+      await cleanupExportMemory("before-export");
 
       const segmentPlan = getLongEditableSegmentPlan(normalizedMessage);
       if (segmentPlan && normalizedMessage.longEditableSegmentConsent !== true) {
@@ -2845,6 +2859,11 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
       if (segmentPlan && normalizedMessage.longEditableSegmentConsent === true) {
         return runLongEditableSegmentExport(normalizedMessage, segmentPlan);
+      }
+
+      const workspacePlan = getPsdWorkspacePagePlan(normalizedMessage);
+      if (workspacePlan) {
+        return runWorkspacePageExport(normalizedMessage, workspacePlan);
       }
     }
 
@@ -2927,6 +2946,153 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       disableNoise: source.disableNoise === true,
       disableTexture: source.disableTexture === true
     };
+  }
+
+  function getPsdWorkspacePagePlan(message) {
+    if (!message || message.workspacePageActive === true || message.longEditableSegmentActive === true) {
+      return null;
+    }
+
+    if (typeof figma.createPage !== "function") {
+      return null;
+    }
+
+    const roots = getWorkspaceSelectionRoots();
+    if (!roots.length) {
+      return null;
+    }
+
+    const analysis = analyzeWorkspaceSelectionRoots(roots);
+    if (!analysis.shouldUseWorkspacePage) {
+      return null;
+    }
+
+    return {
+      roots: roots,
+      reason: analysis.reason,
+      title: analysis.title,
+      rootCount: roots.length,
+      longRootCount: analysis.longRootCount,
+      bannerRootCount: analysis.bannerRootCount,
+      totalArea: analysis.totalArea
+    };
+  }
+
+  function getWorkspaceSelectionRoots() {
+    const selection = figma.currentPage && Array.isArray(figma.currentPage.selection)
+      ? Array.from(figma.currentPage.selection)
+      : [];
+    const selectedIds = new Set();
+    for (let index = 0; index < selection.length; index += 1) {
+      const node = selection[index];
+      if (node && !node.removed && node.id) {
+        selectedIds.add(node.id);
+      }
+    }
+
+    const roots = [];
+    for (let index = 0; index < selection.length; index += 1) {
+      const node = selection[index];
+      if (!node || node.removed || !("exportAsync" in node)) {
+        continue;
+      }
+      if (hasSelectedAncestor(node, selectedIds)) {
+        continue;
+      }
+      roots.push(node);
+    }
+    return roots;
+  }
+
+  function hasSelectedAncestor(node, selectedIds) {
+    let parent = node && node.parent ? node.parent : null;
+    while (parent) {
+      if (parent.id && selectedIds.has(parent.id)) {
+        return true;
+      }
+      parent = parent.parent ? parent.parent : null;
+    }
+    return false;
+  }
+
+  function analyzeWorkspaceSelectionRoots(roots) {
+    let boundedRootCount = 0;
+    let longRootCount = 0;
+    let bannerRootCount = 0;
+    let totalArea = 0;
+
+    for (let index = 0; index < roots.length; index += 1) {
+      const bounds = getNodeBounds(roots[index]);
+      if (!bounds) {
+        continue;
+      }
+
+      boundedRootCount += 1;
+      totalArea += bounds.width * bounds.height;
+
+      if (bounds.height >= PSD_WORKSPACE_PAGE_LONG_HEIGHT) {
+        longRootCount += 1;
+      }
+
+      if (isWorkspaceBannerBounds(bounds)) {
+        bannerRootCount += 1;
+      }
+    }
+
+    const bannerThreshold = Math.max(PSD_WORKSPACE_PAGE_BANNER_ROOT_COUNT, Math.ceil(Math.max(1, boundedRootCount) * 0.6));
+    if (longRootCount > 0) {
+      return {
+        shouldUseWorkspacePage: true,
+        reason: "long-page",
+        title: "\uAE34 \uD398\uC774\uC9C0 PSD",
+        longRootCount: longRootCount,
+        bannerRootCount: bannerRootCount,
+        totalArea: totalArea
+      };
+    }
+
+    if (boundedRootCount >= PSD_WORKSPACE_PAGE_BANNER_ROOT_COUNT && bannerRootCount >= bannerThreshold) {
+      return {
+        shouldUseWorkspacePage: true,
+        reason: "banner-batch",
+        title: "\uBC30\uB108 \uBB36\uC74C PSD",
+        longRootCount: longRootCount,
+        bannerRootCount: bannerRootCount,
+        totalArea: totalArea
+      };
+    }
+
+    if (boundedRootCount >= PSD_WORKSPACE_PAGE_BATCH_ROOT_COUNT && totalArea >= PSD_WORKSPACE_PAGE_BATCH_AREA) {
+      return {
+        shouldUseWorkspacePage: true,
+        reason: "large-batch",
+        title: "\uB300\uB7C9 PSD",
+        longRootCount: longRootCount,
+        bannerRootCount: bannerRootCount,
+        totalArea: totalArea
+      };
+    }
+
+    return {
+      shouldUseWorkspacePage: false,
+      reason: "",
+      title: "",
+      longRootCount: longRootCount,
+      bannerRootCount: bannerRootCount,
+      totalArea: totalArea
+    };
+  }
+
+  function isWorkspaceBannerBounds(bounds) {
+    if (!bounds || bounds.width < PSD_WORKSPACE_PAGE_BANNER_MIN_WIDTH || bounds.height < PSD_WORKSPACE_PAGE_BANNER_MIN_HEIGHT) {
+      return false;
+    }
+
+    if (bounds.height > PSD_WORKSPACE_PAGE_BANNER_MAX_HEIGHT) {
+      return false;
+    }
+
+    return bounds.width / Math.max(1, bounds.height) >= PSD_WORKSPACE_PAGE_BANNER_RATIO;
   }
 
   function getLongEditableSegmentPlan(message) {
@@ -3255,14 +3421,194 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     };
   }
 
-  async function runLongEditableSegmentExport(message, plan) {
-    cleanupExportMemory("before-long-editable");
+  async function runWorkspacePageExport(message, plan) {
+    const previousPage = figma.currentPage;
+    const previousSelection = getCurrentSelectionSnapshot();
+    let session = null;
 
+    try {
+      session = await beginPsdWorkspacePageSession(plan, previousPage, previousSelection);
+      if (!session) {
+        return originalOnMessage(Object.assign({}, message, {
+          workspacePageSkipped: true
+        }));
+      }
+
+      const clones = cloneWorkspaceRootsToPage(plan.roots, session.workspacePage);
+      session.clones = clones;
+      if (!clones.length) {
+        throw new Error("\uC0C8 \uD398\uC774\uC9C0\uC5D0 PSD \uC791\uC5C5\uC6A9 \uB808\uC774\uC5B4\uB97C \uC900\uBE44\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.");
+      }
+
+      figma.currentPage.selection = clones;
+      scrollWorkspaceSelectionIntoView(clones);
+      figma.notify(buildWorkspacePageNotifyMessage(plan, clones.length));
+
+      return originalOnMessage(Object.assign({}, message, {
+        workspacePageActive: true,
+        workspacePageReason: plan.reason
+      }));
+    } catch (error) {
+      const currentSession = session || activeWorkspacePageSession;
+      if (currentSession) {
+        await finishPsdWorkspacePageSession(currentSession);
+        if (activeWorkspacePageSession === currentSession) {
+          activeWorkspacePageSession = null;
+        }
+      } else {
+        await restorePageAndSelection(previousPage, previousSelection);
+      }
+
+      try {
+        console.warn("[pigma][psd-workspace-page]", error);
+      } catch (warnError) {
+      }
+
+      return originalOnMessage(Object.assign({}, message, {
+        workspacePageSkipped: true
+      }));
+    }
+  }
+
+  async function beginPsdWorkspacePageSession(plan, previousPage, previousSelection) {
+    if (typeof figma.createPage !== "function") {
+      return null;
+    }
+
+    let workspacePage = null;
+    try {
+      workspacePage = figma.createPage();
+      workspacePage.name = buildPsdWorkspacePageName(plan);
+      const session = {
+        workspacePage: workspacePage,
+        previousPage: previousPage,
+        previousSelection: previousSelection,
+        clones: [],
+        reason: plan && plan.reason ? plan.reason : "export"
+      };
+      activeWorkspacePageSession = session;
+
+      const switched = await setCurrentPageSafely(workspacePage);
+      if (!switched) {
+        throw new Error("Could not enter PSD workspace page.");
+      }
+
+      return session;
+    } catch (error) {
+      if (workspacePage && !workspacePage.removed) {
+        removeNodeSafely(workspacePage);
+      }
+      activeWorkspacePageSession = null;
+      try {
+        console.warn("[pigma][psd-workspace-page-create]", error);
+      } catch (warnError) {
+      }
+      return null;
+    }
+  }
+
+  function buildPsdWorkspacePageName(plan) {
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    const hour = String(now.getHours()).padStart(2, "0");
+    const minute = String(now.getMinutes()).padStart(2, "0");
+    const title = plan && plan.title ? plan.title : "PSD";
+    return "Pigma " + title + " " + month + day + "-" + hour + minute;
+  }
+
+  function cloneWorkspaceRootsToPage(roots, page) {
+    const clones = [];
+    let cursorY = 0;
+    for (let index = 0; index < roots.length; index += 1) {
+      const root = roots[index];
+      if (!root || root.removed || !page || page.removed) {
+        continue;
+      }
+
+      const bounds = getNodeBounds(root);
+      try {
+        const clone = root.clone();
+        page.appendChild(clone);
+        positionWorkspaceClone(clone, cursorY);
+        clones.push(clone);
+        cursorY += getWorkspaceCloneHeight(root, clone, bounds) + PSD_WORKSPACE_PAGE_GAP;
+      } catch (error) {
+        try {
+          console.warn("[pigma][psd-workspace-page-clone]", getNodeName(root), error);
+        } catch (warnError) {
+        }
+      }
+    }
+    return clones;
+  }
+
+  function positionWorkspaceClone(clone, cursorY) {
+    try {
+      if ("x" in clone) {
+        clone.x = 0;
+      }
+      if ("y" in clone) {
+        clone.y = Math.round(cursorY);
+      }
+    } catch (error) {
+    }
+  }
+
+  function getWorkspaceCloneHeight(root, clone, rootBounds) {
+    if (rootBounds && Number.isFinite(rootBounds.height)) {
+      return Math.max(1, Math.round(rootBounds.height));
+    }
+
+    const cloneBounds = getNodeBounds(clone);
+    if (cloneBounds && Number.isFinite(cloneBounds.height)) {
+      return Math.max(1, Math.round(cloneBounds.height));
+    }
+
+    if (root && "height" in root && Number.isFinite(root.height)) {
+      return Math.max(1, Math.round(root.height));
+    }
+
+    return 1000;
+  }
+
+  function scrollWorkspaceSelectionIntoView(nodes) {
+    try {
+      if (nodes && nodes.length && figma.viewport && typeof figma.viewport.scrollAndZoomIntoView === "function") {
+        figma.viewport.scrollAndZoomIntoView(nodes);
+      }
+    } catch (error) {
+    }
+  }
+
+  function buildWorkspacePageNotifyMessage(plan, count) {
+    if (plan && plan.reason === "long-page") {
+      return "\uAE34 \uD398\uC774\uC9C0 PSD\uB97C \uC0C8 \uC791\uC5C5 \uD398\uC774\uC9C0\uC5D0\uC11C \uC900\uBE44\uD569\uB2C8\uB2E4.";
+    }
+
+    if (plan && plan.reason === "banner-batch") {
+      return "\uBC30\uB108 " + count + "\uAC1C\uB97C \uC0C8 \uC791\uC5C5 \uD398\uC774\uC9C0\uC5D0\uC11C PSD\uB85C \uC900\uBE44\uD569\uB2C8\uB2E4.";
+    }
+
+    return "\uC120\uD0DD\uD55C " + count + "\uAC1C \uB808\uC774\uC5B4\uB97C \uC0C8 \uC791\uC5C5 \uD398\uC774\uC9C0\uC5D0\uC11C PSD\uB85C \uC900\uBE44\uD569\uB2C8\uB2E4.";
+  }
+
+  async function runLongEditableSegmentExport(message, plan) {
+    await cleanupExportMemory("before-long-editable");
+
+    const previousPage = figma.currentPage;
     const previousSelection = figma.currentPage.selection ? figma.currentPage.selection.slice() : [];
     const frames = [];
     let splitMode = "fixed";
+    let workspaceSession = null;
 
     try {
+      workspaceSession = await beginPsdWorkspacePageSession({
+        roots: [plan.root],
+        reason: "long-page",
+        title: "\uAE34 \uD398\uC774\uC9C0 PSD"
+      }, previousPage, previousSelection);
+
       const prepared = createLongEditableExportFrames(plan);
       splitMode = prepared.mode;
       for (let index = 0; index < prepared.frames.length; index += 1) {
@@ -3271,7 +3617,8 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
       activeEditableSegmentSession = {
         frames: frames,
-        previousSelection: previousSelection
+        previousSelection: previousSelection,
+        deferSelectionRestore: !!workspaceSession
       };
 
       figma.currentPage.selection = frames;
@@ -3283,14 +3630,23 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
       const segmentedMessage = Object.assign({}, message, {
         longEditableSegmentActive: true,
-        longEditableSegmentConsent: false
+        longEditableSegmentConsent: false,
+        workspacePageActive: !!workspaceSession,
+        workspacePageReason: workspaceSession ? "long-page" : ""
       });
 
       return originalOnMessage(segmentedMessage);
     } catch (error) {
       cleanupNodes(frames);
-      restoreSelection(previousSelection);
       activeEditableSegmentSession = null;
+      if (workspaceSession) {
+        await finishPsdWorkspacePageSession(workspaceSession);
+        if (activeWorkspacePageSession === workspaceSession) {
+          activeWorkspacePageSession = null;
+        }
+      } else {
+        await restorePageAndSelection(previousPage, previousSelection);
+      }
       const messageText = error instanceof Error && error.message ? error.message : "긴 PSD 구간 준비 중 오류가 발생했습니다.";
       figma.ui.postMessage({ type: "export-error", message: messageText });
       figma.notify(messageText, { error: true });
@@ -3747,6 +4103,10 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   }
 
   function shouldRestoreEditableSegmentSelection(session) {
+    if (session && session.deferSelectionRestore === true) {
+      return false;
+    }
+
     try {
       const currentSelection = figma.currentPage && Array.isArray(figma.currentPage.selection)
         ? figma.currentPage.selection
@@ -3767,9 +4127,73 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
   }
 
-  function cleanupExportMemory(reason) {
+  async function cleanupExportMemory(reason) {
     cleanupEditableSegmentSession();
+    await cleanupWorkspacePageSession(reason);
     cleanupOrphanPigmaExportNodes(reason);
+  }
+
+  async function cleanupWorkspacePageSession(reason) {
+    if (activeWorkspaceCleanupPromise) {
+      try {
+        await activeWorkspaceCleanupPromise;
+      } catch (error) {
+      }
+    }
+
+    if (!activeWorkspacePageSession) {
+      return;
+    }
+
+    const session = activeWorkspacePageSession;
+    activeWorkspacePageSession = null;
+    activeWorkspaceCleanupPromise = finishPsdWorkspacePageSession(session);
+    try {
+      await activeWorkspaceCleanupPromise;
+    } catch (error) {
+      try {
+        console.warn("[pigma][psd-workspace-page-cleanup]", reason || "export", error);
+      } catch (warnError) {
+      }
+    } finally {
+      activeWorkspaceCleanupPromise = null;
+    }
+  }
+
+  async function finishPsdWorkspacePageSession(session) {
+    if (!session) {
+      return;
+    }
+
+    const workspacePage = session.workspacePage;
+    const restored = await restorePageAndSelection(session.previousPage, session.previousSelection);
+    if (!restored) {
+      await leaveWorkspacePageBeforeRemove(workspacePage);
+    }
+
+    cleanupNodes(session.clones);
+    if (workspacePage && !workspacePage.removed) {
+      removeNodeSafely(workspacePage);
+    }
+  }
+
+  async function leaveWorkspacePageBeforeRemove(workspacePage) {
+    try {
+      if (!figma.root || !Array.isArray(figma.root.children)) {
+        return false;
+      }
+
+      const pages = Array.from(figma.root.children);
+      for (let index = 0; index < pages.length; index += 1) {
+        const page = pages[index];
+        if (!page || page.removed || page === workspacePage) {
+          continue;
+        }
+        return await setCurrentPageSafely(page);
+      }
+    } catch (error) {
+    }
+    return false;
   }
 
   function cleanupOrphanPigmaExportNodes(reason) {
@@ -3848,6 +4272,58 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     for (let index = 0; index < nodes.length; index += 1) {
       const node = nodes[index];
       removeNodeSafely(node);
+    }
+  }
+
+  function getCurrentSelectionSnapshot() {
+    try {
+      return figma.currentPage && Array.isArray(figma.currentPage.selection)
+        ? figma.currentPage.selection.slice()
+        : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  async function restorePageAndSelection(page, selection) {
+    if (!page || page.removed) {
+      return false;
+    }
+
+    const restoredPage = await setCurrentPageSafely(page);
+    if (!restoredPage) {
+      return false;
+    }
+
+    restoreSelection(selection);
+    return true;
+  }
+
+  async function setCurrentPageSafely(page) {
+    if (!page || page.removed) {
+      return false;
+    }
+
+    try {
+      if (figma.currentPage && figma.currentPage.id === page.id) {
+        return true;
+      }
+    } catch (error) {
+    }
+
+    try {
+      if (typeof figma.setCurrentPageAsync === "function") {
+        await figma.setCurrentPageAsync(page);
+        return true;
+      }
+    } catch (error) {
+    }
+
+    try {
+      figma.currentPage = page;
+      return true;
+    } catch (error) {
+      return false;
     }
   }
 
@@ -30951,6 +31427,591 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
 ;(() => {
   const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
+  if (globalScope.__PIGMA_DETACH_LINKED_COMPONENTS_PATCH__) {
+    return;
+  }
+
+  const originalOnMessage = figma.ui.onmessage;
+  const RESULT_PREVIEW_LIMIT = 24;
+  const MAX_DETACH_PASSES = 50;
+  let isRunning = false;
+
+  if (typeof originalOnMessage !== "function") {
+    return;
+  }
+
+  figma.ui.onmessage = async (message) => {
+    if (isDetachLinkedComponentsMessage(message)) {
+      if (isRunning) {
+        postStatus("running", "\uC5F0\uACB0\uB41C \uCEF4\uD3EC\uB10C\uD2B8 \uD574\uC81C\uAC00 \uC774\uBBF8 \uC9C4\uD589 \uC911\uC785\uB2C8\uB2E4.");
+        return;
+      }
+
+      await runDetachLinkedComponents();
+      return;
+    }
+
+    return originalOnMessage(message);
+  };
+
+  globalScope.__PIGMA_DETACH_LINKED_COMPONENTS_PATCH__ = true;
+
+  function isDetachLinkedComponentsMessage(message) {
+    return !!message && message.type === "run-detach-linked-components";
+  }
+
+  async function runDetachLinkedComponents() {
+    isRunning = true;
+    postStatus("running", "\uC120\uD0DD \uBC94\uC704\uC758 \uC5F0\uACB0\uB41C \uCEF4\uD3EC\uB10C\uD2B8\uB97C \uCC3E\uACE0 \uC788\uC2B5\uB2C8\uB2E4.");
+
+    try {
+      const result = detachLinkedComponentsInSelection();
+      figma.ui.postMessage({
+        type: "detach-linked-components-result",
+        result,
+      });
+      notifyResult(result);
+    } catch (error) {
+      const message = normalizeErrorMessage(error, "\uC5F0\uACB0\uB41C \uCEF4\uD3EC\uB10C\uD2B8\uB97C \uD574\uC81C\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.");
+      figma.ui.postMessage({
+        type: "detach-linked-components-error",
+        message,
+      });
+      figma.notify(message, { error: true, timeout: 2600 });
+    } finally {
+      isRunning = false;
+    }
+  }
+
+  function detachLinkedComponentsInSelection() {
+    const selection = Array.from(figma.currentPage.selection || []);
+    if (!selection.length) {
+      throw new Error("\uD504\uB808\uC784, \uADF8\uB8F9, \uB808\uC774\uC5B4\uB97C \uBA3C\uC800 \uC120\uD0DD\uD558\uC138\uC694.");
+    }
+
+    let roots = selection.slice();
+    const processed = [];
+    const skipped = [];
+    const skippedNodeIds = {};
+    let candidateCount = 0;
+    let passCount = 0;
+
+    for (let pass = 0; pass < MAX_DETACH_PASSES; pass += 1) {
+      const candidates = collectTopLevelLinkedComponentCandidates(roots, skippedNodeIds);
+      if (!candidates.length) {
+        break;
+      }
+
+      let changedCount = 0;
+      candidateCount += candidates.length;
+      passCount += 1;
+
+      for (let index = 0; index < candidates.length; index += 1) {
+        const entry = candidates[index];
+        const target = entry && entry.node;
+        if (!target || target.removed) {
+          continue;
+        }
+
+        try {
+          const replacement =
+            entry.action === "detach-instance" ? detachInstanceNode(target) : convertComponentNodeToFrame(target);
+          if (replacement && replacement !== target) {
+            roots = replaceRootReference(roots, target, replacement);
+          }
+          processed.push(buildProcessedEntry(entry, replacement));
+          changedCount += 1;
+        } catch (error) {
+          skippedNodeIds[entry.nodeId] = true;
+          skipped.push({
+            nodeId: entry.nodeId,
+            nodeName: entry.nodeName,
+            nodeType: entry.nodeType,
+            action: entry.action,
+            path: entry.path,
+            reason: normalizeErrorMessage(error, "\uC774 \uCEF4\uD3EC\uB10C\uD2B8\uB97C \uD574\uC81C\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4."),
+          });
+        }
+      }
+
+      if (changedCount === 0) {
+        break;
+      }
+    }
+
+    const remaining = collectTopLevelLinkedComponentCandidates(roots, skippedNodeIds);
+    const nextSelection = roots.filter((node) => node && !node.removed && isSelectableSceneNode(node));
+    if (nextSelection.length > 0) {
+      figma.currentPage.selection = nextSelection;
+    }
+
+    return buildResult({
+      selection: nextSelection.length > 0 ? nextSelection : selection,
+      processed,
+      skipped,
+      candidateCount,
+      passCount,
+      remainingCount: remaining.length,
+    });
+  }
+
+  function collectTopLevelLinkedComponentCandidates(roots, skippedNodeIds) {
+    const results = [];
+    const stack = [];
+
+    for (let rootIndex = roots.length - 1; rootIndex >= 0; rootIndex -= 1) {
+      const root = roots[rootIndex];
+      if (!root || root.removed) {
+        continue;
+      }
+      stack.push({
+        node: root,
+        path: safeName(root),
+        depth: 0,
+      });
+    }
+
+    while (stack.length > 0) {
+      const current = stack.pop();
+      const node = current && current.node;
+      if (!node || node.removed) {
+        continue;
+      }
+
+      const action = getLinkedComponentAction(node);
+      if (action && !skippedNodeIds[node.id]) {
+        results.push({
+          node,
+          nodeId: node.id,
+          nodeName: safeName(node),
+          nodeType: String(node.type || "UNKNOWN"),
+          action,
+          path: current.path,
+          depth: current.depth,
+        });
+        continue;
+      }
+
+      if (!hasChildren(node)) {
+        continue;
+      }
+
+      for (let index = node.children.length - 1; index >= 0; index -= 1) {
+        const child = node.children[index];
+        stack.push({
+          node: child,
+          path: current.path + " / " + safeName(child),
+          depth: current.depth + 1,
+        });
+      }
+    }
+
+    return results;
+  }
+
+  function getLinkedComponentAction(node) {
+    const type = String((node && node.type) || "");
+    if (type === "INSTANCE" && typeof node.detachInstance === "function") {
+      return "detach-instance";
+    }
+    if (type === "COMPONENT" || type === "COMPONENT_SET") {
+      return "convert-component";
+    }
+    return "";
+  }
+
+  function detachInstanceNode(node) {
+    const wasLocked = readLocked(node);
+    const unlocked = unlockNodeAndAncestors(node);
+    let replacement = null;
+
+    try {
+      replacement = node.detachInstance();
+      if (replacement && typeof replacement === "object") {
+        setLocked(replacement, wasLocked);
+      }
+      return replacement || null;
+    } finally {
+      restoreUnlockedNodes(unlocked, replacement);
+    }
+  }
+
+  function convertComponentNodeToFrame(node) {
+    const parent = node.parent;
+    if (!parent || typeof parent.insertChild !== "function" || !hasChildren(parent)) {
+      throw new Error("\uCEF4\uD3EC\uB10C\uD2B8\uB97C \uBC14\uAFC0 \uC704\uCE58\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.");
+    }
+
+    const index = getChildIndex(parent, node);
+    if (index < 0) {
+      throw new Error("\uCEF4\uD3EC\uB10C\uD2B8 \uC21C\uC11C\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.");
+    }
+
+    const wasLocked = readLocked(node);
+    const unlocked = unlockNodeAndAncestors(node);
+    const frame = figma.createFrame();
+    let movedChildCount = 0;
+
+    try {
+      frame.name = safeName(node);
+      clearDefaultFrameAppearance(frame);
+      resizeLike(node, frame);
+      parent.insertChild(index, frame);
+      copyFrameLikeProperties(node, frame);
+      movedChildCount = moveChildren(node, frame);
+      setLocked(frame, wasLocked);
+      node.remove();
+      return frame;
+    } catch (error) {
+      if (movedChildCount === 0 && frame && !frame.removed) {
+        try {
+          frame.remove();
+        } catch (removeError) {}
+      }
+      throw error;
+    } finally {
+      restoreUnlockedNodes(unlocked, frame);
+    }
+  }
+
+  function clearDefaultFrameAppearance(frame) {
+    trySet(frame, "fills", []);
+    trySet(frame, "strokes", []);
+    trySet(frame, "effects", []);
+  }
+
+  function copyFrameLikeProperties(source, target) {
+    const complexProperties = [
+      "relativeTransform",
+      "fills",
+      "strokes",
+      "effects",
+      "exportSettings",
+      "dashPattern",
+      "constraints",
+      "layoutGrids",
+    ];
+    const simpleProperties = [
+      "x",
+      "y",
+      "rotation",
+      "visible",
+      "opacity",
+      "blendMode",
+      "isMask",
+      "strokeWeight",
+      "strokeAlign",
+      "strokeCap",
+      "strokeJoin",
+      "strokeMiterLimit",
+      "cornerRadius",
+      "cornerSmoothing",
+      "topLeftRadius",
+      "topRightRadius",
+      "bottomLeftRadius",
+      "bottomRightRadius",
+      "clipsContent",
+      "layoutMode",
+      "primaryAxisSizingMode",
+      "counterAxisSizingMode",
+      "primaryAxisAlignItems",
+      "counterAxisAlignItems",
+      "paddingLeft",
+      "paddingRight",
+      "paddingTop",
+      "paddingBottom",
+      "itemSpacing",
+      "counterAxisSpacing",
+      "layoutWrap",
+      "strokesIncludedInLayout",
+      "layoutAlign",
+      "layoutGrow",
+      "layoutPositioning",
+      "minWidth",
+      "maxWidth",
+      "minHeight",
+      "maxHeight",
+      "itemReverseZIndex",
+      "gridStyleId",
+    ];
+
+    for (let index = 0; index < simpleProperties.length; index += 1) {
+      copyProperty(source, target, simpleProperties[index], false);
+    }
+
+    for (let index = 0; index < complexProperties.length; index += 1) {
+      copyProperty(source, target, complexProperties[index], true);
+    }
+  }
+
+  function copyProperty(source, target, property, cloneValue) {
+    if (!source || !target || !(property in source) || !(property in target)) {
+      return;
+    }
+
+    try {
+      const value = source[property];
+      target[property] = cloneValue ? clonePlainValue(value) : value;
+    } catch (error) {}
+  }
+
+  function clonePlainValue(value) {
+    if (!value || typeof value !== "object") {
+      return value;
+    }
+
+    if (Array.isArray(value)) {
+      return value.map((item) => clonePlainValue(item));
+    }
+
+    const clone = {};
+    const keys = Object.keys(value);
+    for (let index = 0; index < keys.length; index += 1) {
+      const key = keys[index];
+      clone[key] = clonePlainValue(value[key]);
+    }
+    return clone;
+  }
+
+  function resizeLike(source, target) {
+    const width = typeof source.width === "number" && Number.isFinite(source.width) ? Math.max(0.01, source.width) : 1;
+    const height = typeof source.height === "number" && Number.isFinite(source.height) ? Math.max(0.01, source.height) : 1;
+
+    try {
+      if (typeof target.resizeWithoutConstraints === "function") {
+        target.resizeWithoutConstraints(width, height);
+      } else if (typeof target.resize === "function") {
+        target.resize(width, height);
+      }
+    } catch (error) {}
+  }
+
+  function moveChildren(source, target) {
+    let moved = 0;
+    while (hasChildren(source) && source.children.length > 0) {
+      target.appendChild(source.children[0]);
+      moved += 1;
+    }
+    return moved;
+  }
+
+  function replaceRootReference(roots, original, replacement) {
+    return roots.map((root) => {
+      if (root && original && root.id === original.id) {
+        return replacement;
+      }
+      return root;
+    });
+  }
+
+  function buildProcessedEntry(entry, replacement) {
+    return {
+      nodeId: entry.nodeId,
+      nodeName: entry.nodeName,
+      nodeType: entry.nodeType,
+      action: entry.action,
+      path: entry.path,
+      replacementId: replacement && typeof replacement.id === "string" ? replacement.id : "",
+      replacementType: replacement && typeof replacement.type === "string" ? replacement.type : "",
+    };
+  }
+
+  function buildResult(options) {
+    const selection = Array.isArray(options.selection) ? options.selection : [];
+    const processed = Array.isArray(options.processed) ? options.processed : [];
+    const skipped = Array.isArray(options.skipped) ? options.skipped : [];
+    const candidateCount =
+      typeof options.candidateCount === "number" && Number.isFinite(options.candidateCount) ? options.candidateCount : 0;
+    const passCount = typeof options.passCount === "number" && Number.isFinite(options.passCount) ? options.passCount : 0;
+    const remainingCount =
+      typeof options.remainingCount === "number" && Number.isFinite(options.remainingCount) ? options.remainingCount : 0;
+    const detachedInstanceCount = countProcessedAction(processed, "detach-instance");
+    const convertedComponentCount = processed.filter((entry) => entry.nodeType === "COMPONENT").length;
+    const convertedComponentSetCount = processed.filter((entry) => entry.nodeType === "COMPONENT_SET").length;
+
+    return {
+      processedAt: new Date().toISOString(),
+      summary: {
+        selectionLabel: formatSelectionLabel(selection),
+        rootCount: selection.length,
+        candidateCount,
+        detachedInstanceCount,
+        convertedComponentCount,
+        convertedComponentSetCount,
+        processedCount: processed.length,
+        skippedCount: skipped.length,
+        passCount,
+        remainingCount,
+      },
+      processed: processed.slice(0, RESULT_PREVIEW_LIMIT),
+      skipped: skipped.slice(0, RESULT_PREVIEW_LIMIT),
+    };
+  }
+
+  function countProcessedAction(processed, action) {
+    let count = 0;
+    for (let index = 0; index < processed.length; index += 1) {
+      if (processed[index] && processed[index].action === action) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
+  function notifyResult(result) {
+    const summary = result && result.summary ? result.summary : {};
+    const processedCount = summary.processedCount || 0;
+    const skippedCount = summary.skippedCount || 0;
+    const remainingCount = summary.remainingCount || 0;
+
+    if (processedCount === 0) {
+      figma.notify("\uD574\uC81C\uD560 \uC5F0\uACB0\uB41C \uCEF4\uD3EC\uB10C\uD2B8\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.", { timeout: 1800 });
+      return;
+    }
+
+    let message = "\uC5F0\uACB0\uB41C \uCEF4\uD3EC\uB10C\uD2B8 \uD574\uC81C \uC644\uB8CC (" + processedCount + "\uAC1C)";
+    if (skippedCount > 0) {
+      message += ", " + skippedCount + "\uAC1C \uAC74\uB108\uB700";
+    }
+    if (remainingCount > 0) {
+      message += ", " + remainingCount + "\uAC1C \uB0A8\uC74C";
+    }
+    figma.notify(message, { timeout: 2400 });
+  }
+
+  function postStatus(status, message) {
+    figma.ui.postMessage({
+      type: "detach-linked-components-status",
+      status,
+      message,
+    });
+  }
+
+  function unlockNodeAndAncestors(node) {
+    const chain = [];
+    let current = node;
+    while (current && current.type !== "DOCUMENT") {
+      chain.push(current);
+      current = current.parent;
+    }
+
+    const unlocked = [];
+    for (let index = chain.length - 1; index >= 0; index -= 1) {
+      const candidate = chain[index];
+      if (!candidate || !("locked" in candidate) || candidate.locked !== true) {
+        continue;
+      }
+
+      try {
+        candidate.locked = false;
+        unlocked.push(candidate);
+      } catch (error) {}
+    }
+    return unlocked;
+  }
+
+  function restoreUnlockedNodes(nodes, replacement) {
+    if (!Array.isArray(nodes) || !nodes.length) {
+      return;
+    }
+
+    const replacementId = replacement && typeof replacement.id === "string" ? replacement.id : "";
+    for (let index = 0; index < nodes.length; index += 1) {
+      const node = nodes[index];
+      if (!node || node.removed) {
+        continue;
+      }
+      if (replacementId && node.id === replacementId) {
+        continue;
+      }
+      setLocked(node, true);
+    }
+  }
+
+  function readLocked(node) {
+    return !!(node && "locked" in node && node.locked === true);
+  }
+
+  function setLocked(node, locked) {
+    if (!node || !("locked" in node) || node.removed) {
+      return;
+    }
+
+    try {
+      node.locked = locked === true;
+    } catch (error) {}
+  }
+
+  function trySet(node, property, value) {
+    if (!node || !(property in node)) {
+      return;
+    }
+
+    try {
+      node[property] = value;
+    } catch (error) {}
+  }
+
+  function hasChildren(node) {
+    return !!node && "children" in node && Array.isArray(node.children);
+  }
+
+  function getChildIndex(parent, child) {
+    if (!hasChildren(parent) || !child) {
+      return -1;
+    }
+
+    for (let index = 0; index < parent.children.length; index += 1) {
+      if (parent.children[index] && parent.children[index].id === child.id) {
+        return index;
+      }
+    }
+    return -1;
+  }
+
+  function isSelectableSceneNode(node) {
+    return !!node && typeof node.id === "string" && node.type !== "PAGE" && node.type !== "DOCUMENT";
+  }
+
+  function formatSelectionLabel(selection) {
+    if (!selection.length) {
+      return "\uC120\uD0DD \uC5C6\uC74C";
+    }
+
+    if (selection.length === 1) {
+      return safeName(selection[0]);
+    }
+
+    return safeName(selection[0]) + " +" + (selection.length - 1);
+  }
+
+  function safeName(node) {
+    if (node && typeof node.name === "string" && node.name.trim()) {
+      return node.name.trim();
+    }
+
+    if (node && typeof node.type === "string" && node.type.trim()) {
+      return node.type.trim();
+    }
+
+    return "Unnamed";
+  }
+
+  function normalizeErrorMessage(error, fallback) {
+    if (error && typeof error === "object" && typeof error.message === "string" && error.message.trim()) {
+      return error.message.trim();
+    }
+
+    if (typeof error === "string" && error.trim()) {
+      return error.trim();
+    }
+
+    return fallback;
+  }
+})();
+
+;(() => {
+  const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
   if (globalScope.__PIGMA_DELETE_HIDDEN_LAYERS_PATCH__) {
     return;
   }
@@ -37603,7 +38664,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       const source = await exportImageMergeSelection();
       const createdImage = figma.createImage(source.bytes);
       if (!createdImage || !createdImage.hash) {
-        throw new Error("Could not create a Figma image from the merged image result.");
+        throw new Error("이미지 합치기 결과를 Figma 이미지로 만들지 못했습니다.");
       }
 
       const result = await applyImageCompositeToSelection(
@@ -37642,11 +38703,11 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         result: result,
       });
 
-      figma.notify("Created a merged image layer.", {
+      figma.notify("이미지 합치기 레이어를 만들었습니다.", {
         timeout: 2200,
       });
     } catch (error) {
-      const messageText = normalizeErrorMessage(error, "Failed to merge images.");
+      const messageText = normalizeErrorMessage(error, "이미지 합치기에 실패했습니다.");
       figma.ui.postMessage({
         type: "image-merge-error",
         clientRequestId: clientRequestId,
@@ -37661,17 +38722,17 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     for (let index = 0; index < skipped.length; index += 1) {
       const reason = skipped[index] && typeof skipped[index].reason === "string" ? skipped[index].reason.trim() : "";
       if (reason) {
-        return "Could not create the merged image layer: " + reason;
+        return "이미지 합치기 레이어를 만들지 못했습니다: " + reason;
       }
     }
 
     const summary = result && result.summary ? result.summary : {};
     const byteLength = Number(summary.resultByteLength) || 0;
     if (byteLength > 0) {
-      return "Merged image PNG was created, but it could not be placed as a new layer.";
+      return "이미지 합치기 PNG는 생성됐지만 새 레이어로 배치하지 못했습니다.";
     }
 
-    return "Could not create the merged image layer.";
+    return "이미지 합치기 레이어를 만들지 못했습니다.";
   }
 
   function withImageMergeTimeout(promise, timeoutMs, label) {
@@ -37682,14 +38743,14 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
     let settled = false;
     let timerId = null;
-    const taskLabel = typeof label === "string" && label.trim() ? label.trim() : "Merge Images";
+    const taskLabel = typeof label === "string" && label.trim() ? label.trim() : "이미지 합치기";
     return new Promise(function (resolve, reject) {
       timerId = setTimeout(function () {
         if (settled) {
           return;
         }
         settled = true;
-        reject(new Error(taskLabel + " timed out. Reduce the selection or retry complex mask groups one frame at a time."));
+        reject(new Error(taskLabel + " 시간이 초과되었습니다. 선택 범위를 줄이거나 복잡한 마스크 그룹은 프레임 단위로 다시 시도해주세요."));
       }, ms);
 
       Promise.resolve(promise).then(
@@ -37718,7 +38779,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       return isImageMergeExportableNode(node);
     });
     if (!selection.length) {
-      throw new Error("Select a frame, group, or layer to merge into an image first.");
+      throw new Error("이미지로 병합할 프레임, 그룹, 레이어를 먼저 선택해주세요.");
     }
 
     const exportSelection = resolveImageMergeExportSelection(selection);
@@ -37730,7 +38791,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       .filter(Boolean);
     const unionRect = unionAbsoluteRects(rects);
     if (!unionRect || !(unionRect.width > 0) || !(unionRect.height > 0)) {
-      throw new Error("Could not calculate the merge bounds for the selected items.");
+      throw new Error("선택한 항목의 병합 영역을 계산하지 못했습니다.");
     }
 
     const exportScale = resolveImageMergeExportScale(unionRect);
@@ -37741,7 +38802,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       (await exportImageMergeFrameSelection(exportSelection, unionRect, exportSettings));
 
     if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
-      throw new Error("Merged image PNG is empty.");
+      throw new Error("이미지 합치기 PNG가 비어 있습니다.");
     }
 
     return {
@@ -37846,7 +38907,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       const bytes = await withImageMergeTimeout(
         selection[0].exportAsync(exportSettings),
         IMAGE_MERGE_FAST_EXPORT_TIMEOUT_MS,
-        "Merge Images fast export"
+        "이미지 합치기 빠른 export"
       );
       return bytes && typeof bytes.length === "number" && bytes.length > 0 ? bytes : null;
     } catch (error) {
@@ -38004,13 +39065,13 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       }
 
       if (!clones.length) {
-        throw new Error("Could not find any selected layers that can be merged.");
+        throw new Error("병합 가능한 선택 레이어를 찾지 못했습니다.");
       }
 
       return await withImageMergeTimeout(
         preview.exportAsync(exportSettings),
         IMAGE_MERGE_EXPORT_TIMEOUT_MS,
-        "Merge Images preview export"
+        "이미지 합치기 preview export"
       );
     } finally {
       for (let index = 0; index < clones.length; index += 1) {

@@ -19,6 +19,7 @@ const defaultFiles = [
   "button-text-auto-size.js",
   "text-line-height-adjust.js",
   "unlock-locked-layers.js",
+  "detach-linked-components.js",
   "delete-hidden-layers.js",
   "original-image-download.js",
   "ai-image-upscale.js",

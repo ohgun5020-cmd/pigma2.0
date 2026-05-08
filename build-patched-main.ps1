@@ -17,6 +17,7 @@ $cornerRadiusAdjustPatch = Join-Path $root "corner-radius-adjust.js"
 $buttonTextAutoSizePatch = Join-Path $root "button-text-auto-size.js"
 $textLineHeightAdjustPatch = Join-Path $root "text-line-height-adjust.js"
 $unlockLockedLayersPatch = Join-Path $root "unlock-locked-layers.js"
+$detachLinkedComponentsPatch = Join-Path $root "detach-linked-components.js"
 $deleteHiddenLayersPatch = Join-Path $root "delete-hidden-layers.js"
 $splitLongFramePatch = Join-Path $root "split-long-frame.js"
 $aiUrlShortenerPatch = Join-Path $root "ai-url-shortener.js"
@@ -110,6 +111,10 @@ if (-not (Test-Path $textLineHeightAdjustPatch)) {
 
 if (-not (Test-Path $unlockLockedLayersPatch)) {
   throw "Missing locked layer unlock patch: $unlockLockedLayersPatch"
+}
+
+if (-not (Test-Path $detachLinkedComponentsPatch)) {
+  throw "Missing linked component detach patch: $detachLinkedComponentsPatch"
 }
 
 if (-not (Test-Path $deleteHiddenLayersPatch)) {
@@ -243,6 +248,7 @@ $runtimeSyntaxSourceFiles = @(
   $buttonTextAutoSizePatch,
   $textLineHeightAdjustPatch,
   $unlockLockedLayersPatch,
+  $detachLinkedComponentsPatch,
   $deleteHiddenLayersPatch,
   $aiUrlShortenerPatch,
   $aiColorExtractPatch,
@@ -1583,6 +1589,7 @@ $cornerRadiusAdjustPatchContent = [System.IO.File]::ReadAllText($cornerRadiusAdj
 $buttonTextAutoSizePatchContent = [System.IO.File]::ReadAllText($buttonTextAutoSizePatch, [System.Text.Encoding]::UTF8)
 $textLineHeightAdjustPatchContent = [System.IO.File]::ReadAllText($textLineHeightAdjustPatch, [System.Text.Encoding]::UTF8)
 $unlockLockedLayersPatchContent = [System.IO.File]::ReadAllText($unlockLockedLayersPatch, [System.Text.Encoding]::UTF8)
+$detachLinkedComponentsPatchContent = [System.IO.File]::ReadAllText($detachLinkedComponentsPatch, [System.Text.Encoding]::UTF8)
 $deleteHiddenLayersPatchContent = [System.IO.File]::ReadAllText($deleteHiddenLayersPatch, [System.Text.Encoding]::UTF8)
 $splitLongFramePatchContent = [System.IO.File]::ReadAllText($splitLongFramePatch, [System.Text.Encoding]::UTF8)
 $aiUrlShortenerPatchContent = [System.IO.File]::ReadAllText($aiUrlShortenerPatch, [System.Text.Encoding]::UTF8)
@@ -1609,6 +1616,7 @@ $patchedRuntimeParts = @(
   $buttonTextAutoSizePatchContent,
   $textLineHeightAdjustPatchContent,
   $unlockLockedLayersPatchContent,
+  $detachLinkedComponentsPatchContent,
   $deleteHiddenLayersPatchContent,
   $splitLongFramePatchContent,
   $aiUrlShortenerPatchContent,
