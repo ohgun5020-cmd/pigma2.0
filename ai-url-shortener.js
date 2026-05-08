@@ -19,7 +19,7 @@
   figma.ui.onmessage = async (message) => {
     if (isShortenRequestMessage(message)) {
       if (isRunning) {
-        postStatus("running", "링크 짧게 만들기를 이미 진행 중입니다.");
+        postStatus("running", "Shorten Link is already running.");
         return;
       }
 
@@ -29,7 +29,7 @@
 
     if (isCopyPrototypeLinkMessage(message)) {
       if (isRunning) {
-        postPrototypeStatus("running", "\uD504\uB85C\uD1A0\uD0C0\uC785 \uB9C1\uD06C\uB97C \uC900\uBE44 \uC911\uC785\uB2C8\uB2E4.");
+        postPrototypeStatus("running", "Preparing the prototype link.");
         return;
       }
 
@@ -52,7 +52,7 @@
 
   async function runShortenFigmaUrl() {
     isRunning = true;
-    postStatus("running", "선택한 프레임 또는 섹션의 프로토타입 주소를 줄이는 중입니다.");
+    postStatus("running", "Shortening the prototype link for the selected frame or section.");
 
     try {
       await ensureCurrentPageLoaded();
@@ -70,9 +70,9 @@
           shortUrl: shortUrl,
         },
       });
-      figma.notify("단축 주소를 준비했습니다.", { timeout: 1800 });
+      figma.notify("Short link is ready.", { timeout: 1800 });
     } catch (error) {
-      const message = normalizeErrorMessage(error, "링크 짧게 만들기에 실패했습니다.");
+      const message = normalizeErrorMessage(error, "Failed to shorten the link.");
       figma.ui.postMessage({
         type: "shorten-figma-url-error",
         message: message,
@@ -85,7 +85,7 @@
 
   async function runCopyPrototypeLink() {
     isRunning = true;
-    postPrototypeStatus("running", "\uD504\uB85C\uD1A0\uD0C0\uC785 \uB9C1\uD06C\uB97C \uC900\uBE44 \uC911\uC785\uB2C8\uB2E4.");
+    postPrototypeStatus("running", "Preparing the prototype link.");
 
     try {
       await ensureCurrentPageLoaded();
@@ -102,9 +102,9 @@
           longUrl: prototypeUrl,
         },
       });
-      figma.notify("\uD504\uB85C\uD1A0\uD0C0\uC785 \uB9C1\uD06C\uB97C \uC900\uBE44\uD588\uC2B5\uB2C8\uB2E4.", { timeout: 1800 });
+      figma.notify("Prototype link is ready.", { timeout: 1800 });
     } catch (error) {
-      const message = normalizeErrorMessage(error, "\uD504\uB85C\uD1A0\uD0C0\uC785 \uB9C1\uD06C \uAC00\uC838\uC624\uAE30\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.");
+      const message = normalizeErrorMessage(error, "Failed to get the prototype link.");
       figma.ui.postMessage({
         type: "copy-prototype-link-error",
         message: message,
@@ -134,20 +134,20 @@
   function collectTargetNode() {
     const selection = Array.from(figma.currentPage.selection || []).filter(Boolean);
     if (!selection.length) {
-      throw new Error("프레임 또는 섹션 1개를 먼저 선택해 주세요.");
+      throw new Error("Select one frame or section first.");
     }
 
     if (selection.length !== 1) {
-      throw new Error("프레임 또는 섹션은 1개만 선택할 수 있습니다.");
+      throw new Error("Select only one frame or section.");
     }
 
     const node = selection[0];
     if (!node || node.removed) {
-      throw new Error("선택한 대상을 다시 찾지 못했습니다. 다시 선택해 주세요.");
+      throw new Error("Could not find the selected item again. Select it again and retry.");
     }
 
     if (node.type !== "FRAME" && node.type !== "SECTION") {
-      throw new Error("프레임 또는 섹션 1개를 선택한 경우에만 사용할 수 있습니다.");
+      throw new Error("This only works when one frame or section is selected.");
     }
 
     const shareNode = resolvePrototypeShareNode(node);
@@ -163,7 +163,7 @@
   async function getShortUrl(longUrl) {
     const normalizedLongUrl = String(longUrl || "").trim();
     if (!normalizedLongUrl) {
-      throw new Error("단축할 주소를 만들지 못했습니다.");
+      throw new Error("Could not build a link to shorten.");
     }
 
     const dubApiKey = (await readDubApiKey()) || sanitizeApiKey(BUNDLED_DUB_API_KEY);
@@ -185,7 +185,7 @@
         shortUrlCache[proxyCacheKey] = proxyShortUrl;
         return proxyShortUrl;
       } catch (error) {
-        lastError = normalizeErrorMessage(error, "주소 단축 서버로 주소를 줄이지 못했습니다.");
+        lastError = normalizeErrorMessage(error, "Could not shorten the link with the shortener server.");
       }
     }
 
@@ -195,7 +195,7 @@
         shortUrlCache[cacheKey] = dubShortUrl;
         return dubShortUrl;
       } catch (error) {
-        lastError = normalizeErrorMessage(error, "Dub로 주소를 줄이지 못했습니다.");
+        lastError = normalizeErrorMessage(error, "Could not shorten the link with Dub.");
       }
     }
 
@@ -204,7 +204,7 @@
       shortUrlCache[cacheKey] = isGdShortUrl;
       return isGdShortUrl;
     } catch (error) {
-      const isGdError = normalizeErrorMessage(error, "is.gd로 주소를 줄이지 못했습니다.");
+      const isGdError = normalizeErrorMessage(error, "Could not shorten the link with is.gd.");
       lastError = lastError ? lastError + " / " + isGdError : isGdError;
     }
 
@@ -213,7 +213,7 @@
       shortUrlCache[cacheKey] = tinyUrlShortUrl;
       return tinyUrlShortUrl;
     } catch (error) {
-      const tinyUrlError = normalizeErrorMessage(error, "TinyURL로 주소를 줄이지 못했습니다.");
+      const tinyUrlError = normalizeErrorMessage(error, "Could not shorten the link with TinyURL.");
       throw new Error(lastError ? lastError + " / " + tinyUrlError : tinyUrlError);
     }
   }
@@ -247,7 +247,7 @@
       });
       text = String(await response.text()).trim();
     } catch (error) {
-      throw new Error("Dub에 연결하지 못했습니다.");
+      throw new Error("Could not connect to Dub.");
     }
 
     let payload = null;
@@ -271,11 +271,11 @@
           : "";
 
     if (!shortLink) {
-      throw new Error("Dub에서 단축 주소를 받지 못했습니다.");
+      throw new Error("Dub did not return a short link.");
     }
 
     if (!/^https?:\/\//i.test(shortLink)) {
-      throw new Error("Dub 응답 형식을 확인하지 못했습니다.");
+      throw new Error("Could not read the Dub response format.");
     }
 
     return shortLink;
@@ -296,7 +296,7 @@
       });
       text = String(await response.text()).trim();
     } catch (error) {
-      throw new Error("주소 단축 서버에 연결하지 못했습니다.");
+      throw new Error("Could not connect to the shortener server.");
     }
 
     let payload = null;
@@ -320,11 +320,11 @@
           : "";
 
     if (!shortUrl) {
-      throw new Error("주소 단축 서버에서 단축 주소를 받지 못했습니다.");
+      throw new Error("The shortener server did not return a short link.");
     }
 
     if (!/^https?:\/\//i.test(shortUrl)) {
-      throw new Error("주소 단축 서버 응답 형식을 확인하지 못했습니다.");
+      throw new Error("Could not read the shortener server response format.");
     }
 
     return shortUrl;
@@ -344,14 +344,14 @@
     }
 
     if (statusCode === 401 || statusCode === 403) {
-      return "Dub API 키 권한을 확인해 주세요.";
+      return "Check the Dub API key permissions.";
     }
 
     if (statusCode === 429) {
-      return "Dub 사용량 또는 요청 제한을 초과했습니다.";
+      return "Dub usage or request limit was exceeded.";
     }
 
-    return "Dub로 주소를 줄이지 못했습니다.";
+    return "Could not shorten the link with Dub.";
   }
 
   function normalizeProxyError(payload, text, statusCode) {
@@ -368,10 +368,10 @@
     }
 
     if (statusCode === 429) {
-      return "주소 단축 서버 사용량 또는 요청 제한을 초과했습니다.";
+      return "The shortener server usage or request limit was exceeded.";
     }
 
-    return "주소 단축 서버로 주소를 줄이지 못했습니다.";
+    return "Could not shorten the link with the shortener server.";
   }
 
   function sanitizeApiKey(value) {
@@ -391,7 +391,7 @@
         method: "GET",
       });
     } catch (error) {
-      throw new Error("is.gd에 연결하지 못했습니다.");
+      throw new Error("Could not connect to is.gd.");
     }
 
     const text = String(await response.text()).trim();
@@ -400,15 +400,15 @@
     }
 
     if (!text) {
-      throw new Error("is.gd에서 단축 주소를 받지 못했습니다.");
+      throw new Error("is.gd did not return a short link.");
     }
 
     if (/^Error:\s*/i.test(text)) {
-      throw new Error(text.replace(/^Error:\s*/i, "").trim() || "is.gd가 주소 단축 요청을 처리하지 못했습니다.");
+      throw new Error(text.replace(/^Error:\s*/i, "").trim() || "is.gd could not process the short link request.");
     }
 
     if (!/^https?:\/\//i.test(text)) {
-      throw new Error("is.gd 응답 형식을 확인하지 못했습니다.");
+      throw new Error("Could not read the is.gd response format.");
     }
 
     return text;
@@ -421,7 +421,7 @@
         method: "GET",
       });
     } catch (error) {
-      throw new Error("TinyURL에 연결하지 못했습니다.");
+      throw new Error("Could not connect to TinyURL.");
     }
 
     const text = String(await response.text()).trim();
@@ -430,15 +430,15 @@
     }
 
     if (!text) {
-      throw new Error("TinyURL에서 단축 주소를 받지 못했습니다.");
+      throw new Error("TinyURL did not return a short link.");
     }
 
     if (/^Error:\s*/i.test(text)) {
-      throw new Error(text.replace(/^Error:\s*/i, "").trim() || "TinyURL이 주소 단축 요청을 처리하지 못했습니다.");
+      throw new Error(text.replace(/^Error:\s*/i, "").trim() || "TinyURL could not process the short link request.");
     }
 
     if (!/^https?:\/\//i.test(text)) {
-      throw new Error("TinyURL 응답 형식을 확인하지 못했습니다.");
+      throw new Error("Could not read the TinyURL response format.");
     }
 
     return text;
@@ -451,14 +451,14 @@
     }
 
     if (statusCode === 502) {
-      return providerLabel + " 요청 한도를 초과했습니다. 잠시 후 다시 시도해 주세요.";
+      return providerLabel + " request limit was exceeded. Try again later.";
     }
 
     if (statusCode === 503) {
-      return providerLabel + " 서비스를 지금 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.";
+      return providerLabel + " service is unavailable right now. Try again later.";
     }
 
-    return providerLabel + "로 주소를 줄이지 못했습니다.";
+    return providerLabel + " could not shorten the link.";
   }
 
   async function ensureCurrentPageLoaded() {
@@ -493,7 +493,7 @@
       return fileKey;
     }
 
-    throw new Error("이 파일에서는 공유 주소를 만들 수 없습니다. 파일을 저장한 뒤 다시 시도해 주세요.");
+    throw new Error("This file cannot create a share link yet. Save the file, then try again.");
   }
 
   function buildFileNameSegment() {
@@ -507,7 +507,7 @@
   function normalizeNodeIdForUrl(value) {
     const raw = String(value || "").trim();
     if (!raw) {
-      throw new Error("선택한 대상의 node id를 읽지 못했습니다.");
+      throw new Error("Could not read the selected item's node id.");
     }
 
     return encodeURIComponent(raw).replace(/%3A/gi, "-");
@@ -516,7 +516,7 @@
   function normalizePageIdForUrl(value) {
     const raw = String(value || "").trim();
     if (!raw) {
-      throw new Error("선택한 페이지 id를 읽지 못했습니다.");
+      throw new Error("Could not read the selected page id.");
     }
 
     return encodeURIComponent(raw);
@@ -528,12 +528,12 @@
     }
 
     if (!node || node.type !== "SECTION") {
-      throw new Error("프로토타입 공유용 프레임을 찾지 못했습니다.");
+      throw new Error("Could not find a frame to share as a prototype.");
     }
 
     const candidates = collectSectionPrototypeCandidates(node);
     if (!candidates.length) {
-      throw new Error("선택한 섹션 안에서 프로토타입으로 공유할 프레임을 찾지 못했습니다.");
+      throw new Error("Could not find a prototype-ready frame inside the selected section.");
     }
 
     const candidateById = new Map();
@@ -618,7 +618,7 @@
       current = current.parent || null;
     }
 
-    throw new Error("선택한 대상의 페이지를 찾지 못했습니다.");
+    throw new Error("Could not find the selected item's page.");
   }
 
   function safeName(node) {

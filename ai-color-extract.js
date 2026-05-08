@@ -82,7 +82,7 @@
 
   async function prepareColorExtractSource(message) {
     if (isPreparing || isApplying) {
-      postPrepareError("색상 추출이 이미 진행 중입니다.", sanitizeClientRequestId(message && message.clientRequestId));
+      postPrepareError("Extract Colors is already running.", sanitizeClientRequestId(message && message.clientRequestId));
       return;
     }
 
@@ -106,7 +106,7 @@
 
       const bytes = await target.node.exportAsync(exportOptions);
       if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
-        throw new Error("선택한 화면을 이미지로 준비하지 못했습니다.");
+        throw new Error("Could not prepare the selected screen as an image.");
       }
 
       const sessionId = buildSessionId();
@@ -137,7 +137,7 @@
     } catch (error) {
       pendingSession = null;
       postPrepareError(
-        normalizeErrorMessage(error, "색상 추출용 선택 이미지를 준비하지 못했습니다."),
+        normalizeErrorMessage(error, "Could not prepare the selected image for Extract Colors."),
         sanitizeClientRequestId(message && message.clientRequestId)
       );
     } finally {
@@ -147,7 +147,7 @@
 
   async function applyColorExtractPalette(message) {
     if (isApplying) {
-      postApplyError("색상 추출 팔레트를 이미 만들고 있습니다.", sanitizeClientRequestId(message && message.clientRequestId));
+      postApplyError("The Extract Colors palette is already being created.", sanitizeClientRequestId(message && message.clientRequestId));
       return;
     }
 
@@ -155,7 +155,7 @@
 
     try {
       if (!pendingSession || !message || message.sessionId !== pendingSession.id) {
-        throw new Error("색상 추출 세션이 만료되었습니다. 다시 실행해 주세요.");
+        throw new Error("The Extract Colors session expired. Please run it again.");
       }
 
       const palette = normalizePalette(message && message.palette);
@@ -192,7 +192,7 @@
       notifyApplyResult(result, pendingSession.operationLabel);
       pendingSession = null;
     } catch (error) {
-      const messageText = normalizeErrorMessage(error, "색상 팔레트를 만들지 못했습니다.");
+      const messageText = normalizeErrorMessage(error, "Could not create the color palette.");
       figma.ui.postMessage({
         type: "ai-color-extract-apply-error",
         clientRequestId:
@@ -210,16 +210,16 @@
   function collectColorExtractTargetFromSelection() {
     const selection = Array.from(figma.currentPage.selection || []).filter(Boolean);
     if (!selection.length) {
-      throw new Error("색상을 추출할 프레임, 그룹, 이미지, 텍스트 중 하나를 먼저 선택해 주세요.");
+      throw new Error("Select one frame, group, image, or text layer before extracting colors.");
     }
 
     if (selection.length !== 1) {
-      throw new Error("색상 추출은 현재 선택 1개 기준으로 팔레트를 만듭니다. 대상을 하나만 선택해 주세요.");
+      throw new Error("Extract Colors creates a palette from one selected item. Select only one target.");
     }
 
     const node = selection[0];
     if (node.removed || typeof node.exportAsync !== "function") {
-      throw new Error("선택한 레이어는 색상 추출용 미리보기를 만들 수 없습니다.");
+      throw new Error("The selected layer cannot create a preview for Extract Colors.");
     }
 
     return {
@@ -576,8 +576,8 @@
   }
 
   function buildPaletteName(selectionLabel) {
-    const base = typeof selectionLabel === "string" && selectionLabel.trim() ? selectionLabel.trim() : "선택";
-    return base + " 색상 추출 팔레트";
+    const base = typeof selectionLabel === "string" && selectionLabel.trim() ? selectionLabel.trim() : "Selection";
+    return base + " Extract Colors palette";
   }
 
   function solidPaintFromHex(hex, opacity) {
@@ -1327,12 +1327,12 @@
       typeof summary.swatchCount === "number" && Number.isFinite(summary.swatchCount) ? summary.swatchCount : 0;
 
     if (!swatchCount) {
-      figma.notify("색상 추출 결과가 비어 있습니다.", { timeout: 2200 });
+      figma.notify("Extract Colors returned an empty result.", { timeout: 2200 });
       return;
     }
 
     const note = buildAnalysisNote(summary);
-    figma.notify((operationLabel || "색상 추출") + " 완료 (" + swatchCount + "칸 팔레트 생성" + note + ")", { timeout: 2600 });
+    figma.notify((operationLabel || "Extract Colors") + " complete (" + swatchCount + " swatches created" + note + ")", { timeout: 2600 });
   }
 
   function buildAnalysisNote(summary) {
@@ -1352,7 +1352,7 @@
       return "";
     }
 
-    return ", 감지: " + parts.slice(0, 3).join(" / ");
+    return ", detected: " + parts.slice(0, 3).join(" / ");
   }
 
   function postPrepareError(message, clientRequestId) {
@@ -1376,7 +1376,7 @@
   function notifyUiReportedError(message) {
     const text = normalizeErrorMessage(
       message && message.message ? message.message : "",
-      "색상 추출 중 브라우저 분석 단계에서 문제가 발생했습니다."
+      "A browser analysis step failed during Extract Colors."
     );
     figma.notify(text, { error: true, timeout: 2400 });
   }
@@ -1388,7 +1388,7 @@
 
   function sanitizeOperationLabel(value) {
     const label = typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
-    return label || "색상 추출";
+    return label || "Extract Colors";
   }
 
   function sanitizeFileName(value) {

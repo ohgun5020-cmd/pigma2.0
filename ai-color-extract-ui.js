@@ -22,7 +22,7 @@
     const normalizedMessage =
       typeof message === "string" && message.trim()
         ? message.trim()
-        : "색상 추출 초기화 중 문제가 발생했습니다. 플러그인을 다시 열어 주세요.";
+        : "Extract Colors could not initialize. Reopen the plugin.";
 
     window.__PIGMA_AI_COLOR_EXTRACT_V2_INIT_FAILED__ = normalizedMessage;
     if (error) {
@@ -41,7 +41,7 @@
     button.setAttribute("aria-busy", "false");
     button.setAttribute("aria-disabled", "false");
     button.title = normalizedMessage;
-    button.setAttribute("aria-label", `색상 추출 초기화 실패. ${normalizedMessage}`);
+    button.setAttribute("aria-label", `Extract Colors initialization failed. ${normalizedMessage}`);
     button.addEventListener("click", () => {
       postColorExtractInitFailure(normalizedMessage);
     });
@@ -66,7 +66,7 @@
     typeof shared.isAbortError !== "function" ||
     typeof shared.ensureProcessingToast !== "function"
   ) {
-    bindColorExtractInitFailure("색상 추출 초기화에 필요한 공용 이미지 런타임을 찾지 못했습니다. 플러그인을 다시 열어 주세요.");
+    bindColorExtractInitFailure("Could not find the shared image runtime required by Extract Colors. Reopen the plugin.");
     return;
   }
 
@@ -85,19 +85,29 @@
     return;
   }
 
-  button.title =
-    "\uC120\uD0DD\uD55C \uC774\uBBF8\uC9C0\uB098 \uD14D\uC2A4\uD2B8\uB97C \uBC14\uD0D5\uC73C\uB85C AI\uAC00 \uC5C5\uC885, \uBE0C\uB79C\uB4DC, \uC6A9\uB3C4\uB97C \uC790\uB3D9 \uAC10\uC9C0\uD574 \uC5B4\uB3C4\uBE44/\uD2B8\uB80C\uB514 \uCD94\uCC9C\uC0C9\uC744 \uD3EC\uD568\uD55C 3x7 \uD314\uB808\uD2B8\uC640 \uADF8\uB77C\uB370\uC774\uC158 \uC2A4\uC640\uCE58\uB97C \uB9CC\uB4ED\uB2C8\uB2E4.";
+  function translateUiMessage(message) {
+    if (typeof window.__PIGMA_TRANSLATE_UI_TEXT__ === "function") {
+      return window.__PIGMA_TRANSLATE_UI_TEXT__(message);
+    }
+    return String(message ?? "");
+  }
+
+  button.title = translateUiMessage(
+    "선택한 이미지나 텍스트를 바탕으로 AI가 업종, 브랜드, 용도를 자동 감지해 어도비/트렌디 추천색을 포함한 3x7 팔레트와 그라데이션 스와치를 만듭니다."
+  );
   button.setAttribute(
     "aria-label",
-    "\uC0C9\uC0C1 \uCD94\uCD9C. \uC120\uD0DD\uD55C \uC774\uBBF8\uC9C0\uB098 \uD14D\uC2A4\uD2B8\uB97C \uBC14\uD0D5\uC73C\uB85C AI\uAC00 \uC5C5\uC885, \uBE0C\uB79C\uB4DC, \uC6A9\uB3C4\uB97C \uC790\uB3D9 \uAC10\uC9C0\uD574 \uC5B4\uB3C4\uBE44/\uD2B8\uB80C\uB514 \uCD94\uCC9C\uC0C9\uC744 \uD3EC\uD568\uD55C 3x7 \uD314\uB808\uD2B8\uC640 \uADF8\uB77C\uB370\uC774\uC158 \uC2A4\uC640\uCE58\uB97C \uB9CC\uB4ED\uB2C8\uB2E4."
+    translateUiMessage(
+      "색상 추출. 선택한 이미지나 텍스트를 바탕으로 AI가 업종, 브랜드, 용도를 자동 감지해 어도비/트렌디 추천색을 포함한 3x7 팔레트와 그라데이션 스와치를 만듭니다."
+    )
   );
 
-  const defaultLabel = String(button.textContent || "\uC0C9\uC0C1 \uCD94\uCD9C").trim() || "\uC0C9\uC0C1 \uCD94\uCD9C";
-  const preparingLabel = "\uC120\uD0DD \uD655\uC778 \uC911...";
-  const analyzingLabel = "AI \uC0C9\uC0C1 \uBD84\uC11D \uC911...";
-  const fallbackLabel = "\uBCF4\uC870 \uD314\uB808\uD2B8 \uC815\uB9AC \uC911...";
-  const applyingLabel = "\uD314\uB808\uD2B8 \uC0DD\uC131 \uC911...";
-  const operationLabel = "\uC0C9\uC0C1 \uCD94\uCD9C";
+  const defaultLabel = String(button.textContent || translateUiMessage("색상 추출")).trim() || translateUiMessage("색상 추출");
+  const preparingLabel = "선택 준비 중...";
+  const analyzingLabel = "AI 색상 분석 중...";
+  const fallbackLabel = "보조 팔레트 정리 중...";
+  const applyingLabel = "팔레트 생성 중...";
+  const operationLabel = translateUiMessage("색상 추출");
   const openAiModel = "gpt-4.1-mini";
   const geminiModel = "gemini-2.5-flash-lite";
   const processingToast = shared.ensureProcessingToast();
@@ -255,10 +265,10 @@
     button.dataset.pigmaBusy = busy ? "true" : "false";
     button.setAttribute("aria-busy", busy ? "true" : "false");
     button.setAttribute("aria-disabled", busy ? "true" : "false");
-    button.textContent = busy ? label : defaultLabel;
+    button.textContent = translateUiMessage(busy ? label : defaultLabel);
     setPeerDisabled(busy);
     if (busy) {
-      processingToast.show(label, cancelCurrentRun, "\uCDE8\uC18C Esc", { ownerKey: toastOwnerKey });
+      processingToast.show(translateUiMessage(label), cancelCurrentRun, translateUiMessage("취소 Esc"), { ownerKey: toastOwnerKey });
       return;
     }
     processingToast.hide({ ownerKey: toastOwnerKey });
@@ -283,11 +293,11 @@
     const normalized =
       typeof message === "string" && message.trim()
         ? message.trim()
-        : "\uC0C9\uC0C1 \uCD94\uCD9C\uC744 \uC644\uB8CC\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.";
+        : "색상 추출을 완료하지 못했습니다.";
     postPluginMessage({
       type: "ai-color-extract-report-error",
       clientRequestId: activeRequestId,
-      message: normalized,
+      message: translateUiMessage(normalized),
     });
   }
 
@@ -2866,7 +2876,7 @@
     }
 
     if (isPeerBusy()) {
-      reportUiError("\uB2E4\uB978 AI \uC774\uBBF8\uC9C0 \uC791\uC5C5\uC774 \uC774\uBBF8 \uC2E4\uD589 \uC911\uC785\uB2C8\uB2E4.");
+      reportUiError("다른 AI 이미지 작업이 이미 실행 중입니다.");
       return;
     }
 
@@ -2904,7 +2914,7 @@
       const signal = activeAbortController ? activeAbortController.signal : null;
       handleSourceReady(payload, currentRequestId, signal).catch((error) => {
         if (!shared.isAbortError(error)) {
-          reportUiError(shared.normalizeErrorMessage(error, "\uC0C9\uC0C1 \uCD94\uCD9C\uC744 \uC644\uB8CC\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4."));
+          reportUiError(shared.normalizeErrorMessage(error, "색상 추출을 완료하지 못했습니다."));
         }
         resetState();
       });
@@ -2927,9 +2937,9 @@
     }
   });
 
-  button.textContent = defaultLabel;
+  button.textContent = translateUiMessage(defaultLabel);
   window.__PIGMA_AI_COLOR_EXTRACT_V2__ = true;
   } catch (error) {
-    bindColorExtractInitFailure("색상 추출 초기화 중 오류가 발생했습니다. 플러그인을 다시 열어 주세요.", error);
+    bindColorExtractInitFailure("Extract Colors initialization failed. Reopen the plugin.", error);
   }
 })();

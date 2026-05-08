@@ -20,7 +20,7 @@
           status: "running",
           currentCount: 0,
           totalCount: 0,
-          message: "원본 이미지 찾기가 이미 진행 중입니다.",
+          message: "Original image search is already running.",
         });
         return;
       }
@@ -56,7 +56,7 @@
           type: "original-image-download-result",
           result: emptyResult,
         });
-        figma.notify("선택 범위에서 다운로드할 원본 이미지가 없습니다.", { timeout: 2000 });
+        figma.notify("No original images are available to download in the selection.", { timeout: 2000 });
         return;
       }
 
@@ -75,13 +75,13 @@
           status: "prepare",
           currentCount: index + 1,
           totalCount,
-          message: `"${entry.displayName}" 원본 이미지를 준비하는 중입니다.`,
+          message: `Preparing original image for "${entry.displayName}".`,
         });
 
         try {
           const image = figma.getImageByHash(entry.imageHash);
           if (!image) {
-            throw new Error("원본 이미지 객체를 찾지 못했습니다.");
+            throw new Error("Could not find the original image object.");
           }
 
           const bytes = await image.getBytesAsync();
@@ -110,7 +110,7 @@
             nodeName: entry.nodeName,
             imageHash: entry.imageHash,
             path: entry.path,
-            reason: normalizeErrorMessage(error, "원본 이미지 바이트를 읽지 못했습니다."),
+            reason: normalizeErrorMessage(error, "Could not read the original image bytes."),
           });
         }
       }
@@ -127,7 +127,7 @@
       });
       notifyResult(result);
     } catch (error) {
-      const message = normalizeErrorMessage(error, "원본 이미지 저장 준비에 실패했습니다.");
+      const message = normalizeErrorMessage(error, "Could not prepare original image saving.");
       figma.ui.postMessage({
         type: "original-image-download-error",
         message,
@@ -141,7 +141,7 @@
   function collectOriginalImagesFromSelection() {
     const selection = Array.from(figma.currentPage.selection || []);
     if (!selection.length) {
-      throw new Error("프레임, 그룹, 이미지 레이어를 먼저 선택해주세요.");
+      throw new Error("Select a frame, group, or image layer first.");
     }
 
     const uniqueEntries = [];
@@ -194,7 +194,7 @@
               path: current.path,
               paintKind: paintEntry.paintKind,
               paintIndex: paintEntry.paintIndex,
-              reason: `${paintEntry.paintKind} IMAGE paint에 imageHash가 없어 건너뜁니다.`,
+              reason: `${paintEntry.paintKind} IMAGE paint has no imageHash, so it was skipped.`,
             });
             continue;
           }
@@ -301,16 +301,16 @@
     const duplicateCount = summary.duplicateImagePaintCount || summary.duplicateFillCount || 0;
 
     if (!downloadedCount) {
-      figma.notify("다운로드할 수 있는 원본 이미지가 없습니다.", { timeout: 2000 });
+      figma.notify("No original images are available to download.", { timeout: 2000 });
       return;
     }
 
-    let message = `원본 이미지 ${downloadedCount}개를 찾았습니다. 목록에서 다운로드할 수 있습니다.`;
+    let message = `Found ${downloadedCount} original image${downloadedCount === 1 ? "" : "s"}. You can download from the list.`;
     if (duplicateCount > 0) {
-      message += ` 중복 사용 ${duplicateCount}건은 한 번만 준비했습니다.`;
+      message += ` ${duplicateCount} duplicate use${duplicateCount === 1 ? "" : "s"} were prepared only once.`;
     }
     if (skippedCount > 0) {
-      message += ` ${skippedCount}건은 건너뜁니다.`;
+      message += ` ${skippedCount} item${skippedCount === 1 ? "" : "s"} skipped.`;
     }
     figma.notify(message, { timeout: 2600 });
   }
@@ -447,14 +447,14 @@
 
   function formatSelectionLabel(selection) {
     if (!selection.length) {
-      return "선택 없음";
+      return "No selection";
     }
 
     if (selection.length === 1) {
       return safeName(selection[0]);
     }
 
-    return `${safeName(selection[0])} 외 ${selection.length - 1}개`;
+    return `${safeName(selection[0])} + ${selection.length - 1} more`;
   }
 
   function collectUniqueStrings(values) {

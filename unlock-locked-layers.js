@@ -15,7 +15,7 @@
   figma.ui.onmessage = async (message) => {
     if (isUnlockLockedLayersMessage(message)) {
       if (isRunning) {
-        postStatus("running", "잠긴 레이어 해제가 이미 진행 중입니다.");
+        postStatus("running", "Unlock Locked Layers is already running.");
         return;
       }
 
@@ -34,7 +34,7 @@
 
   async function runUnlockLockedLayers() {
     isRunning = true;
-    postStatus("running", "현재 선택 안의 잠긴 레이어를 찾고 있습니다.");
+    postStatus("running", "Finding locked layers in the current selection.");
 
     try {
       const result = unlockLockedLayersInSelection();
@@ -44,7 +44,7 @@
       });
       notifyResult(result);
     } catch (error) {
-      const message = normalizeErrorMessage(error, "잠긴 레이어 해제에 실패했습니다.");
+      const message = normalizeErrorMessage(error, "Could not unlock locked layers.");
       figma.ui.postMessage({
         type: "unlock-locked-layers-error",
         message,
@@ -58,7 +58,7 @@
   function unlockLockedLayersInSelection() {
     const selection = Array.from(figma.currentPage.selection || []);
     if (!selection.length) {
-      throw new Error("프레임, 그룹, 레이어를 먼저 선택하세요.");
+      throw new Error("Select a frame, group, or layer first.");
     }
 
     const candidates = collectLockedNodes(selection);
@@ -94,7 +94,7 @@
           nodeName: entry.nodeName,
           nodeType: entry.nodeType,
           path: entry.path,
-          reason: normalizeErrorMessage(error, "해당 레이어의 잠금을 해제할 수 없습니다."),
+          reason: normalizeErrorMessage(error, "Could not unlock this layer."),
         });
       }
     }
@@ -179,12 +179,12 @@
     const skippedCount = summary.skippedCount || 0;
 
     if (unlockedCount === 0) {
-      figma.notify("해제할 잠긴 레이어가 없습니다.", { timeout: 1800 });
+      figma.notify("There are no locked layers to unlock.", { timeout: 1800 });
       return;
     }
 
-    const baseMessage = "잠긴 레이어 해제 완료 (" + unlockedCount + "개)";
-    const message = skippedCount > 0 ? baseMessage + ", " + skippedCount + "개 건너뜀" : baseMessage;
+    const baseMessage = "Unlocked locked layers (" + unlockedCount + ")";
+    const message = skippedCount > 0 ? baseMessage + ", skipped " + skippedCount : baseMessage;
     figma.notify(message, { timeout: 2200 });
   }
 
@@ -202,14 +202,14 @@
 
   function formatSelectionLabel(selection) {
     if (!selection.length) {
-      return "선택 없음";
+      return "No selection";
     }
 
     if (selection.length === 1) {
       return safeName(selection[0]);
     }
 
-    return safeName(selection[0]) + " 외 " + (selection.length - 1) + "개";
+    return safeName(selection[0]) + " +" + (selection.length - 1);
   }
 
   function safeName(node) {

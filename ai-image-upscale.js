@@ -38,7 +38,7 @@
   const BOUNDS_FIT_APPLY_IN_PROGRESS_MESSAGE = "Bounds fit is already applying a result.";
   const BOUNDS_FIT_SESSION_EXPIRED_MESSAGE = "The bounds-fit session expired. Please run it again.";
   const BOUNDS_FIT_APPLY_ERROR_MESSAGE = "Failed to apply the bounds-fit result.";
-  const ORIGINAL_SIZE_FIT_APPLY_ERROR_MESSAGE = "원본 크기 적용에 실패했습니다.";
+  const ORIGINAL_SIZE_FIT_APPLY_ERROR_MESSAGE = "Could not apply Fit Original Size.";
   const UI_REPORTED_IMAGE_ERROR_FALLBACK = "The image task failed before a usable result was returned.";
   const IMAGE_TASK_NO_SELECTION_MESSAGE = "Select at least one node before running this image task.";
   const IMAGE_FILL_NOT_FOUND_MESSAGE = "Could not find the selected IMAGE fill.";
@@ -1243,7 +1243,9 @@
 
   async function runImageOriginalSizeFit(message) {
     const clientRequestId = sanitizeClientRequestId(message && message.clientRequestId);
-    const operationLabel = sanitizeOperationLabel(message && message.operationLabel) || "원본 크기 맞춤";
+    const operationLabel = normalizeOriginalSizeFitOperationLabel(
+      sanitizeOperationLabel(message && message.operationLabel)
+    );
     if (
       isPreparing ||
       isApplying ||
@@ -1273,7 +1275,10 @@
       });
       notifyOriginalSizeFitResult(result, operationLabel);
     } catch (error) {
-      const messageText = normalizeErrorMessage(error, ORIGINAL_SIZE_FIT_APPLY_ERROR_MESSAGE);
+      const messageText = normalizeErrorMessage(error, ORIGINAL_SIZE_FIT_APPLY_ERROR_MESSAGE, {
+        operationLabel: "Fit Original Size",
+        operationKind: "original-size-fit",
+      });
       postOriginalSizeFitError(messageText, clientRequestId);
     } finally {
       isBoundsFitApplying = false;
@@ -1422,7 +1427,7 @@
       message,
       ORIGINAL_SIZE_FIT_APPLY_ERROR_MESSAGE,
       {
-        operationLabel: "원본 크기 맞춤",
+        operationLabel: "Fit Original Size",
         operationKind: "original-size-fit",
       }
     );
@@ -5500,7 +5505,7 @@
   async function applyOriginalSizeFitToSelection(message) {
     const selection = Array.from(figma.currentPage.selection || []).filter(Boolean);
     if (!selection.length) {
-      throw new Error("원본 크기로 맞출 이미지 레이어를 먼저 선택하세요.");
+      throw new Error("Select an image layer to fit to original size first.");
     }
 
     const state = {
@@ -5548,21 +5553,21 @@
   async function collectOriginalSizeFitTargetsFromNode(node, state, isRootSelection) {
     if (!node || node.removed) {
       if (isRootSelection) {
-        appendOriginalSizeFitSkipped(state, node, "선택한 레이어를 읽지 못했습니다.");
+        appendOriginalSizeFitSkipped(state, node, "Could not read the selected layer.");
       }
       return false;
     }
 
     if (!isBoundsFitNodeVisible(node)) {
       if (isRootSelection) {
-        appendOriginalSizeFitSkipped(state, node, "숨겨진 레이어는 원본 크기로 맞출 수 없습니다.");
+        appendOriginalSizeFitSkipped(state, node, "Hidden layers cannot be fit to original size.");
       }
       return false;
     }
 
     if ("locked" in node && node.locked) {
       if (isRootSelection) {
-        appendOriginalSizeFitSkipped(state, node, "잠긴 레이어는 원본 크기로 맞출 수 없습니다.");
+        appendOriginalSizeFitSkipped(state, node, "Locked layers cannot be fit to original size.");
       }
       return false;
     }
@@ -5579,7 +5584,7 @@
         appendOriginalSizeFitSkipped(
           state,
           node,
-          "선택 범위 안에서 원본 크기로 맞출 이미지 채우기 레이어를 찾지 못했습니다."
+          "Could not find an image fill layer to fit to original size in the selection."
         );
       }
       return hasEligibleDescendant;
@@ -5599,34 +5604,34 @@
 
   async function analyzeOriginalSizeFitNode(node, isRootSelection) {
     if (!node || node.removed) {
-      return buildOriginalSizeFitSkipped(node, "선택한 레이어를 읽지 못했습니다.");
+      return buildOriginalSizeFitSkipped(node, "Could not read the selected layer.");
     }
 
     if (!canResizeBoundsFitNode(node)) {
-      return buildOriginalSizeFitSkipped(node, "이 레이어는 크기를 변경할 수 없습니다.");
+      return buildOriginalSizeFitSkipped(node, "This layer cannot be resized.");
     }
 
     if ("rotation" in node && typeof node.rotation === "number" && Math.abs(node.rotation) > 0.01) {
-      return buildOriginalSizeFitSkipped(node, "회전된 이미지 레이어는 아직 지원하지 않습니다.");
+      return buildOriginalSizeFitSkipped(node, "Rotated image layers are not supported yet.");
     }
 
     const fills = getNodeFills(node);
     const fillIndex = getPrimaryVisibleImageFillIndex(fills);
     if (fillIndex < 0) {
-      return isRootSelection ? buildOriginalSizeFitSkipped(node, "이미지 채우기를 찾지 못했습니다.") : null;
+      return isRootSelection ? buildOriginalSizeFitSkipped(node, "Could not find an image fill.") : null;
     }
 
     const fill = fills[fillIndex];
     const image = fill && fill.imageHash ? figma.getImageByHash(fill.imageHash) : null;
     if (!image || typeof image.getSizeAsync !== "function") {
-      return buildOriginalSizeFitSkipped(node, "원본 이미지 객체를 찾지 못했습니다.");
+      return buildOriginalSizeFitSkipped(node, "Could not find the original image object.");
     }
 
     const size = await image.getSizeAsync();
     const sourceWidth = size && typeof size.width === "number" ? size.width : 0;
     const sourceHeight = size && typeof size.height === "number" ? size.height : 0;
     if (!(sourceWidth > 0) || !(sourceHeight > 0)) {
-      return buildOriginalSizeFitSkipped(node, "원본 이미지 크기를 읽지 못했습니다.");
+      return buildOriginalSizeFitSkipped(node, "Could not read the original image size.");
     }
 
     return {
@@ -6825,7 +6830,7 @@
       skipped.push({
         nodeId: target.nodeId,
         nodeName: target.nodeName,
-        reason: "레이어를 다시 찾지 못했습니다.",
+        reason: "Could not find the layer again.",
       });
       return "skipped";
     }
@@ -6834,7 +6839,7 @@
       skipped.push({
         nodeId: target.nodeId,
         nodeName: safeName(node),
-        reason: "이 레이어는 크기를 변경할 수 없습니다.",
+        reason: "This layer cannot be resized.",
       });
       return "skipped";
     }
@@ -6854,7 +6859,7 @@
       skipped.push({
         nodeId: target.nodeId,
         nodeName: safeName(node),
-        reason: "원본 이미지 채우기를 다시 찾지 못했습니다.",
+        reason: "Could not find the original image fill again.",
       });
       return "skipped";
     }
@@ -6865,7 +6870,7 @@
       skipped.push({
         nodeId: target.nodeId,
         nodeName: safeName(node),
-        reason: "원본 이미지 크기를 읽지 못했습니다.",
+        reason: "Could not read the original image size.",
       });
       return "skipped";
     }
@@ -6877,7 +6882,7 @@
       skipped.push({
         nodeId: target.nodeId,
         nodeName: safeName(node),
-        reason: "이미지 채우기 설정을 초기화하지 못했습니다.",
+        reason: "Could not reset the image fill settings.",
       });
       return "skipped";
     }
@@ -6900,7 +6905,10 @@
       skipped.push({
         nodeId: target.nodeId,
         nodeName: safeName(node),
-        reason: normalizeErrorMessage(error, "원본 크기 적용에 실패했습니다."),
+        reason: normalizeErrorMessage(error, ORIGINAL_SIZE_FIT_APPLY_ERROR_MESSAGE, {
+          operationLabel: "Fit Original Size",
+          operationKind: "original-size-fit",
+        }),
       });
       return "skipped";
     }
@@ -7659,7 +7667,7 @@
         return first.reason.trim();
       }
     }
-    return "선택 범위 안에서 원본 크기로 맞출 이미지 채우기 레이어를 찾지 못했습니다.";
+    return "Could not find an image fill layer to fit to original size in the selection.";
   }
 
   function buildImageCompositeEmptySelectionMessage(layers, skipped) {
@@ -7914,27 +7922,35 @@
       typeof summary.unchangedCount === "number" && Number.isFinite(summary.unchangedCount) ? summary.unchangedCount : 0;
     const skippedCount =
       typeof summary.skippedCount === "number" && Number.isFinite(summary.skippedCount) ? summary.skippedCount : 0;
-    const label = operationLabel || "원본 크기 맞춤";
+    const label = normalizeOriginalSizeFitOperationLabel(operationLabel);
 
     if (!appliedCount && unchangedCount > 0 && skippedCount === 0) {
-      figma.notify("선택한 이미지는 이미 원본 크기입니다.", { timeout: 2200 });
+      figma.notify("The selected image is already at original size.", { timeout: 2200 });
       return;
     }
 
     if (!appliedCount && skippedCount > 0) {
-      figma.notify(label + "를 적용할 수 있는 이미지 레이어를 찾지 못했습니다.", { timeout: 2200 });
+      figma.notify(label + " could not find an eligible image layer to apply.", { timeout: 2200 });
       return;
     }
 
-    let message = label + " 완료 (" + appliedCount + "개 적용";
+    let message = label + " complete (" + appliedCount + " applied";
     if (unchangedCount > 0) {
-      message += ", " + unchangedCount + "개 유지";
+      message += ", " + unchangedCount + " unchanged";
     }
     if (skippedCount > 0) {
-      message += ", " + skippedCount + "개 건너뜀";
+      message += ", " + skippedCount + " skipped";
     }
     message += ")";
     figma.notify(message, { timeout: 2600 });
+  }
+
+  function normalizeOriginalSizeFitOperationLabel(value) {
+    const label = sanitizeOperationLabel(value);
+    if (!label || label === "원본 크기 맞춤") {
+      return "Fit Original Size";
+    }
+    return label;
   }
 
   function notifyBoundsFitResult(result, operationLabel) {

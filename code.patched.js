@@ -30727,7 +30727,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   figma.ui.onmessage = async (message) => {
     if (isUnlockLockedLayersMessage(message)) {
       if (isRunning) {
-        postStatus("running", "잠긴 레이어 해제가 이미 진행 중입니다.");
+        postStatus("running", "Unlock Locked Layers is already running.");
         return;
       }
 
@@ -30746,7 +30746,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
   async function runUnlockLockedLayers() {
     isRunning = true;
-    postStatus("running", "현재 선택 안의 잠긴 레이어를 찾고 있습니다.");
+    postStatus("running", "Finding locked layers in the current selection.");
 
     try {
       const result = unlockLockedLayersInSelection();
@@ -30756,7 +30756,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       });
       notifyResult(result);
     } catch (error) {
-      const message = normalizeErrorMessage(error, "잠긴 레이어 해제에 실패했습니다.");
+      const message = normalizeErrorMessage(error, "Could not unlock locked layers.");
       figma.ui.postMessage({
         type: "unlock-locked-layers-error",
         message,
@@ -30770,7 +30770,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   function unlockLockedLayersInSelection() {
     const selection = Array.from(figma.currentPage.selection || []);
     if (!selection.length) {
-      throw new Error("프레임, 그룹, 레이어를 먼저 선택하세요.");
+      throw new Error("Select a frame, group, or layer first.");
     }
 
     const candidates = collectLockedNodes(selection);
@@ -30806,7 +30806,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
           nodeName: entry.nodeName,
           nodeType: entry.nodeType,
           path: entry.path,
-          reason: normalizeErrorMessage(error, "해당 레이어의 잠금을 해제할 수 없습니다."),
+          reason: normalizeErrorMessage(error, "Could not unlock this layer."),
         });
       }
     }
@@ -30891,12 +30891,12 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     const skippedCount = summary.skippedCount || 0;
 
     if (unlockedCount === 0) {
-      figma.notify("해제할 잠긴 레이어가 없습니다.", { timeout: 1800 });
+      figma.notify("There are no locked layers to unlock.", { timeout: 1800 });
       return;
     }
 
-    const baseMessage = "잠긴 레이어 해제 완료 (" + unlockedCount + "개)";
-    const message = skippedCount > 0 ? baseMessage + ", " + skippedCount + "개 건너뜀" : baseMessage;
+    const baseMessage = "Unlocked locked layers (" + unlockedCount + ")";
+    const message = skippedCount > 0 ? baseMessage + ", skipped " + skippedCount : baseMessage;
     figma.notify(message, { timeout: 2200 });
   }
 
@@ -30914,14 +30914,14 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
   function formatSelectionLabel(selection) {
     if (!selection.length) {
-      return "선택 없음";
+      return "No selection";
     }
 
     if (selection.length === 1) {
       return safeName(selection[0]);
     }
 
-    return safeName(selection[0]) + " 외 " + (selection.length - 1) + "개";
+    return safeName(selection[0]) + " +" + (selection.length - 1);
   }
 
   function safeName(node) {
@@ -32923,7 +32923,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   figma.ui.onmessage = async (message) => {
     if (isShortenRequestMessage(message)) {
       if (isRunning) {
-        postStatus("running", "링크 짧게 만들기를 이미 진행 중입니다.");
+        postStatus("running", "Shorten Link is already running.");
         return;
       }
 
@@ -32933,7 +32933,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
     if (isCopyPrototypeLinkMessage(message)) {
       if (isRunning) {
-        postPrototypeStatus("running", "\uD504\uB85C\uD1A0\uD0C0\uC785 \uB9C1\uD06C\uB97C \uC900\uBE44 \uC911\uC785\uB2C8\uB2E4.");
+        postPrototypeStatus("running", "Preparing the prototype link.");
         return;
       }
 
@@ -32956,7 +32956,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
   async function runShortenFigmaUrl() {
     isRunning = true;
-    postStatus("running", "선택한 프레임 또는 섹션의 프로토타입 주소를 줄이는 중입니다.");
+    postStatus("running", "Shortening the prototype link for the selected frame or section.");
 
     try {
       await ensureCurrentPageLoaded();
@@ -32974,9 +32974,9 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
           shortUrl: shortUrl,
         },
       });
-      figma.notify("단축 주소를 준비했습니다.", { timeout: 1800 });
+      figma.notify("Short link is ready.", { timeout: 1800 });
     } catch (error) {
-      const message = normalizeErrorMessage(error, "링크 짧게 만들기에 실패했습니다.");
+      const message = normalizeErrorMessage(error, "Failed to shorten the link.");
       figma.ui.postMessage({
         type: "shorten-figma-url-error",
         message: message,
@@ -32989,7 +32989,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
   async function runCopyPrototypeLink() {
     isRunning = true;
-    postPrototypeStatus("running", "\uD504\uB85C\uD1A0\uD0C0\uC785 \uB9C1\uD06C\uB97C \uC900\uBE44 \uC911\uC785\uB2C8\uB2E4.");
+    postPrototypeStatus("running", "Preparing the prototype link.");
 
     try {
       await ensureCurrentPageLoaded();
@@ -33006,9 +33006,9 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
           longUrl: prototypeUrl,
         },
       });
-      figma.notify("\uD504\uB85C\uD1A0\uD0C0\uC785 \uB9C1\uD06C\uB97C \uC900\uBE44\uD588\uC2B5\uB2C8\uB2E4.", { timeout: 1800 });
+      figma.notify("Prototype link is ready.", { timeout: 1800 });
     } catch (error) {
-      const message = normalizeErrorMessage(error, "\uD504\uB85C\uD1A0\uD0C0\uC785 \uB9C1\uD06C \uAC00\uC838\uC624\uAE30\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.");
+      const message = normalizeErrorMessage(error, "Failed to get the prototype link.");
       figma.ui.postMessage({
         type: "copy-prototype-link-error",
         message: message,
@@ -33038,20 +33038,20 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   function collectTargetNode() {
     const selection = Array.from(figma.currentPage.selection || []).filter(Boolean);
     if (!selection.length) {
-      throw new Error("프레임 또는 섹션 1개를 먼저 선택해 주세요.");
+      throw new Error("Select one frame or section first.");
     }
 
     if (selection.length !== 1) {
-      throw new Error("프레임 또는 섹션은 1개만 선택할 수 있습니다.");
+      throw new Error("Select only one frame or section.");
     }
 
     const node = selection[0];
     if (!node || node.removed) {
-      throw new Error("선택한 대상을 다시 찾지 못했습니다. 다시 선택해 주세요.");
+      throw new Error("Could not find the selected item again. Select it again and retry.");
     }
 
     if (node.type !== "FRAME" && node.type !== "SECTION") {
-      throw new Error("프레임 또는 섹션 1개를 선택한 경우에만 사용할 수 있습니다.");
+      throw new Error("This only works when one frame or section is selected.");
     }
 
     const shareNode = resolvePrototypeShareNode(node);
@@ -33067,7 +33067,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   async function getShortUrl(longUrl) {
     const normalizedLongUrl = String(longUrl || "").trim();
     if (!normalizedLongUrl) {
-      throw new Error("단축할 주소를 만들지 못했습니다.");
+      throw new Error("Could not build a link to shorten.");
     }
 
     const dubApiKey = (await readDubApiKey()) || sanitizeApiKey(BUNDLED_DUB_API_KEY);
@@ -33089,7 +33089,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         shortUrlCache[proxyCacheKey] = proxyShortUrl;
         return proxyShortUrl;
       } catch (error) {
-        lastError = normalizeErrorMessage(error, "주소 단축 서버로 주소를 줄이지 못했습니다.");
+        lastError = normalizeErrorMessage(error, "Could not shorten the link with the shortener server.");
       }
     }
 
@@ -33099,7 +33099,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         shortUrlCache[cacheKey] = dubShortUrl;
         return dubShortUrl;
       } catch (error) {
-        lastError = normalizeErrorMessage(error, "Dub로 주소를 줄이지 못했습니다.");
+        lastError = normalizeErrorMessage(error, "Could not shorten the link with Dub.");
       }
     }
 
@@ -33108,7 +33108,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       shortUrlCache[cacheKey] = isGdShortUrl;
       return isGdShortUrl;
     } catch (error) {
-      const isGdError = normalizeErrorMessage(error, "is.gd로 주소를 줄이지 못했습니다.");
+      const isGdError = normalizeErrorMessage(error, "Could not shorten the link with is.gd.");
       lastError = lastError ? lastError + " / " + isGdError : isGdError;
     }
 
@@ -33117,7 +33117,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       shortUrlCache[cacheKey] = tinyUrlShortUrl;
       return tinyUrlShortUrl;
     } catch (error) {
-      const tinyUrlError = normalizeErrorMessage(error, "TinyURL로 주소를 줄이지 못했습니다.");
+      const tinyUrlError = normalizeErrorMessage(error, "Could not shorten the link with TinyURL.");
       throw new Error(lastError ? lastError + " / " + tinyUrlError : tinyUrlError);
     }
   }
@@ -33151,7 +33151,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       });
       text = String(await response.text()).trim();
     } catch (error) {
-      throw new Error("Dub에 연결하지 못했습니다.");
+      throw new Error("Could not connect to Dub.");
     }
 
     let payload = null;
@@ -33175,11 +33175,11 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
           : "";
 
     if (!shortLink) {
-      throw new Error("Dub에서 단축 주소를 받지 못했습니다.");
+      throw new Error("Dub did not return a short link.");
     }
 
     if (!/^https?:\/\//i.test(shortLink)) {
-      throw new Error("Dub 응답 형식을 확인하지 못했습니다.");
+      throw new Error("Could not read the Dub response format.");
     }
 
     return shortLink;
@@ -33200,7 +33200,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       });
       text = String(await response.text()).trim();
     } catch (error) {
-      throw new Error("주소 단축 서버에 연결하지 못했습니다.");
+      throw new Error("Could not connect to the shortener server.");
     }
 
     let payload = null;
@@ -33224,11 +33224,11 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
           : "";
 
     if (!shortUrl) {
-      throw new Error("주소 단축 서버에서 단축 주소를 받지 못했습니다.");
+      throw new Error("The shortener server did not return a short link.");
     }
 
     if (!/^https?:\/\//i.test(shortUrl)) {
-      throw new Error("주소 단축 서버 응답 형식을 확인하지 못했습니다.");
+      throw new Error("Could not read the shortener server response format.");
     }
 
     return shortUrl;
@@ -33248,14 +33248,14 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
 
     if (statusCode === 401 || statusCode === 403) {
-      return "Dub API 키 권한을 확인해 주세요.";
+      return "Check the Dub API key permissions.";
     }
 
     if (statusCode === 429) {
-      return "Dub 사용량 또는 요청 제한을 초과했습니다.";
+      return "Dub usage or request limit was exceeded.";
     }
 
-    return "Dub로 주소를 줄이지 못했습니다.";
+    return "Could not shorten the link with Dub.";
   }
 
   function normalizeProxyError(payload, text, statusCode) {
@@ -33272,10 +33272,10 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
 
     if (statusCode === 429) {
-      return "주소 단축 서버 사용량 또는 요청 제한을 초과했습니다.";
+      return "The shortener server usage or request limit was exceeded.";
     }
 
-    return "주소 단축 서버로 주소를 줄이지 못했습니다.";
+    return "Could not shorten the link with the shortener server.";
   }
 
   function sanitizeApiKey(value) {
@@ -33295,7 +33295,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         method: "GET",
       });
     } catch (error) {
-      throw new Error("is.gd에 연결하지 못했습니다.");
+      throw new Error("Could not connect to is.gd.");
     }
 
     const text = String(await response.text()).trim();
@@ -33304,15 +33304,15 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
 
     if (!text) {
-      throw new Error("is.gd에서 단축 주소를 받지 못했습니다.");
+      throw new Error("is.gd did not return a short link.");
     }
 
     if (/^Error:\s*/i.test(text)) {
-      throw new Error(text.replace(/^Error:\s*/i, "").trim() || "is.gd가 주소 단축 요청을 처리하지 못했습니다.");
+      throw new Error(text.replace(/^Error:\s*/i, "").trim() || "is.gd could not process the short link request.");
     }
 
     if (!/^https?:\/\//i.test(text)) {
-      throw new Error("is.gd 응답 형식을 확인하지 못했습니다.");
+      throw new Error("Could not read the is.gd response format.");
     }
 
     return text;
@@ -33325,7 +33325,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         method: "GET",
       });
     } catch (error) {
-      throw new Error("TinyURL에 연결하지 못했습니다.");
+      throw new Error("Could not connect to TinyURL.");
     }
 
     const text = String(await response.text()).trim();
@@ -33334,15 +33334,15 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
 
     if (!text) {
-      throw new Error("TinyURL에서 단축 주소를 받지 못했습니다.");
+      throw new Error("TinyURL did not return a short link.");
     }
 
     if (/^Error:\s*/i.test(text)) {
-      throw new Error(text.replace(/^Error:\s*/i, "").trim() || "TinyURL이 주소 단축 요청을 처리하지 못했습니다.");
+      throw new Error(text.replace(/^Error:\s*/i, "").trim() || "TinyURL could not process the short link request.");
     }
 
     if (!/^https?:\/\//i.test(text)) {
-      throw new Error("TinyURL 응답 형식을 확인하지 못했습니다.");
+      throw new Error("Could not read the TinyURL response format.");
     }
 
     return text;
@@ -33355,14 +33355,14 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
 
     if (statusCode === 502) {
-      return providerLabel + " 요청 한도를 초과했습니다. 잠시 후 다시 시도해 주세요.";
+      return providerLabel + " request limit was exceeded. Try again later.";
     }
 
     if (statusCode === 503) {
-      return providerLabel + " 서비스를 지금 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.";
+      return providerLabel + " service is unavailable right now. Try again later.";
     }
 
-    return providerLabel + "로 주소를 줄이지 못했습니다.";
+    return providerLabel + " could not shorten the link.";
   }
 
   async function ensureCurrentPageLoaded() {
@@ -33397,7 +33397,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       return fileKey;
     }
 
-    throw new Error("이 파일에서는 공유 주소를 만들 수 없습니다. 파일을 저장한 뒤 다시 시도해 주세요.");
+    throw new Error("This file cannot create a share link yet. Save the file, then try again.");
   }
 
   function buildFileNameSegment() {
@@ -33411,7 +33411,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   function normalizeNodeIdForUrl(value) {
     const raw = String(value || "").trim();
     if (!raw) {
-      throw new Error("선택한 대상의 node id를 읽지 못했습니다.");
+      throw new Error("Could not read the selected item's node id.");
     }
 
     return encodeURIComponent(raw).replace(/%3A/gi, "-");
@@ -33420,7 +33420,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   function normalizePageIdForUrl(value) {
     const raw = String(value || "").trim();
     if (!raw) {
-      throw new Error("선택한 페이지 id를 읽지 못했습니다.");
+      throw new Error("Could not read the selected page id.");
     }
 
     return encodeURIComponent(raw);
@@ -33432,12 +33432,12 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
 
     if (!node || node.type !== "SECTION") {
-      throw new Error("프로토타입 공유용 프레임을 찾지 못했습니다.");
+      throw new Error("Could not find a frame to share as a prototype.");
     }
 
     const candidates = collectSectionPrototypeCandidates(node);
     if (!candidates.length) {
-      throw new Error("선택한 섹션 안에서 프로토타입으로 공유할 프레임을 찾지 못했습니다.");
+      throw new Error("Could not find a prototype-ready frame inside the selected section.");
     }
 
     const candidateById = new Map();
@@ -33522,7 +33522,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       current = current.parent || null;
     }
 
-    throw new Error("선택한 대상의 페이지를 찾지 못했습니다.");
+    throw new Error("Could not find the selected item's page.");
   }
 
   function safeName(node) {
@@ -33634,7 +33634,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
   async function prepareColorExtractSource(message) {
     if (isPreparing || isApplying) {
-      postPrepareError("색상 추출이 이미 진행 중입니다.", sanitizeClientRequestId(message && message.clientRequestId));
+      postPrepareError("Extract Colors is already running.", sanitizeClientRequestId(message && message.clientRequestId));
       return;
     }
 
@@ -33658,7 +33658,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
       const bytes = await target.node.exportAsync(exportOptions);
       if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
-        throw new Error("선택한 화면을 이미지로 준비하지 못했습니다.");
+        throw new Error("Could not prepare the selected screen as an image.");
       }
 
       const sessionId = buildSessionId();
@@ -33689,7 +33689,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     } catch (error) {
       pendingSession = null;
       postPrepareError(
-        normalizeErrorMessage(error, "색상 추출용 선택 이미지를 준비하지 못했습니다."),
+        normalizeErrorMessage(error, "Could not prepare the selected image for Extract Colors."),
         sanitizeClientRequestId(message && message.clientRequestId)
       );
     } finally {
@@ -33699,7 +33699,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
   async function applyColorExtractPalette(message) {
     if (isApplying) {
-      postApplyError("색상 추출 팔레트를 이미 만들고 있습니다.", sanitizeClientRequestId(message && message.clientRequestId));
+      postApplyError("The Extract Colors palette is already being created.", sanitizeClientRequestId(message && message.clientRequestId));
       return;
     }
 
@@ -33707,7 +33707,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
     try {
       if (!pendingSession || !message || message.sessionId !== pendingSession.id) {
-        throw new Error("색상 추출 세션이 만료되었습니다. 다시 실행해 주세요.");
+        throw new Error("The Extract Colors session expired. Please run it again.");
       }
 
       const palette = normalizePalette(message && message.palette);
@@ -33744,7 +33744,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       notifyApplyResult(result, pendingSession.operationLabel);
       pendingSession = null;
     } catch (error) {
-      const messageText = normalizeErrorMessage(error, "색상 팔레트를 만들지 못했습니다.");
+      const messageText = normalizeErrorMessage(error, "Could not create the color palette.");
       figma.ui.postMessage({
         type: "ai-color-extract-apply-error",
         clientRequestId:
@@ -33762,16 +33762,16 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   function collectColorExtractTargetFromSelection() {
     const selection = Array.from(figma.currentPage.selection || []).filter(Boolean);
     if (!selection.length) {
-      throw new Error("색상을 추출할 프레임, 그룹, 이미지, 텍스트 중 하나를 먼저 선택해 주세요.");
+      throw new Error("Select one frame, group, image, or text layer before extracting colors.");
     }
 
     if (selection.length !== 1) {
-      throw new Error("색상 추출은 현재 선택 1개 기준으로 팔레트를 만듭니다. 대상을 하나만 선택해 주세요.");
+      throw new Error("Extract Colors creates a palette from one selected item. Select only one target.");
     }
 
     const node = selection[0];
     if (node.removed || typeof node.exportAsync !== "function") {
-      throw new Error("선택한 레이어는 색상 추출용 미리보기를 만들 수 없습니다.");
+      throw new Error("The selected layer cannot create a preview for Extract Colors.");
     }
 
     return {
@@ -34128,8 +34128,8 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   }
 
   function buildPaletteName(selectionLabel) {
-    const base = typeof selectionLabel === "string" && selectionLabel.trim() ? selectionLabel.trim() : "선택";
-    return base + " 색상 추출 팔레트";
+    const base = typeof selectionLabel === "string" && selectionLabel.trim() ? selectionLabel.trim() : "Selection";
+    return base + " Extract Colors palette";
   }
 
   function solidPaintFromHex(hex, opacity) {
@@ -34879,12 +34879,12 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       typeof summary.swatchCount === "number" && Number.isFinite(summary.swatchCount) ? summary.swatchCount : 0;
 
     if (!swatchCount) {
-      figma.notify("색상 추출 결과가 비어 있습니다.", { timeout: 2200 });
+      figma.notify("Extract Colors returned an empty result.", { timeout: 2200 });
       return;
     }
 
     const note = buildAnalysisNote(summary);
-    figma.notify((operationLabel || "색상 추출") + " 완료 (" + swatchCount + "칸 팔레트 생성" + note + ")", { timeout: 2600 });
+    figma.notify((operationLabel || "Extract Colors") + " complete (" + swatchCount + " swatches created" + note + ")", { timeout: 2600 });
   }
 
   function buildAnalysisNote(summary) {
@@ -34904,7 +34904,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       return "";
     }
 
-    return ", 감지: " + parts.slice(0, 3).join(" / ");
+    return ", detected: " + parts.slice(0, 3).join(" / ");
   }
 
   function postPrepareError(message, clientRequestId) {
@@ -34928,7 +34928,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   function notifyUiReportedError(message) {
     const text = normalizeErrorMessage(
       message && message.message ? message.message : "",
-      "색상 추출 중 브라우저 분석 단계에서 문제가 발생했습니다."
+      "A browser analysis step failed during Extract Colors."
     );
     figma.notify(text, { error: true, timeout: 2400 });
   }
@@ -34940,7 +34940,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
   function sanitizeOperationLabel(value) {
     const label = typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
-    return label || "색상 추출";
+    return label || "Extract Colors";
   }
 
   function sanitizeFileName(value) {
@@ -35034,7 +35034,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   const BOUNDS_FIT_APPLY_IN_PROGRESS_MESSAGE = "Bounds fit is already applying a result.";
   const BOUNDS_FIT_SESSION_EXPIRED_MESSAGE = "The bounds-fit session expired. Please run it again.";
   const BOUNDS_FIT_APPLY_ERROR_MESSAGE = "Failed to apply the bounds-fit result.";
-  const ORIGINAL_SIZE_FIT_APPLY_ERROR_MESSAGE = "원본 크기 적용에 실패했습니다.";
+  const ORIGINAL_SIZE_FIT_APPLY_ERROR_MESSAGE = "Could not apply Fit Original Size.";
   const UI_REPORTED_IMAGE_ERROR_FALLBACK = "The image task failed before a usable result was returned.";
   const IMAGE_TASK_NO_SELECTION_MESSAGE = "Select at least one node before running this image task.";
   const IMAGE_FILL_NOT_FOUND_MESSAGE = "Could not find the selected IMAGE fill.";
@@ -36239,7 +36239,9 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
   async function runImageOriginalSizeFit(message) {
     const clientRequestId = sanitizeClientRequestId(message && message.clientRequestId);
-    const operationLabel = sanitizeOperationLabel(message && message.operationLabel) || "원본 크기 맞춤";
+    const operationLabel = normalizeOriginalSizeFitOperationLabel(
+      sanitizeOperationLabel(message && message.operationLabel)
+    );
     if (
       isPreparing ||
       isApplying ||
@@ -36269,7 +36271,10 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       });
       notifyOriginalSizeFitResult(result, operationLabel);
     } catch (error) {
-      const messageText = normalizeErrorMessage(error, ORIGINAL_SIZE_FIT_APPLY_ERROR_MESSAGE);
+      const messageText = normalizeErrorMessage(error, ORIGINAL_SIZE_FIT_APPLY_ERROR_MESSAGE, {
+        operationLabel: "Fit Original Size",
+        operationKind: "original-size-fit",
+      });
       postOriginalSizeFitError(messageText, clientRequestId);
     } finally {
       isBoundsFitApplying = false;
@@ -36418,7 +36423,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       message,
       ORIGINAL_SIZE_FIT_APPLY_ERROR_MESSAGE,
       {
-        operationLabel: "원본 크기 맞춤",
+        operationLabel: "Fit Original Size",
         operationKind: "original-size-fit",
       }
     );
@@ -37598,7 +37603,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       const source = await exportImageMergeSelection();
       const createdImage = figma.createImage(source.bytes);
       if (!createdImage || !createdImage.hash) {
-        throw new Error("이미지 합치기 결과를 Figma 이미지로 만들지 못했습니다.");
+        throw new Error("Could not create a Figma image from the merged image result.");
       }
 
       const result = await applyImageCompositeToSelection(
@@ -37637,11 +37642,11 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         result: result,
       });
 
-      figma.notify("이미지 합치기 레이어를 만들었습니다.", {
+      figma.notify("Created a merged image layer.", {
         timeout: 2200,
       });
     } catch (error) {
-      const messageText = normalizeErrorMessage(error, "이미지 합치기에 실패했습니다.");
+      const messageText = normalizeErrorMessage(error, "Failed to merge images.");
       figma.ui.postMessage({
         type: "image-merge-error",
         clientRequestId: clientRequestId,
@@ -37656,17 +37661,17 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     for (let index = 0; index < skipped.length; index += 1) {
       const reason = skipped[index] && typeof skipped[index].reason === "string" ? skipped[index].reason.trim() : "";
       if (reason) {
-        return "이미지 합치기 레이어를 만들지 못했습니다: " + reason;
+        return "Could not create the merged image layer: " + reason;
       }
     }
 
     const summary = result && result.summary ? result.summary : {};
     const byteLength = Number(summary.resultByteLength) || 0;
     if (byteLength > 0) {
-      return "이미지 합치기 PNG는 생성됐지만 새 레이어로 배치하지 못했습니다.";
+      return "Merged image PNG was created, but it could not be placed as a new layer.";
     }
 
-    return "이미지 합치기 레이어를 만들지 못했습니다.";
+    return "Could not create the merged image layer.";
   }
 
   function withImageMergeTimeout(promise, timeoutMs, label) {
@@ -37677,14 +37682,14 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
     let settled = false;
     let timerId = null;
-    const taskLabel = typeof label === "string" && label.trim() ? label.trim() : "이미지 합치기";
+    const taskLabel = typeof label === "string" && label.trim() ? label.trim() : "Merge Images";
     return new Promise(function (resolve, reject) {
       timerId = setTimeout(function () {
         if (settled) {
           return;
         }
         settled = true;
-        reject(new Error(taskLabel + " 시간이 초과되었습니다. 선택 범위를 줄이거나 복잡한 마스크 그룹은 프레임 단위로 다시 시도해주세요."));
+        reject(new Error(taskLabel + " timed out. Reduce the selection or retry complex mask groups one frame at a time."));
       }, ms);
 
       Promise.resolve(promise).then(
@@ -37713,7 +37718,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       return isImageMergeExportableNode(node);
     });
     if (!selection.length) {
-      throw new Error("이미지로 병합할 프레임, 그룹, 레이어를 먼저 선택해주세요.");
+      throw new Error("Select a frame, group, or layer to merge into an image first.");
     }
 
     const exportSelection = resolveImageMergeExportSelection(selection);
@@ -37725,7 +37730,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       .filter(Boolean);
     const unionRect = unionAbsoluteRects(rects);
     if (!unionRect || !(unionRect.width > 0) || !(unionRect.height > 0)) {
-      throw new Error("선택한 항목의 병합 영역을 계산하지 못했습니다.");
+      throw new Error("Could not calculate the merge bounds for the selected items.");
     }
 
     const exportScale = resolveImageMergeExportScale(unionRect);
@@ -37736,7 +37741,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       (await exportImageMergeFrameSelection(exportSelection, unionRect, exportSettings));
 
     if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
-      throw new Error("이미지 합치기 PNG가 비어 있습니다.");
+      throw new Error("Merged image PNG is empty.");
     }
 
     return {
@@ -37841,7 +37846,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       const bytes = await withImageMergeTimeout(
         selection[0].exportAsync(exportSettings),
         IMAGE_MERGE_FAST_EXPORT_TIMEOUT_MS,
-        "이미지 합치기 빠른 export"
+        "Merge Images fast export"
       );
       return bytes && typeof bytes.length === "number" && bytes.length > 0 ? bytes : null;
     } catch (error) {
@@ -37999,13 +38004,13 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       }
 
       if (!clones.length) {
-        throw new Error("병합 가능한 선택 레이어를 찾지 못했습니다.");
+        throw new Error("Could not find any selected layers that can be merged.");
       }
 
       return await withImageMergeTimeout(
         preview.exportAsync(exportSettings),
         IMAGE_MERGE_EXPORT_TIMEOUT_MS,
-        "이미지 합치기 preview export"
+        "Merge Images preview export"
       );
     } finally {
       for (let index = 0; index < clones.length; index += 1) {
@@ -40496,7 +40501,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   async function applyOriginalSizeFitToSelection(message) {
     const selection = Array.from(figma.currentPage.selection || []).filter(Boolean);
     if (!selection.length) {
-      throw new Error("원본 크기로 맞출 이미지 레이어를 먼저 선택하세요.");
+      throw new Error("Select an image layer to fit to original size first.");
     }
 
     const state = {
@@ -40544,21 +40549,21 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   async function collectOriginalSizeFitTargetsFromNode(node, state, isRootSelection) {
     if (!node || node.removed) {
       if (isRootSelection) {
-        appendOriginalSizeFitSkipped(state, node, "선택한 레이어를 읽지 못했습니다.");
+        appendOriginalSizeFitSkipped(state, node, "Could not read the selected layer.");
       }
       return false;
     }
 
     if (!isBoundsFitNodeVisible(node)) {
       if (isRootSelection) {
-        appendOriginalSizeFitSkipped(state, node, "숨겨진 레이어는 원본 크기로 맞출 수 없습니다.");
+        appendOriginalSizeFitSkipped(state, node, "Hidden layers cannot be fit to original size.");
       }
       return false;
     }
 
     if ("locked" in node && node.locked) {
       if (isRootSelection) {
-        appendOriginalSizeFitSkipped(state, node, "잠긴 레이어는 원본 크기로 맞출 수 없습니다.");
+        appendOriginalSizeFitSkipped(state, node, "Locked layers cannot be fit to original size.");
       }
       return false;
     }
@@ -40575,7 +40580,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         appendOriginalSizeFitSkipped(
           state,
           node,
-          "선택 범위 안에서 원본 크기로 맞출 이미지 채우기 레이어를 찾지 못했습니다."
+          "Could not find an image fill layer to fit to original size in the selection."
         );
       }
       return hasEligibleDescendant;
@@ -40595,34 +40600,34 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
   async function analyzeOriginalSizeFitNode(node, isRootSelection) {
     if (!node || node.removed) {
-      return buildOriginalSizeFitSkipped(node, "선택한 레이어를 읽지 못했습니다.");
+      return buildOriginalSizeFitSkipped(node, "Could not read the selected layer.");
     }
 
     if (!canResizeBoundsFitNode(node)) {
-      return buildOriginalSizeFitSkipped(node, "이 레이어는 크기를 변경할 수 없습니다.");
+      return buildOriginalSizeFitSkipped(node, "This layer cannot be resized.");
     }
 
     if ("rotation" in node && typeof node.rotation === "number" && Math.abs(node.rotation) > 0.01) {
-      return buildOriginalSizeFitSkipped(node, "회전된 이미지 레이어는 아직 지원하지 않습니다.");
+      return buildOriginalSizeFitSkipped(node, "Rotated image layers are not supported yet.");
     }
 
     const fills = getNodeFills(node);
     const fillIndex = getPrimaryVisibleImageFillIndex(fills);
     if (fillIndex < 0) {
-      return isRootSelection ? buildOriginalSizeFitSkipped(node, "이미지 채우기를 찾지 못했습니다.") : null;
+      return isRootSelection ? buildOriginalSizeFitSkipped(node, "Could not find an image fill.") : null;
     }
 
     const fill = fills[fillIndex];
     const image = fill && fill.imageHash ? figma.getImageByHash(fill.imageHash) : null;
     if (!image || typeof image.getSizeAsync !== "function") {
-      return buildOriginalSizeFitSkipped(node, "원본 이미지 객체를 찾지 못했습니다.");
+      return buildOriginalSizeFitSkipped(node, "Could not find the original image object.");
     }
 
     const size = await image.getSizeAsync();
     const sourceWidth = size && typeof size.width === "number" ? size.width : 0;
     const sourceHeight = size && typeof size.height === "number" ? size.height : 0;
     if (!(sourceWidth > 0) || !(sourceHeight > 0)) {
-      return buildOriginalSizeFitSkipped(node, "원본 이미지 크기를 읽지 못했습니다.");
+      return buildOriginalSizeFitSkipped(node, "Could not read the original image size.");
     }
 
     return {
@@ -41821,7 +41826,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       skipped.push({
         nodeId: target.nodeId,
         nodeName: target.nodeName,
-        reason: "레이어를 다시 찾지 못했습니다.",
+        reason: "Could not find the layer again.",
       });
       return "skipped";
     }
@@ -41830,7 +41835,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       skipped.push({
         nodeId: target.nodeId,
         nodeName: safeName(node),
-        reason: "이 레이어는 크기를 변경할 수 없습니다.",
+        reason: "This layer cannot be resized.",
       });
       return "skipped";
     }
@@ -41850,7 +41855,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       skipped.push({
         nodeId: target.nodeId,
         nodeName: safeName(node),
-        reason: "원본 이미지 채우기를 다시 찾지 못했습니다.",
+        reason: "Could not find the original image fill again.",
       });
       return "skipped";
     }
@@ -41861,7 +41866,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       skipped.push({
         nodeId: target.nodeId,
         nodeName: safeName(node),
-        reason: "원본 이미지 크기를 읽지 못했습니다.",
+        reason: "Could not read the original image size.",
       });
       return "skipped";
     }
@@ -41873,7 +41878,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       skipped.push({
         nodeId: target.nodeId,
         nodeName: safeName(node),
-        reason: "이미지 채우기 설정을 초기화하지 못했습니다.",
+        reason: "Could not reset the image fill settings.",
       });
       return "skipped";
     }
@@ -41896,7 +41901,10 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       skipped.push({
         nodeId: target.nodeId,
         nodeName: safeName(node),
-        reason: normalizeErrorMessage(error, "원본 크기 적용에 실패했습니다."),
+        reason: normalizeErrorMessage(error, ORIGINAL_SIZE_FIT_APPLY_ERROR_MESSAGE, {
+          operationLabel: "Fit Original Size",
+          operationKind: "original-size-fit",
+        }),
       });
       return "skipped";
     }
@@ -42655,7 +42663,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         return first.reason.trim();
       }
     }
-    return "선택 범위 안에서 원본 크기로 맞출 이미지 채우기 레이어를 찾지 못했습니다.";
+    return "Could not find an image fill layer to fit to original size in the selection.";
   }
 
   function buildImageCompositeEmptySelectionMessage(layers, skipped) {
@@ -42910,27 +42918,35 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       typeof summary.unchangedCount === "number" && Number.isFinite(summary.unchangedCount) ? summary.unchangedCount : 0;
     const skippedCount =
       typeof summary.skippedCount === "number" && Number.isFinite(summary.skippedCount) ? summary.skippedCount : 0;
-    const label = operationLabel || "원본 크기 맞춤";
+    const label = normalizeOriginalSizeFitOperationLabel(operationLabel);
 
     if (!appliedCount && unchangedCount > 0 && skippedCount === 0) {
-      figma.notify("선택한 이미지는 이미 원본 크기입니다.", { timeout: 2200 });
+      figma.notify("The selected image is already at original size.", { timeout: 2200 });
       return;
     }
 
     if (!appliedCount && skippedCount > 0) {
-      figma.notify(label + "를 적용할 수 있는 이미지 레이어를 찾지 못했습니다.", { timeout: 2200 });
+      figma.notify(label + " could not find an eligible image layer to apply.", { timeout: 2200 });
       return;
     }
 
-    let message = label + " 완료 (" + appliedCount + "개 적용";
+    let message = label + " complete (" + appliedCount + " applied";
     if (unchangedCount > 0) {
-      message += ", " + unchangedCount + "개 유지";
+      message += ", " + unchangedCount + " unchanged";
     }
     if (skippedCount > 0) {
-      message += ", " + skippedCount + "개 건너뜀";
+      message += ", " + skippedCount + " skipped";
     }
     message += ")";
     figma.notify(message, { timeout: 2600 });
+  }
+
+  function normalizeOriginalSizeFitOperationLabel(value) {
+    const label = sanitizeOperationLabel(value);
+    if (!label || label === "원본 크기 맞춤") {
+      return "Fit Original Size";
+    }
+    return label;
   }
 
   function notifyBoundsFitResult(result, operationLabel) {
@@ -43334,7 +43350,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
           status: "running",
           currentCount: 0,
           totalCount: 0,
-          message: "원본 이미지 찾기가 이미 진행 중입니다.",
+          message: "Original image search is already running.",
         });
         return;
       }
@@ -43370,7 +43386,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
           type: "original-image-download-result",
           result: emptyResult,
         });
-        figma.notify("선택 범위에서 다운로드할 원본 이미지가 없습니다.", { timeout: 2000 });
+        figma.notify("No original images are available to download in the selection.", { timeout: 2000 });
         return;
       }
 
@@ -43389,13 +43405,13 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
           status: "prepare",
           currentCount: index + 1,
           totalCount,
-          message: `"${entry.displayName}" 원본 이미지를 준비하는 중입니다.`,
+          message: `Preparing original image for "${entry.displayName}".`,
         });
 
         try {
           const image = figma.getImageByHash(entry.imageHash);
           if (!image) {
-            throw new Error("원본 이미지 객체를 찾지 못했습니다.");
+            throw new Error("Could not find the original image object.");
           }
 
           const bytes = await image.getBytesAsync();
@@ -43424,7 +43440,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
             nodeName: entry.nodeName,
             imageHash: entry.imageHash,
             path: entry.path,
-            reason: normalizeErrorMessage(error, "원본 이미지 바이트를 읽지 못했습니다."),
+            reason: normalizeErrorMessage(error, "Could not read the original image bytes."),
           });
         }
       }
@@ -43441,7 +43457,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       });
       notifyResult(result);
     } catch (error) {
-      const message = normalizeErrorMessage(error, "원본 이미지 저장 준비에 실패했습니다.");
+      const message = normalizeErrorMessage(error, "Could not prepare original image saving.");
       figma.ui.postMessage({
         type: "original-image-download-error",
         message,
@@ -43455,7 +43471,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   function collectOriginalImagesFromSelection() {
     const selection = Array.from(figma.currentPage.selection || []);
     if (!selection.length) {
-      throw new Error("프레임, 그룹, 이미지 레이어를 먼저 선택해주세요.");
+      throw new Error("Select a frame, group, or image layer first.");
     }
 
     const uniqueEntries = [];
@@ -43508,7 +43524,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
               path: current.path,
               paintKind: paintEntry.paintKind,
               paintIndex: paintEntry.paintIndex,
-              reason: `${paintEntry.paintKind} IMAGE paint에 imageHash가 없어 건너뜁니다.`,
+              reason: `${paintEntry.paintKind} IMAGE paint has no imageHash, so it was skipped.`,
             });
             continue;
           }
@@ -43615,16 +43631,16 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     const duplicateCount = summary.duplicateImagePaintCount || summary.duplicateFillCount || 0;
 
     if (!downloadedCount) {
-      figma.notify("다운로드할 수 있는 원본 이미지가 없습니다.", { timeout: 2000 });
+      figma.notify("No original images are available to download.", { timeout: 2000 });
       return;
     }
 
-    let message = `원본 이미지 ${downloadedCount}개를 찾았습니다. 목록에서 다운로드할 수 있습니다.`;
+    let message = `Found ${downloadedCount} original image${downloadedCount === 1 ? "" : "s"}. You can download from the list.`;
     if (duplicateCount > 0) {
-      message += ` 중복 사용 ${duplicateCount}건은 한 번만 준비했습니다.`;
+      message += ` ${duplicateCount} duplicate use${duplicateCount === 1 ? "" : "s"} were prepared only once.`;
     }
     if (skippedCount > 0) {
-      message += ` ${skippedCount}건은 건너뜁니다.`;
+      message += ` ${skippedCount} item${skippedCount === 1 ? "" : "s"} skipped.`;
     }
     figma.notify(message, { timeout: 2600 });
   }
@@ -43761,14 +43777,14 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
   function formatSelectionLabel(selection) {
     if (!selection.length) {
-      return "선택 없음";
+      return "No selection";
     }
 
     if (selection.length === 1) {
       return safeName(selection[0]);
     }
 
-    return `${safeName(selection[0])} 외 ${selection.length - 1}개`;
+    return `${safeName(selection[0])} + ${selection.length - 1} more`;
   }
 
   function collectUniqueStrings(values) {
