@@ -4038,6 +4038,14 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return Math.max(min, Math.min(max, Math.round(numeric)));
   }
 
+  function normalizeModelId(value, fallback) {
+    const next = String(value || "")
+      .replace(/[\u0000-\u001F\u007F-\u009F]/g, "")
+      .replace(/[\u200B-\u200D\uFEFF]/g, "")
+      .trim();
+    return next || fallback;
+  }
+
   function normalizeProofingLocale(value) {
     const compact = String(value || "")
       .replace(/[^A-Za-z-]/g, "")
@@ -4090,14 +4098,6 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
   if (globalScope.__PIGMA_AI_RESPONSIVE_MEMORY_PATCH__) {
     return;
-  }
-
-  function normalizeModelId(value, fallback) {
-    const next = String(value || "")
-      .replace(/[\u0000-\u001F\u007F-\u009F]/g, "")
-      .replace(/[\u200B-\u200D\uFEFF]/g, "")
-      .trim();
-    return next || fallback;
   }
 
   const originalOnMessage = figma.ui.onmessage;
@@ -21816,6 +21816,16 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   const AI_TEXT_HIGHLIGHT_DEFAULT_RADIUS = 0;
   const AI_TEXT_HIGHLIGHT_DEFAULT_DECORATION_SCALE = 3;
   const AI_TEXT_HIGHLIGHT_DEFAULT_BOX_PADDING_PX = 0;
+  const AI_TEXT_HIGHLIGHT_BASE_VERTICAL_PADDING_MIN_PX = 2;
+  const AI_TEXT_HIGHLIGHT_BASE_VERTICAL_PADDING_MAX_PX = 6;
+  const AI_TEXT_HIGHLIGHT_BASE_VERTICAL_PADDING_RATIO = 0.04;
+  const AI_TEXT_HIGHLIGHT_BASE_HORIZONTAL_PADDING_MIN_PX = 3;
+  const AI_TEXT_HIGHLIGHT_BASE_HORIZONTAL_PADDING_MAX_PX = 10;
+  const AI_TEXT_HIGHLIGHT_BASE_HORIZONTAL_PADDING_RATIO = 0.06;
+  const AI_TEXT_HIGHLIGHT_MICRO_FONT_FULL_TIGHTEN_PX = 12;
+  const AI_TEXT_HIGHLIGHT_MICRO_FONT_NO_TIGHTEN_PX = 16;
+  const AI_TEXT_HIGHLIGHT_SMALL_FONT_FULL_TIGHTEN_PX = 32;
+  const AI_TEXT_HIGHLIGHT_SMALL_FONT_NO_TIGHTEN_PX = 96;
   const AI_TEXT_HIGHLIGHT_DEFAULT_STRIKE_RADIUS = 0;
   const AI_TEXT_HIGHLIGHT_MEASURE_COLOR = "#FF00FF";
   const AI_TEXT_HIGHLIGHT_GROUP_NAME = "#high-light-text";
@@ -30042,6 +30052,42 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     });
   }
 
+  function getTextHighlightSmallFontTightenBlend(fontSize) {
+    const size = Math.max(12, Number(fontSize) || 16);
+    if (size <= AI_TEXT_HIGHLIGHT_SMALL_FONT_FULL_TIGHTEN_PX) {
+      return 1;
+    }
+    if (size >= AI_TEXT_HIGHLIGHT_SMALL_FONT_NO_TIGHTEN_PX) {
+      return 0;
+    }
+    return Math.max(
+      0,
+      Math.min(
+        1,
+        (AI_TEXT_HIGHLIGHT_SMALL_FONT_NO_TIGHTEN_PX - size) /
+          (AI_TEXT_HIGHLIGHT_SMALL_FONT_NO_TIGHTEN_PX - AI_TEXT_HIGHLIGHT_SMALL_FONT_FULL_TIGHTEN_PX)
+      )
+    );
+  }
+
+  function getTextHighlightMicroFontTightenBlend(fontSize) {
+    const size = Math.max(1, Number(fontSize) || 16);
+    if (size <= AI_TEXT_HIGHLIGHT_MICRO_FONT_FULL_TIGHTEN_PX) {
+      return 1;
+    }
+    if (size >= AI_TEXT_HIGHLIGHT_MICRO_FONT_NO_TIGHTEN_PX) {
+      return 0;
+    }
+    return Math.max(
+      0,
+      Math.min(
+        1,
+        (AI_TEXT_HIGHLIGHT_MICRO_FONT_NO_TIGHTEN_PX - size) /
+          (AI_TEXT_HIGHLIGHT_MICRO_FONT_NO_TIGHTEN_PX - AI_TEXT_HIGHLIGHT_MICRO_FONT_FULL_TIGHTEN_PX)
+      )
+    );
+  }
+
   function doTextHighlightBoundsIntersect(left, right) {
     const leftBounds = normalizeTextHighlightWorldBounds(left);
     const rightBounds = normalizeTextHighlightWorldBounds(right);
@@ -30579,13 +30625,51 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   function buildTextHighlightBoxPixelPadding(fontSize, boxPaddingPx) {
     const size = Math.max(12, Number(fontSize) || 16);
     const padding = sanitizeTextHighlightBoxPaddingPx(boxPaddingPx, AI_TEXT_HIGHLIGHT_DEFAULT_BOX_PADDING_PX);
+    const baseHorizontalPadding = buildTextHighlightBoxBaseHorizontalPadding(size);
+    const baseVerticalPadding = buildTextHighlightBoxBaseVerticalPadding(size);
     return {
-      left: padding,
-      right: padding,
-      top: padding,
-      bottom: padding,
+      left: padding + baseHorizontalPadding,
+      right: padding + baseHorizontalPadding,
+      top: padding + baseVerticalPadding,
+      bottom: padding + baseVerticalPadding,
       radius: roundTextHighlightMetric(Math.max(0, Math.min(14, size * 0.16))),
     };
+  }
+
+  function buildTextHighlightBoxBaseHorizontalPadding(fontSize) {
+    const rawSize = Math.max(1, Number(fontSize) || 16);
+    const size = Math.max(12, rawSize);
+    const tightBlend = getTextHighlightSmallFontTightenBlend(size);
+    const microBlend = getTextHighlightMicroFontTightenBlend(rawSize);
+    const loosePadding = Math.max(
+      AI_TEXT_HIGHLIGHT_BASE_HORIZONTAL_PADDING_MIN_PX,
+      Math.min(
+        AI_TEXT_HIGHLIGHT_BASE_HORIZONTAL_PADDING_MAX_PX,
+        size * AI_TEXT_HIGHLIGHT_BASE_HORIZONTAL_PADDING_RATIO
+      )
+    );
+    const tightPadding = Math.max(1.5, Math.min(5, size * 0.04));
+    const smallPadding = loosePadding * (1 - tightBlend) + tightPadding * tightBlend;
+    const microPadding = Math.max(0.75, Math.min(1.25, rawSize * 0.07));
+    return roundTextHighlightMetric(smallPadding * (1 - microBlend) + microPadding * microBlend);
+  }
+
+  function buildTextHighlightBoxBaseVerticalPadding(fontSize) {
+    const rawSize = Math.max(1, Number(fontSize) || 16);
+    const size = Math.max(12, rawSize);
+    const tightBlend = getTextHighlightSmallFontTightenBlend(size);
+    const microBlend = getTextHighlightMicroFontTightenBlend(rawSize);
+    const loosePadding = Math.max(
+      AI_TEXT_HIGHLIGHT_BASE_VERTICAL_PADDING_MIN_PX,
+      Math.min(
+        AI_TEXT_HIGHLIGHT_BASE_VERTICAL_PADDING_MAX_PX,
+        size * AI_TEXT_HIGHLIGHT_BASE_VERTICAL_PADDING_RATIO
+      )
+    );
+    const tightPadding = Math.max(1, Math.min(3, size * 0.025));
+    const smallPadding = loosePadding * (1 - tightBlend) + tightPadding * tightBlend;
+    const microPadding = Math.max(0.25, Math.min(0.75, rawSize * 0.03));
+    return roundTextHighlightMetric(smallPadding * (1 - microBlend) + microPadding * microBlend);
   }
 
   function getNodeRenderBounds(node) {
@@ -33747,6 +33831,1431 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return skippedCount > 0
       ? "스큐 정리 완료 (" + cleanedCount + "개 정리, " + skippedCount + "개 제외)"
       : "스큐 정리 완료 (" + cleanedCount + "개 정리)";
+  }
+})();
+
+;(() => {
+  const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
+  if (globalScope.__PIGMA_CORNER_RADIUS_ADJUST_PATCH__) {
+    return;
+  }
+
+  const originalOnMessage = figma.ui.onmessage;
+  const LAST_VALUE_STORAGE_KEY = "pigma:corner-radius-adjust:last-value:v1";
+  const FORMULA_PERCENT_RADIUS = 25;
+  const MAX_PERCENT_RADIUS = 50;
+  const AUTO_RADIUS_SOFT_CAP_START_SIDE = 96;
+  const AUTO_RADIUS_SOFT_CAP_GROWTH = 1.3;
+  const AUTO_RADIUS_ASPECT_DAMPING_POWER = 0.18;
+  const AUTO_RADIUS_ASPECT_DAMPING_MIN = 0.72;
+
+  if (typeof originalOnMessage !== "function") {
+    return;
+  }
+
+  figma.ui.onmessage = async (message) => {
+    if (isCornerRadiusAdjustMessage(message)) {
+      await handleCornerRadiusAdjustMessage(message);
+      return;
+    }
+
+    return originalOnMessage(message);
+  };
+
+  globalScope.__PIGMA_CORNER_RADIUS_ADJUST_PATCH__ = true;
+
+  function isCornerRadiusAdjustMessage(message) {
+    return (
+      !!message &&
+      (message.type === "request-corner-radius-adjust-session" ||
+        message.type === "apply-corner-radius-adjust")
+    );
+  }
+
+  async function handleCornerRadiusAdjustMessage(message) {
+    const clientRequestId = typeof message.clientRequestId === "string" ? message.clientRequestId : "";
+
+    try {
+      await ensureCornerRadiusSelectionAccess();
+
+      if (message.type === "request-corner-radius-adjust-session") {
+        const analysis = analyzeCornerRadiusSelection();
+        const storedValue = await readLastCornerRadiusValue();
+        const session = Object.assign({}, analysis, {
+          lastValue: storedValue,
+          defaultValue: analysis.defaultValue || storedValue || "auto",
+        });
+        figma.ui.postMessage({
+          type: "corner-radius-adjust-session-result",
+          clientRequestId,
+          session,
+        });
+        return;
+      }
+
+      if (message.type === "apply-corner-radius-adjust") {
+        const result = await applyCornerRadiusToSelection(message.radiusValue);
+        figma.ui.postMessage({
+          type: "corner-radius-adjust-result",
+          clientRequestId,
+          result,
+        });
+        figma.notify(buildCornerRadiusToast(result), { timeout: 1800 });
+      }
+    } catch (error) {
+      const messageText = normalizeCornerRadiusError(error, "라운드 값 조정에 실패했습니다.");
+      figma.ui.postMessage({
+        type: "corner-radius-adjust-error",
+        clientRequestId,
+        message: messageText,
+      });
+      figma.notify(messageText, { error: true, timeout: 2400 });
+    }
+  }
+
+  async function ensureCornerRadiusSelectionAccess() {
+    if (typeof figma.loadAllPagesAsync !== "function") {
+      return;
+    }
+    try {
+      await figma.loadAllPagesAsync();
+    } catch (error) {
+      console.warn("[pigma] corner radius selection preload failed:", error);
+    }
+  }
+
+  function analyzeCornerRadiusSelection() {
+    const selection = getCornerRadiusSelection();
+    const collection = collectCornerRadiusTargets(selection);
+    const currentValues = collection.targets
+      .map((target) => target.currentRadius)
+      .filter((value) => typeof value === "number" && Number.isFinite(value));
+    const firstValue = currentValues.length ? currentValues[0] : null;
+    const allSame =
+      firstValue !== null &&
+      currentValues.length === collection.targets.length &&
+      currentValues.every((value) => Math.abs(value - firstValue) <= 0.001);
+
+    return {
+      selectionCount: selection.length,
+      targetCount: collection.targets.length,
+      skippedCount: collection.skipped.length,
+      defaultValue: allSame ? formatCornerRadiusNumber(firstValue) : "",
+      targets: collection.targets.map(serializeCornerRadiusTarget).slice(0, 24),
+      skipped: collection.skipped.slice(0, 24),
+    };
+  }
+
+  async function applyCornerRadiusToSelection(rawRadiusValue) {
+    const spec = parseCornerRadiusSpec(rawRadiusValue);
+    const selection = getCornerRadiusSelection();
+    if (!selection.length) {
+      throw new Error("라운드 값을 적용할 사각형, 프레임, 그룹을 먼저 선택해 주세요.");
+    }
+
+    const collection = collectCornerRadiusTargets(selection);
+    if (!collection.targets.length) {
+      const reason = collection.skipped.length
+        ? collection.skipped[0].reason
+        : "선택 항목에서 라운드 값을 적용할 수 있는 사각형을 찾지 못했습니다.";
+      throw new Error(reason);
+    }
+
+    const applied = [];
+    const skipped = collection.skipped.slice(0);
+
+    for (let index = 0; index < collection.targets.length; index += 1) {
+      const target = collection.targets[index];
+      if (!target.node || target.node.removed) {
+        skipped.push({
+          nodeId: target.nodeId,
+          nodeName: target.nodeName,
+          nodeType: target.nodeType,
+          reason: "레이어가 더 이상 존재하지 않습니다.",
+        });
+        continue;
+      }
+
+      try {
+        const radius = resolveCornerRadiusForTarget(spec, target);
+        setCornerRadius(target.node, radius);
+        applied.push({
+          nodeId: target.nodeId,
+          nodeName: target.nodeName,
+          nodeType: target.nodeType,
+          from: target.currentRadius === null ? "mixed" : formatCornerRadiusPx(target.currentRadius),
+          to: formatCornerRadiusPx(radius),
+        });
+      } catch (error) {
+        skipped.push({
+          nodeId: target.nodeId,
+          nodeName: target.nodeName,
+          nodeType: target.nodeType,
+          reason: normalizeCornerRadiusError(error, "이 레이어의 라운드 값을 바꾸지 못했습니다."),
+        });
+      }
+    }
+
+    if (!applied.length) {
+      const reason = skipped.length
+        ? skipped[0].reason
+        : "라운드 값을 적용할 수 있는 사각형을 찾지 못했습니다.";
+      throw new Error(reason);
+    }
+
+    await writeLastCornerRadiusValue(formatCornerRadiusSpec(spec));
+
+    return {
+      processedAt: new Date().toISOString(),
+      inputValue: formatCornerRadiusSpec(spec),
+      summary: {
+        selectionCount: selection.length,
+        targetCount: collection.targets.length,
+        appliedCount: applied.length,
+        skippedCount: skipped.length,
+      },
+      applied: applied.slice(0, 24),
+      skipped: skipped.slice(0, 24),
+    };
+  }
+
+  function getCornerRadiusSelection() {
+    return Array.from(figma.currentPage.selection || []);
+  }
+
+  function collectCornerRadiusTargets(selection) {
+    const targets = [];
+    const skipped = [];
+    const seen = {};
+    const selectedIds = buildSelectedCornerRadiusIdSet(selection);
+
+    for (let index = 0; index < selection.length; index += 1) {
+      const node = selection[index];
+      if (hasSelectedCornerRadiusAncestor(node, selectedIds)) {
+        skipped.push(buildSkippedCornerRadiusNode(node, "상위 선택 항목에 포함되어 별도로 적용하지 않았습니다."));
+        continue;
+      }
+
+      const result = collectCornerRadiusTargetsForSelectionNode(node, seen);
+      appendCornerRadiusTargetResult(result, targets, skipped);
+    }
+
+    return { targets, skipped };
+  }
+
+  function collectCornerRadiusTargetsForSelectionNode(node, seen) {
+    const direct = buildCornerRadiusTarget(node, seen);
+    if (!isCornerRadiusContainerNode(node)) {
+      return {
+        targets: direct.target ? [direct.target] : [],
+        skipped: direct.skipped ? [direct.skipped] : [],
+      };
+    }
+
+    const nested = collectNestedCornerRadiusTargets(node, seen);
+    const targets = [];
+    const skipped = [];
+
+    if (direct.target && shouldApplyCornerRadiusToDirectNode(node)) {
+      targets.push(direct.target);
+    }
+
+    if (nested.targets.length) {
+      targets.push(...nested.targets);
+    }
+
+    if (direct.target && !targets.length) {
+      targets.push(direct.target);
+    }
+
+    if (direct.skipped) {
+      skipped.push(direct.skipped);
+    }
+    if (nested.skipped.length) {
+      skipped.push(...nested.skipped);
+    }
+
+    if (targets.length) {
+      return {
+        targets,
+        skipped,
+      };
+    }
+
+    return {
+      targets: [],
+      skipped,
+    };
+  }
+
+  function collectNestedCornerRadiusTargets(root, seen) {
+    const targets = [];
+    const skipped = [];
+    const stack = [];
+
+    if (isCornerRadiusContainerNode(root)) {
+      for (let index = root.children.length - 1; index >= 0; index -= 1) {
+        stack.push(root.children[index]);
+      }
+    }
+
+    while (stack.length) {
+      const node = stack.pop();
+      const result = buildCornerRadiusTarget(node, seen);
+      if (result.target) {
+        targets.push(result.target);
+        continue;
+      }
+      if (result.skipped) {
+        skipped.push(result.skipped);
+      }
+      if (isCornerRadiusContainerNode(node)) {
+        for (let index = node.children.length - 1; index >= 0; index -= 1) {
+          stack.push(node.children[index]);
+        }
+      }
+    }
+
+    return { targets, skipped };
+  }
+
+  function buildCornerRadiusTarget(node, seen) {
+    if (!node || node.removed || !node.id || seen[node.id]) {
+      return {};
+    }
+    seen[node.id] = true;
+
+    if (node.type === "PAGE" || node.type === "DOCUMENT") {
+      return {
+        skipped: buildSkippedCornerRadiusNode(node, "페이지나 문서에는 라운드 값을 적용할 수 없습니다."),
+      };
+    }
+    if ("locked" in node && node.locked === true) {
+      return {
+        skipped: buildSkippedCornerRadiusNode(node, "잠긴 레이어입니다."),
+      };
+    }
+    if (hasLockedCornerRadiusAncestor(node)) {
+      return {
+        skipped: buildSkippedCornerRadiusNode(node, "상위 레이어가 잠겨 있습니다."),
+      };
+    }
+    if (!isCornerRadiusEditableNode(node)) {
+      return {};
+    }
+
+    const width = typeof node.width === "number" && Number.isFinite(node.width) ? node.width : 0;
+    const height = typeof node.height === "number" && Number.isFinite(node.height) ? node.height : 0;
+    if (!(width > 0) || !(height > 0)) {
+      return {
+        skipped: buildSkippedCornerRadiusNode(node, "레이어 크기가 비어 있습니다."),
+      };
+    }
+
+    return {
+      target: {
+        node,
+        nodeId: node.id,
+        nodeName: safeCornerRadiusName(node),
+        nodeType: String(node.type || "UNKNOWN"),
+        width,
+        height,
+        currentRadius: readUniformCornerRadius(node),
+      },
+    };
+  }
+
+  function appendCornerRadiusTargetResult(result, targets, skipped) {
+    if (!result) {
+      return;
+    }
+    if (Array.isArray(result.targets)) {
+      targets.push(...result.targets);
+    }
+    if (Array.isArray(result.skipped)) {
+      skipped.push(...result.skipped);
+    }
+  }
+
+  function buildSelectedCornerRadiusIdSet(selection) {
+    const result = {};
+    for (let index = 0; index < selection.length; index += 1) {
+      const node = selection[index];
+      if (node && typeof node.id === "string") {
+        result[node.id] = true;
+      }
+    }
+    return result;
+  }
+
+  function hasSelectedCornerRadiusAncestor(node, selectedIds) {
+    let current = node && node.parent ? node.parent : null;
+    while (current && current.type !== "PAGE" && current.type !== "DOCUMENT") {
+      if (current.id && selectedIds[current.id]) {
+        return true;
+      }
+      current = current.parent;
+    }
+    return false;
+  }
+
+  function hasLockedCornerRadiusAncestor(node) {
+    let current = node && node.parent ? node.parent : null;
+    while (current && current.type !== "PAGE" && current.type !== "DOCUMENT") {
+      if ("locked" in current && current.locked === true) {
+        return true;
+      }
+      current = current.parent;
+    }
+    return false;
+  }
+
+  function isCornerRadiusContainerNode(node) {
+    return !!(node && "children" in node && Array.isArray(node.children) && node.children.length);
+  }
+
+  function isCornerRadiusEditableNode(node) {
+    return !!(
+      node &&
+      typeof node === "object" &&
+      "width" in node &&
+      "height" in node &&
+      ("cornerRadius" in node ||
+        "topLeftRadius" in node ||
+        "topRightRadius" in node ||
+        "bottomRightRadius" in node ||
+        "bottomLeftRadius" in node)
+    );
+  }
+
+  function shouldApplyCornerRadiusToDirectNode(node) {
+    if (!node) {
+      return false;
+    }
+    if (node.type === "RECTANGLE") {
+      return true;
+    }
+    if ("clipsContent" in node && node.clipsContent === true) {
+      return true;
+    }
+    return hasVisibleCornerRadiusPaint(node);
+  }
+
+  function hasVisibleCornerRadiusPaint(node) {
+    return hasVisiblePaintArray(node && node.fills) || hasVisiblePaintArray(node && node.strokes);
+  }
+
+  function hasVisiblePaintArray(paints) {
+    if (!Array.isArray(paints)) {
+      return false;
+    }
+    for (let index = 0; index < paints.length; index += 1) {
+      const paint = paints[index];
+      if (!paint || paint.visible === false) {
+        continue;
+      }
+      const opacity = typeof paint.opacity === "number" && Number.isFinite(paint.opacity) ? paint.opacity : 1;
+      if (opacity > 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function parseCornerRadiusSpec(rawValue) {
+    const raw = String(rawValue == null ? "" : rawValue).trim().toLowerCase();
+    if (!raw) {
+      throw new Error("라운드 값을 입력해 주세요. 예: 6, 12px, 25%, auto");
+    }
+
+    if (raw === "auto" || raw === "quarter" || raw === "formula") {
+      return {
+        mode: "auto",
+        value: FORMULA_PERCENT_RADIUS,
+      };
+    }
+
+    if (raw === "pill" || raw === "capsule" || raw === "max" || raw === "full") {
+      return {
+        mode: "percent",
+        value: MAX_PERCENT_RADIUS,
+      };
+    }
+
+    const percentMatch = raw.match(/^(\d+(?:\.\d+)?)\s*%$/);
+    if (percentMatch) {
+      const value = Number(percentMatch[1]);
+      if (!Number.isFinite(value) || value < 0) {
+        throw new Error("퍼센트 라운드 값은 0% 이상이어야 합니다.");
+      }
+      return {
+        mode: "percent",
+        value: Math.min(value, MAX_PERCENT_RADIUS),
+      };
+    }
+
+    const pxMatch = raw.replace(",", ".").match(/^(\d+(?:\.\d+)?)\s*(?:px)?$/);
+    if (pxMatch) {
+      const value = Number(pxMatch[1]);
+      if (!Number.isFinite(value) || value < 0) {
+        throw new Error("px 라운드 값은 0 이상이어야 합니다.");
+      }
+      return {
+        mode: "px",
+        value,
+      };
+    }
+
+    throw new Error("라운드 값 형식을 확인해 주세요. 예: 6, 12px, 25%, auto");
+  }
+
+  function resolveCornerRadiusForTarget(spec, target) {
+    const minSide = Math.max(0, Math.min(Number(target.width) || 0, Number(target.height) || 0));
+    const maxRadius = minSide > 0 ? minSide / 2 : Number.POSITIVE_INFINITY;
+    const rawRadius =
+      spec.mode === "auto"
+        ? resolveAutoCornerRadiusForTarget(target)
+        : spec.mode === "percent"
+          ? minSide * (spec.value / 100)
+          : spec.value;
+    return roundCornerRadius(Math.max(0, Math.min(rawRadius, maxRadius)));
+  }
+
+  function resolveAutoCornerRadiusForTarget(target) {
+    const width = Math.max(0, Number(target && target.width) || 0);
+    const height = Math.max(0, Number(target && target.height) || 0);
+    const shortSide = Math.min(width, height);
+    const longSide = Math.max(width, height);
+    if (!(shortSide > 0)) {
+      return 0;
+    }
+
+    const baseRadius = shortSide * (FORMULA_PERCENT_RADIUS / 100);
+    const softCappedRadius =
+      shortSide <= AUTO_RADIUS_SOFT_CAP_START_SIDE
+        ? baseRadius
+        : AUTO_RADIUS_SOFT_CAP_START_SIDE * (FORMULA_PERCENT_RADIUS / 100) +
+          Math.sqrt(shortSide - AUTO_RADIUS_SOFT_CAP_START_SIDE) * AUTO_RADIUS_SOFT_CAP_GROWTH;
+    const aspectRatio = longSide / shortSide;
+    const aspectDamping =
+      shortSide <= AUTO_RADIUS_SOFT_CAP_START_SIDE || !(aspectRatio > 1)
+        ? 1
+        : Math.max(
+            AUTO_RADIUS_ASPECT_DAMPING_MIN,
+            1 / Math.pow(aspectRatio, AUTO_RADIUS_ASPECT_DAMPING_POWER)
+          );
+
+    return Math.min(baseRadius, softCappedRadius) * aspectDamping;
+  }
+
+  function setCornerRadius(node, radius) {
+    let wrote = false;
+
+    if ("cornerRadius" in node) {
+      node.cornerRadius = radius;
+      wrote = true;
+    }
+    if ("topLeftRadius" in node) {
+      node.topLeftRadius = radius;
+      wrote = true;
+    }
+    if ("topRightRadius" in node) {
+      node.topRightRadius = radius;
+      wrote = true;
+    }
+    if ("bottomRightRadius" in node) {
+      node.bottomRightRadius = radius;
+      wrote = true;
+    }
+    if ("bottomLeftRadius" in node) {
+      node.bottomLeftRadius = radius;
+      wrote = true;
+    }
+
+    if (!wrote) {
+      throw new Error("이 레이어는 라운드 값을 직접 수정할 수 없습니다.");
+    }
+  }
+
+  function readUniformCornerRadius(node) {
+    if ("cornerRadius" in node && typeof node.cornerRadius === "number" && Number.isFinite(node.cornerRadius)) {
+      return roundCornerRadius(node.cornerRadius);
+    }
+
+    const values = ["topLeftRadius", "topRightRadius", "bottomRightRadius", "bottomLeftRadius"]
+      .filter((key) => key in node)
+      .map((key) => node[key])
+      .filter((value) => typeof value === "number" && Number.isFinite(value));
+
+    if (!values.length || values.length < 4) {
+      return null;
+    }
+
+    const first = values[0];
+    return values.every((value) => Math.abs(value - first) <= 0.001) ? roundCornerRadius(first) : null;
+  }
+
+  function serializeCornerRadiusTarget(target) {
+    return {
+      nodeId: target.nodeId,
+      nodeName: target.nodeName,
+      nodeType: target.nodeType,
+      width: roundCornerRadius(target.width),
+      height: roundCornerRadius(target.height),
+      currentRadius: target.currentRadius,
+    };
+  }
+
+  function buildSkippedCornerRadiusNode(node, reason) {
+    return {
+      nodeId: node && node.id ? node.id : "",
+      nodeName: safeCornerRadiusName(node),
+      nodeType: node && node.type ? String(node.type) : "UNKNOWN",
+      reason,
+    };
+  }
+
+  async function readLastCornerRadiusValue() {
+    try {
+      const value = await figma.clientStorage.getAsync(LAST_VALUE_STORAGE_KEY);
+      return typeof value === "string" && value.trim() ? value.trim() : "";
+    } catch (error) {
+      return "";
+    }
+  }
+
+  async function writeLastCornerRadiusValue(value) {
+    try {
+      await figma.clientStorage.setAsync(LAST_VALUE_STORAGE_KEY, value);
+    } catch (error) {}
+  }
+
+  function formatCornerRadiusSpec(spec) {
+    if (spec.mode === "auto") {
+      return "auto";
+    }
+    return spec.mode === "percent" ? formatCornerRadiusNumber(spec.value) + "%" : formatCornerRadiusNumber(spec.value);
+  }
+
+  function formatCornerRadiusPx(value) {
+    return formatCornerRadiusNumber(value) + "px";
+  }
+
+  function formatCornerRadiusNumber(value) {
+    const rounded = roundCornerRadius(value);
+    return Math.abs(rounded % 1) < 0.001 ? String(Math.round(rounded)) : String(rounded);
+  }
+
+  function roundCornerRadius(value) {
+    return Math.round(Number(value) || 0);
+  }
+
+  function safeCornerRadiusName(node) {
+    const name = node && typeof node.name === "string" ? node.name.trim() : "";
+    return name || "Layer";
+  }
+
+  function buildCornerRadiusToast(result) {
+    const summary = result && result.summary ? result.summary : {};
+    const appliedCount = Number(summary.appliedCount) || 0;
+    const skippedCount = Number(summary.skippedCount) || 0;
+    return skippedCount > 0
+      ? `라운드 값 적용 ${appliedCount}개, 제외 ${skippedCount}개`
+      : `라운드 값 적용 ${appliedCount}개`;
+  }
+
+  function normalizeCornerRadiusError(error, fallback) {
+    if (error instanceof Error && typeof error.message === "string" && error.message.trim()) {
+      return error.message.trim();
+    }
+    if (typeof error === "string" && error.trim()) {
+      return error.trim();
+    }
+    return fallback;
+  }
+})();
+
+;(() => {
+  const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
+  if (globalScope.__PIGMA_BUTTON_TEXT_AUTO_SIZE_PATCH__) {
+    return;
+  }
+
+  const originalOnMessage = figma.ui.onmessage;
+  const RESULT_PREVIEW_LIMIT = 24;
+  const BUTTON_RULES = [
+    { fontSize: 12, lineHeight: 16, paddingY: 6, height: 28 },
+    { fontSize: 13, lineHeight: 18, paddingY: 7, height: 32 },
+    { fontSize: 14, lineHeight: 20, paddingY: 10, height: 40 },
+    { fontSize: 15, lineHeight: 22, paddingY: 11, height: 44 },
+    { fontSize: 16, lineHeight: 24, paddingY: 12, height: 48 },
+    { fontSize: 18, lineHeight: 28, paddingY: 14, height: 56 },
+  ];
+  let isRunning = false;
+
+  if (typeof originalOnMessage !== "function") {
+    return;
+  }
+
+  figma.ui.onmessage = async (message) => {
+    if (isButtonTextAutoSizeMessage(message)) {
+      await runButtonTextAutoSize();
+      return;
+    }
+
+    return originalOnMessage(message);
+  };
+
+  globalScope.__PIGMA_BUTTON_TEXT_AUTO_SIZE_PATCH__ = true;
+
+  function isButtonTextAutoSizeMessage(message) {
+    return !!message && message.type === "run-button-text-auto-size";
+  }
+
+  async function runButtonTextAutoSize() {
+    if (isRunning) {
+      postStatus("running", "\uBC84\uD2BC \uD14D\uC2A4\uD2B8 \uD06C\uAE30\uC5D0 \uB9DE\uCDB0 \uBC15\uC2A4\uB97C \uC870\uC808\uD558\uACE0 \uC788\uC2B5\uB2C8\uB2E4.");
+      return;
+    }
+
+    isRunning = true;
+    postStatus("running", "\uBC84\uD2BC \uD14D\uC2A4\uD2B8 \uD06C\uAE30\uC5D0 \uB9DE\uB294 \uBC15\uC2A4 \uD06C\uAE30\uB97C \uACC4\uC0B0\uD558\uACE0 \uC788\uC2B5\uB2C8\uB2E4.");
+
+    try {
+      const result = await applyButtonTextAutoSize();
+      figma.ui.postMessage({
+        type: "button-text-auto-size-result",
+        result,
+      });
+      figma.notify(buildResultToast(result), { timeout: 2200 });
+    } catch (error) {
+      const message = normalizeErrorMessage(
+        error,
+        "\uBC84\uD2BC \uD14D\uC2A4\uD2B8 \uC624\uD1A0 \uC0AC\uC774\uC988\uB97C \uCC98\uB9AC\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4."
+      );
+      figma.ui.postMessage({
+        type: "button-text-auto-size-error",
+        message,
+      });
+      figma.notify(message, { error: true, timeout: 2400 });
+    } finally {
+      isRunning = false;
+    }
+  }
+
+  function postStatus(status, message) {
+    figma.ui.postMessage({
+      type: "button-text-auto-size-status",
+      status,
+      message,
+    });
+  }
+
+  async function applyButtonTextAutoSize() {
+    await ensureSelectionAccess();
+
+    const selection = Array.from(figma.currentPage.selection || []);
+    if (!selection.length) {
+      throw new Error("\uD14D\uC2A4\uD2B8\uB098 \uD14D\uC2A4\uD2B8+\uBC15\uC2A4\uB97C \uBA3C\uC800 \uC120\uD0DD\uD574 \uC8FC\uC138\uC694.");
+    }
+
+    const textNodes = selection.filter((node) => node && node.type === "TEXT" && !node.removed);
+    if (!textNodes.length) {
+      throw new Error("\uBC84\uD2BC \uD06C\uAE30\uB97C \uB9DE\uCD9C \uD14D\uC2A4\uD2B8\uB97C \uD558\uB098 \uC774\uC0C1 \uC120\uD0DD\uD574 \uC8FC\uC138\uC694.");
+    }
+
+    const boxNodes = selection.filter((node) => isResizableBoxNode(node));
+    const usedBoxIds = {};
+    const resized = [];
+    const created = [];
+    const skipped = [];
+
+    for (let index = 0; index < textNodes.length; index += 1) {
+      const textNode = textNodes[index];
+      try {
+        const result = await fitSingleButtonText(textNode, boxNodes, usedBoxIds);
+        if (result && result.mode === "created") {
+          created.push(result.entry);
+        } else if (result && result.mode === "resized") {
+          resized.push(result.entry);
+        }
+      } catch (error) {
+        skipped.push({
+          nodeId: safeNodeId(textNode),
+          nodeName: safeName(textNode),
+          nodeType: safeNodeType(textNode),
+          reason: normalizeErrorMessage(error, "\uC774 \uD14D\uC2A4\uD2B8\uB294 \uBC15\uC2A4 \uD06C\uAE30\uB97C \uB9DE\uCD9C \uC218 \uC5C6\uC2B5\uB2C8\uB2E4."),
+        });
+      }
+    }
+
+    if (!resized.length && !created.length) {
+      const reason = skipped.length
+        ? skipped[0].reason
+        : "\uC801\uC6A9\uD560 \uD14D\uC2A4\uD2B8\uB098 \uBC15\uC2A4\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.";
+      throw new Error(reason);
+    }
+
+    restoreSelection(textNodes, resized, created);
+
+    return {
+      processedAt: new Date().toISOString(),
+      summary: {
+        selectionCount: selection.length,
+        textCount: textNodes.length,
+        resizedBoxCount: resized.length,
+        createdBoxCount: created.length,
+        skippedCount: skipped.length,
+      },
+      resized: resized.slice(0, RESULT_PREVIEW_LIMIT),
+      created: created.slice(0, RESULT_PREVIEW_LIMIT),
+      skipped: skipped.slice(0, RESULT_PREVIEW_LIMIT),
+    };
+  }
+
+  async function fitSingleButtonText(textNode, boxNodes, usedBoxIds) {
+    await loadFontsForTextNode(textNode);
+
+    const fontSize = resolveUniformFontSize(textNode);
+    if (!(fontSize > 0)) {
+      throw new Error("\uD14D\uC2A4\uD2B8\uC758 \uD3F0\uD2B8 \uD06C\uAE30\uAC00 \uC11E\uC5EC \uC788\uC5B4 \uAE30\uC900 \uB192\uC774\uB97C \uACC4\uC0B0\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.");
+    }
+
+    const metrics = resolveButtonMetrics(fontSize);
+    const beforeTextSize = {
+      width: roundMetric(getNodeWidth(textNode)),
+      height: roundMetric(getNodeHeight(textNode)),
+    };
+    const beforeLineHeight = describeLineHeight(textNode.lineHeight, fontSize);
+
+    prepareTextForButtonSizing(textNode, metrics);
+
+    const textBounds = getAbsoluteBounds(textNode);
+    if (!textBounds || textBounds.width <= 0 || textBounds.height <= 0) {
+      throw new Error("\uD14D\uC2A4\uD2B8\uC758 \uBC14\uC6B4\uB4DC\uB97C \uC77D\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.");
+    }
+
+    const targetRect = buildTargetButtonRect(textBounds, metrics);
+    const pairedBox = findBestBoxForText(textNode, boxNodes, usedBoxIds);
+
+    if (pairedBox) {
+      const beforeBoxSize = {
+        width: roundMetric(getNodeWidth(pairedBox)),
+        height: roundMetric(getNodeHeight(pairedBox)),
+      };
+
+      applyRectToBox(pairedBox, textNode, targetRect, metrics);
+      if (safeNodeId(pairedBox)) {
+        usedBoxIds[safeNodeId(pairedBox)] = true;
+      }
+
+      return {
+        mode: "resized",
+        entry: {
+          nodeId: safeNodeId(pairedBox),
+          nodeName: safeName(pairedBox),
+          textNodeId: safeNodeId(textNode),
+          textNodeName: safeName(textNode),
+          fontSize: roundMetric(fontSize),
+          lineHeight: metrics.lineHeight,
+          paddingY: metrics.paddingY,
+          paddingX: metrics.paddingX,
+          from: formatSize(beforeBoxSize),
+          to: formatSize({ width: targetRect.width, height: targetRect.height }),
+          textFrom: formatSize(beforeTextSize) + " / " + beforeLineHeight,
+          textTo: formatSize({ width: getNodeWidth(textNode), height: getNodeHeight(textNode) }) + " / " + metrics.lineHeight + "px",
+        },
+      };
+    }
+
+    const createdBox = createBoxBehindText(textNode, targetRect, metrics);
+    return {
+      mode: "created",
+      entry: {
+        nodeId: safeNodeId(createdBox),
+        nodeName: safeName(createdBox),
+        textNodeId: safeNodeId(textNode),
+        textNodeName: safeName(textNode),
+        fontSize: roundMetric(fontSize),
+        lineHeight: metrics.lineHeight,
+        paddingY: metrics.paddingY,
+        paddingX: metrics.paddingX,
+        to: formatSize({ width: targetRect.width, height: targetRect.height }),
+        textFrom: formatSize(beforeTextSize) + " / " + beforeLineHeight,
+        textTo: formatSize({ width: getNodeWidth(textNode), height: getNodeHeight(textNode) }) + " / " + metrics.lineHeight + "px",
+      },
+    };
+  }
+
+  function prepareTextForButtonSizing(textNode, metrics) {
+    textNode.lineHeight = {
+      unit: "PIXELS",
+      value: metrics.lineHeight,
+    };
+
+    if ("textAutoResize" in textNode) {
+      try {
+        textNode.textAutoResize = "WIDTH_AND_HEIGHT";
+      } catch (error) {}
+    }
+  }
+
+  function resolveButtonMetrics(fontSize) {
+    const roundedSize = Math.round(Number(fontSize) || 0);
+    for (let index = 0; index < BUTTON_RULES.length; index += 1) {
+      if (BUTTON_RULES[index].fontSize === roundedSize) {
+        return buildMetrics(BUTTON_RULES[index]);
+      }
+    }
+
+    const lineHeight = Math.max(12, roundToEven(roundedSize * 2 - 8));
+    const paddingY = Math.max(4, Math.round(lineHeight / 2));
+    return buildMetrics({
+      fontSize: roundedSize,
+      lineHeight,
+      paddingY,
+      height: lineHeight + paddingY * 2,
+    });
+  }
+
+  function buildMetrics(rule) {
+    const height = Math.max(1, Math.round(Number(rule.height) || Number(rule.lineHeight) + Number(rule.paddingY) * 2));
+    return {
+      fontSize: Number(rule.fontSize) || 0,
+      lineHeight: Math.max(1, Math.round(Number(rule.lineHeight) || 0)),
+      paddingY: Math.max(0, Math.round(Number(rule.paddingY) || 0)),
+      paddingX: Math.max(12, Math.round(height / 2)),
+      height,
+    };
+  }
+
+  function buildTargetButtonRect(textBounds, metrics) {
+    const width = Math.max(1, Math.ceil(textBounds.width + metrics.paddingX * 2));
+    const height = Math.max(1, Math.round(metrics.height));
+    return {
+      x: roundMetric(textBounds.x - metrics.paddingX),
+      y: roundMetric(textBounds.y + textBounds.height / 2 - height / 2),
+      width,
+      height,
+    };
+  }
+
+  function findBestBoxForText(textNode, boxNodes, usedBoxIds) {
+    const textBounds = getAbsoluteBounds(textNode);
+    if (!textBounds) {
+      return null;
+    }
+
+    let best = null;
+    let bestScore = -Infinity;
+
+    for (let index = 0; index < boxNodes.length; index += 1) {
+      const box = boxNodes[index];
+      if (!box || box.removed || box === textNode) {
+        continue;
+      }
+      const boxId = safeNodeId(box);
+      if (boxId && usedBoxIds[boxId]) {
+        continue;
+      }
+      if (!canPairTextAndBox(textNode, box)) {
+        continue;
+      }
+
+      const boxBounds = getAbsoluteBounds(box);
+      if (!boxBounds) {
+        continue;
+      }
+
+      const overlapRatio = getOverlapRatio(textBounds, boxBounds);
+      const contains = containsBounds(boxBounds, textBounds);
+      const centerDistance = getCenterDistance(textBounds, boxBounds);
+      const singleBoxBoost = boxNodes.length === 1 ? 20000 : 0;
+      const score = overlapRatio * 10000 + (contains ? 8000 : 0) + singleBoxBoost - centerDistance;
+
+      if (score > bestScore) {
+        bestScore = score;
+        best = box;
+      }
+    }
+
+    if (!best) {
+      return null;
+    }
+
+    if (boxNodes.length === 1) {
+      return best;
+    }
+
+    return bestScore > -500 ? best : null;
+  }
+
+  function canPairTextAndBox(textNode, boxNode) {
+    if (!textNode || !boxNode) {
+      return false;
+    }
+    if (textNode.parent === boxNode) {
+      return true;
+    }
+    if (textNode.parent && boxNode.parent && textNode.parent === boxNode.parent) {
+      return true;
+    }
+    return false;
+  }
+
+  function applyRectToBox(boxNode, textNode, targetRect, metrics) {
+    if (textNode.parent === boxNode) {
+      if (isAutoLayoutParent(boxNode)) {
+        applyAutoLayoutButtonPadding(boxNode, metrics);
+        resizeNode(boxNode, targetRect.width, targetRect.height);
+        return;
+      }
+
+      resizeNode(boxNode, targetRect.width, targetRect.height);
+      textNode.x = roundMetric(metrics.paddingX);
+      textNode.y = roundMetric((targetRect.height - getNodeHeight(textNode)) / 2);
+      return;
+    }
+
+    setNodeAbsoluteRect(boxNode, targetRect);
+    moveNodeBehindText(boxNode, textNode);
+  }
+
+  function createBoxBehindText(textNode, targetRect, metrics) {
+    const parent = textNode && textNode.parent && "appendChild" in textNode.parent ? textNode.parent : figma.currentPage;
+    const rect = figma.createRectangle();
+    rect.name = "Button Text Auto Size Box";
+    rect.fills = [buildDefaultBoxFill(textNode)];
+    rect.strokes = [];
+    rect.cornerRadius = Math.min(8, Math.max(4, Math.round(metrics.height / 4)));
+    resizeNode(rect, targetRect.width, targetRect.height);
+
+    if ("layoutPositioning" in rect && isAutoLayoutParent(parent)) {
+      try {
+        rect.layoutPositioning = "ABSOLUTE";
+      } catch (error) {}
+    }
+
+    insertNodeBehindText(parent, rect, textNode);
+    setNodeAbsoluteRect(rect, targetRect);
+    return rect;
+  }
+
+  function insertNodeBehindText(parent, node, textNode) {
+    if (!parent || !("appendChild" in parent)) {
+      figma.currentPage.appendChild(node);
+      return;
+    }
+
+    const children = Array.isArray(parent.children) ? parent.children : [];
+    const textIndex = children.indexOf(textNode);
+    if (textIndex >= 0 && typeof parent.insertChild === "function") {
+      parent.insertChild(textIndex, node);
+      return;
+    }
+
+    parent.appendChild(node);
+  }
+
+  function moveNodeBehindText(node, textNode) {
+    const parent = node && node.parent ? node.parent : null;
+    if (!parent || parent !== textNode.parent || typeof parent.insertChild !== "function") {
+      return;
+    }
+    const children = Array.isArray(parent.children) ? parent.children : [];
+    const textIndex = children.indexOf(textNode);
+    if (textIndex >= 0) {
+      parent.insertChild(textIndex, node);
+    }
+  }
+
+  function setNodeAbsoluteRect(node, rect) {
+    const parent = node && node.parent ? node.parent : null;
+    const localPoint = absolutePointToLocal(parent, rect.x, rect.y);
+    resizeNode(node, rect.width, rect.height);
+    if ("x" in node) {
+      node.x = roundMetric(localPoint.x);
+    }
+    if ("y" in node) {
+      node.y = roundMetric(localPoint.y);
+    }
+  }
+
+  function absolutePointToLocal(parent, x, y) {
+    if (!parent || !("absoluteTransform" in parent)) {
+      return { x, y };
+    }
+    const inverse = invertTransform(parent.absoluteTransform);
+    if (!inverse) {
+      return { x, y };
+    }
+    return {
+      x: inverse[0][0] * x + inverse[0][1] * y + inverse[0][2],
+      y: inverse[1][0] * x + inverse[1][1] * y + inverse[1][2],
+    };
+  }
+
+  function invertTransform(matrix) {
+    if (!matrix || !matrix[0] || !matrix[1]) {
+      return null;
+    }
+    const a = Number(matrix[0][0]) || 0;
+    const b = Number(matrix[0][1]) || 0;
+    const c = Number(matrix[1][0]) || 0;
+    const d = Number(matrix[1][1]) || 0;
+    const tx = Number(matrix[0][2]) || 0;
+    const ty = Number(matrix[1][2]) || 0;
+    const det = a * d - b * c;
+    if (Math.abs(det) < 0.000001) {
+      return null;
+    }
+    const invDet = 1 / det;
+    return [
+      [d * invDet, -b * invDet, (b * ty - d * tx) * invDet],
+      [-c * invDet, a * invDet, (c * tx - a * ty) * invDet],
+    ];
+  }
+
+  function buildDefaultBoxFill(textNode) {
+    const textColor = getFirstSolidFill(textNode);
+    if (textColor && getLuminance(textColor.color) > 0.72) {
+      return {
+        type: "SOLID",
+        color: { r: 0.067, g: 0.094, b: 0.153 },
+        opacity: 1,
+      };
+    }
+
+    return {
+      type: "SOLID",
+      color: { r: 0.953, g: 0.961, b: 0.973 },
+      opacity: 1,
+    };
+  }
+
+  function getFirstSolidFill(node) {
+    if (!node || !("fills" in node) || !Array.isArray(node.fills)) {
+      return null;
+    }
+    for (let index = 0; index < node.fills.length; index += 1) {
+      const fill = node.fills[index];
+      if (fill && fill.type === "SOLID" && fill.visible !== false && fill.color) {
+        return fill;
+      }
+    }
+    return null;
+  }
+
+  function getLuminance(color) {
+    const r = normalizeColorChannel(color && color.r);
+    const g = normalizeColorChannel(color && color.g);
+    const b = normalizeColorChannel(color && color.b);
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+
+  function normalizeColorChannel(value) {
+    const channel = Math.max(0, Math.min(1, Number(value) || 0));
+    return channel <= 0.03928 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);
+  }
+
+  function isResizableBoxNode(node) {
+    return (
+      !!node &&
+      node.type !== "TEXT" &&
+      node.type !== "PAGE" &&
+      node.type !== "DOCUMENT" &&
+      !node.removed &&
+      typeof node.resize === "function" &&
+      typeof getNodeWidth(node) === "number" &&
+      typeof getNodeHeight(node) === "number" &&
+      "x" in node &&
+      "y" in node
+    );
+  }
+
+  function isAutoLayoutParent(node) {
+    return !!node && "layoutMode" in node && node.layoutMode && node.layoutMode !== "NONE";
+  }
+
+  function applyAutoLayoutButtonPadding(node, metrics) {
+    setNumericProperty(node, "paddingTop", metrics.paddingY);
+    setNumericProperty(node, "paddingBottom", metrics.paddingY);
+    setNumericProperty(node, "paddingLeft", metrics.paddingX);
+    setNumericProperty(node, "paddingRight", metrics.paddingX);
+    setEnumProperty(node, "primaryAxisAlignItems", "CENTER");
+    setEnumProperty(node, "counterAxisAlignItems", "CENTER");
+    setEnumProperty(node, "primaryAxisSizingMode", "FIXED");
+    setEnumProperty(node, "counterAxisSizingMode", "FIXED");
+  }
+
+  function setNumericProperty(node, key, value) {
+    if (!node || !(key in node)) {
+      return;
+    }
+    try {
+      node[key] = value;
+    } catch (error) {}
+  }
+
+  function setEnumProperty(node, key, value) {
+    if (!node || !(key in node)) {
+      return;
+    }
+    try {
+      node[key] = value;
+    } catch (error) {}
+  }
+
+  function resizeNode(node, width, height) {
+    const nextWidth = Math.max(1, roundMetric(width));
+    const nextHeight = Math.max(1, roundMetric(height));
+    if (typeof node.resizeWithoutConstraints === "function") {
+      node.resizeWithoutConstraints(nextWidth, nextHeight);
+      return;
+    }
+    node.resize(nextWidth, nextHeight);
+  }
+
+  function getAbsoluteBounds(node) {
+    if (!node) {
+      return null;
+    }
+    const bounds = node.absoluteBoundingBox || node.absoluteRenderBounds || null;
+    if (!bounds) {
+      return null;
+    }
+    return {
+      x: Number(bounds.x) || 0,
+      y: Number(bounds.y) || 0,
+      width: Math.max(0, Number(bounds.width) || 0),
+      height: Math.max(0, Number(bounds.height) || 0),
+    };
+  }
+
+  function containsBounds(outer, inner) {
+    return (
+      outer.x <= inner.x + 0.5 &&
+      outer.y <= inner.y + 0.5 &&
+      outer.x + outer.width >= inner.x + inner.width - 0.5 &&
+      outer.y + outer.height >= inner.y + inner.height - 0.5
+    );
+  }
+
+  function getOverlapRatio(a, b) {
+    const left = Math.max(a.x, b.x);
+    const top = Math.max(a.y, b.y);
+    const right = Math.min(a.x + a.width, b.x + b.width);
+    const bottom = Math.min(a.y + a.height, b.y + b.height);
+    const overlap = Math.max(0, right - left) * Math.max(0, bottom - top);
+    return overlap / Math.max(1, a.width * a.height);
+  }
+
+  function getCenterDistance(a, b) {
+    const ax = a.x + a.width / 2;
+    const ay = a.y + a.height / 2;
+    const bx = b.x + b.width / 2;
+    const by = b.y + b.height / 2;
+    const dx = ax - bx;
+    const dy = ay - by;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  async function loadFontsForTextNode(node) {
+    const fonts = [];
+    const characters = typeof node.characters === "string" ? node.characters : "";
+    if (characters.length > 0 && typeof node.getRangeAllFontNames === "function") {
+      const rangeFonts = node.getRangeAllFontNames(0, characters.length);
+      for (let index = 0; index < rangeFonts.length; index += 1) {
+        appendFontName(fonts, rangeFonts[index]);
+      }
+    } else {
+      appendFontName(fonts, node.fontName);
+    }
+
+    for (let index = 0; index < fonts.length; index += 1) {
+      await figma.loadFontAsync(fonts[index]);
+    }
+  }
+
+  function appendFontName(fonts, fontName) {
+    if (!fontName || fontName === figma.mixed || typeof fontName !== "object") {
+      return;
+    }
+    if (typeof fontName.family !== "string" || typeof fontName.style !== "string") {
+      return;
+    }
+    const key = fontName.family + "\u0000" + fontName.style;
+    for (let index = 0; index < fonts.length; index += 1) {
+      if (fonts[index].family + "\u0000" + fonts[index].style === key) {
+        return;
+      }
+    }
+    fonts.push(fontName);
+  }
+
+  function resolveUniformFontSize(node) {
+    if (typeof node.fontSize === "number" && Number.isFinite(node.fontSize)) {
+      return node.fontSize;
+    }
+    const characters = typeof node.characters === "string" ? node.characters : "";
+    if (!characters.length || typeof node.getRangeFontSize !== "function") {
+      return null;
+    }
+    const first = node.getRangeFontSize(0, 1);
+    if (typeof first !== "number" || !Number.isFinite(first)) {
+      return null;
+    }
+    for (let index = 1; index < characters.length; index += 1) {
+      const next = node.getRangeFontSize(index, index + 1);
+      if (typeof next !== "number" || Math.abs(next - first) > 0.001) {
+        return null;
+      }
+    }
+    return first;
+  }
+
+  async function ensureSelectionAccess() {
+    if (typeof figma.loadAllPagesAsync !== "function") {
+      return;
+    }
+    try {
+      await figma.loadAllPagesAsync();
+    } catch (error) {
+      console.warn("[pigma] button text auto size selection preload failed:", error);
+    }
+  }
+
+  function restoreSelection(textNodes, resized, created) {
+    const nextSelection = [];
+    appendUniqueNodeList(nextSelection, textNodes);
+    appendResultNodes(nextSelection, resized);
+    appendResultNodes(nextSelection, created);
+    if (nextSelection.length) {
+      figma.currentPage.selection = nextSelection;
+    }
+  }
+
+  function appendResultNodes(list, entries) {
+    if (typeof figma.getNodeById !== "function") {
+      return;
+    }
+    for (let index = 0; index < entries.length; index += 1) {
+      const entry = entries[index];
+      if (entry && entry.nodeId) {
+        let node = null;
+        try {
+          node = figma.getNodeById(entry.nodeId);
+        } catch (error) {
+          node = null;
+        }
+        if (node && !node.removed) {
+          appendUniqueNode(list, node);
+        }
+      }
+    }
+  }
+
+  function appendUniqueNodeList(list, nodes) {
+    for (let index = 0; index < nodes.length; index += 1) {
+      appendUniqueNode(list, nodes[index]);
+    }
+  }
+
+  function appendUniqueNode(list, node) {
+    if (!node || node.removed) {
+      return;
+    }
+    for (let index = 0; index < list.length; index += 1) {
+      if (list[index] === node) {
+        return;
+      }
+    }
+    list.push(node);
+  }
+
+  function buildResultToast(result) {
+    const summary = result && result.summary ? result.summary : {};
+    const resizedCount = Number(summary.resizedBoxCount) || 0;
+    const createdCount = Number(summary.createdBoxCount) || 0;
+    const skippedCount = Number(summary.skippedCount) || 0;
+    let message = "\uBC84\uD2BC \uD14D\uC2A4\uD2B8 \uC624\uD1A0 \uC0AC\uC774\uC988 \uC644\uB8CC";
+    message += " (\uC870\uC808 " + resizedCount + "\uAC1C, \uC0DD\uC131 " + createdCount + "\uAC1C";
+    if (skippedCount > 0) {
+      message += ", \uC81C\uC678 " + skippedCount + "\uAC1C";
+    }
+    return message + ")";
+  }
+
+  function describeLineHeight(lineHeight, fontSize) {
+    if (lineHeight && typeof lineHeight === "object") {
+      if (lineHeight.unit === "PIXELS" && typeof lineHeight.value === "number") {
+        return roundMetric(lineHeight.value) + "px";
+      }
+      if (lineHeight.unit === "PERCENT" && typeof lineHeight.value === "number") {
+        return roundMetric((fontSize * lineHeight.value) / 100) + "px";
+      }
+      if (lineHeight.unit === "AUTO") {
+        return "auto";
+      }
+    }
+    return "mixed";
+  }
+
+  function formatSize(size) {
+    return roundMetric(size.width) + " x " + roundMetric(size.height) + "px";
+  }
+
+  function getNodeWidth(node) {
+    return typeof node.width === "number" ? node.width : 0;
+  }
+
+  function getNodeHeight(node) {
+    return typeof node.height === "number" ? node.height : 0;
+  }
+
+  function roundMetric(value) {
+    return Math.round((Number(value) || 0) * 100) / 100;
+  }
+
+  function roundToEven(value) {
+    return Math.round((Number(value) || 0) / 2) * 2;
+  }
+
+  function safeNodeId(node) {
+    try {
+      return node && typeof node.id === "string" ? node.id : "";
+    } catch (error) {
+      return "";
+    }
+  }
+
+  function safeName(node) {
+    try {
+      if (node && typeof node.name === "string" && node.name.trim()) {
+        return node.name.trim();
+      }
+      return String((node && node.type) || "Layer");
+    } catch (error) {
+      return "Layer";
+    }
+  }
+
+  function safeNodeType(node) {
+    try {
+      return String((node && node.type) || "UNKNOWN");
+    } catch (error) {
+      return "UNKNOWN";
+    }
+  }
+
+  function normalizeErrorMessage(error, fallback) {
+    if (error && typeof error === "object" && typeof error.message === "string" && error.message.trim()) {
+      return error.message.trim();
+    }
+    if (typeof error === "string" && error.trim()) {
+      return error.trim();
+    }
+    return fallback;
   }
 })();
 

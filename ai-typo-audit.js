@@ -16,6 +16,16 @@
   const AI_TEXT_HIGHLIGHT_DEFAULT_RADIUS = 0;
   const AI_TEXT_HIGHLIGHT_DEFAULT_DECORATION_SCALE = 3;
   const AI_TEXT_HIGHLIGHT_DEFAULT_BOX_PADDING_PX = 0;
+  const AI_TEXT_HIGHLIGHT_BASE_VERTICAL_PADDING_MIN_PX = 2;
+  const AI_TEXT_HIGHLIGHT_BASE_VERTICAL_PADDING_MAX_PX = 6;
+  const AI_TEXT_HIGHLIGHT_BASE_VERTICAL_PADDING_RATIO = 0.04;
+  const AI_TEXT_HIGHLIGHT_BASE_HORIZONTAL_PADDING_MIN_PX = 3;
+  const AI_TEXT_HIGHLIGHT_BASE_HORIZONTAL_PADDING_MAX_PX = 10;
+  const AI_TEXT_HIGHLIGHT_BASE_HORIZONTAL_PADDING_RATIO = 0.06;
+  const AI_TEXT_HIGHLIGHT_MICRO_FONT_FULL_TIGHTEN_PX = 12;
+  const AI_TEXT_HIGHLIGHT_MICRO_FONT_NO_TIGHTEN_PX = 16;
+  const AI_TEXT_HIGHLIGHT_SMALL_FONT_FULL_TIGHTEN_PX = 32;
+  const AI_TEXT_HIGHLIGHT_SMALL_FONT_NO_TIGHTEN_PX = 96;
   const AI_TEXT_HIGHLIGHT_DEFAULT_STRIKE_RADIUS = 0;
   const AI_TEXT_HIGHLIGHT_MEASURE_COLOR = "#FF00FF";
   const AI_TEXT_HIGHLIGHT_GROUP_NAME = "#high-light-text";
@@ -8242,6 +8252,42 @@
     });
   }
 
+  function getTextHighlightSmallFontTightenBlend(fontSize) {
+    const size = Math.max(12, Number(fontSize) || 16);
+    if (size <= AI_TEXT_HIGHLIGHT_SMALL_FONT_FULL_TIGHTEN_PX) {
+      return 1;
+    }
+    if (size >= AI_TEXT_HIGHLIGHT_SMALL_FONT_NO_TIGHTEN_PX) {
+      return 0;
+    }
+    return Math.max(
+      0,
+      Math.min(
+        1,
+        (AI_TEXT_HIGHLIGHT_SMALL_FONT_NO_TIGHTEN_PX - size) /
+          (AI_TEXT_HIGHLIGHT_SMALL_FONT_NO_TIGHTEN_PX - AI_TEXT_HIGHLIGHT_SMALL_FONT_FULL_TIGHTEN_PX)
+      )
+    );
+  }
+
+  function getTextHighlightMicroFontTightenBlend(fontSize) {
+    const size = Math.max(1, Number(fontSize) || 16);
+    if (size <= AI_TEXT_HIGHLIGHT_MICRO_FONT_FULL_TIGHTEN_PX) {
+      return 1;
+    }
+    if (size >= AI_TEXT_HIGHLIGHT_MICRO_FONT_NO_TIGHTEN_PX) {
+      return 0;
+    }
+    return Math.max(
+      0,
+      Math.min(
+        1,
+        (AI_TEXT_HIGHLIGHT_MICRO_FONT_NO_TIGHTEN_PX - size) /
+          (AI_TEXT_HIGHLIGHT_MICRO_FONT_NO_TIGHTEN_PX - AI_TEXT_HIGHLIGHT_MICRO_FONT_FULL_TIGHTEN_PX)
+      )
+    );
+  }
+
   function doTextHighlightBoundsIntersect(left, right) {
     const leftBounds = normalizeTextHighlightWorldBounds(left);
     const rightBounds = normalizeTextHighlightWorldBounds(right);
@@ -8779,13 +8825,51 @@
   function buildTextHighlightBoxPixelPadding(fontSize, boxPaddingPx) {
     const size = Math.max(12, Number(fontSize) || 16);
     const padding = sanitizeTextHighlightBoxPaddingPx(boxPaddingPx, AI_TEXT_HIGHLIGHT_DEFAULT_BOX_PADDING_PX);
+    const baseHorizontalPadding = buildTextHighlightBoxBaseHorizontalPadding(size);
+    const baseVerticalPadding = buildTextHighlightBoxBaseVerticalPadding(size);
     return {
-      left: padding,
-      right: padding,
-      top: padding,
-      bottom: padding,
+      left: padding + baseHorizontalPadding,
+      right: padding + baseHorizontalPadding,
+      top: padding + baseVerticalPadding,
+      bottom: padding + baseVerticalPadding,
       radius: roundTextHighlightMetric(Math.max(0, Math.min(14, size * 0.16))),
     };
+  }
+
+  function buildTextHighlightBoxBaseHorizontalPadding(fontSize) {
+    const rawSize = Math.max(1, Number(fontSize) || 16);
+    const size = Math.max(12, rawSize);
+    const tightBlend = getTextHighlightSmallFontTightenBlend(size);
+    const microBlend = getTextHighlightMicroFontTightenBlend(rawSize);
+    const loosePadding = Math.max(
+      AI_TEXT_HIGHLIGHT_BASE_HORIZONTAL_PADDING_MIN_PX,
+      Math.min(
+        AI_TEXT_HIGHLIGHT_BASE_HORIZONTAL_PADDING_MAX_PX,
+        size * AI_TEXT_HIGHLIGHT_BASE_HORIZONTAL_PADDING_RATIO
+      )
+    );
+    const tightPadding = Math.max(1.5, Math.min(5, size * 0.04));
+    const smallPadding = loosePadding * (1 - tightBlend) + tightPadding * tightBlend;
+    const microPadding = Math.max(0.75, Math.min(1.25, rawSize * 0.07));
+    return roundTextHighlightMetric(smallPadding * (1 - microBlend) + microPadding * microBlend);
+  }
+
+  function buildTextHighlightBoxBaseVerticalPadding(fontSize) {
+    const rawSize = Math.max(1, Number(fontSize) || 16);
+    const size = Math.max(12, rawSize);
+    const tightBlend = getTextHighlightSmallFontTightenBlend(size);
+    const microBlend = getTextHighlightMicroFontTightenBlend(rawSize);
+    const loosePadding = Math.max(
+      AI_TEXT_HIGHLIGHT_BASE_VERTICAL_PADDING_MIN_PX,
+      Math.min(
+        AI_TEXT_HIGHLIGHT_BASE_VERTICAL_PADDING_MAX_PX,
+        size * AI_TEXT_HIGHLIGHT_BASE_VERTICAL_PADDING_RATIO
+      )
+    );
+    const tightPadding = Math.max(1, Math.min(3, size * 0.025));
+    const smallPadding = loosePadding * (1 - tightBlend) + tightPadding * tightBlend;
+    const microPadding = Math.max(0.25, Math.min(0.75, rawSize * 0.03));
+    return roundTextHighlightMetric(smallPadding * (1 - microBlend) + microPadding * microBlend);
   }
 
   function getNodeRenderBounds(node) {

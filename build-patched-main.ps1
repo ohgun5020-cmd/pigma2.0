@@ -14,6 +14,8 @@ $aiRegroupRenamePatch = Join-Path $root "ai-regroup-rename.js"
 $aiTypoAuditPatch = Join-Path $root "ai-typo-audit.js"
 $aiPixelPerfectPatch = Join-Path $root "ai-pixel-perfect.js"
 $skewTransformPatch = Join-Path $root "skew-transform.js"
+$cornerRadiusAdjustPatch = Join-Path $root "corner-radius-adjust.js"
+$buttonTextAutoSizePatch = Join-Path $root "button-text-auto-size.js"
 $unlockLockedLayersPatch = Join-Path $root "unlock-locked-layers.js"
 $deleteHiddenLayersPatch = Join-Path $root "delete-hidden-layers.js"
 $splitLongFramePatch = Join-Path $root "split-long-frame.js"
@@ -96,6 +98,14 @@ if (-not (Test-Path $aiPixelPerfectPatch)) {
 
 if (-not (Test-Path $skewTransformPatch)) {
   throw "Missing skew transform patch: $skewTransformPatch"
+}
+
+if (-not (Test-Path $cornerRadiusAdjustPatch)) {
+  throw "Missing corner radius adjust patch: $cornerRadiusAdjustPatch"
+}
+
+if (-not (Test-Path $buttonTextAutoSizePatch)) {
+  throw "Missing button text auto size patch: $buttonTextAutoSizePatch"
 }
 
 if (-not (Test-Path $unlockLockedLayersPatch)) {
@@ -230,6 +240,8 @@ $runtimeSyntaxSourceFiles = @(
   $aiTypoAuditPatch,
   $aiPixelPerfectPatch,
   $skewTransformPatch,
+  $cornerRadiusAdjustPatch,
+  $buttonTextAutoSizePatch,
   $unlockLockedLayersPatch,
   $deleteHiddenLayersPatch,
   $aiUrlShortenerPatch,
@@ -1568,6 +1580,8 @@ $aiRegroupRenamePatchContent = [System.IO.File]::ReadAllText($aiRegroupRenamePat
 $aiTypoAuditPatchContent = [System.IO.File]::ReadAllText($aiTypoAuditPatch, [System.Text.Encoding]::UTF8)
 $aiPixelPerfectPatchContent = [System.IO.File]::ReadAllText($aiPixelPerfectPatch, [System.Text.Encoding]::UTF8)
 $skewTransformPatchContent = [System.IO.File]::ReadAllText($skewTransformPatch, [System.Text.Encoding]::UTF8)
+$cornerRadiusAdjustPatchContent = [System.IO.File]::ReadAllText($cornerRadiusAdjustPatch, [System.Text.Encoding]::UTF8)
+$buttonTextAutoSizePatchContent = [System.IO.File]::ReadAllText($buttonTextAutoSizePatch, [System.Text.Encoding]::UTF8)
 $unlockLockedLayersPatchContent = [System.IO.File]::ReadAllText($unlockLockedLayersPatch, [System.Text.Encoding]::UTF8)
 $deleteHiddenLayersPatchContent = [System.IO.File]::ReadAllText($deleteHiddenLayersPatch, [System.Text.Encoding]::UTF8)
 $splitLongFramePatchContent = [System.IO.File]::ReadAllText($splitLongFramePatch, [System.Text.Encoding]::UTF8)
@@ -1592,6 +1606,8 @@ $patchedRuntimeParts = @(
   $aiTypoAuditPatchContent,
   $aiPixelPerfectPatchContent,
   $skewTransformPatchContent,
+  $cornerRadiusAdjustPatchContent,
+  $buttonTextAutoSizePatchContent,
   $unlockLockedLayersPatchContent,
   $deleteHiddenLayersPatchContent,
   $splitLongFramePatchContent,
