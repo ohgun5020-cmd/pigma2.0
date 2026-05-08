@@ -2791,15 +2791,6 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   const LONG_EDITABLE_WHITESPACE_CAPTURE_MIN = 8;
   const LONG_EDITABLE_WHITESPACE_CAPTURE_MAX = 160;
   const LONG_EDITABLE_WHITESPACE_EDGE_TOLERANCE = 4;
-  const PSD_WORKSPACE_PAGE_LONG_HEIGHT = 4500;
-  const PSD_WORKSPACE_PAGE_BATCH_ROOT_COUNT = 8;
-  const PSD_WORKSPACE_PAGE_BATCH_AREA = 15000000;
-  const PSD_WORKSPACE_PAGE_BANNER_ROOT_COUNT = 4;
-  const PSD_WORKSPACE_PAGE_BANNER_RATIO = 1.25;
-  const PSD_WORKSPACE_PAGE_BANNER_MIN_WIDTH = 480;
-  const PSD_WORKSPACE_PAGE_BANNER_MIN_HEIGHT = 120;
-  const PSD_WORKSPACE_PAGE_BANNER_MAX_HEIGHT = 1800;
-  const PSD_WORKSPACE_PAGE_GAP = 160;
   const PIGMA_EXPORT_TEMP_NODE_NAMES = Object.freeze([
     "__pigma-mask-preview__",
     "__pigma-background-blur-crop__",
@@ -2810,8 +2801,6 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   ]);
   const PIGMA_EXPORT_TEMP_NODE_NAME_SET = new Set(PIGMA_EXPORT_TEMP_NODE_NAMES);
   let activeEditableSegmentSession = null;
-  let activeWorkspacePageSession = null;
-  let activeWorkspaceCleanupPromise = null;
 
   if (typeof originalOnMessage !== "function") {
     return;
@@ -2821,10 +2810,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     figma.ui.postMessage = message => {
       const result = originalPostMessage(message);
       if (message && (message.type === "export-finished" || message.type === "export-error")) {
-        const cleanupResult = cleanupExportMemory("after-export");
-        if (cleanupResult && typeof cleanupResult.catch === "function") {
-          cleanupResult.catch(() => {});
-        }
+        cleanupExportMemory("after-export");
       }
       return result;
     };
@@ -2844,7 +2830,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     const normalizedMessage = normalizeExportMessage(message);
 
     if (normalizedMessage.type === "request-export") {
-      await cleanupExportMemory("before-export");
+      cleanupExportMemory("before-export");
 
       const segmentPlan = getLongEditableSegmentPlan(normalizedMessage);
       if (segmentPlan && normalizedMessage.longEditableSegmentConsent !== true) {
@@ -2859,11 +2845,6 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
       if (segmentPlan && normalizedMessage.longEditableSegmentConsent === true) {
         return runLongEditableSegmentExport(normalizedMessage, segmentPlan);
-      }
-
-      const workspacePlan = getPsdWorkspacePagePlan(normalizedMessage);
-      if (workspacePlan) {
-        return runWorkspacePageExport(normalizedMessage, workspacePlan);
       }
     }
 
@@ -2946,153 +2927,6 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       disableNoise: source.disableNoise === true,
       disableTexture: source.disableTexture === true
     };
-  }
-
-  function getPsdWorkspacePagePlan(message) {
-    if (!message || message.workspacePageActive === true || message.longEditableSegmentActive === true) {
-      return null;
-    }
-
-    if (typeof figma.createPage !== "function") {
-      return null;
-    }
-
-    const roots = getWorkspaceSelectionRoots();
-    if (!roots.length) {
-      return null;
-    }
-
-    const analysis = analyzeWorkspaceSelectionRoots(roots);
-    if (!analysis.shouldUseWorkspacePage) {
-      return null;
-    }
-
-    return {
-      roots: roots,
-      reason: analysis.reason,
-      title: analysis.title,
-      rootCount: roots.length,
-      longRootCount: analysis.longRootCount,
-      bannerRootCount: analysis.bannerRootCount,
-      totalArea: analysis.totalArea
-    };
-  }
-
-  function getWorkspaceSelectionRoots() {
-    const selection = figma.currentPage && Array.isArray(figma.currentPage.selection)
-      ? Array.from(figma.currentPage.selection)
-      : [];
-    const selectedIds = new Set();
-    for (let index = 0; index < selection.length; index += 1) {
-      const node = selection[index];
-      if (node && !node.removed && node.id) {
-        selectedIds.add(node.id);
-      }
-    }
-
-    const roots = [];
-    for (let index = 0; index < selection.length; index += 1) {
-      const node = selection[index];
-      if (!node || node.removed || !("exportAsync" in node)) {
-        continue;
-      }
-      if (hasSelectedAncestor(node, selectedIds)) {
-        continue;
-      }
-      roots.push(node);
-    }
-    return roots;
-  }
-
-  function hasSelectedAncestor(node, selectedIds) {
-    let parent = node && node.parent ? node.parent : null;
-    while (parent) {
-      if (parent.id && selectedIds.has(parent.id)) {
-        return true;
-      }
-      parent = parent.parent ? parent.parent : null;
-    }
-    return false;
-  }
-
-  function analyzeWorkspaceSelectionRoots(roots) {
-    let boundedRootCount = 0;
-    let longRootCount = 0;
-    let bannerRootCount = 0;
-    let totalArea = 0;
-
-    for (let index = 0; index < roots.length; index += 1) {
-      const bounds = getNodeBounds(roots[index]);
-      if (!bounds) {
-        continue;
-      }
-
-      boundedRootCount += 1;
-      totalArea += bounds.width * bounds.height;
-
-      if (bounds.height >= PSD_WORKSPACE_PAGE_LONG_HEIGHT) {
-        longRootCount += 1;
-      }
-
-      if (isWorkspaceBannerBounds(bounds)) {
-        bannerRootCount += 1;
-      }
-    }
-
-    const bannerThreshold = Math.max(PSD_WORKSPACE_PAGE_BANNER_ROOT_COUNT, Math.ceil(Math.max(1, boundedRootCount) * 0.6));
-    if (longRootCount > 0) {
-      return {
-        shouldUseWorkspacePage: true,
-        reason: "long-page",
-        title: "\uAE34 \uD398\uC774\uC9C0 PSD",
-        longRootCount: longRootCount,
-        bannerRootCount: bannerRootCount,
-        totalArea: totalArea
-      };
-    }
-
-    if (boundedRootCount >= PSD_WORKSPACE_PAGE_BANNER_ROOT_COUNT && bannerRootCount >= bannerThreshold) {
-      return {
-        shouldUseWorkspacePage: true,
-        reason: "banner-batch",
-        title: "\uBC30\uB108 \uBB36\uC74C PSD",
-        longRootCount: longRootCount,
-        bannerRootCount: bannerRootCount,
-        totalArea: totalArea
-      };
-    }
-
-    if (boundedRootCount >= PSD_WORKSPACE_PAGE_BATCH_ROOT_COUNT && totalArea >= PSD_WORKSPACE_PAGE_BATCH_AREA) {
-      return {
-        shouldUseWorkspacePage: true,
-        reason: "large-batch",
-        title: "\uB300\uB7C9 PSD",
-        longRootCount: longRootCount,
-        bannerRootCount: bannerRootCount,
-        totalArea: totalArea
-      };
-    }
-
-    return {
-      shouldUseWorkspacePage: false,
-      reason: "",
-      title: "",
-      longRootCount: longRootCount,
-      bannerRootCount: bannerRootCount,
-      totalArea: totalArea
-    };
-  }
-
-  function isWorkspaceBannerBounds(bounds) {
-    if (!bounds || bounds.width < PSD_WORKSPACE_PAGE_BANNER_MIN_WIDTH || bounds.height < PSD_WORKSPACE_PAGE_BANNER_MIN_HEIGHT) {
-      return false;
-    }
-
-    if (bounds.height > PSD_WORKSPACE_PAGE_BANNER_MAX_HEIGHT) {
-      return false;
-    }
-
-    return bounds.width / Math.max(1, bounds.height) >= PSD_WORKSPACE_PAGE_BANNER_RATIO;
   }
 
   function getLongEditableSegmentPlan(message) {
@@ -3421,194 +3255,14 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     };
   }
 
-  async function runWorkspacePageExport(message, plan) {
-    const previousPage = figma.currentPage;
-    const previousSelection = getCurrentSelectionSnapshot();
-    let session = null;
-
-    try {
-      session = await beginPsdWorkspacePageSession(plan, previousPage, previousSelection);
-      if (!session) {
-        return originalOnMessage(Object.assign({}, message, {
-          workspacePageSkipped: true
-        }));
-      }
-
-      const clones = cloneWorkspaceRootsToPage(plan.roots, session.workspacePage);
-      session.clones = clones;
-      if (!clones.length) {
-        throw new Error("\uC0C8 \uD398\uC774\uC9C0\uC5D0 PSD \uC791\uC5C5\uC6A9 \uB808\uC774\uC5B4\uB97C \uC900\uBE44\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.");
-      }
-
-      figma.currentPage.selection = clones;
-      scrollWorkspaceSelectionIntoView(clones);
-      figma.notify(buildWorkspacePageNotifyMessage(plan, clones.length));
-
-      return originalOnMessage(Object.assign({}, message, {
-        workspacePageActive: true,
-        workspacePageReason: plan.reason
-      }));
-    } catch (error) {
-      const currentSession = session || activeWorkspacePageSession;
-      if (currentSession) {
-        await finishPsdWorkspacePageSession(currentSession);
-        if (activeWorkspacePageSession === currentSession) {
-          activeWorkspacePageSession = null;
-        }
-      } else {
-        await restorePageAndSelection(previousPage, previousSelection);
-      }
-
-      try {
-        console.warn("[pigma][psd-workspace-page]", error);
-      } catch (warnError) {
-      }
-
-      return originalOnMessage(Object.assign({}, message, {
-        workspacePageSkipped: true
-      }));
-    }
-  }
-
-  async function beginPsdWorkspacePageSession(plan, previousPage, previousSelection) {
-    if (typeof figma.createPage !== "function") {
-      return null;
-    }
-
-    let workspacePage = null;
-    try {
-      workspacePage = figma.createPage();
-      workspacePage.name = buildPsdWorkspacePageName(plan);
-      const session = {
-        workspacePage: workspacePage,
-        previousPage: previousPage,
-        previousSelection: previousSelection,
-        clones: [],
-        reason: plan && plan.reason ? plan.reason : "export"
-      };
-      activeWorkspacePageSession = session;
-
-      const switched = await setCurrentPageSafely(workspacePage);
-      if (!switched) {
-        throw new Error("Could not enter PSD workspace page.");
-      }
-
-      return session;
-    } catch (error) {
-      if (workspacePage && !workspacePage.removed) {
-        removeNodeSafely(workspacePage);
-      }
-      activeWorkspacePageSession = null;
-      try {
-        console.warn("[pigma][psd-workspace-page-create]", error);
-      } catch (warnError) {
-      }
-      return null;
-    }
-  }
-
-  function buildPsdWorkspacePageName(plan) {
-    const now = new Date();
-    const month = String(now.getMonth() + 1).padStart(2, "0");
-    const day = String(now.getDate()).padStart(2, "0");
-    const hour = String(now.getHours()).padStart(2, "0");
-    const minute = String(now.getMinutes()).padStart(2, "0");
-    const title = plan && plan.title ? plan.title : "PSD";
-    return "Pigma " + title + " " + month + day + "-" + hour + minute;
-  }
-
-  function cloneWorkspaceRootsToPage(roots, page) {
-    const clones = [];
-    let cursorY = 0;
-    for (let index = 0; index < roots.length; index += 1) {
-      const root = roots[index];
-      if (!root || root.removed || !page || page.removed) {
-        continue;
-      }
-
-      const bounds = getNodeBounds(root);
-      try {
-        const clone = root.clone();
-        page.appendChild(clone);
-        positionWorkspaceClone(clone, cursorY);
-        clones.push(clone);
-        cursorY += getWorkspaceCloneHeight(root, clone, bounds) + PSD_WORKSPACE_PAGE_GAP;
-      } catch (error) {
-        try {
-          console.warn("[pigma][psd-workspace-page-clone]", getNodeName(root), error);
-        } catch (warnError) {
-        }
-      }
-    }
-    return clones;
-  }
-
-  function positionWorkspaceClone(clone, cursorY) {
-    try {
-      if ("x" in clone) {
-        clone.x = 0;
-      }
-      if ("y" in clone) {
-        clone.y = Math.round(cursorY);
-      }
-    } catch (error) {
-    }
-  }
-
-  function getWorkspaceCloneHeight(root, clone, rootBounds) {
-    if (rootBounds && Number.isFinite(rootBounds.height)) {
-      return Math.max(1, Math.round(rootBounds.height));
-    }
-
-    const cloneBounds = getNodeBounds(clone);
-    if (cloneBounds && Number.isFinite(cloneBounds.height)) {
-      return Math.max(1, Math.round(cloneBounds.height));
-    }
-
-    if (root && "height" in root && Number.isFinite(root.height)) {
-      return Math.max(1, Math.round(root.height));
-    }
-
-    return 1000;
-  }
-
-  function scrollWorkspaceSelectionIntoView(nodes) {
-    try {
-      if (nodes && nodes.length && figma.viewport && typeof figma.viewport.scrollAndZoomIntoView === "function") {
-        figma.viewport.scrollAndZoomIntoView(nodes);
-      }
-    } catch (error) {
-    }
-  }
-
-  function buildWorkspacePageNotifyMessage(plan, count) {
-    if (plan && plan.reason === "long-page") {
-      return "\uAE34 \uD398\uC774\uC9C0 PSD\uB97C \uC0C8 \uC791\uC5C5 \uD398\uC774\uC9C0\uC5D0\uC11C \uC900\uBE44\uD569\uB2C8\uB2E4.";
-    }
-
-    if (plan && plan.reason === "banner-batch") {
-      return "\uBC30\uB108 " + count + "\uAC1C\uB97C \uC0C8 \uC791\uC5C5 \uD398\uC774\uC9C0\uC5D0\uC11C PSD\uB85C \uC900\uBE44\uD569\uB2C8\uB2E4.";
-    }
-
-    return "\uC120\uD0DD\uD55C " + count + "\uAC1C \uB808\uC774\uC5B4\uB97C \uC0C8 \uC791\uC5C5 \uD398\uC774\uC9C0\uC5D0\uC11C PSD\uB85C \uC900\uBE44\uD569\uB2C8\uB2E4.";
-  }
-
   async function runLongEditableSegmentExport(message, plan) {
-    await cleanupExportMemory("before-long-editable");
+    cleanupExportMemory("before-long-editable");
 
-    const previousPage = figma.currentPage;
     const previousSelection = figma.currentPage.selection ? figma.currentPage.selection.slice() : [];
     const frames = [];
     let splitMode = "fixed";
-    let workspaceSession = null;
 
     try {
-      workspaceSession = await beginPsdWorkspacePageSession({
-        roots: [plan.root],
-        reason: "long-page",
-        title: "\uAE34 \uD398\uC774\uC9C0 PSD"
-      }, previousPage, previousSelection);
-
       const prepared = createLongEditableExportFrames(plan);
       splitMode = prepared.mode;
       for (let index = 0; index < prepared.frames.length; index += 1) {
@@ -3617,8 +3271,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
       activeEditableSegmentSession = {
         frames: frames,
-        previousSelection: previousSelection,
-        deferSelectionRestore: !!workspaceSession
+        previousSelection: previousSelection
       };
 
       figma.currentPage.selection = frames;
@@ -3630,23 +3283,14 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
       const segmentedMessage = Object.assign({}, message, {
         longEditableSegmentActive: true,
-        longEditableSegmentConsent: false,
-        workspacePageActive: !!workspaceSession,
-        workspacePageReason: workspaceSession ? "long-page" : ""
+        longEditableSegmentConsent: false
       });
 
       return originalOnMessage(segmentedMessage);
     } catch (error) {
       cleanupNodes(frames);
+      restoreSelection(previousSelection);
       activeEditableSegmentSession = null;
-      if (workspaceSession) {
-        await finishPsdWorkspacePageSession(workspaceSession);
-        if (activeWorkspacePageSession === workspaceSession) {
-          activeWorkspacePageSession = null;
-        }
-      } else {
-        await restorePageAndSelection(previousPage, previousSelection);
-      }
       const messageText = error instanceof Error && error.message ? error.message : "긴 PSD 구간 준비 중 오류가 발생했습니다.";
       figma.ui.postMessage({ type: "export-error", message: messageText });
       figma.notify(messageText, { error: true });
@@ -4103,10 +3747,6 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   }
 
   function shouldRestoreEditableSegmentSelection(session) {
-    if (session && session.deferSelectionRestore === true) {
-      return false;
-    }
-
     try {
       const currentSelection = figma.currentPage && Array.isArray(figma.currentPage.selection)
         ? figma.currentPage.selection
@@ -4127,73 +3767,9 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
   }
 
-  async function cleanupExportMemory(reason) {
+  function cleanupExportMemory(reason) {
     cleanupEditableSegmentSession();
-    await cleanupWorkspacePageSession(reason);
     cleanupOrphanPigmaExportNodes(reason);
-  }
-
-  async function cleanupWorkspacePageSession(reason) {
-    if (activeWorkspaceCleanupPromise) {
-      try {
-        await activeWorkspaceCleanupPromise;
-      } catch (error) {
-      }
-    }
-
-    if (!activeWorkspacePageSession) {
-      return;
-    }
-
-    const session = activeWorkspacePageSession;
-    activeWorkspacePageSession = null;
-    activeWorkspaceCleanupPromise = finishPsdWorkspacePageSession(session);
-    try {
-      await activeWorkspaceCleanupPromise;
-    } catch (error) {
-      try {
-        console.warn("[pigma][psd-workspace-page-cleanup]", reason || "export", error);
-      } catch (warnError) {
-      }
-    } finally {
-      activeWorkspaceCleanupPromise = null;
-    }
-  }
-
-  async function finishPsdWorkspacePageSession(session) {
-    if (!session) {
-      return;
-    }
-
-    const workspacePage = session.workspacePage;
-    const restored = await restorePageAndSelection(session.previousPage, session.previousSelection);
-    if (!restored) {
-      await leaveWorkspacePageBeforeRemove(workspacePage);
-    }
-
-    cleanupNodes(session.clones);
-    if (workspacePage && !workspacePage.removed) {
-      removeNodeSafely(workspacePage);
-    }
-  }
-
-  async function leaveWorkspacePageBeforeRemove(workspacePage) {
-    try {
-      if (!figma.root || !Array.isArray(figma.root.children)) {
-        return false;
-      }
-
-      const pages = Array.from(figma.root.children);
-      for (let index = 0; index < pages.length; index += 1) {
-        const page = pages[index];
-        if (!page || page.removed || page === workspacePage) {
-          continue;
-        }
-        return await setCurrentPageSafely(page);
-      }
-    } catch (error) {
-    }
-    return false;
   }
 
   function cleanupOrphanPigmaExportNodes(reason) {
@@ -4272,58 +3848,6 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     for (let index = 0; index < nodes.length; index += 1) {
       const node = nodes[index];
       removeNodeSafely(node);
-    }
-  }
-
-  function getCurrentSelectionSnapshot() {
-    try {
-      return figma.currentPage && Array.isArray(figma.currentPage.selection)
-        ? figma.currentPage.selection.slice()
-        : [];
-    } catch (error) {
-      return [];
-    }
-  }
-
-  async function restorePageAndSelection(page, selection) {
-    if (!page || page.removed) {
-      return false;
-    }
-
-    const restoredPage = await setCurrentPageSafely(page);
-    if (!restoredPage) {
-      return false;
-    }
-
-    restoreSelection(selection);
-    return true;
-  }
-
-  async function setCurrentPageSafely(page) {
-    if (!page || page.removed) {
-      return false;
-    }
-
-    try {
-      if (figma.currentPage && figma.currentPage.id === page.id) {
-        return true;
-      }
-    } catch (error) {
-    }
-
-    try {
-      if (typeof figma.setCurrentPageAsync === "function") {
-        await figma.setCurrentPageAsync(page);
-        return true;
-      }
-    } catch (error) {
-    }
-
-    try {
-      figma.currentPage = page;
-      return true;
-    } catch (error) {
-      return false;
     }
   }
 
