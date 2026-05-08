@@ -803,6 +803,7 @@
       const colorSnapshot = extractTextRangeColorSnapshot(range.node, range.start, range.end);
       const highlightColorHex = sanitizeHexColor(message && message.highlightColorHex, AI_TEXT_HIGHLIGHT_DEFAULT_COLOR);
       const textColorHex = sanitizeHexColor(message && message.textColorHex, colorSnapshot.hex);
+      const shouldApplyTextColor = shouldApplyTextHighlightColor(message);
       const cornerRadius = sanitizeTextHighlightRadius(
         message && message.cornerRadius,
         AI_TEXT_HIGHLIGHT_DEFAULT_RADIUS
@@ -842,7 +843,9 @@
         throw new Error("선택한 텍스트 범위의 위치를 안전하게 계산하지 못했습니다. 다시 드래그한 뒤 시도해 주세요.");
       }
 
-      await applyTextHighlightColor(range.node, range.start, range.end, textColorHex);
+      if (shouldApplyTextColor) {
+        await applyTextHighlightColor(range.node, range.start, range.end, textColorHex);
+      }
 
       const container = prepareTextHighlightLayerContainer(parent, range.node);
       const highlightParent = container.parent;
@@ -901,6 +904,7 @@
       const lineHeight = getTextRangeLineHeight(range.node, range.start, range.end, fontSize);
       const highlightColorHex = sanitizeHexColor(message && message.highlightColorHex, AI_TEXT_HIGHLIGHT_DEFAULT_COLOR);
       const textColorHex = sanitizeHexColor(message && message.textColorHex, colorSnapshot.hex);
+      const shouldApplyTextColor = shouldApplyTextHighlightColor(message);
       const decorationScale = sanitizeTextHighlightDecorationScale(
         message && message.decorationScale,
         buildTextHighlightAutoDecorationScale(fontSize, "line", lineHeight)
@@ -941,7 +945,9 @@
       }
 
       clearTextHighlightDecoration(range.node, range.start, range.end);
-      await applyTextHighlightColor(range.node, range.start, range.end, textColorHex);
+      if (shouldApplyTextColor) {
+        await applyTextHighlightColor(range.node, range.start, range.end, textColorHex);
+      }
 
       const container = prepareTextHighlightLayerContainer(parent, range.node);
       const highlightParent = container.parent;
@@ -1001,6 +1007,7 @@
       const lineHeight = getTextRangeLineHeight(range.node, range.start, range.end, fontSize);
       const highlightColorHex = sanitizeHexColor(message && message.highlightColorHex, AI_TEXT_HIGHLIGHT_DEFAULT_COLOR);
       const textColorHex = sanitizeHexColor(message && message.textColorHex, colorSnapshot.hex);
+      const shouldApplyTextColor = shouldApplyTextHighlightColor(message);
       const decorationScale = sanitizeTextHighlightDecorationScale(
         message && message.decorationScale,
         buildTextHighlightAutoDecorationScale(fontSize, "strike", lineHeight)
@@ -1041,7 +1048,9 @@
       }
 
       clearTextHighlightDecoration(range.node, range.start, range.end);
-      await applyTextHighlightColor(range.node, range.start, range.end, textColorHex);
+      if (shouldApplyTextColor) {
+        await applyTextHighlightColor(range.node, range.start, range.end, textColorHex);
+      }
 
       const container = prepareTextHighlightLayerContainer(parent, range.node);
       const highlightParent = container.parent;
@@ -1099,6 +1108,7 @@
       const colorSnapshot = extractTextRangeColorSnapshot(range.node, range.start, range.end);
       const highlightColorHex = sanitizeHexColor(message && message.highlightColorHex, AI_TEXT_HIGHLIGHT_DEFAULT_COLOR);
       const textColorHex = sanitizeHexColor(message && message.textColorHex, colorSnapshot.hex);
+      const shouldApplyTextColor = shouldApplyTextHighlightColor(message);
       const decorationScale = sanitizeTextHighlightDecorationScale(
         message && message.decorationScale,
         AI_TEXT_HIGHLIGHT_DEFAULT_DECORATION_SCALE
@@ -1106,7 +1116,9 @@
 
       postTextHighlightStatus("running", "텍스트 하이라이트를 적용하는 중입니다.");
       await applyTextHighlightDecoration(range.node, range.start, range.end, highlightColorHex, resolvedMode, decorationScale);
-      await applyTextHighlightColor(range.node, range.start, range.end, textColorHex);
+      if (shouldApplyTextColor) {
+        await applyTextHighlightColor(range.node, range.start, range.end, textColorHex);
+      }
       figma.currentPage.selection = [range.node];
       figma.viewport.scrollAndZoomIntoView([range.node]);
 
@@ -9087,6 +9099,22 @@
 
     const fallbackValue = normalizeHexCandidate(fallback);
     return fallbackValue || AI_TEXT_HIGHLIGHT_DEFAULT_TEXT_COLOR;
+  }
+
+  function shouldApplyTextHighlightColor(message) {
+    const mode = String((message && message.textColorMode) || "")
+      .trim()
+      .toLowerCase();
+
+    if (mode === "default" || mode === "preserve") {
+      return false;
+    }
+
+    if (mode === "custom") {
+      return true;
+    }
+
+    return !!normalizeHexCandidate(message && message.textColorHex);
   }
 
   function sanitizeTextHighlightRadius(value, fallback) {

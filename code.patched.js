@@ -17454,6 +17454,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       const colorSnapshot = extractTextRangeColorSnapshot(range.node, range.start, range.end);
       const highlightColorHex = sanitizeHexColor(message && message.highlightColorHex, AI_TEXT_HIGHLIGHT_DEFAULT_COLOR);
       const textColorHex = sanitizeHexColor(message && message.textColorHex, colorSnapshot.hex);
+      const shouldApplyTextColor = shouldApplyTextHighlightColor(message);
       const cornerRadius = sanitizeTextHighlightRadius(
         message && message.cornerRadius,
         AI_TEXT_HIGHLIGHT_DEFAULT_RADIUS
@@ -17493,7 +17494,9 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         throw new Error("선택한 텍스트 범위의 위치를 안전하게 계산하지 못했습니다. 다시 드래그한 뒤 시도해 주세요.");
       }
 
-      await applyTextHighlightColor(range.node, range.start, range.end, textColorHex);
+      if (shouldApplyTextColor) {
+        await applyTextHighlightColor(range.node, range.start, range.end, textColorHex);
+      }
 
       const container = prepareTextHighlightLayerContainer(parent, range.node);
       const highlightParent = container.parent;
@@ -17552,6 +17555,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       const lineHeight = getTextRangeLineHeight(range.node, range.start, range.end, fontSize);
       const highlightColorHex = sanitizeHexColor(message && message.highlightColorHex, AI_TEXT_HIGHLIGHT_DEFAULT_COLOR);
       const textColorHex = sanitizeHexColor(message && message.textColorHex, colorSnapshot.hex);
+      const shouldApplyTextColor = shouldApplyTextHighlightColor(message);
       const decorationScale = sanitizeTextHighlightDecorationScale(
         message && message.decorationScale,
         buildTextHighlightAutoDecorationScale(fontSize, "line", lineHeight)
@@ -17592,7 +17596,9 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       }
 
       clearTextHighlightDecoration(range.node, range.start, range.end);
-      await applyTextHighlightColor(range.node, range.start, range.end, textColorHex);
+      if (shouldApplyTextColor) {
+        await applyTextHighlightColor(range.node, range.start, range.end, textColorHex);
+      }
 
       const container = prepareTextHighlightLayerContainer(parent, range.node);
       const highlightParent = container.parent;
@@ -17652,6 +17658,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       const lineHeight = getTextRangeLineHeight(range.node, range.start, range.end, fontSize);
       const highlightColorHex = sanitizeHexColor(message && message.highlightColorHex, AI_TEXT_HIGHLIGHT_DEFAULT_COLOR);
       const textColorHex = sanitizeHexColor(message && message.textColorHex, colorSnapshot.hex);
+      const shouldApplyTextColor = shouldApplyTextHighlightColor(message);
       const decorationScale = sanitizeTextHighlightDecorationScale(
         message && message.decorationScale,
         buildTextHighlightAutoDecorationScale(fontSize, "strike", lineHeight)
@@ -17692,7 +17699,9 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       }
 
       clearTextHighlightDecoration(range.node, range.start, range.end);
-      await applyTextHighlightColor(range.node, range.start, range.end, textColorHex);
+      if (shouldApplyTextColor) {
+        await applyTextHighlightColor(range.node, range.start, range.end, textColorHex);
+      }
 
       const container = prepareTextHighlightLayerContainer(parent, range.node);
       const highlightParent = container.parent;
@@ -17750,6 +17759,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       const colorSnapshot = extractTextRangeColorSnapshot(range.node, range.start, range.end);
       const highlightColorHex = sanitizeHexColor(message && message.highlightColorHex, AI_TEXT_HIGHLIGHT_DEFAULT_COLOR);
       const textColorHex = sanitizeHexColor(message && message.textColorHex, colorSnapshot.hex);
+      const shouldApplyTextColor = shouldApplyTextHighlightColor(message);
       const decorationScale = sanitizeTextHighlightDecorationScale(
         message && message.decorationScale,
         AI_TEXT_HIGHLIGHT_DEFAULT_DECORATION_SCALE
@@ -17757,7 +17767,9 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
       postTextHighlightStatus("running", "텍스트 하이라이트를 적용하는 중입니다.");
       await applyTextHighlightDecoration(range.node, range.start, range.end, highlightColorHex, resolvedMode, decorationScale);
-      await applyTextHighlightColor(range.node, range.start, range.end, textColorHex);
+      if (shouldApplyTextColor) {
+        await applyTextHighlightColor(range.node, range.start, range.end, textColorHex);
+      }
       figma.currentPage.selection = [range.node];
       figma.viewport.scrollAndZoomIntoView([range.node]);
 
@@ -25740,6 +25752,22 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return fallbackValue || AI_TEXT_HIGHLIGHT_DEFAULT_TEXT_COLOR;
   }
 
+  function shouldApplyTextHighlightColor(message) {
+    const mode = String((message && message.textColorMode) || "")
+      .trim()
+      .toLowerCase();
+
+    if (mode === "default" || mode === "preserve") {
+      return false;
+    }
+
+    if (mode === "custom") {
+      return true;
+    }
+
+    return !!normalizeHexCandidate(message && message.textColorHex);
+  }
+
   function sanitizeTextHighlightRadius(value, fallback) {
     const next = parseTextHighlightRadius(value);
     if (typeof next === "number") {
@@ -31312,7 +31340,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         return;
       }
 
-      await runSplitLongFrame();
+      await runSplitLongFrame(message);
       return;
     }
 
@@ -31328,12 +31356,20 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return !!message && message.type === "run-split-long-frame";
   }
 
-  async function runSplitLongFrame() {
+  async function runSplitLongFrame(message) {
+    const splitMode = normalizeSplitMode(message && message.splitMode);
     isRunning = true;
-    postStatus("running", "\uAE34 \uD504\uB808\uC784\uC744 \uC139\uC158\uBCC4\uB85C \uB098\uB204\uACE0 \uC788\uC2B5\uB2C8\uB2E4.");
+    postStatus(
+      "running",
+      splitMode === "user"
+        ? "\uC0AC\uC6A9\uC790\uAC00 \uB9CC\uB4E0 \uADF8\uB8F9 \uAE30\uC900\uC73C\uB85C \uD504\uB808\uC784\uC744 \uB098\uB204\uACE0 \uC788\uC2B5\uB2C8\uB2E4."
+        : "\uAE34 \uD504\uB808\uC784\uC744 \uC139\uC158\uBCC4\uB85C \uB098\uB204\uACE0 \uC788\uC2B5\uB2C8\uB2E4."
+    );
 
     try {
-      const result = splitSelectedLongFrame();
+      const result = splitSelectedLongFrame({
+        splitMode,
+      });
       figma.ui.postMessage({
         type: "split-long-frame-result",
         result,
@@ -31351,15 +31387,17 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
   }
 
-  function splitSelectedLongFrame() {
+  function splitSelectedLongFrame(options) {
     const selection = Array.from(figma.currentPage.selection || []);
     if (selection.length !== 1) {
       throw new Error("\uB098\uB20C \uD504\uB808\uC784 \uD558\uB098\uB9CC \uC120\uD0DD\uD558\uC138\uC694.");
     }
 
+    const normalizedOptions = options && typeof options === "object" ? options : {};
     const output = createSplitLongFrames(selection[0], {
       selectCreatedFrames: true,
       scrollIntoView: true,
+      splitMode: normalizedOptions.splitMode,
     });
     return output.result;
   }
@@ -31376,27 +31414,46 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     const maxSegmentAxis = getMaxSegmentAxis(normalizedOptions);
     const outputOffset = getNumberOption(normalizedOptions, "outputOffset", OUTPUT_OFFSET);
     const outputGap = getNumberOption(normalizedOptions, "outputGap", OUTPUT_GAP);
+    const splitMode = normalizeSplitMode(normalizedOptions.splitMode);
     const entries = collectDirectChildEntries(root, direction);
     if (!entries.length) {
       throw new Error("\uB098\uB204\uAE30\uC5D0 \uC0AC\uC6A9\uD560 \uC790\uC2DD \uB808\uC774\uC5B4\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.");
     }
 
     const boundaryEntries = collectNestedAnchorEntries(root, direction);
-    let anchors = buildSectionAnchors(entries, rootAxis, rootCross);
-    if (anchors.length < 2) {
-      anchors = buildSectionAnchors(boundaryEntries, rootAxis, rootCross);
+    let anchors = [];
+    let segments = [];
+    let userGroupCount = 0;
+
+    if (splitMode === "user") {
+      anchors = buildUserGroupAnchors(entries, rootAxis, rootCross);
+      userGroupCount = anchors.length;
+      if (anchors.length < 2) {
+        throw new Error("\uC0AC\uC6A9\uC790 \uB098\uB204\uAE30\uB294 \uC120\uD0DD\uD55C \uD504\uB808\uC784 \uC548\uC5D0 \uC9C1\uC811 \uB9CC\uB4E0 \uADF8\uB8F9, \uD504\uB808\uC784, \uC139\uC158\uC774 2\uAC1C \uC774\uC0C1 \uC788\uC5B4\uC57C \uD569\uB2C8\uB2E4.");
+      }
+      segments = buildUserGroupSegments(anchors, rootAxis);
+      segments = expandLargeSegments(segments, maxSegmentAxis, boundaryEntries);
+    } else {
+      anchors = buildSectionAnchors(entries, rootAxis, rootCross);
+      if (anchors.length < 2) {
+        anchors = buildSectionAnchors(boundaryEntries, rootAxis, rootCross);
+      }
+      segments =
+        anchors.length >= 2 ? buildSectionSegments(anchors, rootAxis) : buildChunkSegments(rootAxis, maxSegmentAxis, boundaryEntries);
+      if (anchors.length >= 2 && segmentsHaveUnsafeCuts(segments, boundaryEntries)) {
+        segments = buildChunkSegments(rootAxis, maxSegmentAxis, boundaryEntries);
+      }
+      segments = expandLargeSegments(segments, maxSegmentAxis, boundaryEntries);
+      segments = mergeSmallSegments(segments, maxSegmentAxis);
+      segments = includeAdjacentWhitespaceAroundSegments(segments, boundaryEntries, rootAxis, maxSegmentAxis);
     }
-    let segments =
-      anchors.length >= 2 ? buildSectionSegments(anchors, rootAxis) : buildChunkSegments(rootAxis, maxSegmentAxis, boundaryEntries);
-    if (anchors.length >= 2 && segmentsHaveUnsafeCuts(segments, boundaryEntries)) {
-      segments = buildChunkSegments(rootAxis, maxSegmentAxis, boundaryEntries);
-    }
-    segments = expandLargeSegments(segments, maxSegmentAxis, boundaryEntries);
-    segments = mergeSmallSegments(segments, maxSegmentAxis);
-    segments = includeAdjacentWhitespaceAroundSegments(segments, boundaryEntries, rootAxis, maxSegmentAxis);
 
     if (segments.length < 2) {
-      throw new Error("\uB098\uB20C \uC139\uC158\uC774 \uBD80\uC871\uD558\uAC70\uB098 \uC774\uBBF8 PSD\uC6A9\uC73C\uB85C \uCDA9\uBD84\uD788 \uC9E7\uC2B5\uB2C8\uB2E4.");
+      throw new Error(
+        splitMode === "user"
+          ? "\uADF8\uB8F9 \uAE30\uC900\uC73C\uB85C \uB098\uB20C \uC139\uC158\uC774 \uBD80\uC871\uD569\uB2C8\uB2E4. \uD504\uB808\uC784 \uC548\uC758 \uC9C1\uACC4 \uADF8\uB8F9\uC744 2\uAC1C \uC774\uC0C1 \uB9CC\uB4E4\uC5B4 \uC8FC\uC138\uC694."
+          : "\uB098\uB20C \uC139\uC158\uC774 \uBD80\uC871\uD558\uAC70\uB098 \uC774\uBBF8 PSD\uC6A9\uC73C\uB85C \uCDA9\uBD84\uD788 \uC9E7\uC2B5\uB2C8\uB2E4."
+      );
     }
 
     const rootPageBox = getAbsoluteBox(root);
@@ -31458,7 +31515,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
     return {
       frames: selectionTargets,
-      result: buildResult(root, direction, segments, createdFrames, skipped, warnings, anchors.length, maxSegmentAxis),
+      result: buildResult(root, direction, segments, createdFrames, skipped, warnings, anchors.length, maxSegmentAxis, splitMode, userGroupCount),
     };
   }
 
@@ -31655,6 +31712,82 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       }, rootAxis);
     }
 
+    return segments;
+  }
+
+  function buildUserGroupAnchors(entries, rootAxis, rootCross) {
+    const anchors = [];
+    for (let index = 0; index < entries.length; index += 1) {
+      const entry = entries[index];
+      if (!isUserGroupAnchorCandidate(entry, rootAxis, rootCross)) {
+        continue;
+      }
+
+      anchors.push({
+        start: clamp(entry.mainStart, 0, rootAxis),
+        end: clamp(entry.mainEnd, 0, rootAxis),
+        label: entry.name,
+        nodeId: entry.node.id,
+      });
+    }
+
+    anchors.sort((a, b) => a.start - b.start || a.end - b.end);
+    return removeDuplicateUserGroupAnchors(anchors);
+  }
+
+  function isUserGroupAnchorCandidate(entry, rootAxis, rootCross) {
+    if (!entry || !entry.node || entry.node.visible === false) {
+      return false;
+    }
+
+    const type = String(entry.node.type || "");
+    if (type !== "GROUP" && type !== "FRAME" && type !== "SECTION") {
+      return false;
+    }
+
+    if (entry.mainLength < MIN_SEGMENT_AXIS) {
+      return false;
+    }
+
+    if (entry.mainLength >= rootAxis - 2) {
+      return false;
+    }
+
+    return entry.crossLength >= Math.max(24, rootCross * 0.05);
+  }
+
+  function removeDuplicateUserGroupAnchors(anchors) {
+    const unique = [];
+    for (let index = 0; index < anchors.length; index += 1) {
+      const anchor = anchors[index];
+      const previous = unique.length > 0 ? unique[unique.length - 1] : null;
+      if (previous && Math.abs(previous.start - anchor.start) <= CUT_SNAP_TOLERANCE) {
+        if (anchor.end - anchor.start > previous.end - previous.start) {
+          previous.end = anchor.end;
+          previous.label = anchor.label || previous.label;
+          previous.nodeId = anchor.nodeId || previous.nodeId;
+        }
+        continue;
+      }
+      unique.push(anchor);
+    }
+    return unique;
+  }
+
+  function buildUserGroupSegments(anchors, rootAxis) {
+    const segments = [];
+    for (let index = 0; index < anchors.length; index += 1) {
+      const anchor = anchors[index];
+      const next = index < anchors.length - 1 ? anchors[index + 1] : null;
+      const start = index === 0 ? 0 : anchor.start;
+      const end = next ? next.start : rootAxis;
+      appendSegment(segments, {
+        start,
+        end,
+        label: anchor.label,
+        mode: "user-group",
+      }, rootAxis);
+    }
     return segments;
   }
 
@@ -31958,6 +32091,10 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   function getMinOutputSegmentAxis(maxSegmentAxis) {
     const preferredMin = Math.min(MIN_OUTPUT_SEGMENT_AXIS, Math.max(maxSegmentAxis, MIN_SEGMENT_AXIS));
     return Math.min(preferredMin, getHardMaxSegmentAxis(maxSegmentAxis));
+  }
+
+  function normalizeSplitMode(value) {
+    return value === "user" ? "user" : "system";
   }
 
   function chooseSegmentEnd(partStart, targetEnd, hardEnd, segmentEnd, entries) {
@@ -32647,7 +32784,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return cleaned.length > 120 ? cleaned.slice(0, 120).trim() : cleaned;
   }
 
-  function buildResult(root, direction, segments, createdFrames, skipped, warnings, anchorCount, maxSegmentAxis) {
+  function buildResult(root, direction, segments, createdFrames, skipped, warnings, anchorCount, maxSegmentAxis, splitMode, userGroupCount) {
     const frames = [];
     for (let index = 0; index < createdFrames.length && index < RESULT_PREVIEW_LIMIT; index += 1) {
       frames.push({
@@ -32666,6 +32803,9 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         directionLabel: direction === "vertical" ? "\uC138\uB85C" : "\uAC00\uB85C",
         sourceChildCount: root.children.length,
         sectionAnchorCount: anchorCount,
+        userGroupCount: userGroupCount || 0,
+        splitMode: normalizeSplitMode(splitMode),
+        splitModeLabel: normalizeSplitMode(splitMode) === "user" ? "\uC0AC\uC6A9\uC790 \uB098\uB204\uAE30" : "\uC2DC\uC2A4\uD15C \uB098\uB204\uAE30",
         segmentCount: segments.length,
         createdFrameCount: createdFrames.length,
         skippedLayerCount: skipped.length,
