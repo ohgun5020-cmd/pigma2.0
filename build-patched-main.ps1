@@ -16,6 +16,7 @@ $aiPixelPerfectPatch = Join-Path $root "ai-pixel-perfect.js"
 $skewTransformPatch = Join-Path $root "skew-transform.js"
 $cornerRadiusAdjustPatch = Join-Path $root "corner-radius-adjust.js"
 $buttonTextAutoSizePatch = Join-Path $root "button-text-auto-size.js"
+$textLineHeightAdjustPatch = Join-Path $root "text-line-height-adjust.js"
 $unlockLockedLayersPatch = Join-Path $root "unlock-locked-layers.js"
 $deleteHiddenLayersPatch = Join-Path $root "delete-hidden-layers.js"
 $splitLongFramePatch = Join-Path $root "split-long-frame.js"
@@ -106,6 +107,10 @@ if (-not (Test-Path $cornerRadiusAdjustPatch)) {
 
 if (-not (Test-Path $buttonTextAutoSizePatch)) {
   throw "Missing button text auto size patch: $buttonTextAutoSizePatch"
+}
+
+if (-not (Test-Path $textLineHeightAdjustPatch)) {
+  throw "Missing text line height adjust patch: $textLineHeightAdjustPatch"
 }
 
 if (-not (Test-Path $unlockLockedLayersPatch)) {
@@ -242,6 +247,7 @@ $runtimeSyntaxSourceFiles = @(
   $skewTransformPatch,
   $cornerRadiusAdjustPatch,
   $buttonTextAutoSizePatch,
+  $textLineHeightAdjustPatch,
   $unlockLockedLayersPatch,
   $deleteHiddenLayersPatch,
   $aiUrlShortenerPatch,
@@ -1582,6 +1588,7 @@ $aiPixelPerfectPatchContent = [System.IO.File]::ReadAllText($aiPixelPerfectPatch
 $skewTransformPatchContent = [System.IO.File]::ReadAllText($skewTransformPatch, [System.Text.Encoding]::UTF8)
 $cornerRadiusAdjustPatchContent = [System.IO.File]::ReadAllText($cornerRadiusAdjustPatch, [System.Text.Encoding]::UTF8)
 $buttonTextAutoSizePatchContent = [System.IO.File]::ReadAllText($buttonTextAutoSizePatch, [System.Text.Encoding]::UTF8)
+$textLineHeightAdjustPatchContent = [System.IO.File]::ReadAllText($textLineHeightAdjustPatch, [System.Text.Encoding]::UTF8)
 $unlockLockedLayersPatchContent = [System.IO.File]::ReadAllText($unlockLockedLayersPatch, [System.Text.Encoding]::UTF8)
 $deleteHiddenLayersPatchContent = [System.IO.File]::ReadAllText($deleteHiddenLayersPatch, [System.Text.Encoding]::UTF8)
 $splitLongFramePatchContent = [System.IO.File]::ReadAllText($splitLongFramePatch, [System.Text.Encoding]::UTF8)
@@ -1608,6 +1615,7 @@ $patchedRuntimeParts = @(
   $skewTransformPatchContent,
   $cornerRadiusAdjustPatchContent,
   $buttonTextAutoSizePatchContent,
+  $textLineHeightAdjustPatchContent,
   $unlockLockedLayersPatchContent,
   $deleteHiddenLayersPatchContent,
   $splitLongFramePatchContent,

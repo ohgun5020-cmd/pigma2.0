@@ -18,6 +18,7 @@ const defaultFiles = [
   "ai-typo-audit.js",
   "ai-pixel-perfect.js",
   "button-text-auto-size.js",
+  "text-line-height-adjust.js",
   "unlock-locked-layers.js",
   "delete-hidden-layers.js",
   "original-image-download.js",
