@@ -395,6 +395,7 @@
         targetNodeName: target.entry.nodeName,
         originalHash: target.entry.imageHash,
         expand: expand,
+        outputMode: sanitizeImageExtendOutputMode(message && message.outputMode),
         imageBounds: target.imageBounds,
         placementMode: target.placementMode || "underlay",
         preparedAt: new Date().toISOString(),
@@ -926,6 +927,10 @@
         currentHeight: currentHeight,
         targetWidth: currentWidth + safeExpand.left + safeExpand.right,
         targetHeight: currentHeight + safeExpand.top + safeExpand.bottom,
+        placementMode: target && target.placementMode === "outside-reference" ? "outside-reference" : "underlay",
+        outputMode: session ? sanitizeImageExtendOutputMode(session.outputMode) : "use_ai_only",
+        defaultOutputMode: "use_ai_only",
+        preserveMode: "soft",
         expandTop: safeExpand.top,
         expandRight: safeExpand.right,
         expandBottom: safeExpand.bottom,
@@ -2316,6 +2321,10 @@
     return !!padding && (padding.top > 0 || padding.right > 0 || padding.bottom > 0 || padding.left > 0);
   }
 
+  function sanitizeImageExtendOutputMode(value) {
+    return "use_ai_only";
+  }
+
   function resolveImageExtendEffectivePadding(requestedPadding, boundsPadding) {
     const requested = requestedPadding || { top: 0, right: 0, bottom: 0, left: 0 };
     const bounds = boundsPadding || { top: 0, right: 0, bottom: 0, left: 0 };
@@ -2454,33 +2463,53 @@
     const nextY = localBounds.y + imageBounds.y - expand.top;
     const nextWidth = Math.max(1, roundBoundsFitMetric(imageBounds.width + expand.left + expand.right));
     const nextHeight = Math.max(1, roundBoundsFitMetric(imageBounds.height + expand.top + expand.bottom));
-    let background = null;
+    const outputMode = sanitizeImageExtendOutputMode(session && session.outputMode);
+    let aiExpandedLayer = null;
+    let maskLayer = null;
+    let group = null;
+    const originalVisible = "visible" in node ? node.visible : true;
 
     try {
-      background = figma.createRectangle();
-      background.name = safeName(node) + " / extended background";
-      background.resize(nextWidth, nextHeight);
-      background.fills = [buildVisibleImageFill(newImageHash)];
-      background.strokes = [];
-      if ("cornerRadius" in background) {
-        background.cornerRadius = 0;
-      }
-      setImageExtendNodePosition(background, nextX, nextY);
+      aiExpandedLayer = createImageExtendResultRectangle("AI Expanded Layer", newImageHash, nextWidth, nextHeight);
+      setImageExtendNodePosition(aiExpandedLayer, nextX, nextY);
 
       const nodeIndex = findNodeChildIndex(parent, node.id);
       if (nodeIndex < 0) {
         throw new Error("Could not find the layer inside its current parent.");
       }
 
-      parent.insertChild(nodeIndex, background);
-      const group = figma.group([background, node], parent);
-      group.name = safeName(node) + " / extended";
+      if (outputMode === "use_ai_only") {
+        parent.insertChild(nodeIndex + 1, aiExpandedLayer);
+        if ("visible" in node) {
+          node.visible = false;
+        }
+        figma.currentPage.selection = [aiExpandedLayer];
+        return buildImageExtendApplyResult(session, aiExpandedLayer, byteLength, skipped);
+      }
+
+      maskLayer = createImageExtendExpansionMaskLayer(imageBounds, expand, nextWidth, nextHeight);
+      if (maskLayer) {
+        setImageExtendNodePosition(maskLayer, nextX, nextY);
+      }
+
+      parent.insertChild(nodeIndex, aiExpandedLayer);
+      if (maskLayer) {
+        parent.insertChild(nodeIndex + 1, maskLayer);
+      }
+      group = figma.group(maskLayer ? [aiExpandedLayer, maskLayer, node] : [aiExpandedLayer, node], parent);
+      group.name = safeName(node) + " / image extension layers";
       figma.currentPage.selection = [group];
 
       return buildImageExtendApplyResult(session, group, byteLength, skipped);
     } catch (error) {
-      if (background && !background.removed && background.parent) {
-        background.remove();
+      if (maskLayer && !maskLayer.removed && maskLayer.parent) {
+        maskLayer.remove();
+      }
+      if (aiExpandedLayer && !aiExpandedLayer.removed && aiExpandedLayer.parent) {
+        aiExpandedLayer.remove();
+      }
+      if ("visible" in node) {
+        node.visible = originalVisible;
       }
       skipped.push({
         nodeId: node.id,
@@ -2489,6 +2518,87 @@
       });
       return buildImageExtendApplyResult(session, null, byteLength, skipped);
     }
+  }
+
+  function createImageExtendResultRectangle(name, imageHash, width, height) {
+    const node = figma.createRectangle();
+    node.name = name || "AI Expanded Layer";
+    node.resize(Math.max(1, roundBoundsFitMetric(width)), Math.max(1, roundBoundsFitMetric(height)));
+    node.fills = [buildVisibleImageFill(imageHash)];
+    node.strokes = [];
+    if ("cornerRadius" in node) {
+      node.cornerRadius = 0;
+    }
+    return node;
+  }
+
+  function createImageExtendMaskBand(name, x, y, width, height) {
+    const safeWidth = Math.max(0, roundBoundsFitMetric(width));
+    const safeHeight = Math.max(0, roundBoundsFitMetric(height));
+    if (!(safeWidth > 0) || !(safeHeight > 0)) {
+      return null;
+    }
+
+    const band = figma.createRectangle();
+    band.name = name;
+    band.resize(Math.max(1, safeWidth), Math.max(1, safeHeight));
+    band.fills = [
+      {
+        type: "SOLID",
+        color: { r: 1, g: 1, b: 1 },
+        visible: true,
+      },
+    ];
+    band.strokes = [];
+    setImageExtendNodePosition(band, roundBoundsFitMetric(x), roundBoundsFitMetric(y));
+    return band;
+  }
+
+  function createImageExtendExpansionMaskLayer(imageBounds, expand, width, height) {
+    const safeBounds = normalizeImageExtendLocalBounds(imageBounds, width, height);
+    const safeExpand = expand || { top: 0, right: 0, bottom: 0, left: 0 };
+    const safeWidth = Math.max(1, roundBoundsFitMetric(width));
+    const safeHeight = Math.max(1, roundBoundsFitMetric(height));
+    const maskFrame = figma.createFrame();
+    maskFrame.name = "Expansion Mask Layer";
+    maskFrame.resize(safeWidth, safeHeight);
+    maskFrame.fills = [];
+    maskFrame.strokes = [];
+    maskFrame.clipsContent = true;
+    if ("visible" in maskFrame) {
+      maskFrame.visible = false;
+    }
+
+    const bands = [
+      createImageExtendMaskBand("Mask / Top", 0, 0, safeWidth, safeExpand.top),
+      createImageExtendMaskBand(
+        "Mask / Bottom",
+        0,
+        safeExpand.top + safeBounds.height,
+        safeWidth,
+        safeExpand.bottom
+      ),
+      createImageExtendMaskBand("Mask / Left", 0, safeExpand.top, safeExpand.left, safeBounds.height),
+      createImageExtendMaskBand(
+        "Mask / Right",
+        safeExpand.left + safeBounds.width,
+        safeExpand.top,
+        safeExpand.right,
+        safeBounds.height
+      ),
+    ].filter(Boolean);
+
+    if (!bands.length) {
+      if (!maskFrame.removed) {
+        maskFrame.remove();
+      }
+      return null;
+    }
+
+    bands.forEach((band) => {
+      maskFrame.appendChild(band);
+    });
+    return maskFrame;
   }
 
   function applyImageExtendOutsideReference(session, targetNode, newImageHash, byteLength, skipped) {
@@ -2575,6 +2685,7 @@
         expandRight: expand.right,
         expandBottom: expand.bottom,
         expandLeft: expand.left,
+        outputMode: session ? sanitizeImageExtendOutputMode(session.outputMode) : "use_ai_only",
         resultByteLength: byteLength,
       },
       skipped: Array.isArray(skipped) ? skipped.slice(0, 24) : [],
