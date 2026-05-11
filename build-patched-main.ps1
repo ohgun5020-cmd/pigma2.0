@@ -471,21 +471,35 @@ if ($bundle.Contains($exportCancelHelperFind)) {
   throw 'Could not patch PSD export cancel helper.'
 }
 
-$figmaColorBurnBlendFind = 'case"COLOR_BURN":return"linear burn"'
-$figmaColorBurnBlendReplace = 'case"COLOR_BURN":return"color burn"'
+$figmaColorBurnBlendFind = 'case"COLOR_BURN":return"color burn"'
+$figmaColorBurnBlendReplace = 'case"COLOR_BURN":return"linear burn"'
 if ($bundle.Contains($figmaColorBurnBlendFind)) {
   $bundle = Replace-Exact `
     -Text $bundle `
     -Find $figmaColorBurnBlendFind `
     -Replace $figmaColorBurnBlendReplace `
     -ExpectedCount 1 `
-    -Label 'Figma color burn uses Photoshop color burn with opacity compensation'
+    -Label 'Figma color burn uses Photoshop linear burn with opacity compensation'
 } elseif ($bundle.Contains($figmaColorBurnBlendReplace)) {
   # Already patched in this bundle variant.
 } else {
   throw 'Could not patch Figma color burn blend mapping.'
 }
 
+$figmaColorBurnLayerOpacityFind = 'function j(e){return!("opacity"in e)||typeof e.opacity!="number"?1:h(e.opacity,0,1)}'
+$figmaColorBurnLayerOpacityReplace = 'function j(e){let t=!("opacity"in e)||typeof e.opacity!="number"?1:h(e.opacity,0,1);return h(t*(e&&e.blendMode==="COLOR_BURN"?.875:1),0,1)}'
+if ($bundle.Contains($figmaColorBurnLayerOpacityFind)) {
+  $bundle = Replace-Exact `
+    -Text $bundle `
+    -Find $figmaColorBurnLayerOpacityFind `
+    -Replace $figmaColorBurnLayerOpacityReplace `
+    -ExpectedCount 1 `
+    -Label 'Figma color burn layer opacity compensation'
+} elseif ($bundle.Contains($figmaColorBurnLayerOpacityReplace)) {
+  # Already patched in this bundle variant.
+} else {
+  throw 'Could not patch Figma color burn layer opacity compensation.'
+}
 $bundle = Replace-Exact `
   -Text $bundle `
   -Find 'mask:gt(e,t.documentBounds)' `
