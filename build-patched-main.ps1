@@ -998,6 +998,9 @@ $editableTextInvalidateWriteFind = 'let u=(0,Lh.writePsdUint8Array)(i,{invalidat
 $editableTextInvalidateWriteReplace = 'let u=(0,Lh.writePsdUint8Array)(i,{invalidateTextLayers:n1,noBackground:!0});'
 $editableTextRootFallbackFind = 'catch(r){if(e.hasEditableText)try{'
 $editableTextRootFallbackReplace = 'catch(r){typeof ji=="function"&&ji("editable-text-build-root-fallback",{rootName:e.rootName,reason:r instanceof Error?r.message:String(r),editableTextCount:e.editableTextCount});typeof Bt=="function"&&e.hasEditableText&&Bt("warning","Editable text PSD fallback","Root bitmap fallback: ".concat(e.rootName));if(e.hasEditableText)try{'
+$uiEditableTextBaselineShiftFind = 'function kh(e,t=0){let n={font:editableTextFontDescriptor(e),fontSize:e.fontSize};return e.fillColor&&(n.fillColor=Uw(e.fillColor)),e.lineHeightPx!==null?(n.leading=e.lineHeightPx,n.autoLeading=!1):n.autoLeading=!0,e.tracking!==0&&(n.tracking=e.tracking,n.autoKerning=!1),e.fontCaps!==0&&(n.fontCaps=e.fontCaps),e.underline&&(n.underline=!0),e.strikethrough&&(n.strikethrough=!0),Math.abs(t)>=.01&&(n.baselineShift=t),n}'
+$uiEditableTextBaselineShiftLegacyReplace = 'function pigmaEditableTextLineGapBaselineShift(e){let t=Number(e&&e.fontSize),n=Number(e&&e.lineHeightPx);return!Number.isFinite(t)||t<=0||!Number.isFinite(n)||n<=t+.01?0:we(ae(t-n,-t,0))}function pigmaEditableTextResolvedBaselineShift(e,t=0){let n=Number(t),r=Number.isFinite(n)?n:0,i=pigmaEditableTextLineGapBaselineShift(e);return Math.abs(i)>Math.abs(r)?i:we(r)}function kh(e,t=0){let n={font:editableTextFontDescriptor(e),fontSize:e.fontSize},r=pigmaEditableTextResolvedBaselineShift(e,t);return e.fillColor&&(n.fillColor=Uw(e.fillColor)),e.lineHeightPx!==null?(n.leading=e.lineHeightPx,n.autoLeading=!1):n.autoLeading=!0,e.tracking!==0&&(n.tracking=e.tracking,n.autoKerning=!1),e.fontCaps!==0&&(n.fontCaps=e.fontCaps),e.underline&&(n.underline=!0),e.strikethrough&&(n.strikethrough=!0),Math.abs(r)>=.01&&(n.baselineShift=r),n}'
+$uiEditableTextBaselineShiftReplace = 'function pigmaEditableTextLineGapBaselineShift(e){return 0}function pigmaEditableTextResolvedBaselineShift(e,t=0){let n=Number(e&&e.baselineShift);return Number.isFinite(n)?we(n):0}function kh(e,t=0){let n={font:editableTextFontDescriptor(e),fontSize:e.fontSize},r=pigmaEditableTextResolvedBaselineShift(e,t);return e.fillColor&&(n.fillColor=Uw(e.fillColor)),e.lineHeightPx!==null?(n.leading=e.lineHeightPx,n.autoLeading=!1):n.autoLeading=!0,e.tracking!==0&&(n.tracking=e.tracking,n.autoKerning=!1),e.fontCaps!==0&&(n.fontCaps=e.fontCaps),e.underline&&(n.underline=!0),e.strikethrough&&(n.strikethrough=!0),Math.abs(r)>=.01&&(n.baselineShift=r),n}'
 $uiBackgroundClipHelperFind = 'function Eu(e){return e.buffer instanceof ArrayBuffer&&e.byteOffset===0&&e.byteLength===e.buffer.byteLength?e.buffer:e.buffer.slice(e.byteOffset,e.byteOffset+e.byteLength)}async function vm('
 $uiBackgroundClipHelperReplace = 'function Eu(e){return e.buffer instanceof ArrayBuffer&&e.byteOffset===0&&e.byteLength===e.buffer.byteLength?e.buffer:e.buffer.slice(e.byteOffset,e.byteOffset+e.byteLength)}function pigmaIsBackgroundClipBaseLayer(e){return!!(e&&typeof e=="object"&&typeof e.name=="string"&&(e.name==="Background"||e.name.indexOf("Background ")===0))}function pigmaApplyContainerClipToBackground(e){if(!Array.isArray(e)||e.length<2)return!1;let t=e.findIndex(pigmaIsBackgroundClipBaseLayer);if(t!==0)return!1;let n=!1;for(let r=t+1;r<e.length;r+=1){let i=e[r];if(i&&typeof i=="object"){i.clipping=!0,n=!0}}return n}async function vm('
 $uiBackgroundClipGroupFind = 'if(v.kind==="group"){let M=await vm(v.children,t,n.concat(v.name),r,i,a,(h=v.mask)!=null?h:o);if(M.children.length===0){m();continue}let B={name:v.name,opacity:v.opacity,hidden:!v.visible,blendMode:v.blendMode,opened:!1,children:M.children};v.mask&&(B.mask=await Qm(v.mask)),Wn(B,v.effects,v.strokeEffect),u.push(...M.linkedFiles),l.push(...M.backgroundDebug),c.push(...M.warnings),s.push(B),m();continue}'
@@ -1529,6 +1532,27 @@ if ($uiBundle.Contains($editableTextRootFallbackFind)) {
     -Label 'ui editable text root fallback logging'
 }
 
+if ($uiBundle.Contains($uiEditableTextBaselineShiftFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiEditableTextBaselineShiftFind `
+    -Replace $uiEditableTextBaselineShiftReplace `
+    -ExpectedCount 1 `
+    -Label 'ui editable text baseline shift'
+} elseif ($uiBundle.Contains($uiEditableTextBaselineShiftLegacyReplace)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiEditableTextBaselineShiftLegacyReplace `
+    -Replace $uiEditableTextBaselineShiftReplace `
+    -ExpectedCount 1 `
+    -Label 'ui editable text remove line-gap baseline shift'
+} elseif ($uiBundle.Contains($uiEditableTextBaselineShiftReplace)) {
+  # Already patched in this UI bundle variant.
+} elseif ($uiBundle.Contains('function pigmaEditableTextLineGapBaselineShift(')) {
+  # Already patched in this UI bundle variant.
+} else {
+  # Helper name/path changed in this bundle variant.
+}
 if ($uiBundle.Contains($uiBackgroundClipHelperFind)) {
   $uiBundle = Replace-Exact `
     -Text $uiBundle `
