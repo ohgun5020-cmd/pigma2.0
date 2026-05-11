@@ -303,6 +303,15 @@ function Replace-Section {
   return $Text.Substring(0, $start) + $Replacement + $Text.Substring($end)
 }
 
+function Convert-JsUnicodeEscapes {
+  param([string]$Text)
+
+  return [regex]::Replace($Text, '\\u([0-9A-Fa-f]{4})', {
+    param($Match)
+    [string][char]([Convert]::ToInt32($Match.Groups[1].Value, 16))
+  })
+}
+
 function Collapse-RepeatedSnippetBeforeMarker {
   param(
     [string]$Text,
@@ -433,7 +442,7 @@ if ($bundle.Contains($startupPreviewRequestFind)) {
 }
 
 $runtimeCacheRefreshFind = 'if(e.type==="request-selection-sync"){await pigmaEnsureSelectionAccess(),Ee();return}if(e.type==="request-export"){await Qo('
-$runtimeCacheRefreshReplace = 'if(e.type==="request-selection-sync"){await pigmaEnsureSelectionAccess(),Ee();return}if(e.type==="request-runtime-cache-refresh"){pigmaRefreshRuntimeCaches(),Ee();return}if(e.type==="request-export"){pigmaRefreshRuntimeCaches(),await Qo('
+$runtimeCacheRefreshReplace = 'if(e.type==="request-selection-sync"){await pigmaEnsureSelectionAccess(),Ee();return}if(e.type==="request-runtime-cache-refresh"){pigmaRefreshRuntimeCaches(),Ee();return}if(e.type==="request-export-cancel"){pigmaCancelActiveExport();return}if(e.type==="request-export"){pigmaRefreshRuntimeCaches(),await Qo('
 if ($bundle.Contains($runtimeCacheRefreshFind)) {
   $bundle = Replace-Exact `
     -Text $bundle `
@@ -445,6 +454,36 @@ if ($bundle.Contains($runtimeCacheRefreshFind)) {
   # Already patched in this bundle variant.
 } else {
   # Runtime cache refresh request guard changed in this bundle variant.
+}
+
+$exportCancelHelperFind = 'function N(e){S.postToUi(e)}'
+$exportCancelHelperReplace = 'function N(e){S.postToUi(e)}function pigmaExportCancelMessage(){return w(P.locale,"PSD \uB9CC\uB4E4\uAE30\uB97C \uCDE8\uC18C\uD588\uC2B5\uB2C8\uB2E4.")}function pigmaCancelActiveExport(){var e;let t=be;if(!t)return;t.cancelRequested=!0,t.cancelNotified=!0,be=null,Qe(),le();let r=pigmaExportCancelMessage();N({type:"export-error",message:r,cancelled:!0}),(e=S.notify)==null||e.call(S,r)}function pigmaExportWasCancelled(e){return!!(e&&e.cancelRequested)}function pigmaCleanupCancelledExport(e,t=null){try{t&&qe(t)}catch(r){}Qe(),le();return!0}'
+if ($bundle.Contains($exportCancelHelperFind)) {
+  $bundle = Replace-Exact `
+    -Text $bundle `
+    -Find $exportCancelHelperFind `
+    -Replace $exportCancelHelperReplace `
+    -ExpectedCount 1 `
+    -Label 'PSD export cancel helper'
+} elseif ($bundle.Contains($exportCancelHelperReplace)) {
+  # Already patched in this bundle variant.
+} else {
+  throw 'Could not patch PSD export cancel helper.'
+}
+
+$figmaColorBurnBlendFind = 'case"COLOR_BURN":return"linear burn"'
+$figmaColorBurnBlendReplace = 'case"COLOR_BURN":return"color burn"'
+if ($bundle.Contains($figmaColorBurnBlendFind)) {
+  $bundle = Replace-Exact `
+    -Text $bundle `
+    -Find $figmaColorBurnBlendFind `
+    -Replace $figmaColorBurnBlendReplace `
+    -ExpectedCount 1 `
+    -Label 'Figma color burn uses Photoshop color burn with opacity compensation'
+} elseif ($bundle.Contains($figmaColorBurnBlendReplace)) {
+  # Already patched in this bundle variant.
+} else {
+  throw 'Could not patch Figma color burn blend mapping.'
 }
 
 $bundle = Replace-Exact `
@@ -482,16 +521,15 @@ $bundle = Replace-Exact `
   -ExpectedCount 1 `
   -Label 'mask preview blur padding'
 
-# Stroke-only vectors can still clip when exporting the cloned node directly
-# because Figma rasterizes against the node geometry before the visual stroke
-# extent is fully represented. Export them through a temporary crop frame that
-# matches the chosen preview bounds instead.
+# Clone exports that use render bounds must keep the original transform inside
+# a temporary crop frame. Moving the clone itself to the render-bound origin
+# shifts blurred/blended vector and shape layers by the blur padding.
 $bundle = Replace-Exact `
   -Text $bundle `
   -Find 'async function $r(e,t,r,o){await dt(e);let n=e.clone();try{return Oe(n,o),bt(n,t),await n.exportAsync({format:"PNG",useAbsoluteBounds:t.useAbsoluteBounds})}finally{n.removed||n.remove()}}' `
-  -Replace 'async function $r(e,t,r,o){await dt(e);let n=e.clone(),i=null,a=Re(e)?Nr(e):null,s=Re(e)&&!!me(e)&&!(a!=null&&a.fill)&&"relativeTransform"in n;try{return Oe(n,o),s?(i=figma.createFrame(),i.resize(Math.max(1,d(t.width)),Math.max(1,d(t.height))),i.clipsContent=!0,i.fills=[],i.strokes=[],i.name="__pigma-vector-preview__",i.x=t.x,i.y=t.y,figma.currentPage.appendChild(i),i.appendChild(n),Vr(e,n,t),await i.exportAsync({format:"PNG",useAbsoluteBounds:!1})):(bt(n,t),await n.exportAsync({format:"PNG",useAbsoluteBounds:t.useAbsoluteBounds}))}finally{i&&!i.removed&&i.remove(),n.removed||n.remove()}}' `
+  -Replace 'async function $r(e,t,r,o){await dt(e);let n=e.clone(),i=null,a=t&&t.useAbsoluteBounds===!1;try{return Oe(n,o),a?(i=figma.createFrame(),i.resize(Math.max(1,d(t.width)),Math.max(1,d(t.height))),i.clipsContent=!0,i.fills=[],i.strokes=[],i.name="__pigma-render-preview__",i.x=t.x,i.y=t.y,figma.currentPage.appendChild(i),i.appendChild(n),Vr(e,n,t),await i.exportAsync({format:"PNG",useAbsoluteBounds:!1})):(bt(n,t),await n.exportAsync({format:"PNG",useAbsoluteBounds:t.useAbsoluteBounds}))}finally{i&&!i.removed&&i.remove(),n.removed||n.remove()}}' `
   -ExpectedCount 1 `
-  -Label 'stroke-only vector crop-frame export'
+  -Label 'render-bound clone crop-frame export'
 
 # Preserve simple frame fills/strokes as editable PSD shape backgrounds even when
 # the document switches to long-frame mode.
@@ -531,6 +569,47 @@ $bundle = Replace-Section `
   -EndMarker 'async function Nn(' `
   -Replacement 'async function se(){var n,i,a;let e=be;if(!e)return;O=e.developerExportExperiments;let t=e.nextIndex;if(t>=e.rootCount){N({type:"export-finished",fileName:e.bundleFileName,rootCount:e.rootCount}),e.rootCount===1&&e.singlePayloadSummary?(n=S.notify)==null||n.call(S,w(P.locale,"PSD ready: ".concat(e.singlePayloadSummary.exportNodeCount," layers, ").concat(e.singlePayloadSummary.editableTextCount," text candidates"))):(i=S.notify)==null||i.call(S,w(P.locale,"".concat(e.rootCount," PSD files are ready. The download will be packaged as a ZIP archive."))),be=null,Qe(),le();return}let r=(e.roots||e.nodes)[t],o="node"in r?r.node:r,s="node"in r?r:null,u=f(o);ae("build-marker",{patch:"root-preserved-20260319-1949",main:"code.patched.js"});try{let l=await Dn(o,e.hiddenLayerMode,e.settings,t+1,e.rootCount,e.includeCompositePng,s);e.rootCount===1&&(e.singlePayloadSummary={exportNodeCount:l.exportNodeCount,editableTextCount:l.editableTextCount});let c=Xe(l);e.nextIndex+=1,N({type:"export-root-ready",fileName:e.bundleFileName,rootIndex:t+1,rootCount:e.rootCount,payload:c}),qe(l),e.nextIndex>=e.rootCount&&await se()}catch(l){let c=await Nn(o,e.hiddenLayerMode,e.settings,t+1,e.rootCount,e.includeCompositePng,l,s);if(c){e.rootCount===1&&(e.singlePayloadSummary={exportNodeCount:c.exportNodeCount,editableTextCount:c.editableTextCount});let p=Xe(c);e.nextIndex+=1,N({type:"export-root-ready",fileName:e.bundleFileName,rootIndex:t+1,rootCount:e.rootCount,payload:p}),qe(c),e.nextIndex>=e.rootCount&&await se();return}let g=await Tn(o,e.hiddenLayerMode,e.settings,t+1,e.rootCount,e.includeCompositePng,l,s);if(g){e.rootCount===1&&(e.singlePayloadSummary={exportNodeCount:g.exportNodeCount,editableTextCount:g.editableTextCount});let p=Xe(g);e.nextIndex+=1,N({type:"export-root-ready",fileName:e.bundleFileName,rootIndex:t+1,rootCount:e.rootCount,payload:p}),qe(g),e.nextIndex>=e.rootCount&&await se();return}be=null,Qe(),le();let y=w(P.locale,l instanceof Error?e.rootCount>1?''Export failed for "''.concat(u,''" ('').concat(t+1,"/").concat(e.rootCount,"): ").concat(l.message):l.message:"An unknown error happened while building the PSD.");N({type:"export-error",message:y}),(a=S.notify)==null||a.call(S,y,{error:!0})}}' `
   -Label 'export session dispatch'
+
+$exportCancelSePatches = @(
+  @{
+    Find = 'let e=be;if(!e)return;O=e.developerExportExperiments;'
+    Replace = 'let e=be;if(!e)return;if(pigmaExportWasCancelled(e)){pigmaCleanupCancelledExport(e);return}O=e.developerExportExperiments;'
+    Label = 'export cancel check at session start'
+  },
+  @{
+    Find = 'let t=e.nextIndex;if(t>=e.rootCount){'
+    Replace = 'let t=e.nextIndex;if(pigmaExportWasCancelled(e)){pigmaCleanupCancelledExport(e);return}if(t>=e.rootCount){'
+    Label = 'export cancel check before finish'
+  },
+  @{
+    Find = 'let l=await Dn(o,e.hiddenLayerMode,e.settings,t+1,e.rootCount,e.includeCompositePng,s);e.rootCount===1&&'
+    Replace = 'let l=await Dn(o,e.hiddenLayerMode,e.settings,t+1,e.rootCount,e.includeCompositePng,s);if(pigmaExportWasCancelled(e)){pigmaCleanupCancelledExport(e,l);return}e.rootCount===1&&'
+    Label = 'export cancel check after primary root build'
+  },
+  @{
+    Find = '}catch(l){let c=await Nn(o,e.hiddenLayerMode,e.settings,t+1,e.rootCount,e.includeCompositePng,l,s);if(c){'
+    Replace = '}catch(l){if(pigmaExportWasCancelled(e)){pigmaCleanupCancelledExport(e);return}let c=await Nn(o,e.hiddenLayerMode,e.settings,t+1,e.rootCount,e.includeCompositePng,l,s);if(pigmaExportWasCancelled(e)){pigmaCleanupCancelledExport(e,c);return}if(c){'
+    Label = 'export cancel check around safe layered retry'
+  },
+  @{
+    Find = 'let g=await Tn(o,e.hiddenLayerMode,e.settings,t+1,e.rootCount,e.includeCompositePng,l,s);if(g){'
+    Replace = 'let g=await Tn(o,e.hiddenLayerMode,e.settings,t+1,e.rootCount,e.includeCompositePng,l,s);if(pigmaExportWasCancelled(e)){pigmaCleanupCancelledExport(e,g);return}if(g){'
+    Label = 'export cancel check after flattened retry'
+  }
+)
+
+foreach ($cancelPatch in $exportCancelSePatches) {
+  if ($bundle.Contains($cancelPatch.Find)) {
+    $bundle = Replace-Exact `
+      -Text $bundle `
+      -Find $cancelPatch.Find `
+      -Replace $cancelPatch.Replace `
+      -ExpectedCount 1 `
+      -Label $cancelPatch.Label
+  } elseif (-not $bundle.Contains($cancelPatch.Replace)) {
+    throw "Could not patch $($cancelPatch.Label)."
+  }
+}
 
 $bundle = Replace-Section `
   -Text $bundle `
@@ -739,6 +818,7 @@ if ($uiBundle.Contains($uiStreamZipFinalBlobFind)) {
 
 $uiPreparedDownloadBlobFind = 'function Yi(e,t,n,r,i){let a=URL.createObjectURL(e);S0(),D.downloadUrl=a,D.downloadName=t,D.downloadSourceName=n,D.downloadMessage=r,At.href=a,At.download=t,TS.hidden=!1,D.busy=!1,D.statusTone="ready",D.statusMessage=i,pigmaTriggerPreparedDownload(a,t)}'
 $uiPreparedDownloadBlobReplace = 'function Yi(e,t,n,r,i){let a=URL.createObjectURL(e);e=null;S0(),D.downloadUrl=a,D.downloadName=t,D.downloadSourceName=n,D.downloadMessage=r,At.href=a,At.download=t,TS.hidden=!1,D.busy=!1,D.statusTone="ready",D.statusMessage=i,pigmaTriggerPreparedDownload(a,t)}'
+$uiPreparedDownloadBlobCancelReplace = 'function Yi(e,t,n,r,i){let a=URL.createObjectURL(e);e=null,D.exportCancelRequested=!1,D.exportCancelNoticeShown=!1;S0(),D.downloadUrl=a,D.downloadName=t,D.downloadSourceName=n,D.downloadMessage=r,At.href=a,At.download=t,TS.hidden=!1,D.busy=!1,D.statusTone="ready",D.statusMessage=i,pigmaTriggerPreparedDownload(a,t)}'
 if ($uiBundle.Contains($uiPreparedDownloadBlobFind)) {
   $uiBundle = Replace-Exact `
     -Text $uiBundle `
@@ -746,7 +826,7 @@ if ($uiBundle.Contains($uiPreparedDownloadBlobFind)) {
     -Replace $uiPreparedDownloadBlobReplace `
     -ExpectedCount 1 `
     -Label 'ui prepared download local blob release'
-} elseif ($uiBundle.Contains($uiPreparedDownloadBlobReplace)) {
+} elseif ($uiBundle.Contains($uiPreparedDownloadBlobReplace) -or $uiBundle.Contains($uiPreparedDownloadBlobCancelReplace)) {
   # Already patched in this UI bundle variant.
 } else {
   throw 'Could not patch UI prepared download local blob release.'
@@ -767,6 +847,141 @@ if ($uiBundle.Contains($uiBatchZipBuiltFilesFind)) {
   throw 'Could not patch UI batch ZIP built file release.'
 }
 
+$uiCancelTranslationFind = Convert-JsUnicodeEscapes '"\uCDE8\uC18C": "Cancel",'
+$uiCancelTranslationReplace = '"\uCDE8\uC18C": "Cancel","\uC791\uC5C5 \uC911\uC9C0":"Stop Task","\uCDE8\uC18C \uC911":"Stopping...","\uC911\uC9C0 \uC694\uCCAD\uB428. \uD604\uC7AC \uB2E8\uACC4 \uC815\uB9AC \uC911...":"Stop requested. Cleaning up the current step...","\uD604\uC7AC PSD \uB9CC\uB4E4\uAE30\uB97C \uC911\uC9C0\uD569\uB2C8\uB2E4.":"Stop the current PSD export.","PSD \uB9CC\uB4E4\uAE30\uB97C \uCDE8\uC18C\uD588\uC2B5\uB2C8\uB2E4.":"PSD export was canceled.","\uB0B4\uBCF4\uB0B4\uAE30 \uCDE8\uC18C":"Export canceled",'
+if ($uiBundle.Contains($uiCancelTranslationFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiCancelTranslationFind `
+    -Replace $uiCancelTranslationReplace `
+    -ExpectedCount 1 `
+    -Label 'ui PSD cancel English translations'
+} elseif ($uiBundle.Contains($uiCancelTranslationReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI PSD cancel English translations.'
+}
+
+$uiExportCancelStateFind = 'activeExportStartedAt:null};'
+$uiExportCancelStateReplace = 'activeExportStartedAt:null,exportCancelRequested:!1,exportCancelNoticeShown:!1};'
+if ($uiBundle.Contains($uiExportCancelStateFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiExportCancelStateFind `
+    -Replace $uiExportCancelStateReplace `
+    -ExpectedCount 1 `
+    -Label 'ui PSD cancel state'
+} elseif ($uiBundle.Contains($uiExportCancelStateReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI PSD cancel state.'
+}
+
+$uiExportButtonDisabledFind = 'let e=D.selection,t=nn(),n=e.documentWidth!==null&&e.documentHeight!==null,r=e.selectionCount>1,i=D.busy||!e.ready'
+$uiExportButtonDisabledReplace = 'let e=D.selection,t=nn(),n=e.documentWidth!==null&&e.documentHeight!==null,r=e.selectionCount>1,i=D.busy?D.exportCancelRequested:!e.ready'
+if ($uiBundle.Contains($uiExportButtonDisabledFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiExportButtonDisabledFind `
+    -Replace $uiExportButtonDisabledReplace `
+    -ExpectedCount 2 `
+    -Label 'ui PSD cancel button enablement'
+} elseif ($uiBundle.Contains($uiExportButtonDisabledReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI PSD cancel button enablement.'
+}
+
+$uiExportButtonLabelFind = Convert-JsUnicodeEscapes 'mr.disabled=i,mr.setAttribute("aria-busy",D.busy?"true":"false"),mr.title=D.busy?L("PSD \uB9CC\uB4E4\uAE30 \uC791\uC5C5\uC774 \uC9C4\uD589 \uC911\uC785\uB2C8\uB2E4."):e.ready?L("\uD604\uC7AC \uC120\uD0DD\uC73C\uB85C PSD \uD30C\uC77C\uC744 \uB9CC\uB4ED\uB2C8\uB2E4."):L("\uD504\uB808\uC784, \uADF8\uB8F9, \uB808\uC774\uC5B4\uB97C \uBA3C\uC800 \uC120\uD0DD\uD558\uC138\uC694."),Wh.hidden=!D.busy,Zh.textContent=D.busy?pigmaExportHasRaster(t.exportPackageMode)?L("ZIP \uB9CC\uB4DC\uB294 \uC911"):L("PSD \uB9CC\uB4DC\uB294 \uC911"):e.ready?pigmaExportHasRaster(t.exportPackageMode)?L("ZIP \uB9CC\uB4E4\uAE30"):L("PSD \uB9CC\uB4E4\uAE30"):L("\uB808\uC774\uC5B4 \uC120\uD0DD \uD544\uC694")'
+$uiExportButtonLabelReplace = 'mr.disabled=i,mr.setAttribute("aria-busy",D.busy?"true":"false"),mr.title=D.busy?D.exportCancelRequested?L("\uC911\uC9C0 \uC694\uCCAD\uB428. \uD604\uC7AC \uB2E8\uACC4 \uC815\uB9AC \uC911..."):L("\uD604\uC7AC PSD \uB9CC\uB4E4\uAE30\uB97C \uC911\uC9C0\uD569\uB2C8\uB2E4."):e.ready?L("\uD604\uC7AC \uC120\uD0DD\uC73C\uB85C PSD \uD30C\uC77C\uC744 \uB9CC\uB4ED\uB2C8\uB2E4."):L("\uD504\uB808\uC784, \uADF8\uB8F9, \uB808\uC774\uC5B4\uB97C \uBA3C\uC800 \uC120\uD0DD\uD558\uC138\uC694."),Wh.hidden=!D.busy,Zh.textContent=D.busy?D.exportCancelRequested?L("\uCDE8\uC18C \uC911"):L("\uC791\uC5C5 \uC911\uC9C0"):e.ready?pigmaExportHasRaster(t.exportPackageMode)?L("ZIP \uB9CC\uB4E4\uAE30"):L("PSD \uB9CC\uB4E4\uAE30"):L("\uB808\uC774\uC5B4 \uC120\uD0DD \uD544\uC694")'
+if ($uiBundle.Contains($uiExportButtonLabelFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiExportButtonLabelFind `
+    -Replace $uiExportButtonLabelReplace `
+    -ExpectedCount 2 `
+    -Label 'ui PSD cancel button label'
+} elseif ($uiBundle.Contains($uiExportButtonLabelReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI PSD cancel button label.'
+}
+
+$uiExportCancelClickFind = Convert-JsUnicodeEscapes 'mr.onclick=()=>{let e=nn(),t=Fu();Xi(!0),D.busy=!0,D.statusTone="idle",D.statusMessage=L("PSD \uB9CC\uB4E4\uAE30 \uC900\uBE44 \uC911\uC785\uB2C8\uB2E4."),Ho(),qn({type:"request-export",hiddenLayerMode:e.hiddenLayerMode,settings:e,includeCompositePng:d1(e),developerExportExperiments:t})}'
+$uiExportCancelClickReplace = 'mr.onclick=()=>{if(D.busy){D.exportCancelRequested||(D.exportCancelRequested=!0,D.statusTone="idle",D.statusMessage=L("\uC911\uC9C0 \uC694\uCCAD\uB428. \uD604\uC7AC \uB2E8\uACC4 \uC815\uB9AC \uC911..."),Ho(),qn({type:"request-export-cancel"}));return}let e=nn(),t=Fu();Xi(!0),D.exportCancelRequested=!1,D.exportCancelNoticeShown=!1,D.busy=!0,D.statusTone="idle",D.statusMessage=L("PSD \uB9CC\uB4E4\uAE30 \uC900\uBE44 \uC911\uC785\uB2C8\uB2E4."),Ho(),qn({type:"request-export",hiddenLayerMode:e.hiddenLayerMode,settings:e,includeCompositePng:d1(e),developerExportExperiments:t})}'
+if ($uiBundle.Contains($uiExportCancelClickFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiExportCancelClickFind `
+    -Replace $uiExportCancelClickReplace `
+    -ExpectedCount 1 `
+    -Label 'ui PSD cancel click handler'
+} elseif ($uiBundle.Contains($uiExportCancelClickReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI PSD cancel click handler.'
+}
+
+$uiExportRootCancelFind = 'n.rootCount>1&&(await e1(n,r),br([r])),n.builtFiles.push(r),n.builtFiles.length<n.rootCount&&qn({type:"request-next-export-root"}),D.statusTone="idle",hu();return'
+$uiExportRootCancelReplace = 'n.rootCount>1&&(await e1(n,r),br([r])),n.builtFiles.push(r);if(D.exportCancelRequested){Xi(!0),qn({type:"request-export-cancel"}),D.exportCancelRequested=!1,D.busy=!1,D.activeExportStartedAt=null,D.statusTone="idle",D.statusMessage=L("\u0050\u0053\u0044 \uB9CC\uB4E4\uAE30\uB97C \uCDE8\uC18C\uD588\uC2B5\uB2C8\uB2E4."),D.exportCancelNoticeShown||(D.exportCancelNoticeShown=!0,Bt("info",L("\uB0B4\uBCF4\uB0B4\uAE30 \uCDE8\uC18C"),D.statusMessage)),Le();return}n.builtFiles.length<n.rootCount&&qn({type:"request-next-export-root"}),D.statusTone="idle",hu();return'
+if ($uiBundle.Contains($uiExportRootCancelFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiExportRootCancelFind `
+    -Replace $uiExportRootCancelReplace `
+    -ExpectedCount 1 `
+    -Label 'ui PSD cancel after root build'
+} elseif ($uiBundle.Contains($uiExportRootCancelReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI PSD cancel after root build.'
+}
+
+$uiExportFinishedCancelFind = 'case"export-finished":{let n=mh(e.fileName,e.rootCount);yn=null,await t1(e.fileName,n);return}'
+$uiExportFinishedCancelReplace = 'case"export-finished":{let n=mh(e.fileName,e.rootCount);if(D.exportCancelRequested){Xi(!0),qn({type:"request-export-cancel"}),D.exportCancelRequested=!1,D.busy=!1,D.activeExportStartedAt=null,D.statusTone="idle",D.statusMessage=L("\u0050\u0053\u0044 \uB9CC\uB4E4\uAE30\uB97C \uCDE8\uC18C\uD588\uC2B5\uB2C8\uB2E4."),D.exportCancelNoticeShown||(D.exportCancelNoticeShown=!0,Bt("info",L("\uB0B4\uBCF4\uB0B4\uAE30 \uCDE8\uC18C"),D.statusMessage)),Le();return}yn=null,await t1(e.fileName,n);return}'
+if ($uiBundle.Contains($uiExportFinishedCancelFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiExportFinishedCancelFind `
+    -Replace $uiExportFinishedCancelReplace `
+    -ExpectedCount 1 `
+    -Label 'ui PSD cancel before final bundle'
+} elseif ($uiBundle.Contains($uiExportFinishedCancelReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI PSD cancel before final bundle.'
+}
+
+$uiExportErrorCancelFind = Convert-JsUnicodeEscapes 'case"export-error":wu("error"),Xi(!0),D.busy=!1,D.activeExportStartedAt=null,D.statusTone="error",D.statusMessage=It(D.locale,e.message),Bt("error",L("\uB0B4\uBCF4\uB0B4\uAE30 \uC2E4\uD328"),D.statusMessage),Le()'
+$uiExportErrorCancelReplace = 'case"export-error":wu(e.cancelled?"success":"error"),Xi(!0),D.exportCancelRequested=!1,D.busy=!1,D.activeExportStartedAt=null,D.statusTone=e.cancelled?"idle":"error",D.statusMessage=It(D.locale,e.message),e.cancelled?D.exportCancelNoticeShown||(D.exportCancelNoticeShown=!0,Bt("info",L("\uB0B4\uBCF4\uB0B4\uAE30 \uCDE8\uC18C"),D.statusMessage)):Bt("error",L("\uB0B4\uBCF4\uB0B4\uAE30 \uC2E4\uD328"),D.statusMessage),Le()'
+if ($uiBundle.Contains($uiExportErrorCancelFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiExportErrorCancelFind `
+    -Replace $uiExportErrorCancelReplace `
+    -ExpectedCount 1 `
+    -Label 'ui PSD cancel error result'
+} elseif ($uiBundle.Contains($uiExportErrorCancelReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI PSD cancel error result.'
+}
+
+$uiExportDownloadReadyCancelFind = 'function Yi(e,t,n,r,i){let a=URL.createObjectURL(e);e=null;S0()'
+$uiExportDownloadReadyCancelReplace = 'function Yi(e,t,n,r,i){let a=URL.createObjectURL(e);e=null,D.exportCancelRequested=!1,D.exportCancelNoticeShown=!1;S0()'
+if ($uiBundle.Contains($uiExportDownloadReadyCancelFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiExportDownloadReadyCancelFind `
+    -Replace $uiExportDownloadReadyCancelReplace `
+    -ExpectedCount 1 `
+    -Label 'ui PSD cancel reset on download ready'
+} elseif ($uiBundle.Contains($uiExportDownloadReadyCancelReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI PSD cancel reset on download ready.'
+}
+
 $editableTextParagraphRunsHelper = 'function editableTextParagraphRuns(e,t){let r=(e||"").replace(/\\r\\n?/g,"\\n").split("\\n"),o=[];for(let n=0;n<r.length;n++){let i=r[n],a=i.length+(n<r.length-1?1:0);a>0&&o.push({length:a,style:{justification:t}})}return o}'
 $editableTextEngineMetadataReplacement = $editableTextParagraphRunsHelper + 'function g1(e){let t=E1(e),n=w1(e,t),r=ym(e),i=yh(e.text.bounds,r),a=yh(e.text.boundingBox,r),o=e.text.boxBounds?bm(e,i):null,s=v1(e,n,i,a,o),l=editableTextParagraphRuns(e.text.value,e.text.justification),u={text:e.text.value,transform:n,antiAlias:"smooth",orientation:"horizontal",gridding:"none",useFractionalGlyphWidths:!0,left:s.layerBounds.left,top:s.layerBounds.top,right:s.layerBounds.right,bottom:s.layerBounds.bottom,bounds:{left:{value:s.textBounds.left,units:"Pixels"},top:{value:s.textBounds.top,units:"Pixels"},right:{value:s.textBounds.right,units:"Pixels"},bottom:{value:s.textBounds.bottom,units:"Pixels"}},boundingBox:{left:{value:s.boundingBox.left,units:"Pixels"},top:{value:s.boundingBox.top,units:"Pixels"},right:{value:s.boundingBox.right,units:"Pixels"},bottom:{value:s.boundingBox.bottom,units:"Pixels"}},paragraphStyle:{justification:e.text.justification},paragraphStyleRuns:l,style:kh(e.text.baseStyle,t.boxBaselineShift),styleRuns:e.text.styleRuns.map(c=>({length:c.length,style:kh(c.style,t.boxBaselineShift)}))};return u.shapeType=e.text.shapeType,e.text.pointBase&&(u.pointBase=e.text.pointBase.slice()),o&&(u.boxBounds=o),u}'
 $editableTextPreflightSerializeCallLegacy = 'Il.serializeEngineData(qf.encodeEngineData(T.text))'
@@ -783,6 +998,10 @@ $editableTextInvalidateWriteFind = 'let u=(0,Lh.writePsdUint8Array)(i,{invalidat
 $editableTextInvalidateWriteReplace = 'let u=(0,Lh.writePsdUint8Array)(i,{invalidateTextLayers:n1,noBackground:!0});'
 $editableTextRootFallbackFind = 'catch(r){if(e.hasEditableText)try{'
 $editableTextRootFallbackReplace = 'catch(r){typeof ji=="function"&&ji("editable-text-build-root-fallback",{rootName:e.rootName,reason:r instanceof Error?r.message:String(r),editableTextCount:e.editableTextCount});typeof Bt=="function"&&e.hasEditableText&&Bt("warning","Editable text PSD fallback","Root bitmap fallback: ".concat(e.rootName));if(e.hasEditableText)try{'
+$uiBackgroundClipHelperFind = 'function Eu(e){return e.buffer instanceof ArrayBuffer&&e.byteOffset===0&&e.byteLength===e.buffer.byteLength?e.buffer:e.buffer.slice(e.byteOffset,e.byteOffset+e.byteLength)}async function vm('
+$uiBackgroundClipHelperReplace = 'function Eu(e){return e.buffer instanceof ArrayBuffer&&e.byteOffset===0&&e.byteLength===e.buffer.byteLength?e.buffer:e.buffer.slice(e.byteOffset,e.byteOffset+e.byteLength)}function pigmaIsBackgroundClipBaseLayer(e){return!!(e&&typeof e=="object"&&typeof e.name=="string"&&(e.name==="Background"||e.name.indexOf("Background ")===0))}function pigmaApplyContainerClipToBackground(e){if(!Array.isArray(e)||e.length<2)return!1;let t=e.findIndex(pigmaIsBackgroundClipBaseLayer);if(t!==0)return!1;let n=!1;for(let r=t+1;r<e.length;r+=1){let i=e[r];if(i&&typeof i=="object"){i.clipping=!0,n=!0}}return n}async function vm('
+$uiBackgroundClipGroupFind = 'if(v.kind==="group"){let M=await vm(v.children,t,n.concat(v.name),r,i,a,(h=v.mask)!=null?h:o);if(M.children.length===0){m();continue}let B={name:v.name,opacity:v.opacity,hidden:!v.visible,blendMode:v.blendMode,opened:!1,children:M.children};v.mask&&(B.mask=await Qm(v.mask)),Wn(B,v.effects,v.strokeEffect),u.push(...M.linkedFiles),l.push(...M.backgroundDebug),c.push(...M.warnings),s.push(B),m();continue}'
+$uiBackgroundClipGroupReplace = 'if(v.kind==="group"){let M=await vm(v.children,t,n.concat(v.name),r,i,a,(h=v.mask)!=null?h:o);if(M.children.length===0){m();continue}v.mask&&pigmaApplyContainerClipToBackground(M.children);let B={name:v.name,opacity:v.opacity,hidden:!v.visible,blendMode:v.blendMode,opened:!1,children:M.children};v.mask&&(B.mask=await Qm(v.mask)),Wn(B,v.effects,v.strokeEffect),u.push(...M.linkedFiles),l.push(...M.backgroundDebug),c.push(...M.warnings),s.push(B),m();continue}'
 $psdCompositePreviewFind = 'function d1(e){return e.exportPackageMode==="bundle-with-rasters"}'
 $psdCompositePreviewReplace = 'function d1(e){return e.exportPackageMode==="bundle-with-rasters"||e.exportPackageMode==="psd-only"}'
 $psdThumbnailWriteFind = 'let u=(0,Lh.writePsdUint8Array)(i,{invalidateTextLayers:n1,noBackground:!0});'
@@ -1310,6 +1529,32 @@ if ($uiBundle.Contains($editableTextRootFallbackFind)) {
     -Label 'ui editable text root fallback logging'
 }
 
+if ($uiBundle.Contains($uiBackgroundClipHelperFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiBackgroundClipHelperFind `
+    -Replace $uiBackgroundClipHelperReplace `
+    -ExpectedCount 1 `
+    -Label 'ui PSD background clipping helper'
+} elseif ($uiBundle.Contains('function pigmaApplyContainerClipToBackground(')) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI PSD background clipping helper.'
+}
+
+if ($uiBundle.Contains($uiBackgroundClipGroupFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiBackgroundClipGroupFind `
+    -Replace $uiBackgroundClipGroupReplace `
+    -ExpectedCount 1 `
+    -Label 'ui PSD frame children clip to background'
+} elseif ($uiBundle.Contains($uiBackgroundClipGroupReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI PSD frame children clip to background.'
+}
+
 if ($uiBundle -ne $originalUiBundle) {
   [System.IO.File]::WriteAllText($uiSource, $uiBundle, $utf8NoBom)
 }
@@ -1456,7 +1701,7 @@ if ($bundle.Contains($progressiveBlurPaddingFind)) {
 $bundle = Replace-Exact `
   -Text $bundle `
   -Find 'function oa(e){var u;if(V(e)&&e.children.length>0||te(e)||X(e,"strokes")||!("fills"in e)||!Array.isArray(e.fills))return null;let t=e.fills.filter(c=>W(c));if(t.length!==1)return null;let r=t[0];if(r.type!=="IMAGE"||!r.imageHash)return null;let o=h((u=r.opacity)!=null?u:1,0,1),n=!St(o,1),i=!st(r.blendMode);if(!n&&!i)return null;let a="blendMode"in e?e.blendMode:void 0,s=!st(a),l=i&&!s;return{normalizePaintOpacity:n||l,normalizePaintBlendMode:l,effectiveOpacity:h(j(e)*o,0,1),effectiveBlendMode:l?oe(r.blendMode):K(e),warning:i&&s?''"''.concat(f(e),''" uses both layer and image-fill blend modes, so only the layer blend stayed editable in the PSD.''):null}}' `
-  -Replace 'function oa(e){var u;if(!("fills"in e)||!Array.isArray(e.fills))return null;let t=e.fills.filter(c=>W(c));if(t.length!==1)return null;let r=t[0],o=r.type==="IMAGE"&&!!r.imageHash,n=o?h((u=r.opacity)!=null?u:1,0,1):1,i=o&&!St(n,1),a=!st(r.blendMode);if(!i&&!a)return null;let s="blendMode"in e?e.blendMode:void 0,l=!st(s),c=a,p=c?oe(r.blendMode):K(e),g=l&&c&&K(e)!==p;return{normalizePaintOpacity:i||c&&o,normalizePaintBlendMode:c,effectiveOpacity:o?h(j(e)*n,0,1):j(e),effectiveBlendMode:p,warning:g?''"''.concat(f(e),''" collapses Figma layer/fill blend modes into the fill blend for PSD export.''):null}}' `
+  -Replace 'function oa(e){var u;if(!("fills"in e)||!Array.isArray(e.fills))return null;let t=e.fills.filter(c=>W(c));if(t.length!==1)return null;let r=t[0],o=r.type==="IMAGE"&&!!r.imageHash,n=o?h((u=r.opacity)!=null?u:1,0,1):1,i=o&&!St(n,1),a=!st(r.blendMode);if(!i&&!a)return null;let s="blendMode"in e?e.blendMode:void 0,l=!st(s),c=a,p=c?oe(r.blendMode):K(e),g=l&&c&&K(e)!==p;return{normalizePaintOpacity:i||c&&o,normalizePaintBlendMode:c,effectiveOpacity:o?h(j(e)*n*pigmaColorBurnOpacityScale(r),0,1):h(j(e)*pigmaColorBurnOpacityScale(r),0,1),effectiveBlendMode:p,warning:g?''"''.concat(f(e),''" collapses Figma layer/fill blend modes into the fill blend for PSD export.''):null}}' `
   -ExpectedCount 1 `
   -Label 'single-fill blend mode promotion'
 
@@ -1469,7 +1714,9 @@ $bundle = Replace-Exact `
 
 $multiFillHelpersPatched = @'
 function pigmaVisibleFillEntries(e){return!("fills"in e)||!Array.isArray(e.fills)?[]:e.fills.map((t,r)=>({paint:t,index:r})).filter(t=>W(t.paint))}
-function pigmaFillOpacity(e){var t;return h((t=e.opacity)!=null?t:1,0,1)}
+function pigmaPsdFillStackEntries(e){return e.slice().reverse()}
+function pigmaColorBurnOpacityScale(e){return e&&e.blendMode==="COLOR_BURN"?.875:1}
+function pigmaFillOpacity(e){var t;return h(((t=e.opacity)!=null?t:1)*pigmaColorBurnOpacityScale(e),0,1)}
 function pigmaPaintNeedsDedicatedLayer(e){return!st(e.blendMode)||!St(pigmaFillOpacity(e),1)}
 function pigmaMultiFillBlendInfo(e,t=null){let r=pigmaVisibleFillEntries(e);if(r.length<2||e.type==="TEXT")return null;let o=te(e,t),n=r.filter(i=>pigmaPaintNeedsDedicatedLayer(i.paint));if(!o&&n.length===0)return null;return{entries:r,mode:o?"baked-fx":"split",warning:o?"\"".concat(f(e),"\" uses multiple visible fills plus unsupported effects, so PSD export kept separate fill layers and added one baked effects layer."):"\"".concat(f(e),"\" uses multiple visible fills with blend or opacity overrides, so PSD export split them into separate child layers.")}}
 function pigmaFillBlendMode(e){return at(!st(e.blendMode)?oe(e.blendMode):"normal")}
@@ -1478,10 +1725,10 @@ function pigmaFxChildName(e,t){return t==="background"?"Background Effects":"Eff
 function pigmaBaseFillBounds(e,t=null){let r=k(e);if(r&&r.width>0&&r.height>0)return{x:r.x,y:r.y,width:r.width,height:r.height,useAbsoluteBounds:!0};if("absoluteTransform"in e&&"width"in e&&"height"in e){let o=ce(e);if(o)return{x:o.x,y:o.y,width:o.width,height:o.height,useAbsoluteBounds:!0}}return t!=null?t:v(e)}
 function pigmaIsolateFillOnClone(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.fills;r.fills=o.map((n,i)=>i===t?B(b({},n),{blendMode:"NORMAL",opacity:1,visible:!0}):B(b({},n),{blendMode:"NORMAL",opacity:1,visible:!1}))}
 function pigmaHideAllFillsOnClone(e){if(!("fills"in e)||!Array.isArray(e.fills))return;let t=e,r=e.fills;t.fills=r.map(o=>B(b({},o),{blendMode:"NORMAL",opacity:1,visible:!1}))}
-async function pigmaExportFillBitmapChild(e,t,r,o,n,i,a,s="node"){let l=e.clone();try{pigmaIsolateFillOnClone(l,o.index),s==="background"&&"children"in l&&Ii(l),Oe(l,a),bt(l,r);let u=x(r.x-t.documentBounds.x),c=x(r.y-t.documentBounds.y),p=d(r.width),g=d(r.height);return{kind:"bitmap",id:"".concat(e.id,":").concat(s==="background"?"background-fill":"fill",":").concat(o.index+1),name:pigmaFillChildName(e,n,i,s),sourceType:"".concat(e.type,s==="background"?"_BACKGROUND_FILL":"_FILL"),opacity:pigmaFillOpacity(o.paint),visible:!0,blendMode:pigmaFillBlendMode(o.paint),effects:null,strokeEffect:null,x:u,y:c,width:p,height:g,nodeTransform:de(e,t.documentBounds,u,c),pngBytes:await l.exportAsync({format:"PNG",useAbsoluteBounds:r.useAbsoluteBounds})}}finally{l.removed||l.remove()}}
+async function pigmaExportFillBitmapChild(e,t,r,o,n,i,a,s="node"){let l=e.clone();try{pigmaIsolateFillOnClone(l,o.index),s==="background"&&"children"in l&&Ii(l),Oe(l,a),bt(l,r);let u=x(r.x-t.documentBounds.x),c=x(r.y-t.documentBounds.y),p=d(r.width),g=d(r.height);return{kind:"bitmap",id:"".concat(e.id,":").concat(s==="background"?"background-fill":"fill",":").concat(o.index+1),name:pigmaFillChildName(e,o.index,i,s),sourceType:"".concat(e.type,s==="background"?"_BACKGROUND_FILL":"_FILL"),opacity:pigmaFillOpacity(o.paint),visible:!0,blendMode:pigmaFillBlendMode(o.paint),effects:null,strokeEffect:null,x:u,y:c,width:p,height:g,nodeTransform:de(e,t.documentBounds,u,c),pngBytes:await l.exportAsync({format:"PNG",useAbsoluteBounds:r.useAbsoluteBounds})}}finally{l.removed||l.remove()}}
 async function pigmaExportFxBitmapChild(e,t,r,o,n="node"){let i=e.clone();try{pigmaHideAllFillsOnClone(i),n==="background"&&"children"in i&&Ii(i),Oe(i,o),bt(i,r);let a=x(r.x-t.documentBounds.x),s=x(r.y-t.documentBounds.y),l=d(r.width),u=d(r.height);return{kind:"bitmap",id:"".concat(e.id,":").concat(n==="background"?"background-fx":"fx"),name:pigmaFxChildName(e,n),sourceType:"".concat(e.type,n==="background"?"_BACKGROUND_FX":"_FX"),opacity:1,visible:!0,blendMode:"normal",effects:null,strokeEffect:null,x:a,y:s,width:l,height:u,nodeTransform:de(e,t.documentBounds,a,s),pngBytes:await i.exportAsync({format:"PNG",useAbsoluteBounds:r.useAbsoluteBounds})}}finally{i.removed||i.remove()}}
-async function pigmaExportMultiFillGroup(e,t,r,o=null){let n=pigmaMultiFillBlendInfo(e,t.root);if(!n||t.longFrameMode)return null;let i=o!=null?o:tt(e),a=n.mode==="baked-fx"?tt(e):i,s=n.mode==="baked-fx"?pigmaBaseFillBounds(e,i):i;if(!a||!s)return null;let l=L(e,t.root);if(n.mode!=="baked-fx"&&progressiveBlurShouldRasterize(l))return null;let u=me(e),c=null,p=null,g={removeSupportedStroke:!!u},y=[];t.currentLeaf+=1,Y(t,f(e)),await dt(e),n.mode==="baked-fx"?g.removeAllEffects=!0:(c=await hr(e,t,r),p=c.effects,g.removeSupportedEffects=c.removeSupportedEffects||!!_(p));for(let m=0;m<n.entries.length;m+=1){let T=await pigmaExportFillBitmapChild(e,t,s,n.entries[m],m,n.entries.length>1,g,"node");T&&y.push(T)}if(n.mode==="baked-fx"){let m=await pigmaExportFxBitmapChild(e,t,a,{removeSupportedStroke:!!u},"node");m&&y.push(m)}let d=n.entries.length+(n.mode==="baked-fx"?1:0);return y.length<d?null:(n.warning&&t.warnings.add(n.warning),{kind:"group",id:e.id,name:f(e),sourceType:e.type,opacity:j(e),visible:e.visible,blendMode:K(e),effects:n.mode==="baked-fx"?null:p,strokeEffect:u,mask:null,children:y})}
-async function pigmaExportMultiFillBackgroundGroup(e,t,r){let o=pigmaMultiFillBlendInfo(e,t.root);if(!o||t.longFrameMode||!Ln(e)||!Ur(e))return null;let n=Fn(e),i=o.mode==="baked-fx"?tt(e):n;if(!n||!i)return null;let a=L(e,t.root);if(o.mode!=="baked-fx"&&progressiveBlurShouldRasterize(a))return null;let s=me(e),l=null,u=null,c={removeSupportedStroke:!!s},p=[];t.currentLeaf+=1,Y(t,"".concat(f(e)," Background")),await dt(e),o.mode==="baked-fx"?c.removeAllEffects=!0:(l=Hi(a),u=Vi(a),c.removeSupportedEffects=!!a);for(let g=0;g<o.entries.length;g+=1){let y=await pigmaExportFillBitmapChild(e,t,n,o.entries[g],g,o.entries.length>1,c,"background");y&&p.push(y)}if(o.mode==="baked-fx"){let g=await pigmaExportFxBitmapChild(e,t,i,{removeSupportedStroke:!!s},"background");g&&p.push(g)}let d=o.entries.length+(o.mode==="baked-fx"?1:0);return p.length<d?null:(o.warning&&t.warnings.add(o.warning),{backgroundLayer:{kind:"group",id:"".concat(e.id,":background-stack"),name:"Background",sourceType:"".concat(e.type,"_BACKGROUND_GROUP"),opacity:1,visible:!0,blendMode:"normal",effects:o.mode==="baked-fx"?null:l,strokeEffect:s,mask:null,children:p},groupEffects:o.mode==="baked-fx"?null:u,groupStrokeEffect:null})}
+async function pigmaExportMultiFillGroup(e,t,r,o=null){let n=pigmaMultiFillBlendInfo(e,t.root);if(!n||t.longFrameMode)return null;let i=o!=null?o:tt(e),a=n.mode==="baked-fx"?tt(e):i,s=n.mode==="baked-fx"?pigmaBaseFillBounds(e,i):i;if(!a||!s)return null;let l=L(e,t.root);if(n.mode!=="baked-fx"&&progressiveBlurShouldRasterize(l))return null;let u=me(e),c=null,p=null,g={removeSupportedStroke:!!u},y=[],m=pigmaPsdFillStackEntries(n.entries);t.currentLeaf+=1,Y(t,f(e)),await dt(e),n.mode==="baked-fx"?g.removeAllEffects=!0:(c=await hr(e,t,r),p=c.effects,g.removeSupportedEffects=c.removeSupportedEffects||!!_(p));for(let T=0;T<m.length;T+=1){let E=await pigmaExportFillBitmapChild(e,t,s,m[T],T,n.entries.length>1,g,"node");E&&y.push(E)}if(n.mode==="baked-fx"){let T=await pigmaExportFxBitmapChild(e,t,a,{removeSupportedStroke:!!u},"node");T&&y.push(T)}let d=n.entries.length+(n.mode==="baked-fx"?1:0);return y.length<d?null:(n.warning&&t.warnings.add(n.warning),{kind:"group",id:e.id,name:f(e),sourceType:e.type,opacity:j(e),visible:e.visible,blendMode:K(e),effects:n.mode==="baked-fx"?null:p,strokeEffect:u,mask:null,children:y})}
+async function pigmaExportMultiFillBackgroundGroup(e,t,r){let o=pigmaMultiFillBlendInfo(e,t.root);if(!o||t.longFrameMode||!Ln(e)||!Ur(e))return null;let n=Fn(e),i=o.mode==="baked-fx"?tt(e):n;if(!n||!i)return null;let a=L(e,t.root);if(o.mode!=="baked-fx"&&progressiveBlurShouldRasterize(a))return null;let s=me(e),l=null,u=null,c={removeSupportedStroke:!!s},p=[],g=pigmaPsdFillStackEntries(o.entries);t.currentLeaf+=1,Y(t,"".concat(f(e)," Background")),await dt(e),o.mode==="baked-fx"?c.removeAllEffects=!0:(l=Hi(a),u=Vi(a),c.removeSupportedEffects=!!a);for(let y=0;y<g.length;y+=1){let m=await pigmaExportFillBitmapChild(e,t,n,g[y],y,o.entries.length>1,c,"background");m&&p.push(m)}if(o.mode==="baked-fx"){let y=await pigmaExportFxBitmapChild(e,t,i,{removeSupportedStroke:!!s},"background");y&&p.push(y)}let d=o.entries.length+(o.mode==="baked-fx"?1:0);return p.length<d?null:(o.warning&&t.warnings.add(o.warning),{backgroundLayer:{kind:"group",id:"".concat(e.id,":background-stack"),name:"Background",sourceType:"".concat(e.type,"_BACKGROUND_GROUP"),opacity:1,visible:!0,blendMode:"normal",effects:o.mode==="baked-fx"?null:l,strokeEffect:s,mask:null,children:p},groupEffects:o.mode==="baked-fx"?null:u,groupStrokeEffect:null})}
 function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.fills;r.fills=o.map(n=>na(n,t))}
 '@
 
