@@ -4,15 +4,22 @@
   "requiredRuntimeSnippets": [
     "invalidateTextLayers:n1",
     "function editableTextParagraphRuns(",
+    "function editableTextEngineText(",
+    "replace(/\\r\\n?|\\n/g,\"\\r\")",
     "paragraphStyleRuns:l",
     "gridding:\"none\"",
     "useFractionalGlyphWidths:!0",
+    "function pigmaEditableTextFontWeight(",
+    "function pigmaApplyEditableTextFontFaceStyle(",
+    "fauxBold",
     "Ff().serializeEngineData(Vf().encodeEngineData(T.text))",
     "text metadata could not be encoded safely",
     "editable-text-build-summary"
   ],
   "requiredBuildSnippets": [
     "ui text invalidation disabled",
+    "runtime editable text font weight metadata",
+    "ui editable text font face style application",
     "ui editable text engine metadata",
     "ui editable text preflight fallback",
     "ui editable text redraw write option",

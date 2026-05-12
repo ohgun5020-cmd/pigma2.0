@@ -96,10 +96,7 @@
       typeof source.openAiImageModel === "string"
         ? normalizeModelId(source.openAiImageModel, DEFAULT_AI_SETTINGS.openAiImageModel)
         : DEFAULT_AI_SETTINGS.openAiImageModel;
-    const openAiImageModel =
-      !openAiImageModelPinned && rawOpenAiImageModel === "gpt-image-2"
-        ? DEFAULT_AI_SETTINGS.openAiImageModel
-        : rawOpenAiImageModel;
+    const openAiImageModel = rawOpenAiImageModel;
     const geminiImageModel =
       typeof source.geminiImageModel === "string"
         ? normalizeModelId(source.geminiImageModel, DEFAULT_AI_SETTINGS.geminiImageModel)

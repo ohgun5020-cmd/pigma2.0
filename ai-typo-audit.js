@@ -852,6 +852,11 @@
       const nodeIndex = container.nodeIndex;
       const anchorNodeId = container.anchorNodeId || range.node.id;
       const rects = [];
+      const boxTargetHeightPx = buildTextHighlightBoxTargetHeight(
+        measurement.fontSize,
+        boxPaddingPx,
+        boundsList
+      );
       for (let index = 0; index < boundsList.length; index += 1) {
         const rect = createTextHighlightRect(
           range.node,
@@ -860,7 +865,8 @@
           measurement.fontSize,
           highlightColorHex,
           cornerRadius,
-          boxPaddingPx
+          boxPaddingPx,
+          boxTargetHeightPx
         );
         rect.name = boundsList.length > 1 ? `Highlight ${index + 1}` : "Highlight";
         placeTextHighlightRectBehindNode(highlightParent, rect, anchorNodeId, nodeIndex >= 0 ? nodeIndex + index : -1);
@@ -8450,7 +8456,7 @@
     node.setRangeFills(start, end, [createSolidPaint(textColorHex)]);
   }
 
-  function createTextHighlightRect(node, parent, worldBounds, fontSize, colorHex, cornerRadius, boxPaddingPx) {
+  function createTextHighlightRect(node, parent, worldBounds, fontSize, colorHex, cornerRadius, boxPaddingPx, targetHeightPx) {
     const nodeTransform = getAbsoluteTransformMatrix(node);
     const inverseNodeTransform = invertAffineTransform(nodeTransform);
     if (!inverseNodeTransform) {
@@ -8460,9 +8466,11 @@
     const localBounds = getTextHighlightLocalBounds(inverseNodeTransform, worldBounds);
     const padding = buildTextHighlightBoxPixelPadding(fontSize, boxPaddingPx);
     const localX = localBounds.x - padding.left;
-    const localY = localBounds.y - padding.top;
     const localWidth = Math.max(1, localBounds.width + padding.left + padding.right);
-    const localHeight = ceilTextHighlightMetric(localBounds.height + padding.top + padding.bottom);
+    const naturalLocalHeight = ceilTextHighlightMetric(localBounds.height + padding.top + padding.bottom);
+    const targetLocalHeight = sanitizeTextHighlightBoxTargetHeight(targetHeightPx);
+    const localHeight = targetLocalHeight > 0 ? Math.max(naturalLocalHeight, targetLocalHeight) : naturalLocalHeight;
+    const localY = roundTextHighlightMetric(localBounds.y - padding.top - Math.max(0, localHeight - naturalLocalHeight) / 2);
     const clampedGeometry = clampTextHighlightLocalGeometryToParentBounds(node, parent, {
       x: localX,
       y: localY,
@@ -8846,6 +8854,31 @@
       bottom: padding + baseVerticalPadding,
       radius: roundTextHighlightMetric(Math.max(0, Math.min(14, size * 0.16))),
     };
+  }
+
+  function buildTextHighlightBoxTargetHeight(fontSize, boxPaddingPx, boundsList) {
+    const rawSize = Math.max(1, Number(fontSize) || 16);
+    const userPadding = sanitizeTextHighlightBoxPaddingPx(boxPaddingPx, AI_TEXT_HIGHLIGHT_DEFAULT_BOX_PADDING_PX);
+    const padding = buildTextHighlightBoxPixelPadding(fontSize, boxPaddingPx);
+    let measuredMaxHeight = 0;
+    const rows = Array.isArray(boundsList) ? boundsList : [];
+    for (const row of rows) {
+      const bounds = normalizeTextHighlightWorldBounds(row);
+      if (bounds) {
+        measuredMaxHeight = Math.max(measuredMaxHeight, bounds.height + padding.top + padding.bottom);
+      }
+    }
+
+    return ceilTextHighlightMetric(Math.max(1, rawSize + userPadding * 2, measuredMaxHeight));
+  }
+
+  function sanitizeTextHighlightBoxTargetHeight(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric <= 0) {
+      return 0;
+    }
+
+    return ceilTextHighlightMetric(Math.max(1, Math.min(9999, numeric)));
   }
 
   function buildTextHighlightBoxBaseHorizontalPadding(fontSize) {
