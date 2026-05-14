@@ -7403,12 +7403,17 @@
 
         const minimumWidth = getTextHighlightMinimumWidth(fontSize);
         const alignedRight = alignedLineBounds.x + alignedLineBounds.width;
-        const nextX = roundTextHighlightMetric(
+        let nextX = roundTextHighlightMetric(
           Math.max(alignedLineBounds.x, Math.min(alignedRight - minimumWidth, alignedSelectedBounds.x))
         );
         const nextWidth = roundTextHighlightMetric(
           Math.max(minimumWidth, Math.min(alignedSelectedBounds.width, alignedRight - nextX))
         );
+        if (alignment === "RIGHT") {
+          nextX = roundTextHighlightMetric(
+            Math.max(alignedLineBounds.x, nextX - getRightAlignedTextHighlightNudge(fontSize))
+          );
+        }
         translatedRows.push({
           x: nextX,
           y: alignedSelectedBounds.y,
@@ -7430,6 +7435,11 @@
         leftClone.remove();
       }
     }
+  }
+
+  function getRightAlignedTextHighlightNudge(fontSize) {
+    const size = Math.max(12, Number(fontSize) || 16);
+    return roundTextHighlightMetric(Math.max(1, Math.min(1.5, size * 0.06)));
   }
 
   async function measureLeftAlignedTextHighlightSelectionRows(
