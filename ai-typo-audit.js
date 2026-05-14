@@ -9710,24 +9710,27 @@
       [nodeTransform[0][0], nodeTransform[0][1], absoluteOrigin.x],
       [nodeTransform[1][0], nodeTransform[1][1], absoluteOrigin.y],
     ];
-    const parentTransform = getAbsoluteTransformMatrix(parent);
-    const inverseParentTransform = invertAffineTransform(parentTransform);
-    const relativeTransform = inverseParentTransform
-      ? multiplyAffineTransforms(inverseParentTransform, desiredAbsoluteTransform)
-      : desiredAbsoluteTransform;
 
     if (rect.parent !== parent) {
-      if ("relativeTransform" in rect && Array.isArray(rect.relativeTransform)) {
-        rect.relativeTransform = relativeTransform;
-      } else if ("x" in rect && typeof rect.x === "number" && "y" in rect && typeof rect.y === "number") {
-        rect.x = roundTextHighlightMetric(relativeTransform[0][2]);
-        rect.y = roundTextHighlightMetric(relativeTransform[1][2]);
-      }
       parent.appendChild(rect);
       if (isAutoLayoutParent(parent)) {
         setTextHighlightAbsoluteLayout(rect);
       }
     }
+
+    applyTextHighlightRectTransform(rect, parent, desiredAbsoluteTransform);
+    applyTextHighlightRectTransform(rect, parent, desiredAbsoluteTransform);
+
+    return rect;
+  }
+
+  function applyTextHighlightRectTransform(rect, parent, desiredAbsoluteTransform) {
+    const coordinateParent = getTextHighlightCoordinateParent(parent);
+    const parentTransform = getAbsoluteTransformMatrix(coordinateParent);
+    const inverseParentTransform = invertAffineTransform(parentTransform);
+    const relativeTransform = inverseParentTransform
+      ? multiplyAffineTransforms(inverseParentTransform, desiredAbsoluteTransform)
+      : desiredAbsoluteTransform;
 
     if ("relativeTransform" in rect && Array.isArray(rect.relativeTransform)) {
       rect.relativeTransform = relativeTransform;
@@ -9735,8 +9738,20 @@
       rect.x = roundTextHighlightMetric(relativeTransform[0][2]);
       rect.y = roundTextHighlightMetric(relativeTransform[1][2]);
     }
+  }
 
-    return rect;
+  function getTextHighlightCoordinateParent(parent) {
+    let coordinateParent = parent;
+    while (
+      coordinateParent &&
+      coordinateParent.type === "GROUP" &&
+      coordinateParent.parent &&
+      coordinateParent.parent.type !== "DOCUMENT"
+    ) {
+      coordinateParent = coordinateParent.parent;
+    }
+
+    return coordinateParent || parent;
   }
 
   function setTextHighlightAbsoluteLayout(node) {
@@ -9751,44 +9766,12 @@
 
   function prepareTextHighlightLayerContainer(parent, node) {
     const nodeIndex = findNodeChildIndex(parent, node && node.id);
-    const groupOverlayTarget = getTextHighlightGroupOverlayTarget(parent);
-    if (groupOverlayTarget) {
-      return {
-        parent: groupOverlayTarget.parent,
-        nodeIndex: findNodeChildIndex(groupOverlayTarget.parent, groupOverlayTarget.anchorNodeId),
-        anchorNodeId: groupOverlayTarget.anchorNodeId,
-        looseHighlights: true,
-        externalOverlay: true,
-      };
-    }
 
     return {
       parent,
       nodeIndex,
       looseHighlights: true,
       anchorNodeId: node && node.id,
-    };
-  }
-
-  function getTextHighlightGroupOverlayTarget(parent) {
-    if (!parent || parent.type !== "GROUP") {
-      return null;
-    }
-
-    let anchor = parent;
-    let overlayParent = parent.parent;
-    while (overlayParent && overlayParent.type === "GROUP") {
-      anchor = overlayParent;
-      overlayParent = overlayParent.parent;
-    }
-
-    if (!anchor || !overlayParent || overlayParent.type === "DOCUMENT" || !("children" in overlayParent)) {
-      return null;
-    }
-
-    return {
-      parent: overlayParent,
-      anchorNodeId: anchor.id,
     };
   }
 
