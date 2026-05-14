@@ -270,16 +270,7 @@
       }
     }
 
-    const annotationSupported = supportsAnnotationsForPlans(appliedPlans);
-    const annotationCategory = annotationSupported ? await ensureAnnotationCategory(ANNOTATION_CATEGORY_COLOR) : null;
-    const annotationApplied = annotationSupported
-      ? applyPixelPerfectAnnotations(appliedPlans, annotationCategory)
-      : buildResultOnlyAnnotation(
-          appliedPlans,
-          appliedPlans.length > 0
-            ? "Figma Annotation API is not available for the updated nodes, so the result stays in the panel only."
-            : ""
-        );
+    const annotationApplied = buildResultOnlyAnnotation(appliedPlans, "");
 
     return buildPixelPerfectResult({
       selection,

@@ -386,6 +386,7 @@
     "uk-UA": { label: "우크라이나어 (우크라이나)", aiLabel: "Ukrainian (Ukraine)", latinLocaleHint: "" },
   });
   let activeTypoTask = "";
+  let queuedTypoTask = null;
 
   if (typeof originalOnMessage !== "function") {
     return;
@@ -487,22 +488,120 @@
   }
 
   async function withTypoTaskLock(task, runner) {
+    const selectionSnapshot = createTypoTaskSelectionSnapshot();
+
     if (activeTypoTask) {
       if (activeTypoTask === task) {
         postTypoTaskStatus(task, "running", getTypoTaskRunningMessage(task));
+      } else if (!queuedTypoTask) {
+        queuedTypoTask = {
+          task,
+          runner,
+          selectionSnapshot,
+        };
+        postTypoTaskStatus(task, "queued", getTypoTaskQueuedMessage(task, activeTypoTask));
+      } else if (queuedTypoTask.task === task) {
+        postTypoTaskStatus(task, "queued", getTypoTaskQueuedMessage(task, activeTypoTask));
       } else {
-        postTypoTaskError(task, "다른 텍스트 작업이 이미 진행 중입니다. 현재 작업이 끝난 뒤 다시 실행해 주세요.");
+        postTypoTaskError(
+          task,
+          "다른 텍스트 작업이 이미 대기 중입니다. 현재 작업과 대기 작업이 끝난 뒤 다시 실행해 주세요."
+        );
       }
       return false;
     }
 
+    await runTypoTaskWithSnapshot(task, runner, selectionSnapshot);
+    return true;
+  }
+
+  async function runTypoTaskWithSnapshot(task, runner, selectionSnapshot) {
     activeTypoTask = task;
     try {
+      if (!matchesTypoTaskSelectionSnapshot(selectionSnapshot)) {
+        postTypoTaskError(
+          task,
+          "대기 중 선택 영역이나 텍스트가 바뀌어서 작업을 건너뛰었습니다. 현재 선택으로 다시 실행해 주세요."
+        );
+        return false;
+      }
+
       await runner();
       return true;
+    } catch (error) {
+      postTypoTaskError(task, normalizeErrorMessage(error, "텍스트 작업을 완료하지 못했습니다."));
+      return false;
     } finally {
       activeTypoTask = "";
+      const nextQueuedTask = queuedTypoTask;
+      queuedTypoTask = null;
+      if (nextQueuedTask) {
+        Promise.resolve().then(() => {
+          runTypoTaskWithSnapshot(
+            nextQueuedTask.task,
+            nextQueuedTask.runner,
+            nextQueuedTask.selectionSnapshot
+          );
+        });
+      }
     }
+  }
+
+  function createTypoTaskSelectionSnapshot() {
+    const selection = Array.from(figma.currentPage.selection || []);
+    const selectedTextRange = getSelectedTextRangeSnapshot();
+    return {
+      selectionSignature: getSelectionSignature(selection),
+      textContentSignature: getSelectionTextContentSignature(selection),
+      selectedTextRangeSignature: selectedTextRange ? selectedTextRange.signature : "",
+    };
+  }
+
+  function matchesTypoTaskSelectionSnapshot(snapshot) {
+    if (!snapshot) {
+      return true;
+    }
+
+    const current = createTypoTaskSelectionSnapshot();
+    return (
+      current.selectionSignature === snapshot.selectionSignature &&
+      current.textContentSignature === snapshot.textContentSignature &&
+      current.selectedTextRangeSignature === snapshot.selectedTextRangeSignature
+    );
+  }
+
+  function getSelectedTextRangeSnapshot() {
+    const page = figma.currentPage;
+    const selectedTextRange = page && "selectedTextRange" in page ? page.selectedTextRange : null;
+    if (!selectedTextRange || !selectedTextRange.node || selectedTextRange.node.removed || selectedTextRange.node.type !== "TEXT") {
+      return null;
+    }
+
+    const characters = typeof selectedTextRange.node.characters === "string" ? selectedTextRange.node.characters : "";
+    const start = Math.max(0, Math.floor(Number(selectedTextRange.start) || 0));
+    const end = Math.max(start, Math.min(characters.length, Math.floor(Number(selectedTextRange.end) || 0)));
+    const text = normalizeLineEndings(characters.slice(start, end));
+    return {
+      signature: [selectedTextRange.node.id, start, end, hashTypoTaskSnapshotText(text)].join(":"),
+    };
+  }
+
+  function getSelectionTextContentSignature(selection) {
+    const textNodes = collectTextNodes(selection, { includeHidden: true, includeLocked: true });
+    return textNodes
+      .map((node) => `${node.id}:${hashTypoTaskSnapshotText(getTextValue(node))}`)
+      .sort()
+      .join("|");
+  }
+
+  function hashTypoTaskSnapshotText(value) {
+    const text = normalizeLineEndings(value);
+    let hash = 2166136261;
+    for (let index = 0; index < text.length; index += 1) {
+      hash ^= text.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+    return `${text.length}:${(hash >>> 0).toString(36)}`;
   }
 
   function getTypoTaskRunningMessage(task) {
@@ -519,6 +618,26 @@
       return "선택한 화면의 텍스트를 번역하고 있습니다. 선택이 없으면 전체 페이지 번역을 실행하지 않습니다.";
     }
     return "오타 후보를 찾고 Dev Mode 주석 또는 결과 패널로 정리하는 중입니다.";
+  }
+
+  function getTypoTaskQueuedMessage(task, activeTask) {
+    return `${getTypoTaskLabel(activeTask)} 작업이 끝나면 ${getTypoTaskLabel(task)} 작업을 이어서 실행합니다. 선택이 바뀌면 자동 실행하지 않습니다.`;
+  }
+
+  function getTypoTaskLabel(task) {
+    if (task === "highlight") {
+      return "텍스트 하이라이트";
+    }
+    if (task === "fix") {
+      return "오타 자동 수정";
+    }
+    if (task === "clear") {
+      return "오타 주석 정리";
+    }
+    if (task === "translate") {
+      return "번역";
+    }
+    return "오타 검사";
   }
 
   function postTypoTaskStatus(task, status, message) {

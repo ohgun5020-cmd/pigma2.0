@@ -21,6 +21,8 @@ const defaultFiles = [
   "unlock-locked-layers.js",
   "detach-linked-components.js",
   "delete-hidden-layers.js",
+  "clear-frame-guides.js",
+  "split-long-frame.js",
   "original-image-download.js",
   "ai-image-upscale.js",
 ];

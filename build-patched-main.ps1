@@ -19,6 +19,7 @@ $textLineHeightAdjustPatch = Join-Path $root "text-line-height-adjust.js"
 $unlockLockedLayersPatch = Join-Path $root "unlock-locked-layers.js"
 $detachLinkedComponentsPatch = Join-Path $root "detach-linked-components.js"
 $deleteHiddenLayersPatch = Join-Path $root "delete-hidden-layers.js"
+$clearFrameGuidesPatch = Join-Path $root "clear-frame-guides.js"
 $splitLongFramePatch = Join-Path $root "split-long-frame.js"
 $aiUrlShortenerPatch = Join-Path $root "ai-url-shortener.js"
 $aiColorExtractPatch = Join-Path $root "ai-color-extract.js"
@@ -120,6 +121,10 @@ if (-not (Test-Path $detachLinkedComponentsPatch)) {
 
 if (-not (Test-Path $deleteHiddenLayersPatch)) {
   throw "Missing hidden layer delete patch: $deleteHiddenLayersPatch"
+}
+
+if (-not (Test-Path $clearFrameGuidesPatch)) {
+  throw "Missing frame guides clear patch: $clearFrameGuidesPatch"
 }
 
 if (-not (Test-Path $splitLongFramePatch)) {
@@ -251,6 +256,8 @@ $runtimeSyntaxSourceFiles = @(
   $unlockLockedLayersPatch,
   $detachLinkedComponentsPatch,
   $deleteHiddenLayersPatch,
+  $clearFrameGuidesPatch,
+  $splitLongFramePatch,
   $aiUrlShortenerPatch,
   $aiColorExtractPatch,
   $aiImageUpscalePatch
@@ -2184,6 +2191,7 @@ $textLineHeightAdjustPatchContent = [System.IO.File]::ReadAllText($textLineHeigh
 $unlockLockedLayersPatchContent = [System.IO.File]::ReadAllText($unlockLockedLayersPatch, [System.Text.Encoding]::UTF8)
 $detachLinkedComponentsPatchContent = [System.IO.File]::ReadAllText($detachLinkedComponentsPatch, [System.Text.Encoding]::UTF8)
 $deleteHiddenLayersPatchContent = [System.IO.File]::ReadAllText($deleteHiddenLayersPatch, [System.Text.Encoding]::UTF8)
+$clearFrameGuidesPatchContent = [System.IO.File]::ReadAllText($clearFrameGuidesPatch, [System.Text.Encoding]::UTF8)
 $splitLongFramePatchContent = [System.IO.File]::ReadAllText($splitLongFramePatch, [System.Text.Encoding]::UTF8)
 $aiUrlShortenerPatchContent = [System.IO.File]::ReadAllText($aiUrlShortenerPatch, [System.Text.Encoding]::UTF8)
 $aiColorExtractPatchContent = [System.IO.File]::ReadAllText($aiColorExtractPatch, [System.Text.Encoding]::UTF8)
@@ -2211,6 +2219,7 @@ $patchedRuntimeParts = @(
   $unlockLockedLayersPatchContent,
   $detachLinkedComponentsPatchContent,
   $deleteHiddenLayersPatchContent,
+  $clearFrameGuidesPatchContent,
   $splitLongFramePatchContent,
   $aiUrlShortenerPatchContent,
   $aiColorExtractPatchContent,

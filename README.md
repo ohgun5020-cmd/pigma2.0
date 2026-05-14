@@ -90,6 +90,8 @@ Safe implementation order:
   - Source of truth for the pixel-perfect button's decimal filtering, AI snap decisions, and apply pipeline.
 - `delete-hidden-layers.js`
   - Source of truth for the hidden-layer delete button's local cleanup and apply pipeline.
+- `clear-frame-guides.js`
+  - Source of truth for clearing ruler guides from selected frames.
 - `original-image-download.js`
   - Source of truth for the original-image download button's plugin-side image-hash collection and byte export pipeline.
   - In the externalized UI, 1-2 images download individually and 3 or more are packaged into a ZIP automatically.
