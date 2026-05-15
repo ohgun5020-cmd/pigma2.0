@@ -11,7 +11,9 @@
     "isTextHighlightLineBreakCharacter"
   ],
   "requiredSnippets": [
-    "if (isAlignmentSensitivePartialSingleLineSelection && directBoundsAreSafe)",
+    "if (isAlignmentSensitivePartialSingleLineSelection && directBoundsAreSafe && !preferAlignmentSensitiveFallback)",
+    "const preferAlignmentSensitiveFallback = !!(options && options.preferAlignmentSensitiveFallback);",
+    "{ preferAlignmentSensitiveFallback: true }",
     "bounds: mergeTextHighlightBoundsList(directBoundsList)",
     "const estimatedLineIndex = getEstimatedTextHighlightSoftLineIndexForSelection(",
     "const measuredLineIndex = findTextHighlightSoftLineIndexForRow(",
@@ -38,12 +40,13 @@
     "alignedReferenceLocalBounds",
     "Array.isArray(alignedLineRows)",
     "liveRange.node.id !== node.id || liveRange.start !== start || liveRange.end !== end",
-    "y: yMismatch > tolerance ? estimated.y : row.y"
+    "y: yMismatch > tolerance ? estimated.y : row.y",
+    "if (isAlignmentSensitivePartialSingleLineSelection && directBoundsAreSafe) {"
   ],
   "requiredOrderedSnippets": [
     [
       "const directBoundsAreSafe =",
-      "if (isAlignmentSensitivePartialSingleLineSelection && directBoundsAreSafe)",
+      "if (isAlignmentSensitivePartialSingleLineSelection && directBoundsAreSafe && !preferAlignmentSensitiveFallback)",
       "const underlineGeometryMeasurement = await measureTextHighlightUnderlineGeometryBounds("
     ],
     [
@@ -69,6 +72,12 @@
       "const maximumEstimatedXCorrection = Math.max(tolerance * 2, size * 0.75)",
       "x: xMismatch > tolerance ? estimated.x : row.x",
       "y: row.y"
+    ],
+    [
+      "async function runTextHighlightLine(message)",
+      "const measurement = await measureTextHighlightBounds(",
+      "{ preferAlignmentSensitiveFallback: true }",
+      "boundsList = getTextHighlightMeasurementBoundsList(measurement)"
     ],
     [
       "async function runTextHighlightLine(message)",

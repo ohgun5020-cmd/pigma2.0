@@ -1051,7 +1051,13 @@
 
       postTextHighlightStatus("running", "라인형 하이라이트를 만드는 중입니다.");
 
-      const measurement = await measureTextHighlightBounds(range.node, range.start, range.end, textColorHex);
+      const measurement = await measureTextHighlightBounds(
+        range.node,
+        range.start,
+        range.end,
+        textColorHex,
+        { preferAlignmentSensitiveFallback: true }
+      );
       let boundsList = getTextHighlightMeasurementBoundsList(measurement);
       if (!boundsList.length) {
         throw new Error("선택한 텍스트 범위를 정확히 측정하지 못했습니다. 다시 드래그한 뒤 시도해 주세요.");
@@ -6379,7 +6385,7 @@
     };
   }
 
-  async function measureTextHighlightBounds(node, start, end, textColorHex) {
+  async function measureTextHighlightBounds(node, start, end, textColorHex, options) {
     const characters = node && typeof node.characters === "string" ? node.characters : "";
     const characterCount = characters.length;
     const rangeStart = Math.max(0, Math.min(characterCount, Math.floor(Number(start) || 0)));
@@ -6393,6 +6399,7 @@
       !isWholeTextHighlightRange(node, rangeStart, rangeEnd);
     const isAlignmentSensitivePartialSingleLineSelection =
       isPartialSingleLineSelection && isAlignmentSensitiveTextHighlightNode(node);
+    const preferAlignmentSensitiveFallback = !!(options && options.preferAlignmentSensitiveFallback);
 
     const directMeasurement = await measureExactTextHighlightBounds(
       node,
@@ -6406,7 +6413,7 @@
     const directBoundsAreSafe =
       directBoundsList.length &&
       !hasSuspiciousTextHighlightDirectBounds(node, directBoundsList, rangeStart, rangeEnd, fontSize, lineHeight);
-    if (isAlignmentSensitivePartialSingleLineSelection && directBoundsAreSafe) {
+    if (isAlignmentSensitivePartialSingleLineSelection && directBoundsAreSafe && !preferAlignmentSensitiveFallback) {
       return {
         bounds: mergeTextHighlightBoundsList(directBoundsList),
         boundsList: directBoundsList,
