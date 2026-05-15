@@ -286,18 +286,18 @@
     const fontSize = Number(metrics && metrics.fontSize) || 0;
     const paddingX = Math.max(0, Number(metrics && metrics.paddingX) || 0);
     if (fontSize > 0 && fontSize <= 18) {
-      return paddingX;
+      return paddingX + 4;
     }
-    return Math.max(12, Math.min(28, Math.round(fontSize * 0.44), paddingX));
+    return Math.max(18, Math.min(44, Math.round(fontSize * 0.7)));
   }
 
   function resolveTargetVerticalPadding(metrics) {
     const fontSize = Number(metrics && metrics.fontSize) || 0;
     const paddingY = Math.max(0, Number(metrics && metrics.paddingY) || 0);
     if (fontSize > 0 && fontSize <= 18) {
-      return paddingY;
+      return paddingY + 3;
     }
-    return Math.max(10, Math.min(26, Math.round(fontSize * 0.52), paddingY));
+    return Math.max(14, Math.min(34, Math.round(fontSize * 0.62)));
   }
 
   function findBestBoxForText(textNode, boxNodes, usedBoxIds) {
