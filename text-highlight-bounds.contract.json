@@ -9,6 +9,9 @@
     "reconcileAlignmentSensitiveTextHighlightRowsWithEstimate",
     "getEstimatedTextHighlightSoftLineIndexForSelection",
     "isPlausibleSoftWrappedTextHighlightSelectionRows",
+    "tightenTextHighlightBoxBoundsToVisualRows",
+    "buildTextHighlightBoxVisualRowHeight",
+    "getTextHighlightLargeFontCompactBlend",
     "isTextHighlightLineBreakCharacter"
   ],
   "requiredSnippets": [
@@ -34,6 +37,10 @@
     "y: selectedLocalBounds.y",
     "if (yMismatch > tolerance)",
     "return sortedRows;",
+    "boundsList = tightenTextHighlightBoxBoundsToVisualRows(",
+    "const largeFontBlend = getTextHighlightLargeFontCompactBlend(size);",
+    "const compactHeight = Math.max(size * 0.86, Math.min(resolvedLineHeight * 0.78, size * 0.95));",
+    "const extraTargetHeight = Math.max(0, localHeight - naturalLocalHeight);",
     "return character === \"\\n\" || character === \"\\r\" || character === \"\\u2028\" || character === \"\\u2029\";"
   ],
   "requiredUiSnippets": [
@@ -98,6 +105,12 @@
       "const measurement = await measureTextHighlightBounds(",
       "{ preferAlignmentSensitiveFallback: true }",
       "boundsList = getTextHighlightMeasurementBoundsList(measurement)"
+    ],
+    [
+      "async function runTextHighlightBox(message)",
+      "boundsList = stabilizeTextHighlightBoxBoundsToTypographyRows(",
+      "boundsList = tightenTextHighlightBoxBoundsToVisualRows(",
+      "const boxTargetHeightPx = buildTextHighlightBoxTargetHeight("
     ],
     [
       "async function runTextHighlightLine(message)",

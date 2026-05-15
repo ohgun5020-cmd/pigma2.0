@@ -964,6 +964,12 @@
         measurement.fontSize,
         measurement.lineHeight
       );
+      boundsList = tightenTextHighlightBoxBoundsToVisualRows(
+        range.node,
+        boundsList,
+        measurement.fontSize,
+        measurement.lineHeight
+      );
       if (!boundsList.length) {
         throw new Error("선택한 텍스트 범위의 위치를 안전하게 계산하지 못했습니다. 다시 드래그한 뒤 시도해 주세요.");
       }
@@ -979,6 +985,7 @@
       const rects = [];
       const boxTargetHeightPx = buildTextHighlightBoxTargetHeight(
         measurement.fontSize,
+        measurement.lineHeight,
         boxPaddingPx,
         boundsList
       );
@@ -6920,6 +6927,21 @@
     };
   }
 
+  function buildTextHighlightBoxVisualRowHeight(fontSize, lineHeight) {
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const metrics = buildTextHighlightBoxGlyphMetrics(size, resolvedLineHeight);
+    const largeFontBlend = getTextHighlightLargeFontCompactBlend(size);
+    const compactHeight = Math.max(size * 0.86, Math.min(resolvedLineHeight * 0.78, size * 0.95));
+    const visualHeight = metrics.height * (1 - largeFontBlend) + compactHeight * largeFontBlend;
+    return roundTextHighlightMetric(Math.max(1, Math.min(resolvedLineHeight, visualHeight)));
+  }
+
+  function getTextHighlightLargeFontCompactBlend(fontSize) {
+    const size = Math.max(1, Number(fontSize) || 16);
+    return Math.max(0, Math.min(1, (size - 32) / 24));
+  }
+
   async function refineTextHighlightBoundsWithGlyphBounds(
     node,
     start,
@@ -9685,6 +9707,45 @@
     return stableRows.length ? sortTextHighlightBoundsList(stableRows) : rows;
   }
 
+  function tightenTextHighlightBoxBoundsToVisualRows(node, boundsList, fontSize, lineHeight) {
+    const rows = sortTextHighlightBoundsList(boundsList);
+    if (!rows.length || !node || node.removed) {
+      return rows;
+    }
+
+    const nodeTransform = getAbsoluteTransformMatrix(node);
+    const inverseNodeTransform = invertAffineTransform(nodeTransform);
+    if (!inverseNodeTransform) {
+      return rows;
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const targetHeight = buildTextHighlightBoxVisualRowHeight(size, resolvedLineHeight);
+    const tightenedRows = [];
+
+    for (const row of rows) {
+      const bounds = normalizeTextHighlightWorldBounds(row);
+      if (!bounds) {
+        continue;
+      }
+
+      const localBounds = getTextHighlightLocalBounds(inverseNodeTransform, bounds);
+      const localCenterY = localBounds.y + localBounds.height / 2;
+      const tightenedWorldBounds = getTextHighlightWorldBoundsFromLocalBounds(node, {
+        x: localBounds.x,
+        y: roundTextHighlightMetric(localCenterY - targetHeight / 2),
+        width: localBounds.width,
+        height: targetHeight,
+      });
+      if (tightenedWorldBounds) {
+        tightenedRows.push(tightenedWorldBounds);
+      }
+    }
+
+    return tightenedRows.length ? sortTextHighlightBoundsList(tightenedRows) : rows;
+  }
+
   function getTextHighlightTypographyLocalBounds(node, inverseNodeTransform) {
     if (!node || node.removed) {
       return null;
@@ -9923,7 +9984,8 @@
     const naturalLocalHeight = ceilTextHighlightMetric(localBounds.height + padding.top + padding.bottom);
     const targetLocalHeight = sanitizeTextHighlightBoxTargetHeight(targetHeightPx);
     const localHeight = targetLocalHeight > 0 ? Math.max(naturalLocalHeight, targetLocalHeight) : naturalLocalHeight;
-    const localY = localBounds.y - padding.top;
+    const extraTargetHeight = Math.max(0, localHeight - naturalLocalHeight);
+    const localY = localBounds.y - padding.top - extraTargetHeight / 2;
     const clampedGeometry = clampTextHighlightLocalGeometryToParentBounds(node, parent, {
       x: localX,
       y: localY,
@@ -10292,20 +10354,12 @@
     };
   }
 
-  function buildTextHighlightBoxTargetHeight(fontSize, boxPaddingPx, boundsList) {
+  function buildTextHighlightBoxTargetHeight(fontSize, lineHeight, boxPaddingPx, boundsList) {
     const rawSize = Math.max(1, Number(fontSize) || 16);
-    const userPadding = sanitizeTextHighlightBoxPaddingPx(boxPaddingPx, AI_TEXT_HIGHLIGHT_DEFAULT_BOX_PADDING_PX);
     const padding = buildTextHighlightBoxPixelPadding(fontSize, boxPaddingPx);
-    let measuredMaxHeight = 0;
-    const rows = Array.isArray(boundsList) ? boundsList : [];
-    for (const row of rows) {
-      const bounds = normalizeTextHighlightWorldBounds(row);
-      if (bounds) {
-        measuredMaxHeight = Math.max(measuredMaxHeight, bounds.height + padding.top + padding.bottom);
-      }
-    }
-
-    return ceilTextHighlightMetric(Math.max(1, rawSize + userPadding * 2, measuredMaxHeight));
+    const resolvedLineHeight = Math.max(rawSize, Number(lineHeight) || rawSize * 1.2);
+    const visualRowHeight = buildTextHighlightBoxVisualRowHeight(rawSize, resolvedLineHeight);
+    return ceilTextHighlightMetric(Math.max(1, visualRowHeight + padding.top + padding.bottom));
   }
 
   function sanitizeTextHighlightBoxTargetHeight(value) {

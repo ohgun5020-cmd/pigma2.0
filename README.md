@@ -323,6 +323,9 @@ If a future generated patch needs a newer syntax feature, assume it is unsafe un
 - The automatic box thickness recommendation was reduced from `fontSize * 1.08` to `fontSize`.
   - This keeps the box thinner while still covering glyph height.
 - Y placement was adjusted to use the glyph/bottom target instead of pulling the box upward from the underline-derived top.
+- Box mode now applies an extra visual-row tightening pass after row stabilization.
+  - Large and very large fonts no longer use Figma's full line-box height as the filled highlight height.
+  - The final rectangle height grows from the row center so center/right aligned selections do not look vertically pushed after padding or target-height normalization.
 
 ### Highlight Shape Behavior
 
