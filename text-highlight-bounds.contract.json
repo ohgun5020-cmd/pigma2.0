@@ -8,12 +8,16 @@
     "measureAlignmentSensitiveTextHighlightSelectionFromLeftLayout",
     "reconcileAlignmentSensitiveTextHighlightRowsWithEstimate",
     "getEstimatedTextHighlightSoftLineIndexForSelection",
+    "isPlausibleSoftWrappedTextHighlightSelectionRows",
     "isTextHighlightLineBreakCharacter"
   ],
   "requiredSnippets": [
     "if (isAlignmentSensitivePartialSingleLineSelection && directBoundsAreSafe && !preferAlignmentSensitiveFallback)",
     "const preferAlignmentSensitiveFallback = !!(options && options.preferAlignmentSensitiveFallback);",
     "{ preferAlignmentSensitiveFallback: true }",
+    "if (isPartialSingleLineSelection && directBoundsList.length > 1 && directBoundsAreSafe)",
+    "const isSoftWrappedPartialSelection =",
+    "const maximumExpectedRows = Math.max(2, Math.ceil(estimatedTextWidth / Math.max(size, wrapWidth * 0.86)) + 2);",
     "const underlineSelectionBoundsList = isPartialSingleLineSelection",
     "bounds: mergeTextHighlightBoundsList(underlineSelectionBoundsList)",
     "bounds: mergeTextHighlightBoundsList(directBoundsList)",
@@ -45,13 +49,21 @@
     "y: yMismatch > tolerance ? estimated.y : row.y",
     "if (isAlignmentSensitivePartialSingleLineSelection && directBoundsAreSafe) {",
     "const maximumEstimatedXCorrection = Math.max(tolerance * 2, size * 0.75)",
-    "x: xMismatch > tolerance ? estimated.x : row.x"
+    "x: xMismatch > tolerance ? estimated.x : row.x",
+    "if (normalizedBoundsList.length > 1) {\n      return true;"
   ],
   "requiredOrderedSnippets": [
     [
       "const directBoundsAreSafe =",
+      "if (isPartialSingleLineSelection && directBoundsList.length > 1 && directBoundsAreSafe)",
       "if (isAlignmentSensitivePartialSingleLineSelection && directBoundsAreSafe && !preferAlignmentSensitiveFallback)",
       "const underlineGeometryMeasurement = await measureTextHighlightUnderlineGeometryBounds("
+    ],
+    [
+      "const sortedBoundsList = sortTextHighlightBoundsList(boundsList);",
+      "const isSoftWrappedPartialSelection =",
+      "if (isPartialSingleLineSelection && sortedBoundsList.length !== 1 && !isSoftWrappedPartialSelection)",
+      "!isSoftWrappedPartialSelection &&"
     ],
     [
       "const underlineLineBoxBoundsList = sortTextHighlightBoundsList(underlineGeometryBoundsList);",

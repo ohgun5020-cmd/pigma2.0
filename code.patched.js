@@ -23063,6 +23063,15 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     const directBoundsAreSafe =
       directBoundsList.length &&
       !hasSuspiciousTextHighlightDirectBounds(node, directBoundsList, rangeStart, rangeEnd, fontSize, lineHeight);
+    if (isPartialSingleLineSelection && directBoundsList.length > 1 && directBoundsAreSafe) {
+      return {
+        bounds: mergeTextHighlightBoundsList(directBoundsList),
+        boundsList: directBoundsList,
+        segments: directBoundsList.slice(),
+        fontSize,
+        lineHeight,
+      };
+    }
     if (isAlignmentSensitivePartialSingleLineSelection && directBoundsAreSafe && !preferAlignmentSensitiveFallback) {
       return {
         bounds: mergeTextHighlightBoundsList(directBoundsList),
@@ -23260,7 +23269,16 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       throw new Error("\uc120\ud0dd \ud14d\uc2a4\ud2b8 \ubc94\uc704\ub97c \uc548\uc804\ud558\uac8c \uce21\uc815\ud558\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4.");
     }
     const sortedBoundsList = sortTextHighlightBoundsList(boundsList);
-    if (isPartialSingleLineSelection && sortedBoundsList.length !== 1) {
+    const isSoftWrappedPartialSelection =
+      isPartialSingleLineSelection &&
+      isPlausibleSoftWrappedTextHighlightSelectionRows(
+        node,
+        sortedBoundsList,
+        selectedText,
+        fontSize,
+        lineHeight
+      );
+    if (isPartialSingleLineSelection && sortedBoundsList.length !== 1 && !isSoftWrappedPartialSelection) {
       throw new Error("Could not safely measure the selected text highlight range.");
     }
     if (
@@ -23275,7 +23293,10 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       throw new Error("Could not safely measure the selected text highlight range.");
     }
     boundsList = sortedBoundsList;
-    if (hasOverwideTextHighlightSelectionRows(boundsList, selectedText, fontSize, lineHeight)) {
+    if (
+      !isSoftWrappedPartialSelection &&
+      hasOverwideTextHighlightSelectionRows(boundsList, selectedText, fontSize, lineHeight)
+    ) {
       throw new Error("Could not safely measure the selected text highlight range.");
     }
 
@@ -24934,6 +24955,51 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return mergedBounds.width > maxExpectedWidth && mergedBounds.height <= maxExpectedHeight;
   }
 
+  function isPlausibleSoftWrappedTextHighlightSelectionRows(node, boundsList, selectedText, fontSize, lineHeight) {
+    const rows = sortTextHighlightBoundsList(boundsList);
+    if (rows.length < 2 || !selectedText || /[\r\n]/.test(selectedText)) {
+      return false;
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const nodeBounds = normalizeTextHighlightWorldBounds(getNodeRenderBounds(node));
+    const estimatedTextWidth = Math.max(
+      getTextHighlightMinimumWidth(size),
+      estimateTextHighlightInlineTextWidth(selectedText, size)
+    );
+    const wrapWidth = nodeBounds && nodeBounds.width > 0 ? Math.max(size, nodeBounds.width) : estimatedTextWidth;
+    const maximumExpectedRows = Math.max(2, Math.ceil(estimatedTextWidth / Math.max(size, wrapWidth * 0.86)) + 2);
+    if (rows.length > maximumExpectedRows) {
+      return false;
+    }
+
+    const rowHeightLimit = Math.max(resolvedLineHeight * 1.75, size * 2.1);
+    const rowWidthLimit = nodeBounds ? nodeBounds.width + size * 2 : estimatedTextWidth + size * 2;
+    const expandedNodeBounds = nodeBounds
+      ? {
+          x: nodeBounds.x - size,
+          y: nodeBounds.y - resolvedLineHeight,
+          width: nodeBounds.width + size * 2,
+          height: nodeBounds.height + resolvedLineHeight * 2,
+        }
+      : null;
+    let totalWidth = 0;
+    for (const row of rows) {
+      const bounds = normalizeTextHighlightWorldBounds(row);
+      if (!bounds || bounds.height > rowHeightLimit || bounds.width > rowWidthLimit) {
+        return false;
+      }
+      if (expandedNodeBounds && !doTextHighlightBoundsIntersect(bounds, expandedNodeBounds)) {
+        return false;
+      }
+      totalWidth += bounds.width;
+    }
+
+    const maximumTotalWidth = Math.max(estimatedTextWidth * 1.55, wrapWidth * rows.length + size);
+    return totalWidth <= maximumTotalWidth;
+  }
+
   function hasUnderwideTextHighlightSelectionRows(boundsList, selectedText, fontSize) {
     const rows = sortTextHighlightBoundsList(boundsList);
     if (!rows.length || !selectedText || /[\r\n]/.test(selectedText) || rows.length > 1) {
@@ -25580,7 +25646,13 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       return false;
     }
     if (normalizedBoundsList.length > 1) {
-      return true;
+      return !isPlausibleSoftWrappedTextHighlightSelectionRows(
+        node,
+        normalizedBoundsList,
+        selectedText,
+        fontSize,
+        lineHeight
+      );
     }
 
     const nodeBounds = normalizeTextHighlightWorldBounds(getNodeRenderBounds(node));
