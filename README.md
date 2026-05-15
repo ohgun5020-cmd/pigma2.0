@@ -111,6 +111,10 @@ Safe implementation order:
   - Contract for the export-side text guard.
 - `verify-text-export-guard.js`
   - Verifies the export-side text guard survives source and build output.
+- `text-highlight-bounds.contract.json`
+  - Contract for text highlight range measurement and explicit source-range application, especially center/right aligned partial selections.
+- `verify-text-highlight-bounds.js`
+  - Verifies highlight measurement keeps direct selected-range bounds first, uses the clone row only as fallback, does not reintroduce aligned-row y drift, and keeps apply messages pinned to the UI-confirmed source range.
 - `psd-export-boundary.contract.json`
   - Contract for the export-side runtime message boundary.
 - `verify-psd-export-boundary.js`
@@ -172,6 +176,7 @@ Runtime note: the active AI correction UI logic currently lives inline in `ui.ht
    - `node verify-externalized-ui.js code.patched.js`
    - `node verify-text-import-guard.js`
    - `node verify-text-export-guard.js`
+   - `node verify-text-highlight-bounds.js`
    - `node verify-psd-export-boundary.js`
    - `node verify-figma-runtime-syntax.js`
    - `node -c code.patched.js`

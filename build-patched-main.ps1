@@ -37,6 +37,8 @@ $textGuardContract = Join-Path $root "text-import-guard.contract.json"
 $textGuardVerifier = Join-Path $root "verify-text-import-guard.js"
 $textExportGuardContract = Join-Path $root "text-export-guard.contract.json"
 $textExportGuardVerifier = Join-Path $root "verify-text-export-guard.js"
+$textHighlightBoundsContract = Join-Path $root "text-highlight-bounds.contract.json"
+$textHighlightBoundsVerifier = Join-Path $root "verify-text-highlight-bounds.js"
 $exportBoundaryContract = Join-Path $root "psd-export-boundary.contract.json"
 $exportBoundaryVerifier = Join-Path $root "verify-psd-export-boundary.js"
 $figmaRuntimeSyntaxVerifier = Join-Path $root "verify-figma-runtime-syntax.js"
@@ -192,6 +194,14 @@ if (-not (Test-Path $textExportGuardContract)) {
 
 if (-not (Test-Path $textExportGuardVerifier)) {
   throw "Missing text export guard verifier: $textExportGuardVerifier"
+}
+
+if (-not (Test-Path $textHighlightBoundsContract)) {
+  throw "Missing text highlight bounds contract: $textHighlightBoundsContract"
+}
+
+if (-not (Test-Path $textHighlightBoundsVerifier)) {
+  throw "Missing text highlight bounds verifier: $textHighlightBoundsVerifier"
 }
 
 if (-not (Test-Path $exportBoundaryContract)) {
@@ -2252,6 +2262,11 @@ if ($LASTEXITCODE -ne 0) {
 & node $textExportGuardVerifier
 if ($LASTEXITCODE -ne 0) {
   throw "Text export guard verification failed."
+}
+
+& node $textHighlightBoundsVerifier
+if ($LASTEXITCODE -ne 0) {
+  throw "Text highlight bounds verification failed."
 }
 
 & node $exportBoundaryVerifier

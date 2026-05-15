@@ -22848,9 +22848,11 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       message.nodeId &&
       Number.isFinite(Number(message.start)) &&
       Number.isFinite(Number(message.end));
-    const liveRange = tryResolveLiveSelectedTextHighlightRange();
+    const explicitStart = hasExplicitRange ? Math.max(0, Math.floor(Number(message.start) || 0)) : 0;
+    const explicitEnd = hasExplicitRange ? Math.max(explicitStart, Math.floor(Number(message.end) || 0)) : explicitStart;
+    const liveRange = tryResolveLiveSelectedTextHighlightRange(hasExplicitRange ? message : null);
 
-    if (message && message.preferLiveSelection === true) {
+    if (message && message.preferLiveSelection === true && !hasExplicitRange) {
       if (liveRange) {
         return liveRange;
       }
@@ -22875,26 +22877,28 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
 
     const characters = typeof node.characters === "string" ? node.characters : "";
-    const start = Math.max(0, Math.floor(Number(message.start) || 0));
-    const end = Math.max(start, Math.min(characters.length, Math.floor(Number(message.end) || 0)));
+    const start = Math.min(characters.length, explicitStart);
+    const end = Math.max(start, Math.min(characters.length, explicitEnd));
     const text = normalizeLineEndings(characters.slice(start, end));
     const sourceText = normalizeLineEndings(message && typeof message.sourceText === "string" ? message.sourceText : "");
     if (end <= start || !compactText(text)) {
       throw new Error("하이라이트할 텍스트 범위를 먼저 드래그해 주세요.");
     }
 
-    if (
-      liveRange &&
-      (liveRange.node.id !== node.id || liveRange.start !== start || liveRange.end !== end)
-    ) {
-      return liveRange;
+    if (sourceText && compactText(sourceText) && text !== sourceText) {
+      const matchingLiveRange = tryResolveLiveSelectedTextHighlightRange(message);
+      if (matchingLiveRange && matchingLiveRange.text === sourceText) {
+        return matchingLiveRange;
+      }
     }
 
-    if (sourceText && compactText(sourceText) && text !== sourceText) {
-      const liveRange = tryResolveLiveSelectedTextHighlightRange(message);
-      if (liveRange && liveRange.text === sourceText) {
-        return liveRange;
-      }
+    if (
+      liveRange &&
+      liveRange.node.id === node.id &&
+      liveRange.start === start &&
+      liveRange.end === end
+    ) {
+      return liveRange;
     }
 
     return {
