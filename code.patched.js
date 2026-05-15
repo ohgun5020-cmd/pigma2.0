@@ -17735,6 +17735,12 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       const nodeIndex = container.nodeIndex;
       const anchorNodeId = container.anchorNodeId || range.node.id;
       const rects = [];
+      boundsList = stabilizeTextHighlightBoxBoundsToTypographyRows(
+        range.node,
+        boundsList,
+        measurement.fontSize,
+        measurement.lineHeight
+      );
       const thickness = buildTextHighlightDecorationThickness(measurement.fontSize, "line", decorationScale);
       for (let index = 0; index < boundsList.length; index += 1) {
         const rect = createTextHighlightLineRect(

@@ -69,6 +69,12 @@
       "const maximumEstimatedXCorrection = Math.max(tolerance * 2, size * 0.75)",
       "x: xMismatch > tolerance ? estimated.x : row.x",
       "y: row.y"
+    ],
+    [
+      "async function runTextHighlightLine(message)",
+      "boundsList = normalizeTextHighlightBoundsListForApply(",
+      "boundsList = stabilizeTextHighlightBoxBoundsToTypographyRows(",
+      "const thickness = buildTextHighlightDecorationThickness(measurement.fontSize, \"line\", decorationScale);"
     ]
   ],
   "requiredBuildSnippets": [

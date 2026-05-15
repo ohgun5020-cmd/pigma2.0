@@ -112,9 +112,9 @@ Safe implementation order:
 - `verify-text-export-guard.js`
   - Verifies the export-side text guard survives source and build output.
 - `text-highlight-bounds.contract.json`
-  - Contract for text highlight range measurement and explicit source-range application, especially center/right aligned partial selections.
+  - Contract for text highlight range measurement, line/box row stabilization, and explicit source-range application, especially center/right aligned partial selections.
 - `verify-text-highlight-bounds.js`
-  - Verifies highlight measurement keeps direct selected-range bounds first, uses the clone row only as fallback, does not reintroduce aligned-row y drift, and keeps apply messages pinned to the UI-confirmed source range.
+  - Verifies highlight measurement keeps direct selected-range bounds first, uses the clone row only as fallback, does not reintroduce aligned-row y drift, keeps line highlights on the same stabilized rows as box highlights, and keeps apply messages pinned to the UI-confirmed source range.
 - `psd-export-boundary.contract.json`
   - Contract for the export-side runtime message boundary.
 - `verify-psd-export-boundary.js`
