@@ -6439,6 +6439,32 @@
         !hasOverwideTextHighlightSelectionRows(underlineLineBoxBoundsList, selectedText, fontSize, lineHeight) &&
         !hasUnderwideTextHighlightSelectionRows(underlineLineBoxBoundsList, selectedText, fontSize)
       ) {
+        const underlineSelectionBoundsList = isPartialSingleLineSelection
+          ? await constrainTextHighlightBoundsListToExactSelection(
+              node,
+              rangeStart,
+              rangeEnd,
+              textColorHex,
+              fontSize,
+              lineHeight,
+              underlineLineBoxBoundsList,
+              underlineLineBoxBoundsList
+            )
+          : underlineLineBoxBoundsList;
+        if (
+          underlineSelectionBoundsList.length &&
+          !hasOverwideTextHighlightSelectionRows(underlineSelectionBoundsList, selectedText, fontSize, lineHeight) &&
+          !hasUnderwideTextHighlightSelectionRows(underlineSelectionBoundsList, selectedText, fontSize)
+        ) {
+          return {
+            bounds: mergeTextHighlightBoundsList(underlineSelectionBoundsList),
+            boundsList: underlineSelectionBoundsList,
+            segments: underlineSelectionBoundsList.slice(),
+            fontSize,
+            lineHeight,
+          };
+        }
+
         return {
           bounds: mergeTextHighlightBoundsList(underlineLineBoxBoundsList),
           boundsList: underlineLineBoxBoundsList,
@@ -7615,19 +7641,7 @@
       return sortedRows;
     }
 
-    const maximumEstimatedXCorrection = Math.max(tolerance * 2, size * 0.75);
-    if (xMismatch > maximumEstimatedXCorrection) {
-      return sortedRows;
-    }
-
-    return [
-      {
-        x: xMismatch > tolerance ? estimated.x : row.x,
-        y: row.y,
-        width: row.width,
-        height: row.height,
-      },
-    ];
+    return sortedRows;
   }
 
   function getEstimatedTextHighlightSoftLineIndexForSelection(node, start, end, fontSize) {

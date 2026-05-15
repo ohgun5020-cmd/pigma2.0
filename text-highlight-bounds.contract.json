@@ -14,6 +14,8 @@
     "if (isAlignmentSensitivePartialSingleLineSelection && directBoundsAreSafe && !preferAlignmentSensitiveFallback)",
     "const preferAlignmentSensitiveFallback = !!(options && options.preferAlignmentSensitiveFallback);",
     "{ preferAlignmentSensitiveFallback: true }",
+    "const underlineSelectionBoundsList = isPartialSingleLineSelection",
+    "bounds: mergeTextHighlightBoundsList(underlineSelectionBoundsList)",
     "bounds: mergeTextHighlightBoundsList(directBoundsList)",
     "const estimatedLineIndex = getEstimatedTextHighlightSoftLineIndexForSelection(",
     "const measuredLineIndex = findTextHighlightSoftLineIndexForRow(",
@@ -27,7 +29,7 @@
     "liveRange.node.id === node.id &&",
     "y: selectedLocalBounds.y",
     "if (yMismatch > tolerance)",
-    "const maximumEstimatedXCorrection = Math.max(tolerance * 2, size * 0.75)",
+    "return sortedRows;",
     "return character === \"\\n\" || character === \"\\r\" || character === \"\\u2028\" || character === \"\\u2029\";"
   ],
   "requiredUiSnippets": [
@@ -41,13 +43,21 @@
     "Array.isArray(alignedLineRows)",
     "liveRange.node.id !== node.id || liveRange.start !== start || liveRange.end !== end",
     "y: yMismatch > tolerance ? estimated.y : row.y",
-    "if (isAlignmentSensitivePartialSingleLineSelection && directBoundsAreSafe) {"
+    "if (isAlignmentSensitivePartialSingleLineSelection && directBoundsAreSafe) {",
+    "const maximumEstimatedXCorrection = Math.max(tolerance * 2, size * 0.75)",
+    "x: xMismatch > tolerance ? estimated.x : row.x"
   ],
   "requiredOrderedSnippets": [
     [
       "const directBoundsAreSafe =",
       "if (isAlignmentSensitivePartialSingleLineSelection && directBoundsAreSafe && !preferAlignmentSensitiveFallback)",
       "const underlineGeometryMeasurement = await measureTextHighlightUnderlineGeometryBounds("
+    ],
+    [
+      "const underlineLineBoxBoundsList = sortTextHighlightBoundsList(underlineGeometryBoundsList);",
+      "const underlineSelectionBoundsList = isPartialSingleLineSelection",
+      "await constrainTextHighlightBoundsListToExactSelection(",
+      "bounds: mergeTextHighlightBoundsList(underlineSelectionBoundsList)"
     ],
     [
       "const measuredLineIndex = findTextHighlightSoftLineIndexForRow(",
@@ -69,9 +79,7 @@
     ],
     [
       "if (yMismatch > tolerance)",
-      "const maximumEstimatedXCorrection = Math.max(tolerance * 2, size * 0.75)",
-      "x: xMismatch > tolerance ? estimated.x : row.x",
-      "y: row.y"
+      "return sortedRows;"
     ],
     [
       "async function runTextHighlightLine(message)",
