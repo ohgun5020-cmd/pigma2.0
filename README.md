@@ -326,6 +326,8 @@ If a future generated patch needs a newer syntax feature, assume it is unsafe un
 - Box mode now applies an extra visual-row tightening pass after row stabilization.
   - Large and very large fonts no longer use Figma's full line-box height as the filled highlight height.
   - The final rectangle height grows from the row center so center/right aligned selections do not look vertically pushed after padding or target-height normalization.
+- Center/right aligned partial selections reject direct measurements that are too narrow for the selected string.
+  - This sends tiny-font cases through the left-layout fallback instead of accepting a clipped first word.
 
 ### Highlight Shape Behavior
 

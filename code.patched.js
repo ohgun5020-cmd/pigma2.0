@@ -23079,7 +23079,10 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         lineHeight,
       };
     }
-    if (isAlignmentSensitivePartialSingleLineSelection && directBoundsAreSafe && !preferAlignmentSensitiveFallback) {
+    const directBoundsAreAlignmentSafe =
+      directBoundsAreSafe &&
+      !hasUnderwideAlignmentSensitiveTextHighlightSelectionRows(directBoundsList, selectedText, fontSize);
+    if (isAlignmentSensitivePartialSingleLineSelection && directBoundsAreAlignmentSafe && !preferAlignmentSensitiveFallback) {
       return {
         bounds: mergeTextHighlightBoundsList(directBoundsList),
         boundsList: directBoundsList,
@@ -25044,6 +25047,31 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     const minimumExpectedWidth = Math.max(
       getTextHighlightMinimumWidth(size),
       estimatedWidth * ratio
+    );
+    return bounds.width < minimumExpectedWidth;
+  }
+
+  function hasUnderwideAlignmentSensitiveTextHighlightSelectionRows(boundsList, selectedText, fontSize) {
+    const rows = sortTextHighlightBoundsList(boundsList);
+    if (!rows.length || !selectedText || /[\r\n]/.test(selectedText) || rows.length > 1) {
+      return false;
+    }
+
+    const bounds = normalizeTextHighlightWorldBounds(rows[0]);
+    if (!bounds) {
+      return false;
+    }
+
+    const compactSelectedText = compactText(selectedText);
+    if (compactSelectedText.length <= 3) {
+      return false;
+    }
+
+    const size = Math.max(12, Number(fontSize) || 16);
+    const estimatedWidth = estimateTextHighlightInlineTextWidth(compactSelectedText, size);
+    const minimumExpectedWidth = Math.max(
+      getTextHighlightMinimumWidth(size),
+      estimatedWidth * 0.7
     );
     return bounds.width < minimumExpectedWidth;
   }
