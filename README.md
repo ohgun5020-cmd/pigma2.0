@@ -138,6 +138,8 @@ Not copied forward from `pigma1.7`:
 
 Runtime note: the active AI correction UI logic currently lives inline in `ui.html`, so replace old bootstrap blocks instead of stacking duplicate copies.
 
+Before changing code, read this README and the relevant feature work-log section first. If a task reveals an important source-of-truth rule, build quirk, verification step, or regression note that future work should preserve, add it back to this README instead of leaving it only in chat.
+
 ### PSD Shadow Export Note
 
 - Figma nodes can use four outer shadows as a deliberate 360-degree product shadow system. Preserve each shadow's own X/Y, blur, spread, color, and opacity values.
@@ -326,8 +328,35 @@ If a future generated patch needs a newer syntax feature, assume it is unsafe un
 - Box mode now applies an extra visual-row tightening pass after row stabilization.
   - Large and very large fonts no longer use Figma's full line-box height as the filled highlight height.
   - The final rectangle height grows from the row center so center/right aligned selections do not look vertically pushed after padding or target-height normalization.
+  - For very large fonts, do not use the normal full glyph floor blindly. In the 56px matrix case, `57px` was too short, but `66px` was too tall and sat too low. The huge-font bucket now shifts the baseline metrics upward and blends only halfway back from the compact height so the final box lands around a tighter glyph-covering height.
 - Center/right aligned partial selections reject direct measurements that are too narrow for the selected string.
   - This sends tiny-font cases through the left-layout fallback instead of accepting a clipped first word.
+- Single-line partial selections now accept underline geometry directly when that geometry passes the width safety checks.
+  - Do this before exact-selection reconstraining or estimated fallback, because underline geometry preserves the actual Figma X/width/Y while exact glyph measurement can shrink tiny 10px/14px left-aligned rows.
+- Underline geometry must be filtered to the selected range's expected row before building box bounds.
+  - Figma `fillGeometry` can include transparent glyph fragments that look like thin horizontal underline paths.
+  - Prefer the geometry path whose chunks are all underline-thin before merging rows; in local MCP diagnostics this separated `path 0` glyphs from `path 1` underline strokes.
+  - Keep the thin baseline candidates nearest the selected row's estimated underline Y, then keep the lowest baseline cluster for that row.
+  - This prevents the 10px left-aligned edge-select case from accepting a tiny glyph fragment instead of the real underline width.
+- Width safety is now grouped by text-size bucket and alignment bucket.
+  - Size buckets: `micro <= 12px`, `small <= 16px`, `medium <= 28px`, `large <= 44px`, `huge > 44px`.
+  - Center/right/justified selections use a slightly stricter minimum width ratio than left-aligned selections.
+  - In the font-size matrix test, the old `14px` highlights measured about `0.64x` and old `10px` highlights about `0.895x` of the estimated selected text width, so both now fail the bucket check while `20px`, `34px`, and `56px` rows still pass.
+- After the final exact-selection reconstrain, underwide single-line rows are checked one more time before returning.
+  - If the row is too narrow for the selected text and no safe estimated fallback exists, show the safe-measurement error instead of drawing a misleading tiny highlight.
+- Partial single-line selections now use a final estimated layout fallback before showing `Could not safely measure the selected text highlight range.`
+  - This fallback uses the text node width, soft-line estimate, selected prefix width, font-size bucket, and left/center/right alignment bucket.
+  - It is especially important for small center/right text where direct or left-clone measurement can be rejected as too narrow.
+  - Soft-line estimation ignores trailing spaces when deciding whether the next word still fits on the line, so large text does not split `him feel deeper` too early just because of a following space.
+  - The estimated fallback width is calibrated against Figma underline geometry from the font-size matrix: `micro/small/medium` use `0.948x` of the raw inline estimate, while `large/huge` use `0.98x`.
+  - The micro bucket uses a stricter underwide threshold so old 10px selections that only captured the tail of the phrase are rejected and sent to fallback.
+- Estimated fallback Y must include Figma `paragraphSpacing`.
+  - The font-size matrix uses paragraph spacing on every center/right/left text sample (`6`, `7`, `8`, `12`, and `18px`), so `lineHeight * lineIndex` alone drifts vertically.
+  - When paragraph spacing is present, keep the underline/glyph measured row center instead of snapping the row back to a simple line-height grid.
+- Apply messages now treat `sourceText` as the final guard for the selected range.
+  - If `preferLiveSelection` points at a live range whose text differs from the UI-confirmed `sourceText`, do not trust that live range.
+  - If the explicit `start/end` slice differs from `sourceText`, re-anchor by finding the exact `sourceText` inside the same text node before measuring geometry.
+  - This prevents small left-aligned rows from highlighting only the tail of a phrase when a stale range starts inside the selected text.
 
 ### Highlight Shape Behavior
 
@@ -367,6 +396,14 @@ node verify-externalized-ui.js code.patched.js
 ```
 
 When UI behavior changes, reload the local plugin in Figma after rebuilding.
+
+### Codex Figma MCP Diagnostic Note
+
+- Codex cannot click through the user's local Figma plugin UI directly, but it can use Figma MCP to duplicate a test frame and emulate the text-highlight measurement/rectangle creation logic on real canvas nodes.
+- This is useful for direct visual and numeric checks after source changes: create a diagnostic duplicate, remove old `Text Highlight` rectangles, measure each target text range, insert generated rectangles, then inspect via screenshot and node geometry.
+- The MCP text runtime can expose a smaller API surface than the local plugin runtime. For diagnostics, `getRangeAllFontNames` may be unavailable, so load `node.fontName` when it is a single font.
+- MCP `fillGeometry` can include transparent glyph geometry together with underline geometry. Diagnostic scripts should isolate the thin underline path before converting it into highlight bounds.
+- Historical comparison note: `pigma_old/pigma1.5` and `pigma_old/pigma1.7` do not contain this AI text-highlight box flow (`ai-text-highlight`, `selectedTextRange`, `fillGeometry`, source polling). Their matching highlight-related code is mostly native text decoration/import styling such as `setRangeTextDecoration`, where Figma owns the glyph metrics. Do not treat those versions as a direct geometry reference for the 2.0 rectangle-backed highlight box.
 
 ### Current Watch Points
 

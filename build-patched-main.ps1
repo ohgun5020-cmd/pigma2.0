@@ -1107,6 +1107,7 @@ $uiSelectionBridgeStartupFind = 'qn({type:"request-preferences",detectedLocale:w
 $uiSelectionBridgeStartupReplace = 'function pigmaRequestSelectionBridge(){qn({type:"request-ai-design-chat-selection"})}qn({type:"request-preferences",detectedLocale:w0()});pigmaRequestSelectionBridge();setTimeout(pigmaRequestSelectionBridge,250);setTimeout(pigmaRequestSelectionBridge,1e3);m0();Le();'
 $uiSelectionBridgeTabFind = 'D.activeTab=t,D.unavailableModalOpen=!1,Le()'
 $uiSelectionBridgeTabReplace = 'D.activeTab=t,D.unavailableModalOpen=!1,Le(),t==="main"&&pigmaRequestSelectionBridge()'
+$uiSelectionBridgeTabDuplicate = 't==="main"&&pigmaRequestSelectionBridge(),t==="main"&&pigmaRequestSelectionBridge()'
 $uiAiSelectionStateBridgeFind = 'async function KS(e){switch(e.type){case"preferences":'
 $uiAiSelectionStateBridgeReplace = 'function pigmaSelectionFromAiChat(e){let t=e&&typeof e=="object"?e:{},n=Math.max(0,Number(t.selectionCount)||0),r=Math.max(0,Math.round(Number(t.width)||0)),i=Math.max(0,Math.round(Number(t.height)||0)),a=typeof t.selectionLabel=="string"?t.selectionLabel.trim():"",o=typeof t.selectionTypeLabel=="string"?t.selectionTypeLabel.trim():"",s=!!(t.ready&&n>0);return{ready:s,selectionId:n===1&&typeof t.selectionSignature=="string"?t.selectionSignature:null,selectionCount:n,selectionName:s?a||"Selection":"",selectionType:s?o||"Selection":null,summary:s?''"''.concat(a||"Selection",''" is ready to export.''):"Select one or more frames, groups, or layers to export.",detail:s?"AI selection bridge loaded the current Figma selection for PSD export.":"The exporter is waiting for a Figma selection.",documentWidth:s&&r>0?r:null,documentHeight:s&&i>0?i:null,exportNodeCount:s?n:0,editableTextCount:0,preservedGroupCount:0,warnings:[],analysisPending:s}}function pigmaKeepAiSelection(e){return!!(D&&D.selection&&D.selection.ready&&D.selection.detail==="AI selection bridge loaded the current Figma selection for PSD export."&&e&&e.selectionCount===0)}async function KS(e){switch(e.type){case"ai-design-chat-selection":{let t=pigmaSelectionFromAiChat(e.selection);D.selection=t,D.warnings=t.warnings.slice(),D.busy||(D.statusTone=t.ready?"ready":"idle",D.statusMessage=t.ready&&t.detail.trim().length>0?t.detail:Ch(t)),Le();return}case"preferences":'
 $uiAiSelectionStateOverwriteFind = 'case"selection-state":D.selection=e.state,D.warnings=e.state.warnings.slice(),D.busy||(D.statusTone=e.state.ready?"ready":"idle",D.statusMessage=e.state.ready&&e.state.detail.trim().length>0?e.state.detail:Ch(e.state)),Le();return;'
@@ -1373,13 +1374,18 @@ if ($uiBundle.Contains($uiSelectionBridgeStartupFind) -and -not $uiBundle.Contai
     -Label 'ui startup ai selection bridge request'
 }
 
-if ($uiBundle.Contains($uiSelectionBridgeTabFind)) {
+if ($uiBundle.Contains($uiSelectionBridgeTabReplace)) {
+  # Already patched in this UI bundle variant.
+} elseif ($uiBundle.Contains($uiSelectionBridgeTabFind)) {
   $uiBundle = Replace-Exact `
     -Text $uiBundle `
     -Find $uiSelectionBridgeTabFind `
     -Replace $uiSelectionBridgeTabReplace `
     -ExpectedCount 1 `
     -Label 'ui main tab ai selection bridge request'
+}
+while ($uiBundle.Contains($uiSelectionBridgeTabDuplicate)) {
+  $uiBundle = $uiBundle.Replace($uiSelectionBridgeTabDuplicate, 't==="main"&&pigmaRequestSelectionBridge()')
 }
 
 if ($uiBundle.Contains($uiAiSelectionStateBridgeFind) -and -not $uiBundle.Contains('function pigmaSelectionFromAiChat(')) {

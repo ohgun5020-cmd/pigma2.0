@@ -78,6 +78,7 @@ for (const fileEntry of [
 
 if (contract.uiFile) {
   assertIncludes(uiContent, contract.uiFile, contract.requiredUiSnippets || [], "UI snippet");
+  assertExcludes(uiContent, contract.uiFile, contract.forbiddenUiSnippets || []);
 }
 
 assertIncludes(buildScriptContent, contract.buildScript, contract.requiredBuildSnippets || [], "build hook");

@@ -1371,7 +1371,7 @@
   }
 
   function buildTextHighlightDecorationThickness(fontSize, highlightMode, decorationScale) {
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const scale = sanitizeTextHighlightDecorationScale(decorationScale, AI_TEXT_HIGHLIGHT_DEFAULT_DECORATION_SCALE);
     if (highlightMode === "strike") {
       return roundTextHighlightThickness(Math.max(3, Math.min(size * 1.45, size * 0.22 * scale)));
@@ -1380,7 +1380,7 @@
   }
 
   function buildTextHighlightAutoDecorationScale(fontSize, highlightMode, lineHeight) {
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const mode = highlightMode === "line" ? "line" : "strike";
     const baseThickness = buildTextHighlightDecorationThickness(size, mode, 1);
     if (mode === "strike") {
@@ -1396,13 +1396,13 @@
   }
 
   function buildTextHighlightMinimumBoxThickness(fontSize, lineHeight) {
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
     return ceilTextHighlightThickness(Math.max(size * 0.78, Math.min(resolvedLineHeight, size)));
   }
 
   function buildTextHighlightDecorationOffset(fontSize, highlightMode, decorationScale, thicknessValue) {
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     if (highlightMode === "strike") {
       return roundTextHighlightMetric(0);
     }
@@ -6219,13 +6219,18 @@
       Number.isFinite(Number(message.end));
     const explicitStart = hasExplicitRange ? Math.max(0, Math.floor(Number(message.start) || 0)) : 0;
     const explicitEnd = hasExplicitRange ? Math.max(explicitStart, Math.floor(Number(message.end) || 0)) : explicitStart;
+    const sourceText = normalizeLineEndings(message && typeof message.sourceText === "string" ? message.sourceText : "");
+    const hasSourceText = !!(sourceText && compactText(sourceText));
+    const preferLiveSelection = !!(message && message.preferLiveSelection === true);
     const liveRange = tryResolveLiveSelectedTextHighlightRange(hasExplicitRange ? message : null);
 
-    if (message && message.preferLiveSelection === true && !hasExplicitRange) {
-      if (liveRange) {
+    if (preferLiveSelection) {
+      if (liveRange && (!hasSourceText || liveRange.text === sourceText)) {
         return liveRange;
       }
-      return resolveSelectedTextHighlightRange();
+      if (!hasExplicitRange) {
+        return resolveSelectedTextHighlightRange();
+      }
     }
 
     if (!hasExplicitRange) {
@@ -6249,16 +6254,22 @@
     const start = Math.min(characters.length, explicitStart);
     const end = Math.max(start, Math.min(characters.length, explicitEnd));
     const text = normalizeLineEndings(characters.slice(start, end));
-    const sourceText = normalizeLineEndings(message && typeof message.sourceText === "string" ? message.sourceText : "");
-    if (end <= start || !compactText(text)) {
+    if ((end <= start || !compactText(text)) && !hasSourceText) {
       throw new Error("하이라이트할 텍스트 범위를 먼저 드래그해 주세요.");
     }
 
-    if (sourceText && compactText(sourceText) && text !== sourceText) {
+    if (hasSourceText && text !== sourceText) {
+      const correctedRange = findTextHighlightSourceRangeInNode(node, sourceText, explicitStart, explicitEnd);
+      if (correctedRange) {
+        return correctedRange;
+      }
+
       const matchingLiveRange = tryResolveLiveSelectedTextHighlightRange(message);
       if (matchingLiveRange && matchingLiveRange.text === sourceText) {
         return matchingLiveRange;
       }
+
+      throw new Error("Could not safely resolve the selected text highlight source range.");
     }
 
     if (
@@ -6275,6 +6286,119 @@
       start,
       end,
       text,
+    };
+  }
+
+  function findTextHighlightSourceRangeInNode(node, sourceText, preferredStart, preferredEnd) {
+    const characters = node && typeof node.characters === "string" ? node.characters : "";
+    const normalizedSourceText = normalizeLineEndings(sourceText);
+    if (!characters || !normalizedSourceText || !compactText(normalizedSourceText)) {
+      return null;
+    }
+
+    const directIndex = findClosestTextHighlightSourceTextIndex(
+      characters,
+      normalizedSourceText,
+      preferredStart,
+      preferredEnd
+    );
+    if (directIndex >= 0) {
+      return {
+        node,
+        start: directIndex,
+        end: directIndex + normalizedSourceText.length,
+        text: normalizeLineEndings(characters.slice(directIndex, directIndex + normalizedSourceText.length)),
+      };
+    }
+
+    const normalizedCharacters = buildTextHighlightNormalizedIndexMap(characters);
+    const normalizedIndex = findClosestTextHighlightSourceTextIndex(
+      normalizedCharacters.text,
+      normalizedSourceText,
+      preferredStart,
+      preferredEnd
+    );
+    if (normalizedIndex < 0) {
+      return null;
+    }
+
+    const mappedStart = normalizedCharacters.indexMap[normalizedIndex];
+    const mappedEnd = normalizedCharacters.indexMap[normalizedIndex + normalizedSourceText.length];
+    const start = Math.max(0, Math.min(characters.length, Number(mappedStart) || 0));
+    const end = Math.max(start, Math.min(characters.length, Number(mappedEnd) || characters.length));
+    return {
+      node,
+      start,
+      end,
+      text: normalizeLineEndings(characters.slice(start, end)),
+    };
+  }
+
+  function findClosestTextHighlightSourceTextIndex(haystack, needle, preferredStart, preferredEnd) {
+    const source = String(haystack || "");
+    const target = String(needle || "");
+    if (!source || !target) {
+      return -1;
+    }
+
+    const preferredStartIndex = Math.max(0, Math.floor(Number(preferredStart) || 0));
+    const preferredEndIndex = Math.max(preferredStartIndex, Math.floor(Number(preferredEnd) || 0));
+    let bestIndex = -1;
+    let bestScore = Infinity;
+    let searchIndex = 0;
+
+    while (searchIndex <= source.length) {
+      const index = source.indexOf(target, searchIndex);
+      if (index < 0) {
+        break;
+      }
+
+      const end = index + target.length;
+      let score = Math.abs(index - preferredStartIndex);
+      if (preferredEndIndex > preferredStartIndex) {
+        score += Math.abs(end - preferredEndIndex) * 0.5;
+      }
+      if (score < bestScore) {
+        bestScore = score;
+        bestIndex = index;
+      }
+
+      searchIndex = index + Math.max(1, target.length);
+    }
+
+    return bestIndex;
+  }
+
+  function buildTextHighlightNormalizedIndexMap(value) {
+    const source = String(value || "");
+    const indexMap = [];
+    let normalized = "";
+
+    for (let index = 0; index < source.length; index += 1) {
+      const character = source.charAt(index);
+      if (character === "\r") {
+        indexMap.push(index);
+        normalized += "\n";
+        if (source.charAt(index + 1) === "\n") {
+          index += 1;
+        }
+        continue;
+      }
+
+      if (character === "\u2028" || character === "\u2029") {
+        indexMap.push(index);
+        normalized += "\n";
+        continue;
+      }
+
+      indexMap.push(index);
+      normalized += character;
+    }
+
+    indexMap.push(source.length);
+    return {
+      text: normalized,
+      indexMap,
     };
   }
 
@@ -6452,6 +6576,21 @@
     const underlineGeometryBoundsList = getTextHighlightMeasurementBoundsList(underlineGeometryMeasurement);
     if (underlineGeometryBoundsList.length) {
       const underlineLineBoxBoundsList = sortTextHighlightBoundsList(underlineGeometryBoundsList);
+      const underlineAlignment = getTextHighlightHorizontalAlignment(node);
+      if (
+        isPartialSingleLineSelection &&
+        underlineLineBoxBoundsList.length &&
+        !hasOverwideTextHighlightSelectionRows(underlineLineBoxBoundsList, selectedText, fontSize, lineHeight) &&
+        !hasUnderwideTextHighlightSelectionRows(underlineLineBoxBoundsList, selectedText, fontSize, underlineAlignment)
+      ) {
+        return {
+          bounds: mergeTextHighlightBoundsList(underlineLineBoxBoundsList),
+          boundsList: underlineLineBoxBoundsList,
+          segments: underlineLineBoxBoundsList.slice(),
+          fontSize,
+          lineHeight,
+        };
+      }
       if (
         !isAlignmentSensitivePartialSingleLineSelection &&
         underlineLineBoxBoundsList.length &&
@@ -6535,6 +6674,7 @@
     let boundsList = rangeStart > 0 ? [] : endBoundsList.slice();
     let startMeasurement = null;
     let usedAlignmentSensitiveFallback = false;
+    let usedEstimatedSelectionFallback = false;
 
     if (endBoundsList.length && rangeStart > 0) {
       startMeasurement = await measureTextHighlightPrefixBounds(
@@ -6590,6 +6730,27 @@
     }
 
     if (!boundsList.length && isPartialSingleLineSelection) {
+      const estimatedSelectionBoundsList = buildEstimatedAlignmentSensitiveTextHighlightSelectionBounds(
+        node,
+        rangeStart,
+        rangeEnd,
+        fontSize,
+        lineHeight,
+        selectedText
+      );
+      const alignment = getTextHighlightHorizontalAlignment(node);
+      const safeEstimatedSelectionBoundsList = sortTextHighlightBoundsList(estimatedSelectionBoundsList).filter(
+        (row) =>
+          !hasOverwideTextHighlightSelectionRows([row], selectedText, fontSize, lineHeight) &&
+          !hasUnderwideTextHighlightSelectionRows([row], selectedText, fontSize, alignment)
+      );
+      if (safeEstimatedSelectionBoundsList.length) {
+        boundsList = safeEstimatedSelectionBoundsList;
+        usedEstimatedSelectionFallback = true;
+      }
+    }
+
+    if (!boundsList.length && isPartialSingleLineSelection) {
       throw new Error("Could not safely measure the selected text highlight range.");
     }
 
@@ -6613,7 +6774,7 @@
       throw new Error("선택한 텍스트 범위의 렌더 영역을 찾지 못했습니다.");
     }
 
-    if (!usedAlignmentSensitiveFallback) {
+    if (!usedAlignmentSensitiveFallback && !usedEstimatedSelectionFallback) {
       boundsList = await constrainTextHighlightBoundsListToExactSelection(
         node,
         rangeStart,
@@ -6658,6 +6819,35 @@
       hasOverwideTextHighlightSelectionRows(boundsList, selectedText, fontSize, lineHeight)
     ) {
       throw new Error("Could not safely measure the selected text highlight range.");
+    }
+    if (
+      isPartialSingleLineSelection &&
+      !isSoftWrappedPartialSelection &&
+      hasUnderwideTextHighlightSelectionRows(
+        boundsList,
+        selectedText,
+        fontSize,
+        getTextHighlightHorizontalAlignment(node)
+      )
+    ) {
+      const estimatedSelectionBoundsList = buildEstimatedAlignmentSensitiveTextHighlightSelectionBounds(
+        node,
+        rangeStart,
+        rangeEnd,
+        fontSize,
+        lineHeight,
+        selectedText
+      );
+      const alignment = getTextHighlightHorizontalAlignment(node);
+      const safeEstimatedSelectionBoundsList = sortTextHighlightBoundsList(estimatedSelectionBoundsList).filter(
+        (row) =>
+          !hasOverwideTextHighlightSelectionRows([row], selectedText, fontSize, lineHeight) &&
+          !hasUnderwideTextHighlightSelectionRows([row], selectedText, fontSize, alignment)
+      );
+      if (!safeEstimatedSelectionBoundsList.length) {
+        throw new Error("Could not safely measure the selected text highlight range.");
+      }
+      boundsList = safeEstimatedSelectionBoundsList;
     }
 
     return {
@@ -6727,7 +6917,13 @@
         } catch (error) {}
       }
 
-      const underlineLocalBoundsList = await waitForTextHighlightUnderlineGeometryBounds(clone, fontSize, lineHeight);
+      const underlineLocalBoundsList = await waitForTextHighlightUnderlineGeometryBounds(
+        clone,
+        fontSize,
+        lineHeight,
+        rangeStart,
+        rangeEnd
+      );
       const boundsList = underlineLocalBoundsList
         .map((localBounds) => buildTextHighlightBoundsFromUnderlineLocalBounds(node, localBounds, fontSize, lineHeight))
         .filter(Boolean);
@@ -6754,10 +6950,10 @@
     }
   }
 
-  async function waitForTextHighlightUnderlineGeometryBounds(node, fontSize, lineHeight) {
+  async function waitForTextHighlightUnderlineGeometryBounds(node, fontSize, lineHeight, start, end) {
     const attempts = 10;
     for (let attempt = 0; attempt < attempts; attempt += 1) {
-      const boundsList = getTextHighlightUnderlineGeometryLocalBounds(node, fontSize, lineHeight);
+      const boundsList = getTextHighlightUnderlineGeometryLocalBounds(node, fontSize, lineHeight, start, end);
       if (boundsList.length) {
         return boundsList;
       }
@@ -6773,22 +6969,258 @@
     });
   }
 
-  function getTextHighlightUnderlineGeometryLocalBounds(node, fontSize, lineHeight) {
+  function getTextHighlightUnderlineGeometryLocalBounds(node, fontSize, lineHeight, start, end) {
     const geometry = node && Array.isArray(node.fillGeometry) ? node.fillGeometry : [];
     if (!geometry.length) {
       return [];
     }
 
     const boundsList = [];
+    const underlinePathBoundsList = [];
     for (let index = 0; index < geometry.length; index += 1) {
       const path = geometry[index];
       const pathBoundsList = parseTextHighlightSvgPathBoundsList(path && path.data, fontSize, lineHeight);
       for (const pathBounds of pathBoundsList) {
         boundsList.push(pathBounds);
       }
+      if (isTextHighlightUnderlineGeometryPath(pathBoundsList, fontSize, lineHeight)) {
+        for (const pathBounds of pathBoundsList) {
+          underlinePathBoundsList.push(pathBounds);
+        }
+      }
     }
 
-    return mergeTextHighlightLocalBoundsByRows(boundsList, fontSize, lineHeight);
+    const candidateBoundsList = underlinePathBoundsList.length ? underlinePathBoundsList : boundsList;
+    const filteredUnderlineBoundsList = filterTextHighlightUnderlineGeometryLocalBounds(
+      node,
+      candidateBoundsList,
+      fontSize,
+      lineHeight,
+      start,
+      end
+    );
+    return mergeTextHighlightLocalBoundsByRows(
+      filteredUnderlineBoundsList.length ? filteredUnderlineBoundsList : candidateBoundsList,
+      fontSize,
+      lineHeight
+    );
+  }
+
+  function isTextHighlightUnderlineGeometryPath(boundsList, fontSize, lineHeight) {
+    const rows = sortTextHighlightBoundsList(boundsList)
+      .map((bounds) => normalizeTextHighlightWorldBounds(bounds))
+      .filter(Boolean);
+    if (!rows.length) {
+      return false;
+    }
+
+    const size = getTextHighlightMetricFontSize(fontSize);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const maximumUnderlineHeight = Math.max(
+      0.65,
+      Math.min(resolvedLineHeight * 0.14, size * 0.12)
+    );
+    let totalWidth = 0;
+    for (const row of rows) {
+      if (row.height > maximumUnderlineHeight) {
+        return false;
+      }
+      totalWidth += Math.max(0, row.width);
+    }
+
+    return totalWidth >= getTextHighlightMinimumWidth(size);
+  }
+
+  function filterTextHighlightUnderlineGeometryLocalBounds(node, boundsList, fontSize, lineHeight, start, end) {
+    const rows = sortTextHighlightBoundsList(boundsList)
+      .map((bounds) => normalizeTextHighlightWorldBounds(bounds))
+      .filter(Boolean);
+    if (!rows.length) {
+      return [];
+    }
+
+    const size = getTextHighlightMetricFontSize(fontSize);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const maximumUnderlineHeight = Math.max(
+      0.65,
+      Math.min(resolvedLineHeight * 0.14, size * 0.12)
+    );
+    const minimumWidth = getTextHighlightMinimumWidth(size);
+    const thinRows = rows.filter((bounds) => bounds.height <= maximumUnderlineHeight && bounds.width >= minimumWidth);
+    if (!thinRows.length) {
+      return [];
+    }
+
+    const expectedUnderlineY = getEstimatedTextHighlightUnderlineLocalY(
+      node,
+      start,
+      end,
+      size,
+      resolvedLineHeight
+    );
+    const rowBand = Math.max(size * 0.85, resolvedLineHeight * 0.85);
+    const nearbyRows = Number.isFinite(expectedUnderlineY)
+      ? thinRows.filter((bounds) => Math.abs(bounds.y - expectedUnderlineY) <= rowBand)
+      : thinRows;
+    if (!nearbyRows.length) {
+      return [];
+    }
+
+    const lineGroups = groupTextHighlightUnderlineCandidateRows(nearbyRows, fontSize, resolvedLineHeight);
+    if (!lineGroups.length) {
+      return [];
+    }
+
+    const baselineRows = [];
+    const baselineTolerance = Math.max(0.65, Math.min(size * 0.12, resolvedLineHeight * 0.12));
+    let selectedGroups = lineGroups;
+    if (Number.isFinite(expectedUnderlineY)) {
+      let bestDistance = Infinity;
+      for (const group of lineGroups) {
+        const bottomY = getTextHighlightUnderlineGroupBottomY(group);
+        if (!Number.isFinite(bottomY)) {
+          continue;
+        }
+        bestDistance = Math.min(bestDistance, Math.abs(bottomY - expectedUnderlineY));
+      }
+      if (Number.isFinite(bestDistance)) {
+        selectedGroups = lineGroups.filter((group) => {
+          const bottomY = getTextHighlightUnderlineGroupBottomY(group);
+          return Number.isFinite(bottomY) && Math.abs(bottomY - expectedUnderlineY) <= bestDistance + baselineTolerance;
+        });
+      }
+    }
+
+    for (const group of selectedGroups) {
+      let bottomY = -Infinity;
+      for (const row of group.rows) {
+        if (row.y > bottomY) {
+          bottomY = row.y;
+        }
+      }
+      if (!Number.isFinite(bottomY)) {
+        continue;
+      }
+      for (const row of group.rows) {
+        if (row.y >= bottomY - baselineTolerance) {
+          baselineRows.push(row);
+        }
+      }
+    }
+
+    return baselineRows;
+  }
+
+  function getTextHighlightUnderlineGroupBottomY(group) {
+    let bottomY = -Infinity;
+    const rows = group && Array.isArray(group.rows) ? group.rows : [];
+    for (const row of rows) {
+      const bounds = normalizeTextHighlightWorldBounds(row);
+      if (bounds && bounds.y > bottomY) {
+        bottomY = bounds.y;
+      }
+    }
+    return bottomY;
+  }
+
+  function groupTextHighlightUnderlineCandidateRows(rows, fontSize, lineHeight) {
+    const sortedRows = sortTextHighlightBoundsList(rows);
+    const size = getTextHighlightMetricFontSize(fontSize);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const groupTolerance = Math.max(3, Math.min(size * 0.48, resolvedLineHeight * 0.39));
+    const groups = [];
+    for (const row of sortedRows) {
+      const bounds = normalizeTextHighlightWorldBounds(row);
+      if (!bounds) {
+        continue;
+      }
+
+      let matchedGroup = null;
+      for (const group of groups) {
+        if (bounds.y >= group.minY - groupTolerance && bounds.y <= group.maxY + groupTolerance) {
+          matchedGroup = group;
+          break;
+        }
+      }
+
+      if (!matchedGroup) {
+        groups.push({
+          minY: bounds.y,
+          maxY: bounds.y,
+          rows: [bounds],
+        });
+        continue;
+      }
+
+      matchedGroup.rows.push(bounds);
+      matchedGroup.minY = Math.min(matchedGroup.minY, bounds.y);
+      matchedGroup.maxY = Math.max(matchedGroup.maxY, bounds.y);
+    }
+
+    return groups;
+  }
+
+  function getEstimatedTextHighlightUnderlineLocalY(node, start, end, fontSize, lineHeight) {
+    const characters = node && typeof node.characters === "string" ? node.characters : "";
+    const characterCount = characters.length;
+    const rangeStart = Math.max(0, Math.min(characterCount, Math.floor(Number(start) || 0)));
+    const rangeEnd = Math.max(rangeStart, Math.min(characterCount, Math.floor(Number(end) || 0)));
+    if (!(rangeEnd > rangeStart)) {
+      return NaN;
+    }
+
+    const nodeTransform = getAbsoluteTransformMatrix(node);
+    const inverseNodeTransform = invertAffineTransform(nodeTransform);
+    if (!inverseNodeTransform) {
+      return NaN;
+    }
+
+    const layoutLocalBounds = getTextHighlightTypographyLocalBounds(node, inverseNodeTransform);
+    if (!layoutLocalBounds || !(layoutLocalBounds.width > 0)) {
+      return NaN;
+    }
+
+    const hardLineRange = getTextHighlightLineRangeForSelection(characters, rangeStart, rangeEnd);
+    if (!hardLineRange || !(hardLineRange.end > hardLineRange.start)) {
+      return NaN;
+    }
+
+    const hardLineText = characters.slice(hardLineRange.start, hardLineRange.end);
+    const localSelectionStart = rangeStart - hardLineRange.start;
+    const localSelectionEnd = rangeEnd - hardLineRange.start;
+    const softLines = buildEstimatedTextHighlightSoftLines(hardLineText, layoutLocalBounds.width, fontSize);
+    if (!softLines.length) {
+      return NaN;
+    }
+
+    const selectionMidpoint = (localSelectionStart + localSelectionEnd) / 2;
+    let softLineIndex = softLines.findIndex(
+      (line) => selectionMidpoint >= line.start && selectionMidpoint <= Math.max(line.start, line.end)
+    );
+    if (softLineIndex < 0) {
+      softLineIndex = softLines.findIndex(
+        (line) => localSelectionStart >= line.start && localSelectionStart <= Math.max(line.start, line.end)
+      );
+    }
+    if (softLineIndex < 0) {
+      return NaN;
+    }
+
+    const size = getTextHighlightMetricFontSize(fontSize);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const metrics = buildTextHighlightBoxGlyphMetrics(size, resolvedLineHeight);
+    const previousSoftLineOffsetY = getEstimatedTextHighlightSoftLineOffsetBefore(
+      characters,
+      hardLineRange.start,
+      layoutLocalBounds.width,
+      size,
+      resolvedLineHeight,
+      getTextHighlightParagraphSpacing(node)
+    );
+
+    return roundTextHighlightMetric(
+      layoutLocalBounds.y + previousSoftLineOffsetY + softLineIndex * resolvedLineHeight + metrics.ascent
+    );
   }
 
   function mergeTextHighlightLocalBoundsByRows(boundsList, fontSize, lineHeight) {
@@ -6853,7 +7285,13 @@
       }
 
       const minimumWidth = getTextHighlightMinimumWidth(fontSize);
-      const minimumHeight = Math.max(0.5, Math.min(Math.max(1, Number(lineHeight) || 1), Math.max(1, Number(fontSize) || 12) * 0.2));
+      const minimumHeight = Math.max(
+        0.5,
+        Math.min(
+          Math.max(1, Number(lineHeight) || 1),
+          getTextHighlightMetricFontSize(fontSize) * 0.2
+        )
+      );
       if (bounds.width < minimumWidth || bounds.height < minimumHeight * 0.05) {
         continue;
       }
@@ -6918,11 +7356,74 @@
     return getTextHighlightWorldBoundsFromLocalBounds(node, highlightLocalBounds);
   }
 
+  function getTextHighlightMetricFontSize(fontSize) {
+    const numeric = Number(fontSize);
+    return Number.isFinite(numeric) && numeric > 0 ? numeric : 16;
+  }
+
+  function getTextHighlightFontSizeBucket(fontSize) {
+    const size = getTextHighlightMetricFontSize(fontSize);
+    if (size <= 12) {
+      return "micro";
+    }
+    if (size <= 16) {
+      return "small";
+    }
+    if (size <= 28) {
+      return "medium";
+    }
+    if (size <= 44) {
+      return "large";
+    }
+    return "huge";
+  }
+
+  function getTextHighlightEstimatedLayoutWidthScale(fontSize) {
+    const bucket = getTextHighlightFontSizeBucket(fontSize);
+    // Calibrated against Figma underline geometry for the font-size matrix.
+    if (bucket === "micro" || bucket === "small" || bucket === "medium") {
+      return 0.948;
+    }
+    return 0.98;
+  }
+
+  function calibrateEstimatedTextHighlightLayoutWidth(width, fontSize) {
+    const numeric = Number(width);
+    if (!Number.isFinite(numeric) || !(numeric > 0)) {
+      return 0;
+    }
+    return roundTextHighlightMetric(numeric * getTextHighlightEstimatedLayoutWidthScale(fontSize));
+  }
+
+  function getTextHighlightParagraphSpacing(node) {
+    if (!node) {
+      return 0;
+    }
+    try {
+      return getTextHighlightParagraphSpacingValue(node.paragraphSpacing);
+    } catch (error) {}
+    return 0;
+  }
+
+  function getTextHighlightParagraphSpacingValue(value) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) && numeric > 0 ? numeric : 0;
+  }
+
+  function shouldPreserveTextHighlightMeasuredRowCenter(node) {
+    return getTextHighlightParagraphSpacing(node) > 0;
+  }
+
   function buildTextHighlightBoxGlyphMetrics(fontSize, lineHeight) {
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
-    const ascent = Math.max(size * 0.82, Math.min(resolvedLineHeight * 0.74, size * 0.92));
-    const descent = Math.max(size * 0.14, Math.min(resolvedLineHeight * 0.18, size * 0.22));
+    const baseAscent = Math.max(size * 0.82, Math.min(resolvedLineHeight * 0.74, size * 0.92));
+    const baseDescent = Math.max(size * 0.14, Math.min(resolvedLineHeight * 0.18, size * 0.22));
+    const hugeFontMetricBlend = getTextHighlightHugeFontMetricBlend(size);
+    const hugeAscent = Math.max(size * 0.88, Math.min(resolvedLineHeight * 0.82, size * 0.96));
+    const hugeDescent = Math.max(size * 0.1, Math.min(resolvedLineHeight * 0.12, size * 0.14));
+    const ascent = baseAscent * (1 - hugeFontMetricBlend) + hugeAscent * hugeFontMetricBlend;
+    const descent = baseDescent * (1 - hugeFontMetricBlend) + hugeDescent * hugeFontMetricBlend;
     return {
       ascent: roundTextHighlightMetric(ascent),
       descent: roundTextHighlightMetric(descent),
@@ -6931,18 +7432,43 @@
   }
 
   function buildTextHighlightBoxVisualRowHeight(fontSize, lineHeight) {
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
     const metrics = buildTextHighlightBoxGlyphMetrics(size, resolvedLineHeight);
     const largeFontBlend = getTextHighlightLargeFontCompactBlend(size);
     const compactHeight = Math.max(size * 0.86, Math.min(resolvedLineHeight * 0.78, size * 0.95));
     const visualHeight = metrics.height * (1 - largeFontBlend) + compactHeight * largeFontBlend;
-    return roundTextHighlightMetric(Math.max(1, Math.min(resolvedLineHeight, visualHeight)));
+    const hugeFontGlyphFloorBlend = getTextHighlightHugeFontGlyphFloorBlend(size);
+    const minimumVisualHeight =
+      visualHeight * (1 - hugeFontGlyphFloorBlend) + metrics.height * hugeFontGlyphFloorBlend;
+    return roundTextHighlightMetric(Math.max(1, Math.min(resolvedLineHeight, Math.max(visualHeight, minimumVisualHeight))));
   }
 
   function getTextHighlightLargeFontCompactBlend(fontSize) {
-    const size = Math.max(1, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     return Math.max(0, Math.min(1, (size - 32) / 24));
+  }
+
+  function getTextHighlightHugeFontMetricBlend(fontSize) {
+    const size = getTextHighlightMetricFontSize(fontSize);
+    if (size <= 44) {
+      return 0;
+    }
+    if (size >= 56) {
+      return 1;
+    }
+    return Math.max(0, Math.min(1, (size - 44) / 12));
+  }
+
+  function getTextHighlightHugeFontGlyphFloorBlend(fontSize) {
+    const size = getTextHighlightMetricFontSize(fontSize);
+    if (size <= 44) {
+      return 0;
+    }
+    if (size >= 56) {
+      return 0.5;
+    }
+    return Math.max(0, Math.min(0.5, (size - 44) / 24));
   }
 
   async function refineTextHighlightBoundsWithGlyphBounds(
@@ -7150,7 +7676,7 @@
       lineHeight
     );
     const minimumWidth = getTextHighlightMinimumWidth(fontSize);
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const estimatedSelectedWidth = estimateTextHighlightInlineTextWidth(selectedLineText, fontSize);
     const minimumExpectedWidth = Math.max(
       minimumWidth,
@@ -7201,7 +7727,12 @@
     const normalizedSelectionRow = normalizeTextHighlightWorldBounds(selectionRow);
     const canUseSelectionRow =
       normalizedSelectionRow &&
-      !hasUnderwideTextHighlightSelectionRows([normalizedSelectionRow], selectedLineText, fontSize) &&
+      !hasUnderwideTextHighlightSelectionRows(
+        [normalizedSelectionRow],
+        selectedLineText,
+        fontSize,
+        getTextHighlightHorizontalAlignment(node)
+      ) &&
       !hasOverwideTextHighlightSelectionRows([normalizedSelectionRow], selectedLineText, fontSize, lineHeight);
 
     const targetRight = normalizedTargetRow.x + normalizedTargetRow.width;
@@ -7233,7 +7764,14 @@
       height: normalizedTargetRow.height,
     };
 
-    if (hasUnderwideTextHighlightSelectionRows([row], selectedLineText, fontSize)) {
+    if (
+      hasUnderwideTextHighlightSelectionRows(
+        [row],
+        selectedLineText,
+        fontSize,
+        getTextHighlightHorizontalAlignment(node)
+      )
+    ) {
       return [];
     }
     if (hasOverwideAlignmentSensitiveTextHighlightFallbackRow(row, selectedLineText, fontSize, normalizedTargetRow.width)) {
@@ -7254,7 +7792,7 @@
       return false;
     }
 
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const estimatedWidth = estimateTextHighlightInlineTextWidth(compactSelectedText, size);
     const maximumExpectedWidth = Math.max(size * 3, estimatedWidth * 1.38);
     const reference = Math.max(0, Number(referenceWidth) || 0);
@@ -7291,10 +7829,6 @@
     }
 
     const alignment = getTextHighlightHorizontalAlignment(node);
-    if (alignment !== "CENTER" && alignment !== "RIGHT") {
-      return [];
-    }
-
     const nodeTransform = getAbsoluteTransformMatrix(node);
     const inverseNodeTransform = invertAffineTransform(nodeTransform);
     if (!inverseNodeTransform) {
@@ -7340,7 +7874,7 @@
       return [];
     }
 
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
     const metrics = buildTextHighlightBoxGlyphMetrics(size, resolvedLineHeight);
     const lineWidth = Math.max(
@@ -7359,22 +7893,26 @@
       return [];
     }
 
-    const previousSoftLineCount = countEstimatedTextHighlightSoftLinesBefore(
+    const previousSoftLineOffsetY = getEstimatedTextHighlightSoftLineOffsetBefore(
       characters,
       hardLineRange.start,
       layoutLocalBounds.width,
-      size
+      size,
+      resolvedLineHeight,
+      getTextHighlightParagraphSpacing(node)
     );
-    const absoluteSoftLineIndex = previousSoftLineCount + softLineIndex;
     const lineLocalX =
       alignment === "RIGHT"
         ? layoutLocalBounds.x + Math.max(0, layoutLocalBounds.width - lineWidth)
-        : layoutLocalBounds.x + Math.max(0, (layoutLocalBounds.width - lineWidth) / 2);
+        : alignment === "CENTER"
+          ? layoutLocalBounds.x + Math.max(0, (layoutLocalBounds.width - lineWidth) / 2)
+          : layoutLocalBounds.x;
     const localBounds = {
       x: roundTextHighlightMetric(lineLocalX + prefixWidth),
       y: roundTextHighlightMetric(
         layoutLocalBounds.y +
-          absoluteSoftLineIndex * resolvedLineHeight +
+          previousSoftLineOffsetY +
+          softLineIndex * resolvedLineHeight +
           Math.max(0, (resolvedLineHeight - metrics.height) / 2)
       ),
       width: roundTextHighlightMetric(selectedWidth),
@@ -7389,7 +7927,7 @@
 
     if (
       hasOverwideTextHighlightSelectionRows([worldBounds], selectedLineText, size, resolvedLineHeight) ||
-      hasUnderwideTextHighlightSelectionRows([worldBounds], selectedLineText, size)
+      hasUnderwideTextHighlightSelectionRows([worldBounds], selectedLineText, size, alignment)
     ) {
       return [];
     }
@@ -7400,6 +7938,7 @@
   function buildEstimatedTextHighlightSoftLines(text, maximumWidth, fontSize) {
     const value = String(text || "");
     const widthLimit = Math.max(1, Number(maximumWidth) || 1);
+    const wrapTolerance = Math.max(0.75, getTextHighlightMetricFontSize(fontSize) * 0.1);
     if (!value.length) {
       return [{ start: 0, end: 0, width: 0 }];
     }
@@ -7424,7 +7963,14 @@
     let lineWidth = 0;
     for (const token of tokens) {
       const tokenWidth = estimateTextHighlightLayoutInlineWidth(token.text, fontSize);
-      if (lineEnd > lineStart && lineWidth + tokenWidth > widthLimit) {
+      const tokenTrimmedWidth = estimateTextHighlightLayoutInlineWidth(token.text.replace(/\s+$/g, ""), fontSize);
+      const nextLineWidth = lineWidth + tokenWidth;
+      const nextTrimmedLineWidth = lineWidth + tokenTrimmedWidth;
+      if (
+        lineEnd > lineStart &&
+        nextLineWidth > widthLimit + wrapTolerance &&
+        nextTrimmedLineWidth > widthLimit + wrapTolerance
+      ) {
         lines.push(buildEstimatedTextHighlightSoftLine(value, lineStart, lineEnd, fontSize));
         lineStart = token.start;
         lineEnd = token.end;
@@ -7473,9 +8019,45 @@
     return lineCount;
   }
 
+  function getEstimatedTextHighlightSoftLineOffsetBefore(
+    characters,
+    end,
+    maximumWidth,
+    fontSize,
+    lineHeight,
+    paragraphSpacing
+  ) {
+    const prefixEnd = Math.max(0, Math.min(String(characters || "").length, Math.floor(Number(end) || 0)));
+    const prefix = normalizeLineEndings(String(characters || "").slice(0, prefixEnd));
+    if (!prefix) {
+      return 0;
+    }
+
+    const resolvedLineHeight = Math.max(getTextHighlightMetricFontSize(fontSize), Number(lineHeight) || 0);
+    const resolvedParagraphSpacing = getTextHighlightParagraphSpacingValue(paragraphSpacing);
+    const hardLines = prefix.split("\n");
+    const endsWithLineBreak = prefix.endsWith("\n");
+    if (endsWithLineBreak) {
+      hardLines.pop();
+    }
+
+    let offsetY = 0;
+    for (let index = 0; index < hardLines.length; index += 1) {
+      const lineCount = Math.max(1, buildEstimatedTextHighlightSoftLines(hardLines[index], maximumWidth, fontSize).length);
+      offsetY += lineCount * resolvedLineHeight;
+      if (index < hardLines.length - 1 || endsWithLineBreak) {
+        offsetY += resolvedParagraphSpacing;
+      }
+    }
+    return roundTextHighlightMetric(offsetY);
+  }
+
   function estimateTextHighlightLayoutInlineWidth(text, fontSize) {
-    return estimateTextHighlightInlineTextWidth(
-      String(text || "").replace(/[\u200B-\u200D\uFEFF]/g, ""),
+    return calibrateEstimatedTextHighlightLayoutWidth(
+      estimateTextHighlightInlineTextWidth(
+        String(text || "").replace(/[\u200B-\u200D\uFEFF]/g, ""),
+        fontSize
+      ),
       fontSize
     );
   }
@@ -7489,7 +8071,7 @@
     lineHeight,
     selectedText
   ) {
-    if (!node || typeof node.clone !== "function") {
+    if (!node) {
       return [];
     }
 
@@ -7498,6 +8080,18 @@
     const rangeEnd = Math.max(rangeStart, Math.min(characterCount, Math.floor(Number(end) || 0)));
     if (!(rangeEnd > rangeStart)) {
       return [];
+    }
+
+    const estimatedRows = buildEstimatedAlignmentSensitiveTextHighlightSelectionBounds(
+      node,
+      rangeStart,
+      rangeEnd,
+      fontSize,
+      lineHeight,
+      selectedText
+    );
+    if (typeof node.clone !== "function") {
+      return estimatedRows;
     }
 
     const leftClone = node.clone();
@@ -7524,9 +8118,9 @@
       if (
         !leftSelectedRows.length ||
         hasOverwideTextHighlightSelectionRows(leftSelectedRows, selectedText, fontSize, lineHeight) ||
-        hasUnderwideTextHighlightSelectionRows(leftSelectedRows, selectedText, fontSize)
+        hasUnderwideTextHighlightSelectionRows(leftSelectedRows, selectedText, fontSize, "LEFT")
       ) {
-        return [];
+        return estimatedRows;
       }
 
       const leftLineRows = await measureTextHighlightAllSoftLineRows(
@@ -7537,7 +8131,7 @@
         { preferGlyphBounds: true }
       );
       if (!leftLineRows.length) {
-        return [];
+        return estimatedRows;
       }
       const nodeTransform = getAbsoluteTransformMatrix(node);
       const inverseNodeTransform = invertAffineTransform(nodeTransform);
@@ -7553,7 +8147,7 @@
         !layoutLocalBounds ||
         (alignment !== "CENTER" && alignment !== "RIGHT")
       ) {
-        return [];
+        return estimatedRows;
       }
 
       const estimatedLineIndex = getEstimatedTextHighlightSoftLineIndexForSelection(
@@ -7635,14 +8229,6 @@
         });
       }
 
-      const estimatedRows = buildEstimatedAlignmentSensitiveTextHighlightSelectionBounds(
-        node,
-        rangeStart,
-        rangeEnd,
-        fontSize,
-        lineHeight,
-        selectedText
-      );
       const reconciledRows = reconcileAlignmentSensitiveTextHighlightRowsWithEstimate(
         translatedRows,
         estimatedRows,
@@ -7651,11 +8237,11 @@
       const safeRows = sortTextHighlightBoundsList(reconciledRows).filter(
         (row) =>
           !hasOverwideTextHighlightSelectionRows([row], selectedText, fontSize, lineHeight) &&
-          !hasUnderwideTextHighlightSelectionRows([row], selectedText, fontSize)
+          !hasUnderwideTextHighlightSelectionRows([row], selectedText, fontSize, alignment)
       );
-      return safeRows;
+      return safeRows.length ? safeRows : estimatedRows;
     } catch (error) {
-      return [];
+      return estimatedRows;
     } finally {
       if (leftClone && !leftClone.removed) {
         leftClone.remove();
@@ -7676,7 +8262,7 @@
       return sortedRows;
     }
 
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const tolerance = Math.max(2, size * 0.28);
     const xMismatch = Math.abs(row.x - estimated.x);
     const yMismatch = Math.abs(row.y - estimated.y);
@@ -7745,7 +8331,7 @@
   }
 
   function getRightAlignedTextHighlightNudge(fontSize) {
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     return roundTextHighlightMetric(Math.max(1, Math.min(1.5, size * 0.06)));
   }
 
@@ -7850,7 +8436,7 @@
       return -1;
     }
 
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const rowTolerance = Math.max(getTextHighlightRowTolerance(fontSize, lineHeight), size * 0.28);
     const targetCenter = target.y + target.height / 2;
     let bestIndex = -1;
@@ -7900,7 +8486,7 @@
       return null;
     }
 
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const rowTolerance = Math.max(getTextHighlightRowTolerance(fontSize, lineHeight), size * 0.28);
     const targetCenter = target.y + target.height / 2;
     let bestRow = null;
@@ -7990,7 +8576,7 @@
       return null;
     }
 
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
     const metrics = buildTextHighlightBoxGlyphMetrics(size, resolvedLineHeight);
     const characters = node && typeof node.characters === "string" ? node.characters : "";
@@ -8029,7 +8615,7 @@
     text,
     maximumWidth
   ) {
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const maxWidth = Math.max(0, Number(maximumWidth) || 0);
     if (!text) {
       return 0;
@@ -8055,7 +8641,7 @@
   }
 
   function estimateTextHighlightInlineTextWidth(text, fontSize) {
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     let width = 0;
     for (const character of String(text || "")) {
       const codePoint = character.codePointAt(0);
@@ -8100,6 +8686,23 @@
     return "LEFT";
   }
 
+  function getTextHighlightAlignmentBucket(value) {
+    const alignment =
+      value && typeof value === "object"
+        ? getTextHighlightHorizontalAlignment(value)
+        : String(value || "").trim().toUpperCase();
+    if (alignment === "CENTER") {
+      return "center";
+    }
+    if (alignment === "RIGHT") {
+      return "right";
+    }
+    if (alignment === "JUSTIFIED") {
+      return "justified";
+    }
+    return "left";
+  }
+
   async function buildTextHighlightSelectionRowsFromPrefixStart(
     node,
     start,
@@ -8127,7 +8730,7 @@
       return [];
     }
 
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const rowTolerance = getTextHighlightRowTolerance(fontSize, lineHeight);
     const minimumWidth = getTextHighlightMinimumWidth(fontSize);
     const endRight = targetRow.x + targetRow.width;
@@ -8193,7 +8796,8 @@
         },
       ],
       selectedText,
-      fontSize
+      fontSize,
+      getTextHighlightHorizontalAlignment(node)
     );
     const trustPrefixWidth =
       prefixWidth >= minimumWidth &&
@@ -8244,7 +8848,7 @@
       return 0;
     }
 
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     return roundTextHighlightMetric(whitespaceCount * size * 0.28);
   }
 
@@ -8255,7 +8859,7 @@
       return null;
     }
 
-    const rowTolerance = Math.max(getTextHighlightRowTolerance(fontSize, lineHeight), Math.max(12, Number(fontSize) || 16) * 0.28);
+    const rowTolerance = Math.max(getTextHighlightRowTolerance(fontSize, lineHeight), getTextHighlightMetricFontSize(fontSize) * 0.28);
     let bestRow = null;
     let bestDistance = Infinity;
     for (const row of rows) {
@@ -8302,7 +8906,7 @@
       }
     } catch (error) {}
 
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const selectedLength = Math.max(1, compactText(selectedText).length);
     const estimatedWidth = selectedLength * size * 0.56;
     return roundTextHighlightMetric(Math.max(getTextHighlightMinimumWidth(fontSize), Math.min(Number(maximumWidth) || estimatedWidth, estimatedWidth)));
@@ -8322,7 +8926,7 @@
       return false;
     }
 
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
     const selectedLength = Math.max(1, compactText(selectedText).length);
     const maxExpectedWidth = Math.max(size * 2.8, selectedLength * size * 1.65);
@@ -8336,7 +8940,7 @@
       return false;
     }
 
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
     const nodeBounds = normalizeTextHighlightWorldBounds(getNodeRenderBounds(node));
     const estimatedTextWidth = Math.max(
@@ -8375,7 +8979,44 @@
     return totalWidth <= maximumTotalWidth;
   }
 
-  function hasUnderwideTextHighlightSelectionRows(boundsList, selectedText, fontSize) {
+  function getTextHighlightMinimumSelectionWidthRatio(selectedText, fontSize, alignment) {
+    const compactSelectedText = compactText(selectedText);
+    const compactLength = compactSelectedText.length;
+    if (compactLength <= 1) {
+      return 0;
+    }
+    if (compactLength <= 3) {
+      return 0.28;
+    }
+    if (compactLength <= 8) {
+      return 0.42;
+    }
+
+    const bucket = getTextHighlightFontSizeBucket(fontSize);
+    const alignmentBucket = getTextHighlightAlignmentBucket(alignment);
+    let ratio = 0.62;
+    if (bucket === "micro") {
+      ratio = 0.91;
+    } else if (bucket === "small") {
+      ratio = 0.86;
+    } else if (bucket === "medium") {
+      ratio = 0.8;
+    } else if (bucket === "large") {
+      ratio = 0.68;
+    } else {
+      ratio = 0.62;
+    }
+
+    if (alignmentBucket === "center") {
+      ratio += bucket === "micro" ? 0.015 : bucket === "small" ? 0.02 : 0.03;
+    } else if (alignmentBucket === "right" || alignmentBucket === "justified") {
+      ratio += bucket === "micro" ? 0.02 : bucket === "small" ? 0.025 : 0.04;
+    }
+
+    return Math.max(0.28, Math.min(0.96, ratio));
+  }
+
+  function hasUnderwideTextHighlightSelectionRows(boundsList, selectedText, fontSize, alignment) {
     const rows = sortTextHighlightBoundsList(boundsList);
     if (!rows.length || !selectedText || /[\r\n]/.test(selectedText) || rows.length > 1) {
       return false;
@@ -8391,9 +9032,9 @@
       return false;
     }
 
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const estimatedWidth = estimateTextHighlightInlineTextWidth(compactSelectedText, size);
-    const ratio = compactSelectedText.length <= 3 ? 0.28 : compactSelectedText.length <= 8 ? 0.36 : 0.45;
+    const ratio = getTextHighlightMinimumSelectionWidthRatio(compactSelectedText, size, alignment);
     const minimumExpectedWidth = Math.max(
       getTextHighlightMinimumWidth(size),
       estimatedWidth * ratio
@@ -8417,11 +9058,12 @@
       return false;
     }
 
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const estimatedWidth = estimateTextHighlightInlineTextWidth(compactSelectedText, size);
+    const alignmentRatio = getTextHighlightMinimumSelectionWidthRatio(compactSelectedText, size, "RIGHT");
     const minimumExpectedWidth = Math.max(
       getTextHighlightMinimumWidth(size),
-      estimatedWidth * 0.7
+      estimatedWidth * Math.max(0.7, alignmentRatio)
     );
     return bounds.width < minimumExpectedWidth;
   }
@@ -8432,7 +9074,7 @@
       return false;
     }
 
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const selectedLength = Math.max(1, compactText(selectedText).length);
     const maxExpectedWidth = Math.max(size * 2.2, selectedLength * size * 1.25);
     return bounds.width <= maxExpectedWidth;
@@ -8445,7 +9087,7 @@
       return base;
     }
 
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const baseRight = base.x + base.width;
     const glyphRight = glyph.x + glyph.width;
     const allowedOverflow = Math.max(2, Math.min(size * 0.5, 18));
@@ -8472,7 +9114,7 @@
       return [];
     }
 
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
     const maxGlyphRowHeight = Math.max(size * 1.75, resolvedLineHeight * 1.35);
     return rows.filter((row) => row.height <= maxGlyphRowHeight);
@@ -8490,7 +9132,7 @@
       return null;
     }
 
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
     const rowTolerance = Math.max(getTextHighlightRowTolerance(fontSize, lineHeight), resolvedLineHeight * 0.32);
     const baseCenterY = base.y + base.height / 2;
@@ -8540,7 +9182,7 @@
       return base;
     }
 
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
     const targetTop = Math.min(base.y, glyph.y);
     const targetBottom = Math.max(base.y + base.height, glyph.y + glyph.height);
@@ -9010,7 +9652,7 @@
       return true;
     }
 
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
     const nearFullWidth = fallbackBounds.width >= nodeBounds.width * 0.96;
     const nearFullHeight = fallbackBounds.height >= nodeBounds.height * 0.9;
@@ -9060,7 +9702,7 @@
       return false;
     }
 
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
     const mergedBounds = mergeTextHighlightBoundsList(normalizedBoundsList);
     const bounds = normalizeTextHighlightWorldBounds(mergedBounds);
@@ -9073,7 +9715,12 @@
     const looksLikeWholeRow = bounds.height <= resolvedLineHeight * 1.35 && bounds.width >= nodeBounds.width * 0.72;
     return (
       (looksLikeWholeRow && bounds.width > estimatedMaxWidth) ||
-      hasUnderwideTextHighlightSelectionRows(normalizedBoundsList, selectedText, fontSize)
+      hasUnderwideTextHighlightSelectionRows(
+        normalizedBoundsList,
+        selectedText,
+        fontSize,
+        getTextHighlightHorizontalAlignment(node)
+      )
     );
   }
 
@@ -9216,7 +9863,7 @@
       return matchedStartRight;
     }
 
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
     const relaxedTolerance = Math.max(rowTolerance * 2.5, Math.min(resolvedLineHeight * 0.55, size * 0.9));
     const endCenter = normalizedEndBounds.y + normalizedEndBounds.height / 2;
@@ -9251,7 +9898,7 @@
       return -Infinity;
     }
 
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
     const relaxedTolerance = Math.max(resolvedLineHeight * 0.65, size);
     const endRight = normalizedEndBounds.x + normalizedEndBounds.width;
@@ -9309,13 +9956,13 @@
   }
 
   function getTextHighlightRowTolerance(fontSize, lineHeight) {
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
     return roundTextHighlightMetric(Math.max(2, Math.min(12, resolvedLineHeight * 0.18)));
   }
 
   function getTextHighlightMinimumWidth(fontSize) {
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     return roundTextHighlightMetric(Math.max(1, Math.min(6, size * 0.08)));
   }
 
@@ -9345,7 +9992,7 @@
       return [];
     }
 
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
     const minimumWidth = getTextHighlightMinimumWidth(size);
     const approximateLineHeight = roundTextHighlightMetric(
@@ -9393,7 +10040,7 @@
       return [];
     }
 
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
     const approximateLineHeight = roundTextHighlightMetric(
       Math.max(1, Math.min(resolvedNodeBounds.height, resolvedLineHeight))
@@ -9585,7 +10232,7 @@
       return false;
     }
 
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     return bounds.height > Math.max(size * 1.9, 30);
   }
 
@@ -9596,7 +10243,7 @@
       return Array.isArray(boundsList) ? boundsList : [];
     }
 
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
     const lineCount = Math.max(2, Math.min(80, Math.ceil(Math.max(0, bounds.height - size) / resolvedLineHeight) + 1));
     if (lineCount <= 1) {
@@ -9637,7 +10284,7 @@
       return rows;
     }
 
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
     const padding = Math.max(120, size * 4, resolvedLineHeight * 3);
     const expandedNodeBounds = {
@@ -9689,7 +10336,7 @@
       return rows;
     }
 
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
     const layoutLocalBounds = getTextHighlightTypographyLocalBounds(node, inverseNodeTransform);
     const layoutTop = layoutLocalBounds ? layoutLocalBounds.y : 0;
@@ -9698,6 +10345,7 @@
     const targetHeight = roundTextHighlightMetric(Math.max(1, Math.min(resolvedLineHeight, metrics.height)));
     const maximumLineIndex = getTextHighlightMaximumLocalLineIndex(node, layoutHeight, resolvedLineHeight);
     const maximumSnapShift = Math.max(size * 0.9, resolvedLineHeight * 0.55);
+    const preserveMeasuredRowCenter = shouldPreserveTextHighlightMeasuredRowCenter(node);
     const stableRows = [];
 
     for (const row of rows) {
@@ -9717,10 +10365,10 @@
       const lineBoxTop = layoutTop + lineIndex * resolvedLineHeight;
       const snappedY = lineBoxTop + Math.max(0, (resolvedLineHeight - targetHeight) / 2);
       const centeredY = localCenterY - targetHeight / 2;
-      const nextY =
-        Math.abs(snappedY - localBounds.y) <= maximumSnapShift
-          ? snappedY
-          : centeredY;
+      let nextY = centeredY;
+      if (!preserveMeasuredRowCenter && Math.abs(snappedY - localBounds.y) <= maximumSnapShift) {
+        nextY = snappedY;
+      }
       const stableWorldBounds = getTextHighlightWorldBoundsFromLocalBounds(node, {
         x: localBounds.x,
         y: roundTextHighlightMetric(nextY),
@@ -9747,7 +10395,7 @@
       return rows;
     }
 
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
     const targetHeight = buildTextHighlightBoxVisualRowHeight(size, resolvedLineHeight);
     const tightenedRows = [];
@@ -9813,7 +10461,7 @@
   }
 
   function getTextHighlightSmallFontTightenBlend(fontSize) {
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     if (size <= AI_TEXT_HIGHLIGHT_SMALL_FONT_FULL_TIGHTEN_PX) {
       return 1;
     }
@@ -9831,7 +10479,7 @@
   }
 
   function getTextHighlightMicroFontTightenBlend(fontSize) {
-    const size = Math.max(1, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     if (size <= AI_TEXT_HIGHLIGHT_MICRO_FONT_FULL_TIGHTEN_PX) {
       return 1;
     }
@@ -9927,7 +10575,7 @@
   }
 
   function resolveTextHighlightLineHeight(lineHeight, fontSize) {
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     if (!lineHeight || lineHeight === figma.mixed) {
       return 0;
     }
@@ -9956,7 +10604,7 @@
   }
 
   function getFallbackTextHighlightLineHeight(fontSize) {
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     return roundTextHighlightMetric(size * 1.2);
   }
 
@@ -10040,7 +10688,7 @@
     }
 
     const localBounds = getTextHighlightLocalBounds(inverseNodeTransform, worldBounds);
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const resolvedThickness = roundTextHighlightThickness(
       Math.max(2, Math.min(size * 1.35, Number(thickness) || size * 0.16))
     );
@@ -10077,7 +10725,7 @@
     }
 
     const localBounds = getTextHighlightLocalBounds(inverseNodeTransform, worldBounds);
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const resolvedThickness = roundTextHighlightThickness(
       Math.max(2, Math.min(size * 1.45, Number(thickness) || size * 0.22))
     );
@@ -10358,7 +11006,7 @@
   }
 
   function buildTextHighlightPadding(fontSize) {
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     return {
       left: roundTextHighlightMetric(Math.max(6, size * 0.18)),
       right: roundTextHighlightMetric(Math.max(6, size * 0.18)),
@@ -10369,7 +11017,7 @@
   }
 
   function buildTextHighlightBoxPixelPadding(fontSize, boxPaddingPx) {
-    const size = Math.max(12, Number(fontSize) || 16);
+    const size = getTextHighlightMetricFontSize(fontSize);
     const padding = sanitizeTextHighlightBoxPaddingPx(boxPaddingPx, AI_TEXT_HIGHLIGHT_DEFAULT_BOX_PADDING_PX);
     const baseHorizontalPadding = buildTextHighlightBoxBaseHorizontalPadding(size);
     const baseVerticalPadding = buildTextHighlightBoxBaseVerticalPadding(size);
@@ -10383,7 +11031,7 @@
   }
 
   function buildTextHighlightBoxTargetHeight(fontSize, lineHeight, boxPaddingPx, boundsList) {
-    const rawSize = Math.max(1, Number(fontSize) || 16);
+    const rawSize = getTextHighlightMetricFontSize(fontSize);
     const padding = buildTextHighlightBoxPixelPadding(fontSize, boxPaddingPx);
     const resolvedLineHeight = Math.max(rawSize, Number(lineHeight) || rawSize * 1.2);
     const visualRowHeight = buildTextHighlightBoxVisualRowHeight(rawSize, resolvedLineHeight);
@@ -10400,8 +11048,8 @@
   }
 
   function buildTextHighlightBoxBaseHorizontalPadding(fontSize) {
-    const rawSize = Math.max(1, Number(fontSize) || 16);
-    const size = Math.max(12, rawSize);
+    const rawSize = getTextHighlightMetricFontSize(fontSize);
+    const size = rawSize;
     const tightBlend = getTextHighlightSmallFontTightenBlend(size);
     const microBlend = getTextHighlightMicroFontTightenBlend(rawSize);
     const loosePadding = Math.max(
@@ -10418,8 +11066,8 @@
   }
 
   function buildTextHighlightBoxBaseVerticalPadding(fontSize) {
-    const rawSize = Math.max(1, Number(fontSize) || 16);
-    const size = Math.max(12, rawSize);
+    const rawSize = getTextHighlightMetricFontSize(fontSize);
+    const size = rawSize;
     const tightBlend = getTextHighlightSmallFontTightenBlend(size);
     const microBlend = getTextHighlightMicroFontTightenBlend(rawSize);
     const loosePadding = Math.max(
