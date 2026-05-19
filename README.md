@@ -329,6 +329,9 @@ If a future generated patch needs a newer syntax feature, assume it is unsafe un
   - Large and very large fonts no longer use Figma's full line-box height as the filled highlight height.
   - The final rectangle height grows from the row center so center/right aligned selections do not look vertically pushed after padding or target-height normalization.
   - For very large fonts, do not use the normal full glyph floor blindly. In the 56px matrix case, `57px` was too short, but `66px` was too tall and sat too low. The huge-font bucket now shifts the baseline metrics upward and blends only halfway back from the compact height so the final box lands around a tighter glyph-covering height.
+  - The 2026-05-18 matrix pass found a global lower-fill problem: 10/14/20/34/56px box highlights were all too tall at the bottom. Keep the bucketed visual-height trim, reduced descent ratio, and smaller vertical padding together when recalibrating; changing only one of them tends to make one size bucket look fixed while another drifts.
+  - The follow-up micro pass should stay around 1px per bucket. In the edge-select matrix, the stable target region after user testing was approximately `10px=11-12`, `14px=15-16`, `20px=22`, `34px=36`, and `56px=57-58`.
+  - When the height is close but `i` dots or upper glyphs peek out while lower fill remains visible, tune `getTextHighlightBoxVisualYCorrection()` before changing height. Large buckets generally need an upward nudge more than another height reduction.
 - Center/right aligned partial selections reject direct measurements that are too narrow for the selected string.
   - This sends tiny-font cases through the left-layout fallback instead of accepting a clipped first word.
 - Single-line partial selections now accept underline geometry directly when that geometry passes the width safety checks.

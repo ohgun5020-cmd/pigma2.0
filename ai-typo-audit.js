@@ -16,9 +16,9 @@
   const AI_TEXT_HIGHLIGHT_DEFAULT_RADIUS = 0;
   const AI_TEXT_HIGHLIGHT_DEFAULT_DECORATION_SCALE = 3;
   const AI_TEXT_HIGHLIGHT_DEFAULT_BOX_PADDING_PX = 0;
-  const AI_TEXT_HIGHLIGHT_BASE_VERTICAL_PADDING_MIN_PX = 2;
-  const AI_TEXT_HIGHLIGHT_BASE_VERTICAL_PADDING_MAX_PX = 6;
-  const AI_TEXT_HIGHLIGHT_BASE_VERTICAL_PADDING_RATIO = 0.04;
+  const AI_TEXT_HIGHLIGHT_BASE_VERTICAL_PADDING_MIN_PX = 1.35;
+  const AI_TEXT_HIGHLIGHT_BASE_VERTICAL_PADDING_MAX_PX = 4.2;
+  const AI_TEXT_HIGHLIGHT_BASE_VERTICAL_PADDING_RATIO = 0.03;
   const AI_TEXT_HIGHLIGHT_BASE_HORIZONTAL_PADDING_MIN_PX = 3;
   const AI_TEXT_HIGHLIGHT_BASE_HORIZONTAL_PADDING_MAX_PX = 10;
   const AI_TEXT_HIGHLIGHT_BASE_HORIZONTAL_PADDING_RATIO = 0.06;
@@ -7418,10 +7418,10 @@
     const size = getTextHighlightMetricFontSize(fontSize);
     const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
     const baseAscent = Math.max(size * 0.82, Math.min(resolvedLineHeight * 0.74, size * 0.92));
-    const baseDescent = Math.max(size * 0.14, Math.min(resolvedLineHeight * 0.18, size * 0.22));
+    const baseDescent = Math.max(size * 0.112, Math.min(resolvedLineHeight * 0.14, size * 0.17));
     const hugeFontMetricBlend = getTextHighlightHugeFontMetricBlend(size);
     const hugeAscent = Math.max(size * 0.88, Math.min(resolvedLineHeight * 0.82, size * 0.96));
-    const hugeDescent = Math.max(size * 0.1, Math.min(resolvedLineHeight * 0.12, size * 0.14));
+    const hugeDescent = Math.max(size * 0.076, Math.min(resolvedLineHeight * 0.094, size * 0.098));
     const ascent = baseAscent * (1 - hugeFontMetricBlend) + hugeAscent * hugeFontMetricBlend;
     const descent = baseDescent * (1 - hugeFontMetricBlend) + hugeDescent * hugeFontMetricBlend;
     return {
@@ -7438,10 +7438,58 @@
     const largeFontBlend = getTextHighlightLargeFontCompactBlend(size);
     const compactHeight = Math.max(size * 0.86, Math.min(resolvedLineHeight * 0.78, size * 0.95));
     const visualHeight = metrics.height * (1 - largeFontBlend) + compactHeight * largeFontBlend;
+    const trimRatio = getTextHighlightBoxVisualHeightTrimRatio(size);
+    const trimmedVisualHeight = visualHeight * trimRatio;
     const hugeFontGlyphFloorBlend = getTextHighlightHugeFontGlyphFloorBlend(size);
     const minimumVisualHeight =
       visualHeight * (1 - hugeFontGlyphFloorBlend) + metrics.height * hugeFontGlyphFloorBlend;
-    return roundTextHighlightMetric(Math.max(1, Math.min(resolvedLineHeight, Math.max(visualHeight, minimumVisualHeight))));
+    const compactMinimumVisualHeight = minimumVisualHeight * trimRatio;
+    const minimumGlyphCoverageHeight = metrics.height * getTextHighlightBoxMinimumGlyphCoverageRatio(size);
+    const compactedHeight = Math.max(trimmedVisualHeight, compactMinimumVisualHeight, minimumGlyphCoverageHeight);
+    return roundTextHighlightMetric(Math.max(1, Math.min(resolvedLineHeight, compactedHeight)));
+  }
+
+  function getTextHighlightBoxVisualHeightTrimRatio(fontSize) {
+    const bucket = getTextHighlightFontSizeBucket(fontSize);
+    // Overall matrix calibration: old boxes had too much lower fill across every size bucket.
+    if (bucket === "micro") {
+      return 0.955;
+    }
+    if (bucket === "small") {
+      return 0.945;
+    }
+    if (bucket === "medium" || bucket === "large") {
+      return 0.94;
+    }
+    return 0.945;
+  }
+
+  function getTextHighlightBoxMinimumGlyphCoverageRatio(fontSize) {
+    const bucket = getTextHighlightFontSizeBucket(fontSize);
+    if (bucket === "micro") {
+      return 0.93;
+    }
+    if (bucket === "small") {
+      return 0.91;
+    }
+    return 0.91;
+  }
+
+  function getTextHighlightBoxVisualYCorrection(fontSize) {
+    const bucket = getTextHighlightFontSizeBucket(fontSize);
+    if (bucket === "micro") {
+      return -0.15;
+    }
+    if (bucket === "small") {
+      return -0.25;
+    }
+    if (bucket === "medium") {
+      return -0.55;
+    }
+    if (bucket === "large") {
+      return -2.1;
+    }
+    return -2.6;
   }
 
   function getTextHighlightLargeFontCompactBlend(fontSize) {
@@ -10398,6 +10446,7 @@
     const size = getTextHighlightMetricFontSize(fontSize);
     const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
     const targetHeight = buildTextHighlightBoxVisualRowHeight(size, resolvedLineHeight);
+    const visualYCorrection = getTextHighlightBoxVisualYCorrection(size);
     const tightenedRows = [];
 
     for (const row of rows) {
@@ -10410,7 +10459,7 @@
       const localCenterY = localBounds.y + localBounds.height / 2;
       const tightenedWorldBounds = getTextHighlightWorldBoundsFromLocalBounds(node, {
         x: localBounds.x,
-        y: roundTextHighlightMetric(localCenterY - targetHeight / 2),
+        y: roundTextHighlightMetric(localCenterY - targetHeight / 2 + visualYCorrection),
         width: localBounds.width,
         height: targetHeight,
       });
@@ -11077,9 +11126,9 @@
         size * AI_TEXT_HIGHLIGHT_BASE_VERTICAL_PADDING_RATIO
       )
     );
-    const tightPadding = Math.max(1, Math.min(3, size * 0.025));
+    const tightPadding = Math.max(0.68, Math.min(2, size * 0.02));
     const smallPadding = loosePadding * (1 - tightBlend) + tightPadding * tightBlend;
-    const microPadding = Math.max(0.25, Math.min(0.75, rawSize * 0.03));
+    const microPadding = Math.max(0.18, Math.min(0.5, rawSize * 0.022));
     return roundTextHighlightMetric(smallPadding * (1 - microBlend) + microPadding * microBlend);
   }
 
