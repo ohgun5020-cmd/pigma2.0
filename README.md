@@ -386,6 +386,11 @@ When `ui.html` changes, also run a browser-script parse check with `new Function
   - Scope: added a 15s timeout around the text-highlight measurement probe `exportAsync`. If that probe export is slow, the measurement path falls back through the existing empty-bounds/fallback logic instead of leaving the highlight action waiting indefinitely. Highlight geometry math, colors, box/line/strike modes, and UI controls are unchanged.
   - Manual test: reload the plugin, drag-select a short text range inside one text layer, run `텍스트 하이라이트`, keep the default box mode, and apply. Confirm a highlight layer/group appears behind the selected text and the button returns to normal. Then optionally test line or strike mode on the same short range.
 
+- 2026-05-21 step 31: added cooperative yielding to the visible text-line-height adjustment path.
+  - Reason: `텍스트 행간 조정` can scan a large selected frame, load fonts for many text nodes, inspect long text character-by-character, and apply line-height ranges in one run. Those loops should not monopolize the Figma plugin runtime.
+  - Scope: made text-node collection, dominant-script detection, typography-run building, font loading, and line-height application yield periodically. Added a font-load promise cache so repeated fonts across selected text nodes are not loaded over and over. The line-height target rules and UI result shape are unchanged.
+  - Manual test: reload the plugin, select one simple text layer or a small group with 2-3 text layers, and run `텍스트 행간 조정`. Confirm the line height changes/readability adjusts and the button returns to normal. A large-frame stress test is not required for this step.
+
 1. Edit `ui.html` for UI-only changes.
    - Keep `편집하기` screen markup and styles in `ui.html`.
    - Keep `편집하기` feature logic in `ui-ai-correction.js` so Make/Import behavior stays isolated.

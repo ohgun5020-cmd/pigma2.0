@@ -32662,6 +32662,10 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
   const originalOnMessage = figma.ui.onmessage;
   const RESULT_PREVIEW_LIMIT = 32;
+  const NODE_SCAN_YIELD_INTERVAL = 128;
+  const TEXT_NODE_APPLY_YIELD_INTERVAL = 8;
+  const CHARACTER_SCAN_YIELD_INTERVAL = 512;
+  const FONT_LOAD_YIELD_INTERVAL = 8;
   const HANGUL_SCRIPT = "ko";
   const CJK_SCRIPT = "cjk";
   const LATIN_SCRIPT = "latin";
@@ -32686,6 +32690,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     { size: 96, lineHeight: 112 },
   ];
   let isRunning = false;
+  const loadedFontPromiseCache = new Map();
 
   if (typeof originalOnMessage !== "function") {
     return;
@@ -32745,6 +32750,19 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     });
   }
 
+  function waitForLineHeightTurn() {
+    return new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+  }
+
+  async function yieldLineHeightTurn(index, interval) {
+    const step = Math.max(1, Math.floor(Number(interval) || 1));
+    if (index > 0 && index % step === 0) {
+      await waitForLineHeightTurn();
+    }
+  }
+
   async function applyTextLineHeightAdjust() {
     await ensureSelectionAccess();
 
@@ -32753,7 +32771,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       throw new Error("\uD589\uAC04\uC744 \uC870\uC815\uD560 \uD14D\uC2A4\uD2B8\uB098 \uD504\uB808\uC784\uC744 \uBA3C\uC800 \uC120\uD0DD\uD574 \uC8FC\uC138\uC694.");
     }
 
-    const textNodes = collectTextNodes(selection);
+    const textNodes = await collectTextNodes(selection);
     if (!textNodes.length) {
       throw new Error("\uC120\uD0DD\uC5D0\uC11C \uC870\uC815\uD560 \uD14D\uC2A4\uD2B8 \uB808\uC774\uC5B4\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.");
     }
@@ -32762,6 +32780,17 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     const skipped = [];
 
     for (let index = 0; index < textNodes.length; index += 1) {
+      await yieldLineHeightTurn(index, TEXT_NODE_APPLY_YIELD_INTERVAL);
+      if (index > 0 && index % Math.max(TEXT_NODE_APPLY_YIELD_INTERVAL * 4, 1) === 0) {
+        postStatus(
+          "running",
+          "\uD14D\uC2A4\uD2B8 \uD589\uAC04\uC744 \uC870\uC815\uD558\uACE0 \uC788\uC2B5\uB2C8\uB2E4. (" +
+            (index + 1) +
+            "/" +
+            textNodes.length +
+            ")"
+        );
+      }
       const textNode = textNodes[index];
       try {
         adjusted.push(await adjustSingleTextNode(textNode));
@@ -32807,14 +32836,15 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
     await loadFontsForTextNode(textNode);
 
-    const dominantScript = detectDominantScript(characters);
-    const runs = buildTypographyRuns(textNode, characters, dominantScript);
+    const dominantScript = await detectDominantScript(characters);
+    const runs = await buildTypographyRuns(textNode, characters, dominantScript);
     if (!runs.length) {
       throw new Error("\uD589\uAC04 \uAE30\uC900\uC744 \uACC4\uC0B0\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.");
     }
 
     const beforeLineHeight = describeLineHeight(textNode.lineHeight);
     for (let index = 0; index < runs.length; index += 1) {
+      await yieldLineHeightTurn(index, TEXT_NODE_APPLY_YIELD_INTERVAL);
       const run = runs[index];
       applyLineHeightRange(textNode, run.start, run.end, run.lineHeight);
     }
@@ -32829,7 +32859,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     };
   }
 
-  function buildTypographyRuns(textNode, characters, dominantScript) {
+  async function buildTypographyRuns(textNode, characters, dominantScript) {
     const runs = [];
     let runStart = -1;
     let runEnd = -1;
@@ -32837,6 +32867,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     let lastScript = dominantScript;
 
     for (let index = 0; index < characters.length; index += 1) {
+      await yieldLineHeightTurn(index, CHARACTER_SCAN_YIELD_INTERVAL);
       const rawScript = classifyCharacterScript(characters[index]);
       const script = rawScript || lastScript || dominantScript;
       if (rawScript) {
@@ -32929,13 +32960,16 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     textNode.lineHeight = value;
   }
 
-  function collectTextNodes(nodes) {
+  async function collectTextNodes(nodes) {
     const result = [];
     const seen = {};
     const stack = Array.isArray(nodes) ? nodes.slice() : [];
+    let scannedCount = 0;
 
     while (stack.length > 0) {
-      const node = stack.shift();
+      await yieldLineHeightTurn(scannedCount, NODE_SCAN_YIELD_INTERVAL);
+      scannedCount += 1;
+      const node = stack.pop();
       if (!node || node.removed) {
         continue;
       }
@@ -32952,7 +32986,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       }
 
       if (Array.isArray(node.children)) {
-        for (let index = 0; index < node.children.length; index += 1) {
+        for (let index = node.children.length - 1; index >= 0; index -= 1) {
           stack.push(node.children[index]);
         }
       }
@@ -32974,8 +33008,27 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
 
     for (let index = 0; index < fonts.length; index += 1) {
-      await figma.loadFontAsync(fonts[index]);
+      await yieldLineHeightTurn(index, FONT_LOAD_YIELD_INTERVAL);
+      await loadFontWithCache(fonts[index]);
     }
+  }
+
+  async function loadFontWithCache(fontName) {
+    const key = getFontKey(fontName);
+    if (!key) {
+      return;
+    }
+
+    let pending = loadedFontPromiseCache.get(key);
+    if (!pending) {
+      pending = figma.loadFontAsync({
+        family: fontName.family,
+        style: fontName.style,
+      });
+      loadedFontPromiseCache.set(key, pending);
+    }
+
+    await pending;
   }
 
   function appendFontName(list, fontName) {
@@ -32994,6 +33047,16 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     list.push({ family: fontName.family, style: fontName.style });
   }
 
+  function getFontKey(fontName) {
+    if (!fontName || typeof fontName !== "object") {
+      return "";
+    }
+    if (typeof fontName.family !== "string" || typeof fontName.style !== "string") {
+      return "";
+    }
+    return fontName.family + "\u0000" + fontName.style;
+  }
+
   function resolveFontSizeAt(node, index) {
     if (typeof node.fontSize === "number" && Number.isFinite(node.fontSize)) {
       return node.fontSize;
@@ -33007,7 +33070,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return 16;
   }
 
-  function detectDominantScript(value) {
+  async function detectDominantScript(value) {
     const counts = {
       ko: 0,
       cjk: 0,
@@ -33020,6 +33083,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     };
     const text = String(value || "");
     for (let index = 0; index < text.length; index += 1) {
+      await yieldLineHeightTurn(index, CHARACTER_SCAN_YIELD_INTERVAL);
       const script = classifyCharacterScript(text[index]);
       if (script && Object.prototype.hasOwnProperty.call(counts, script)) {
         counts[script] += 1;
