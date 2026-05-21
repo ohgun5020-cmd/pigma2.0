@@ -16723,6 +16723,10 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     openai: "gpt-5-mini",
     gemini: "gemini-2.5-pro",
   });
+  const TYPO_AUDIT_REQUEST_TIMEOUT_MS = 180000;
+  const TYPO_FIX_TEXT_NODE_SCAN_YIELD_INTERVAL = 96;
+  const TYPO_FIX_TEXT_NODE_APPLY_YIELD_INTERVAL = 8;
+  const TYPO_FIX_CANDIDATE_YIELD_INTERVAL = 48;
   const AI_TRANSLATE_MODEL_BY_PROVIDER = Object.freeze({
     openai: "gpt-4.1-mini",
     gemini: "gemini-2.5-flash",
@@ -18929,7 +18933,9 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     const auditProfile = normalizeTypoAuditProfile(options && options.auditProfile);
     const proofingSettings = await readProofingSettings();
     const context = buildSelectionContext(selection, designReadResult, proofingSettings);
-    const textNodes = collectTextNodes(selection);
+    const textNodes = await collectTextNodesWithYield(selection, {
+      interval: TYPO_FIX_TEXT_NODE_SCAN_YIELD_INTERVAL,
+    });
     if (!textNodes.length) {
       throw new Error("텍스트 레이어가 포함된 선택을 먼저 선택하세요.");
     }
@@ -18999,7 +19005,9 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
     const proofingSettings = await readProofingSettings();
     const context = buildSelectionContext(selection, designReadResult, proofingSettings);
-    const textNodes = collectTextNodes(selection);
+    const textNodes = await collectTextNodesWithYield(selection, {
+      interval: TYPO_FIX_TEXT_NODE_SCAN_YIELD_INTERVAL,
+    });
     if (!textNodes.length) {
       throw new Error("텍스트 레이어가 포함된 선택을 먼저 선택하세요.");
     }
@@ -20213,20 +20221,28 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
   async function applyDirectTextFixes(textNodes, issueResult, context, proofingSettings) {
     const issuesByNode = new Map();
-    const localRepairMap = buildLocalRepairMap(textNodes, context, proofingSettings);
+    const localRepairMap = await buildLocalRepairMap(textNodes, context, proofingSettings);
     const applied = [];
     const annotationIssues = [];
     const skipped = [];
     let appliedCount = 0;
     let unchangedCount = 0;
 
-    for (const issue of issueResult.issues || []) {
+    const issues = Array.isArray(issueResult && issueResult.issues) ? issueResult.issues : [];
+    for (let index = 0; index < issues.length; index += 1) {
+      await yieldTypoTaskTurn(index, TYPO_FIX_CANDIDATE_YIELD_INTERVAL);
+      const issue = issues[index];
+      if (!issue || !issue.node || !issue.node.id) {
+        continue;
+      }
       const bucket = issuesByNode.get(issue.node.id) || [];
       bucket.push(issue);
       issuesByNode.set(issue.node.id, bucket);
     }
 
-    for (const node of textNodes) {
+    for (let index = 0; index < textNodes.length; index += 1) {
+      await yieldTypoTaskTurn(index, TYPO_FIX_TEXT_NODE_APPLY_YIELD_INTERVAL);
+      const node = textNodes[index];
       const currentText = getTextValue(node);
       if (!currentText) {
         unchangedCount += 1;
@@ -20434,10 +20450,12 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return assessDirectReplacementSafety(currentText, localSuggestion).safe;
   }
 
-  function buildLocalRepairMap(textNodes, context, proofingSettings) {
+  async function buildLocalRepairMap(textNodes, context, proofingSettings) {
     const map = new Map();
 
-    for (const node of textNodes) {
+    for (let index = 0; index < textNodes.length; index += 1) {
+      await yieldTypoTaskTurn(index, TYPO_FIX_TEXT_NODE_APPLY_YIELD_INTERVAL);
+      const node = textNodes[index];
       const original = getTextValue(node);
       if (!original) {
         continue;
@@ -21284,7 +21302,9 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     const aiPromise = useSpeedProfile ? null : requestAiTypoIssues(textNodes, context, proofingSettings);
     const localIssues = [];
 
-    for (const node of textNodes) {
+    for (let index = 0; index < textNodes.length; index += 1) {
+      await yieldTypoTaskTurn(index, TYPO_FIX_CANDIDATE_YIELD_INTERVAL);
+      const node = textNodes[index];
       const text = getTextValue(node);
       if (!text) {
         continue;
@@ -21317,11 +21337,15 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     const primaryIssues = useAiPrimary ? aiResult.issues : localIssues;
     const secondaryIssues = useAiPrimary ? localIssues : [];
 
-    for (const issue of primaryIssues) {
+    for (let index = 0; index < primaryIssues.length; index += 1) {
+      await yieldTypoTaskTurn(index, TYPO_FIX_CANDIDATE_YIELD_INTERVAL);
+      const issue = primaryIssues[index];
       pushUniqueIssue(issues, seen, issue);
     }
 
-    for (const issue of secondaryIssues) {
+    for (let index = 0; index < secondaryIssues.length; index += 1) {
+      await yieldTypoTaskTurn(index, TYPO_FIX_CANDIDATE_YIELD_INTERVAL);
+      const issue = secondaryIssues[index];
       pushUniqueIssue(issues, seen, issue);
     }
 
@@ -21471,10 +21495,12 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return false;
   }
 
-  function buildAiTypoCandidates(textNodes, proofingSettings) {
+  async function buildAiTypoCandidates(textNodes, proofingSettings) {
     const candidates = [];
 
-    for (const node of textNodes) {
+    for (let index = 0; index < textNodes.length; index += 1) {
+      await yieldTypoTaskTurn(index, TYPO_FIX_CANDIDATE_YIELD_INTERVAL);
+      const node = textNodes[index];
       const text = String(getTextValue(node) || "");
       if (!text) {
         continue;
@@ -21557,6 +21583,43 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return lines.join("\n");
   }
 
+  function createTypoAuditRequestTimeoutError(timeoutMs) {
+    const seconds = Math.max(1, Math.round(Number(timeoutMs) / 1000));
+    return new Error(`AI typo review request did not finish within ${seconds} seconds. Continuing with local rules.`);
+  }
+
+  function withTypoAuditRequestTimeout(requestPromise) {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const timeoutId = setTimeout(() => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        reject(createTypoAuditRequestTimeoutError(TYPO_AUDIT_REQUEST_TIMEOUT_MS));
+      }, TYPO_AUDIT_REQUEST_TIMEOUT_MS);
+
+      Promise.resolve(requestPromise).then(
+        (value) => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          clearTimeout(timeoutId);
+          resolve(value);
+        },
+        (error) => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          clearTimeout(timeoutId);
+          reject(error);
+        }
+      );
+    });
+  }
+
   async function requestAiTypoIssues(textNodes, context, proofingSettings) {
     const ai = getAiHelper();
     if (!ai) {
@@ -21583,7 +21646,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       };
     }
 
-    const candidates = buildAiTypoCandidates(textNodes, proofingSettings);
+    const candidates = await buildAiTypoCandidates(textNodes, proofingSettings);
 
     if (!candidates.length) {
       return {
@@ -21641,11 +21704,12 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       let response = null;
 
       try {
-        response = await ai.requestJsonTask({
-        instructions: instructions ||
+        response = await withTypoAuditRequestTimeout(
+          ai.requestJsonTask({
+            instructions: instructions ||
           "You review UI copy inside a Figma plugin. Detect only obvious spelling mistakes, broken words, malformed polite endings, spacing errors, punctuation errors, and clearly broken grammar. Preserve the original language, script, wording, and product naming of each string. Do not translate, localize, rewrite into the dominant language of the screen, unify terminology, smooth tone, or replace brand/product names unless the product name itself has an obvious typo. In mixed-language strings, preserve every language segment as-is and only fix the clearly broken part inside that same language segment. If preferredLocaleHint is provided, treat it as the primary locale/country hint. If latinLocaleHint is provided, keep corrections inside that locale. Ignore cosmetic whitespace cleanup such as empty brackets, bracket spacing, or punctuation-only cleanup. Only flag spacing when a word is visibly broken into fragments, for example 'app le' -> 'apple'. Example: German copy with an English brand should stay mixed as needed: 'Find e deine perfekte Work-Life-Balanfce mit LG' -> 'Finde deine perfekte Work-Life-Balance mit LG', 'Jedtazt kaufenq' -> 'Jetzt kaufen', while keeping 'LG' untouched. Return the full corrected string in suggestion, never only a changed token. If the original text contains multiple lines, preserve every line and keep the same line count unless the user text itself clearly intends a merge. Never drop unrelated lower lines. Never edit any protectedTerms under any circumstances. Never mark userDictionary terms as mistakes. Example: '방갑스비난.' should be corrected to the full string '반갑습니다.' If the text looks fine, omit it. Return concise reasons in Korean when possible.",
-        schema: schema,
-        payload: payload || {
+            schema: schema,
+            payload: payload || {
           languageHint:
             context.languageHintLabel || context.detectedLanguageLabel || context.languageLabel || "자동 감지",
           preferredLocaleHint: context.proofingLocale || "",
@@ -21668,28 +21732,35 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
             lineIndex: typeof entry.lineIndex === "number" ? entry.lineIndex : -1,
           })),
         },
-        modelByProvider: TYPO_AUDIT_MODEL_BY_PROVIDER,
-      });
+            modelByProvider: TYPO_AUDIT_MODEL_BY_PROVIDER,
+          })
+        );
       } catch (error) {
         if (!shouldRetryTypoAuditWithDefaultModel(error)) {
           throw error;
         }
 
-        response = await ai.requestJsonTask({
-          instructions,
-          schema,
-          payload,
-        });
+        response = await withTypoAuditRequestTimeout(
+          ai.requestJsonTask({
+            instructions,
+            schema,
+            payload,
+          })
+        );
       }
 
       const rows = response && Array.isArray(response.issues) ? response.issues : [];
       const candidateMap = new Map();
-      for (const candidate of candidates) {
+      for (let index = 0; index < candidates.length; index += 1) {
+        await yieldTypoTaskTurn(index, TYPO_FIX_CANDIDATE_YIELD_INTERVAL);
+        const candidate = candidates[index];
         candidateMap.set(candidate.id, candidate);
       }
 
       const results = [];
-      for (const row of rows) {
+      for (let index = 0; index < rows.length; index += 1) {
+        await yieldTypoTaskTurn(index, TYPO_FIX_CANDIDATE_YIELD_INTERVAL);
+        const row = rows[index];
         if (!row || typeof row !== "object" || typeof row.id !== "string" || typeof row.suggestion !== "string") {
           continue;
         }
@@ -22423,6 +22494,41 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     const nodes = [];
     const stack = [...selection];
     while (stack.length > 0) {
+      const node = stack.pop();
+      if (!node) {
+        continue;
+      }
+
+      if ((!includeHidden && node.visible === false) || (!includeLocked && node.locked === true)) {
+        continue;
+      }
+
+      if (node.type === "TEXT") {
+        nodes.push(node);
+      }
+
+      if (hasChildren(node)) {
+        for (let index = node.children.length - 1; index >= 0; index -= 1) {
+          stack.push(node.children[index]);
+        }
+      }
+    }
+
+    return nodes;
+  }
+
+  async function collectTextNodesWithYield(selection, options) {
+    const settings = options && typeof options === "object" ? options : {};
+    const includeHidden = settings.includeHidden === true;
+    const includeLocked = settings.includeLocked === true;
+    const interval = settings.interval || TYPO_FIX_TEXT_NODE_SCAN_YIELD_INTERVAL;
+    const nodes = [];
+    const stack = [...selection];
+    let scannedCount = 0;
+
+    while (stack.length > 0) {
+      await yieldTypoTaskTurn(scannedCount, interval);
+      scannedCount += 1;
       const node = stack.pop();
       if (!node) {
         continue;

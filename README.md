@@ -391,6 +391,11 @@ When `ui.html` changes, also run a browser-script parse check with `new Function
   - Scope: made text-node collection, dominant-script detection, typography-run building, font loading, and line-height application yield periodically. Added a font-load promise cache so repeated fonts across selected text nodes are not loaded over and over. The line-height target rules and UI result shape are unchanged.
   - Manual test: reload the plugin, select one simple text layer or a small group with 2-3 text layers, and run `텍스트 행간 조정`. Confirm the line height changes/readability adjusts and the button returns to normal. A large-frame stress test is not required for this step.
 
+- 2026-05-21 step 32: stabilized the visible direct typo-fix path.
+  - Reason: `오타 직접 수정` shares typo candidate generation with `오타 검수`, then directly loads fonts and replaces `node.characters`. Large selections or a slow AI typo review should not keep the fix button busy indefinitely.
+  - Scope: added a 3-minute timeout around the AI typo-review request, added cooperative yielding while collecting text nodes, building local/AI typo candidates, merging issue lists, loading/applying direct text fixes, and kept local-rule fallback behavior when AI is unavailable or slow. Typo correction policy, protected-term checks, annotation behavior, and result payloads are unchanged.
+  - Manual test: reload the plugin, select one small text layer containing an obvious typo, and run `오타 직접 수정`. Confirm the typo is corrected or a clear skipped/fallback result appears, and the button returns to normal. Do not use a large frame for this smoke test.
+
 1. Edit `ui.html` for UI-only changes.
    - Keep `편집하기` screen markup and styles in `ui.html`.
    - Keep `편집하기` feature logic in `ui-ai-correction.js` so Make/Import behavior stays isolated.
