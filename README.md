@@ -396,6 +396,11 @@ When `ui.html` changes, also run a browser-script parse check with `new Function
   - Scope: added a 3-minute timeout around the AI typo-review request, added cooperative yielding while collecting text nodes, building local/AI typo candidates, merging issue lists, loading/applying direct text fixes, and kept local-rule fallback behavior when AI is unavailable or slow. Typo correction policy, protected-term checks, annotation behavior, and result payloads are unchanged.
   - Manual test: reload the plugin, select one small text layer containing an obvious typo, and run `오타 직접 수정`. Confirm the typo is corrected or a clear skipped/fallback result appears, and the button returns to normal. Do not use a large frame for this smoke test.
 
+- 2026-05-21 step 33: added cooperative yielding to the visible typo-annotation clear path.
+  - Reason: `오타 주석 삭제` scans selected text nodes, reads each node's annotations, filters Pigma-managed typo annotations, and writes the remaining annotations back. On large selections this annotation cleanup loop can monopolize the runtime.
+  - Scope: reused the yielding text-node collector for the clear flow and made the shared annotation apply/clear helper yield while indexing nodes, preparing issue buckets, and writing annotations. Annotation category matching, legacy-prefix cleanup, and result payloads are unchanged.
+  - Manual test: reload the plugin, select a small text layer or group that has an AI typo annotation from `오타 검수`/`오타 직접 수정`, and run `오타 주석 삭제`. Confirm the typo annotation is removed and the button returns to normal. If no annotation exists, confirm it reports zero removed and still returns to normal.
+
 1. Edit `ui.html` for UI-only changes.
    - Keep `편집하기` screen markup and styles in `ui.html`.
    - Keep `편집하기` feature logic in `ui-ai-correction.js` so Make/Import behavior stays isolated.

@@ -43,6 +43,7 @@
   const TYPO_FIX_TEXT_NODE_SCAN_YIELD_INTERVAL = 96;
   const TYPO_FIX_TEXT_NODE_APPLY_YIELD_INTERVAL = 8;
   const TYPO_FIX_CANDIDATE_YIELD_INTERVAL = 48;
+  const TYPO_ANNOTATION_APPLY_YIELD_INTERVAL = 8;
   const AI_TRANSLATE_MODEL_BY_PROVIDER = Object.freeze({
     openai: "gpt-4.1-mini",
     gemini: "gemini-2.5-flash",
@@ -2262,7 +2263,7 @@
     const annotationSupported = annotationNodes.length > 0;
     const category = annotationSupported ? await ensureAnnotationCategory(getManagedAnnotationCategoryColor()) : null;
     const applied = annotationSupported
-      ? applyAnnotations(annotationNodes, issues, category)
+      ? await applyAnnotations(annotationNodes, issues, category)
       : buildResultOnlyApplication(
           issues,
           "현재 환경에서는 Figma Annotation API를 사용할 수 없어 결과 패널에만 표시했습니다."
@@ -2334,7 +2335,7 @@
     const annotationSupported = annotationNodes.length > 0;
     const category = annotationSupported ? await ensureAnnotationCategory(getManagedAnnotationCategoryColor()) : null;
     const annotationApplied = annotationSupported
-      ? applyAnnotations(annotationNodes, applied.annotationIssues, category)
+      ? await applyAnnotations(annotationNodes, applied.annotationIssues, category)
       : applied.annotationIssues.length > 0
         ? buildResultOnlyApplication(
             applied.annotationIssues,
@@ -3335,7 +3336,7 @@
     const annotationSupported = annotationNodes.length > 0;
     const category = annotationSupported ? await ensureAnnotationCategory(getManagedAnnotationCategoryColor()) : null;
     const applied = annotationSupported
-      ? applyAnnotations(annotationNodes, [], category)
+      ? await applyAnnotations(annotationNodes, [], category)
       : buildResultOnlyApplication([], "현재 환경에서는 Figma Annotation API를 사용할 수 없어 주석을 지울 수 없습니다.");
 
     if (textNodes.length === 0) {
@@ -3422,7 +3423,7 @@
     }
   }
 
-  function applyAnnotations(textNodes, issues, category) {
+  async function applyAnnotations(textNodes, issues, category) {
     const issuesByNode = new Map();
     const applied = [];
     const cleared = [];
@@ -3434,13 +3435,17 @@
     let clearedNodeCount = 0;
     let removedAnnotationCount = 0;
 
-    for (const node of textNodes) {
+    for (let index = 0; index < textNodes.length; index += 1) {
+      await yieldTypoTaskTurn(index, TYPO_ANNOTATION_APPLY_YIELD_INTERVAL);
+      const node = textNodes[index];
       if (node && node.id) {
         availableNodeIds.add(node.id);
       }
     }
 
-    for (const issue of issues) {
+    for (let index = 0; index < issues.length; index += 1) {
+      await yieldTypoTaskTurn(index, TYPO_ANNOTATION_APPLY_YIELD_INTERVAL);
+      const issue = issues[index];
       for (const fragment of getIssueAnnotationFragments(issue)) {
         if (!fragment || !fragment.node || !fragment.node.id) {
           continue;
@@ -3463,7 +3468,9 @@
       }
     }
 
-    for (const node of textNodes) {
+    for (let index = 0; index < textNodes.length; index += 1) {
+      await yieldTypoTaskTurn(index, TYPO_ANNOTATION_APPLY_YIELD_INTERVAL);
+      const node = textNodes[index];
       const nodeIssues = issuesByNode.get(node.id) || [];
       try {
         const existing = Array.isArray(node.annotations) ? Array.from(node.annotations) : [];
