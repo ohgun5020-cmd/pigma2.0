@@ -28,6 +28,7 @@
   const AI_TEXT_HIGHLIGHT_SMALL_FONT_NO_TIGHTEN_PX = 96;
   const AI_TEXT_HIGHLIGHT_DEFAULT_STRIKE_RADIUS = 0;
   const AI_TEXT_HIGHLIGHT_MEASURE_COLOR = "#FF00FF";
+  const AI_TEXT_HIGHLIGHT_PROBE_EXPORT_TIMEOUT_MS = 15000;
   const AI_TEXT_HIGHLIGHT_GROUP_NAME = "#high-light-text";
   const AI_TEXT_HIGHLIGHT_GROUP_PLUGIN_KEY = "pigma:text-highlight-group";
   const AI_TEXT_HIGHLIGHT_GROUP_TEXT_NODE_KEY = "pigma:text-highlight-text-node-id";
@@ -9462,6 +9463,38 @@
     };
   }
 
+  function withTextHighlightProbeExportTimeout(exportPromise) {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const timeoutId = setTimeout(() => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        reject(new Error("Text highlight probe export timed out."));
+      }, AI_TEXT_HIGHLIGHT_PROBE_EXPORT_TIMEOUT_MS);
+
+      Promise.resolve(exportPromise).then(
+        (value) => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          clearTimeout(timeoutId);
+          resolve(value);
+        },
+        (error) => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          clearTimeout(timeoutId);
+          reject(error);
+        }
+      );
+    });
+  }
+
   async function waitForTextHighlightFillGeometryBounds(node, fontSize, lineHeight) {
     const attempts = 8;
     for (let attempt = 0; attempt < attempts; attempt += 1) {
@@ -9497,10 +9530,12 @@
     let alphaMeasurement = null;
 
     try {
-      const pngBytes = await probe.exportAsync({
-        format: "PNG",
-        useAbsoluteBounds: false,
-      });
+      const pngBytes = await withTextHighlightProbeExportTimeout(
+        probe.exportAsync({
+          format: "PNG",
+          useAbsoluteBounds: false,
+        })
+      );
       alphaMeasurement = await requestTextHighlightAlphaBounds({
         pngBytes,
         probeX: probe.x,

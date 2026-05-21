@@ -381,6 +381,11 @@ When `ui.html` changes, also run a browser-script parse check with `new Function
   - Scope: added a 3-minute timeout around each AI translation chunk request and added cooperative yielding while loading fonts and applying translated text. Translation prompts, chunk sizes, translation memory, preview/apply behavior, and text-safety checks are unchanged.
   - Manual test: reload the plugin, select a small frame or group with 2-3 text layers, and run `텍스트 번역`. Choose one target language. Confirm the translation finishes or reports a clear timeout, and the button returns to normal. If a preview/apply step appears, apply one or two suggestions and confirm the text updates.
 
+- 2026-05-21 step 30: bounded the visible text-highlight probe export.
+  - Reason: `텍스트 하이라이트` measures selected text bounds by exporting a temporary measurement probe as PNG before asking the UI to read alpha bounds. The UI alpha measurement already has a timeout, but the probe PNG export itself could still wait too long.
+  - Scope: added a 15s timeout around the text-highlight measurement probe `exportAsync`. If that probe export is slow, the measurement path falls back through the existing empty-bounds/fallback logic instead of leaving the highlight action waiting indefinitely. Highlight geometry math, colors, box/line/strike modes, and UI controls are unchanged.
+  - Manual test: reload the plugin, drag-select a short text range inside one text layer, run `텍스트 하이라이트`, keep the default box mode, and apply. Confirm a highlight layer/group appears behind the selected text and the button returns to normal. Then optionally test line or strike mode on the same short range.
+
 1. Edit `ui.html` for UI-only changes.
    - Keep `편집하기` screen markup and styles in `ui.html`.
    - Keep `편집하기` feature logic in `ui-ai-correction.js` so Make/Import behavior stays isolated.
