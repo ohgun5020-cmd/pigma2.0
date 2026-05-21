@@ -411,6 +411,11 @@ When `ui.html` changes, also run a browser-script parse check with `new Function
   - Scope: added a `preserve_original` output mode as the default UI/runtime mode, bumped the image-extend modal storage key so old `use_ai_only` preference does not silently keep replacing originals, removed the unused expansion-mask apply path, and changed the default apply path to insert one new extended image layer below the source layer without hiding, resizing, or grouping the original. The explicit `AI 결과만 사용` mode still keeps the previous replace-style behavior.
   - Manual test: reload the plugin, select one image layer, run `이미지 영역 확장`, keep `원본 보존 + 확장 레이어`, and generate/apply a small side expansion. Confirm the original layer remains visible and unchanged above a new `... / extended layer` result, and the button returns to normal. Then optionally choose `AI 결과만 사용` once to confirm the old replace behavior is still available.
 
+- 2026-05-21 step 36: bounded the visible image-upscale provider wait path.
+  - Reason: `해상도 높이기` already had a 30s source export/read boundary, but the later auto-classification and provider upscale requests could still wait without a feature-level watchdog. That can leave the button/toast spinning after the image source is ready.
+  - Scope: added a 45s timeout around OpenAI/Gemini subject classification fetches, added a 5-minute controller watchdog to the visible `해상도 높이기` button, and passed a 3-minute OpenAI image upscale timeout through the shared request path. Source export, output-size choices, prompts, provider picker behavior, fill replacement, and local sharpening behavior are unchanged.
+  - Manual test: reload the plugin, select one simple image layer, run `해상도 높이기`, choose `OpenAI`, and pick `1K` or `원본 유지` if offered. Confirm it moves through classification/upscale/apply, replaces the image fill, and the button returns to normal. If OpenAI is slow, it should stop around 3 minutes or the whole run should stop by 5 minutes instead of spinning indefinitely.
+
 1. Edit `ui.html` for UI-only changes.
    - Keep `편집하기` screen markup and styles in `ui.html`.
    - Keep `편집하기` feature logic in `ui-ai-correction.js` so Make/Import behavior stays isolated.
