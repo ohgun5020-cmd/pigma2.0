@@ -329,8 +329,8 @@
         ariaLabel: "오타 자동 수정. 오타 후보를 직접 수정하고 주석을 남깁니다.",
       },
       aiPixelPerfectButton: {
-        title: "소수점 보정 대상을 정수로 교정합니다.",
-        ariaLabel: "정수 픽셀 정렬 교정. 소수점 보정 대상을 정수 픽셀로 교정합니다.",
+        title: "좌표와 크기의 소수점 값을 정수 픽셀로 교정합니다.",
+        ariaLabel: "정수 픽셀 정렬 교정. 좌표와 크기의 소수점 값을 정수 픽셀로 교정합니다.",
       },
       aiDeleteHiddenLayersButton: {
         title: "현재 선택 내부의 숨겨진 레이어를 정리하기 위한 준비 단계입니다.",
@@ -951,8 +951,8 @@
       ariaLabel: "오타 자동 수정. 오타 후보를 직접 수정하고 주석을 남깁니다.",
     },
     aiPixelPerfectButton: {
-      title: "소수점 보정 대상을 정수로 교정합니다.",
-      ariaLabel: "정수 픽셀 정렬 교정. 소수점 보정 대상을 정수 픽셀로 교정합니다.",
+      title: "좌표와 크기의 소수점 값을 정수 픽셀로 교정합니다.",
+      ariaLabel: "정수 픽셀 정렬 교정. 좌표와 크기의 소수점 값을 정수 픽셀로 교정합니다.",
     },
     aiDeleteHiddenLayersButton: {
       title: "현재 선택 내부의 숨겨진 레이어를 정리하기 위한 준비 단계입니다.",
@@ -2574,15 +2574,26 @@
   renderEmptyState();
   requestCachedResult();
 
-  const rootObserver = new MutationObserver(() => {
-    if (rootElement.dataset.aiCorrectionTab === "active") {
-      requestCachedResult();
-    }
-  });
-  rootObserver.observe(rootElement, {
-    attributes: true,
-    attributeFilter: ["data-ai-correction-tab"],
-  });
+  if (
+    window.__PIGMA_AI_CORRECTION_TAB_WATCHER__ &&
+    typeof window.__PIGMA_AI_CORRECTION_TAB_WATCHER__.subscribe === "function"
+  ) {
+    window.__PIGMA_AI_CORRECTION_TAB_WATCHER__.subscribe((active) => {
+      if (active) {
+        requestCachedResult();
+      }
+    });
+  } else {
+    const rootObserver = new MutationObserver(() => {
+      if (rootElement.dataset.aiCorrectionTab === "active") {
+        requestCachedResult();
+      }
+    });
+    rootObserver.observe(rootElement, {
+      attributes: true,
+      attributeFilter: ["data-ai-correction-tab"],
+    });
+  }
 
   window.__PIGMA_AI_CORRECTION_TYPO_AUDIT__ = {
     requestCachedResult,
@@ -2893,15 +2904,26 @@
   renderEmptyState();
   requestCachedResult();
 
-  const rootObserver = new MutationObserver(() => {
-    if (rootElement.dataset.aiCorrectionTab === "active") {
-      requestCachedResult();
-    }
-  });
-  rootObserver.observe(rootElement, {
-    attributes: true,
-    attributeFilter: ["data-ai-correction-tab"],
-  });
+  if (
+    window.__PIGMA_AI_CORRECTION_TAB_WATCHER__ &&
+    typeof window.__PIGMA_AI_CORRECTION_TAB_WATCHER__.subscribe === "function"
+  ) {
+    window.__PIGMA_AI_CORRECTION_TAB_WATCHER__.subscribe((active) => {
+      if (active) {
+        requestCachedResult();
+      }
+    });
+  } else {
+    const rootObserver = new MutationObserver(() => {
+      if (rootElement.dataset.aiCorrectionTab === "active") {
+        requestCachedResult();
+      }
+    });
+    rootObserver.observe(rootElement, {
+      attributes: true,
+      attributeFilter: ["data-ai-correction-tab"],
+    });
+  }
 
 window.__PIGMA_AI_CORRECTION_TYPO_FIX__ = {
     requestCachedResult,
@@ -3057,7 +3079,7 @@ window.__PIGMA_AI_CORRECTION_TYPO_FIX__ = {
       title.className = "list-title";
       detail.className = "list-detail";
       title.textContent = "결과 대기";
-      detail.textContent = "버튼을 실행하면 적용 내역, 0.5 예외 유지 항목, 건너뛴 이유가 여기에 표시됩니다.";
+      detail.textContent = "버튼을 실행하면 좌표와 크기 적용 내역, 건너뛴 이유가 여기에 표시됩니다.";
       item.append(title, detail);
       elements.changeList.append(item);
       return;
@@ -3082,20 +3104,20 @@ window.__PIGMA_AI_CORRECTION_TYPO_FIX__ = {
     setStatus("idle", "대기");
     elements.panelTitle.textContent = "정수 픽셀 정렬 교정 준비";
     elements.panelCopy.textContent =
-      "0.5 예외는 유지하고 나머지는 정수로 교정합니다.";
+      "좌표와 크기만 정수 픽셀로 교정합니다.";
     elements.processedAt.textContent = "마지막 실행 없음";
     elements.selectionSummary.textContent = "정수 픽셀 정렬 교정을 실행하면 결과가 여기에 표시됩니다.";
     elements.selectionNote.textContent =
-      "AI가 보정 방향을 판단하고 제외 항목은 결과에 남깁니다.";
+      "x, y, width, height 후보만 검사합니다.";
     fillMetric(elements.candidateCount, 0);
     fillMetric(elements.appliedCount, 0);
     fillMetric(elements.excludedCount, 0);
     fillMetric(elements.skippedCount, 0);
     elements.contextValue.textContent = "맥락 대기";
     elements.strategyValue.textContent = "전략 대기";
-    elements.aiStatusValue.textContent = "AI 상태 대기";
+    elements.aiStatusValue.textContent = "로컬 규칙 대기";
     elements.previewValue.textContent = "대표 변경 대기";
-    elements.changeMeta.textContent = "AI 호출 대기";
+    elements.changeMeta.textContent = "로컬 판정 대기";
     renderChangeList(null);
   };
 
@@ -3133,7 +3155,7 @@ window.__PIGMA_AI_CORRECTION_TYPO_FIX__ = {
     const applied = Array.isArray(result.applied) ? result.applied : [];
     const excluded = Array.isArray(result.excluded) ? result.excluded : [];
     const skipped = Array.isArray(result.skipped) ? result.skipped : [];
-    const aiStatusLabel = summary.aiStatusLabel || "AI 상태 미확인";
+    const aiStatusLabel = summary.aiStatusLabel || "로컬 규칙";
     const aiProviderLabel = summary.aiProviderLabel || "";
     const aiModelLabel = summary.aiModelLabel || "";
     lastRenderedResult = result;
@@ -3142,10 +3164,10 @@ window.__PIGMA_AI_CORRECTION_TYPO_FIX__ = {
     elements.panelTitle.textContent = matchesCurrentSelection ? "정수 픽셀 정렬 교정 완료" : "최근 결과 불러옴";
     elements.panelCopy.textContent = matchesCurrentSelection
       ? summary.appliedCount > 0
-        ? "소수점 후보를 정수 스냅으로 보정하고, 0.5 예외값은 유지했습니다."
+        ? "소수 좌표와 크기 후보를 정수 픽셀로 보정했습니다."
         : summary.candidateCount > 0
           ? "후보는 찾았지만 실제 적용까지 이어진 항목은 없었습니다."
-          : "보정이 필요한 소수점 후보를 찾지 못했습니다."
+          : "보정이 필요한 소수 좌표/크기 후보를 찾지 못했습니다."
       : "최근 실행한 정수 픽셀 정렬 교정 결과를 보여주고 있습니다.";
     elements.processedAt.textContent = formatProcessedAt(result.processedAt);
     elements.selectionSummary.textContent = `${summary.selectionLabel || "선택"} · ${summary.contextLabel || "일반 UI 화면"}`;
@@ -3180,10 +3202,10 @@ window.__PIGMA_AI_CORRECTION_TYPO_FIX__ = {
     }
 
     setButtonBusy(true);
-    setStatus("running", "적용 중");
+    setStatus("running", "준비 중");
     elements.panelTitle.textContent = "정수 픽셀 정렬 교정 진행 중";
     elements.panelCopy.textContent =
-      "현재 선택에서 소수점 후보를 찾고, 0.5 stroke/blur 예외값을 제외한 뒤 AI 판독으로 정수 스냅을 적용하고 있습니다.";
+      "현재 선택에서 소수 좌표와 크기 후보를 찾고, 로컬 규칙으로 정수 스냅을 적용하고 있습니다.";
     postPluginMessage({ type: "run-ai-pixel-perfect" });
   });
 
@@ -3204,7 +3226,10 @@ window.__PIGMA_AI_CORRECTION_TYPO_FIX__ = {
 
     if (message.type === "ai-pixel-perfect-status") {
       if (message.status === "running") {
-        setStatus("running", "적용 중");
+        const statusLabel =
+          typeof message.message === "string" && message.message.trim() ? message.message.trim() : "적용 중";
+        setStatus("running", "진행 중");
+        elements.panelCopy.textContent = statusLabel;
       }
       return;
     }
@@ -3228,15 +3253,26 @@ window.__PIGMA_AI_CORRECTION_TYPO_FIX__ = {
   renderEmptyState();
   requestCachedResult();
 
-  const rootObserver = new MutationObserver(() => {
-    if (rootElement.dataset.aiCorrectionTab === "active") {
-      requestCachedResult();
-    }
-  });
-  rootObserver.observe(rootElement, {
-    attributes: true,
-    attributeFilter: ["data-ai-correction-tab"],
-  });
+  if (
+    window.__PIGMA_AI_CORRECTION_TAB_WATCHER__ &&
+    typeof window.__PIGMA_AI_CORRECTION_TAB_WATCHER__.subscribe === "function"
+  ) {
+    window.__PIGMA_AI_CORRECTION_TAB_WATCHER__.subscribe((active) => {
+      if (active) {
+        requestCachedResult();
+      }
+    });
+  } else {
+    const rootObserver = new MutationObserver(() => {
+      if (rootElement.dataset.aiCorrectionTab === "active") {
+        requestCachedResult();
+      }
+    });
+    rootObserver.observe(rootElement, {
+      attributes: true,
+      attributeFilter: ["data-ai-correction-tab"],
+    });
+  }
 
   window.__PIGMA_AI_CORRECTION_PIXEL_PERFECT__ = {
     requestCachedResult,

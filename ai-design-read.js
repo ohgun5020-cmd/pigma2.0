@@ -7,6 +7,8 @@
   const originalOnMessage = figma.ui.onmessage;
   const AI_DESIGN_READ_CACHE_KEY = "pigma:ai-design-read-cache:v1";
   const PATCH_VERSION = 1;
+  const DESIGN_READ_SCAN_YIELD_INTERVAL = 80;
+  const DESIGN_READ_SCAN_STATUS_INTERVAL = 240;
   const VECTOR_TYPES = new Set([
     "VECTOR",
     "BOOLEAN_OPERATION",
@@ -94,7 +96,7 @@
     postStatus("running", "선택된 디자인을 읽는 중입니다.");
 
     try {
-      const localResult = analyzeCurrentSelection();
+      const localResult = await analyzeCurrentSelection();
       const result = await enrichDesignReadWithAi(localResult);
       await writeCachedResult(result);
 
@@ -171,7 +173,7 @@
     return typeof selectionSignature === "string" && selectionSignature === getSelectionSignature(figma.currentPage.selection);
   }
 
-  function analyzeCurrentSelection() {
+  async function analyzeCurrentSelection() {
     const selection = Array.from(figma.currentPage.selection || []);
     if (!selection.length) {
       throw new Error("프레임, 그룹, 레이어를 먼저 선택하세요.");
@@ -252,6 +254,14 @@
       const name = safeName(node);
 
       typeStats.totalNodes += 1;
+      if (typeStats.totalNodes % DESIGN_READ_SCAN_STATUS_INTERVAL === 0) {
+        postStatus("running", `Scanning design nodes... ${typeStats.totalNodes}`);
+      }
+
+      if (typeStats.totalNodes % DESIGN_READ_SCAN_YIELD_INTERVAL === 0) {
+        await waitForNextTick();
+      }
+
       typeStats.maxDepth = Math.max(typeStats.maxDepth, depth);
       bumpCount(typeCounts, type);
       bumpCount(nameCounts, canonicalizeName(name));
@@ -571,6 +581,12 @@
     if (typeof node.fontSize === "number" && Number.isFinite(node.fontSize)) {
       bumpCount(fontSizeCounts, String(roundValue(node.fontSize)));
     }
+  }
+
+  function waitForNextTick() {
+    return new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
   }
 
   function collectFontNames(node, fontFamilyCounts) {

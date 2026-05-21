@@ -6,7 +6,6 @@ $aiSettingsPatch = Join-Path $root "ai-settings-storage.js"
 $aiResponsiveMemoryPatch = Join-Path $root "ai-responsive-memory.js"
 $aiResponsivePairAnalyzerPatch = Join-Path $root "ai-responsive-pair-analyzer.js"
 $aiLlmClientPatch = Join-Path $root "ai-llm-client.js"
-$aiDesignReadPatch = Join-Path $root "ai-design-read.js"
 $aiDesignChatPatch = Join-Path $root "ai-design-chat.js"
 $aiAccessibilityDiagnosisPatch = Join-Path $root "ai-accessibility-diagnosis.js"
 $aiDesignConsistencyPatch = Join-Path $root "ai-design-consistency.js"
@@ -71,10 +70,6 @@ if (-not (Test-Path $aiResponsivePairAnalyzerPatch)) {
 
 if (-not (Test-Path $aiLlmClientPatch)) {
   throw "Missing AI LLM client patch: $aiLlmClientPatch"
-}
-
-if (-not (Test-Path $aiDesignReadPatch)) {
-  throw "Missing AI design read patch: $aiDesignReadPatch"
 }
 
 if (-not (Test-Path $aiDesignChatPatch)) {
@@ -253,7 +248,6 @@ $runtimeSyntaxSourceFiles = @(
   $aiResponsiveMemoryPatch,
   $aiResponsivePairAnalyzerPatch,
   $aiLlmClientPatch,
-  $aiDesignReadPatch,
   $aiDesignChatPatch,
   $aiAccessibilityDiagnosisPatch,
   $aiDesignConsistencyPatch,

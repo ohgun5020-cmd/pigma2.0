@@ -42,6 +42,7 @@
   let adobeTrendCacheExpiresAt = 0;
   let colorHuntCache = null;
   let colorHuntCacheExpiresAt = 0;
+  const COLOR_EXTRACT_DATASET_TIMEOUT_MS = 4500;
 
   if (typeof originalOnMessage !== "function") {
     return;
@@ -93,7 +94,9 @@
       const target = collectColorExtractTargetFromSelection();
       const bounds = getNodeBounds(target.node);
       const summary = buildSelectionSummary(target.node, bounds);
-      const [adobeTrends, colorHuntPalettes] = await Promise.all([loadAdobeTrendPaletteDataset(), loadColorHuntDataset()]);
+      const datasets = await loadColorExtractDatasetsWithTimeout();
+      const adobeTrends = datasets.adobeTrends;
+      const colorHuntPalettes = datasets.colorHuntPalettes;
       const constraint = buildColorExtractConstraint(bounds);
       const exportOptions = {
         format: "PNG",
@@ -848,6 +851,58 @@
       console.warn("[pigma] adobe trend palette feed unavailable:", error);
       return Array.isArray(adobeTrendCache) ? adobeTrendCache : [];
     }
+  }
+
+  async function loadColorExtractDatasetsWithTimeout() {
+    const fallback = {
+      adobeTrends: Array.isArray(adobeTrendCache) ? adobeTrendCache : [],
+      colorHuntPalettes: Array.isArray(colorHuntCache) ? colorHuntCache : [],
+    };
+    const datasetsPromise = Promise.all([loadAdobeTrendPaletteDataset(), loadColorHuntDataset()]).then((values) => ({
+      adobeTrends: Array.isArray(values && values[0]) ? values[0] : [],
+      colorHuntPalettes: Array.isArray(values && values[1]) ? values[1] : [],
+    }));
+    return await resolveWithColorExtractTimeout(
+      datasetsPromise,
+      fallback,
+      COLOR_EXTRACT_DATASET_TIMEOUT_MS,
+      "color extract palette datasets"
+    );
+  }
+
+  function resolveWithColorExtractTimeout(promise, fallback, timeoutMs, label) {
+    const safeTimeout = Math.max(1000, Math.round(Number(timeoutMs) || 1000));
+    return new Promise((resolve) => {
+      let settled = false;
+      const timerId = setTimeout(() => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        console.warn("[pigma] timed out loading " + label + "; continuing with cached/local palette data.");
+        resolve(fallback);
+      }, safeTimeout);
+
+      Promise.resolve(promise).then(
+        (value) => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          clearTimeout(timerId);
+          resolve(value);
+        },
+        (error) => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          clearTimeout(timerId);
+          console.warn("[pigma] failed loading " + label + "; continuing with cached/local palette data:", error);
+          resolve(fallback);
+        }
+      );
+    });
   }
 
   async function loadAdobeCuratedTrendDataset() {

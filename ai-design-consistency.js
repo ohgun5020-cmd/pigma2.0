@@ -24,6 +24,8 @@
   const FONT_SIZE_TOKEN_LIMIT = 6;
   const SPACING_TOKEN_LIMIT = 6;
   const MIN_TOKEN_COUNT = 2;
+  const CONSISTENCY_SCAN_YIELD_INTERVAL = 80;
+  const CONSISTENCY_SCAN_STATUS_INTERVAL = 240;
   const SPACING_PLAN_FIELDS = new Set(["itemSpacing", "paddingTop", "paddingRight", "paddingBottom", "paddingLeft"]);
   const PALETTE_ROLES = {
     fills: "배경",
@@ -115,7 +117,7 @@
     }
 
     try {
-      const analysis = analyzeCurrentSelection();
+      const analysis = await analyzeCurrentSelection("running");
       let result = analysis.result;
       const annotationSupported = Array.isArray(analysis.annotationNodes) && analysis.annotationNodes.length > 0;
       const category =
@@ -195,7 +197,7 @@
     postStatus("clearing-annotations", "현재 선택 범위에 남아 있는 웹 접근성 진단과 디자인 일관성 Dev Mode 주석을 정리하고 있습니다.");
 
     try {
-      const analysis = analyzeCurrentSelection();
+      const analysis = await analyzeCurrentSelection("clearing-annotations");
       const managedCategories =
         Array.isArray(analysis.annotationNodes) && analysis.annotationNodes.length > 0
           ? await getManagedDiagnosisCategories()
@@ -373,11 +375,12 @@
     return typeof selectionSignature === "string" && selectionSignature === getSelectionSignature(figma.currentPage.selection);
   }
 
-  function analyzeCurrentSelection() {
+  async function analyzeCurrentSelection(progressStatus) {
     const selection = Array.from(figma.currentPage.selection || []);
     if (!selection.length) {
       throw new Error("프레임, 그룹, 레이어를 먼저 선택해 주세요.");
     }
+    const scanStatus = typeof progressStatus === "string" && progressStatus ? progressStatus : "running";
 
     const rootBounds = [];
     const rootSummaries = [];
@@ -447,6 +450,14 @@
       nodeEntries.push(entry);
 
       stats.totalNodes += 1;
+      if (stats.totalNodes % CONSISTENCY_SCAN_STATUS_INTERVAL === 0) {
+        postStatus(scanStatus, `Scanning consistency nodes... ${stats.totalNodes}`);
+      }
+
+      if (stats.totalNodes % CONSISTENCY_SCAN_YIELD_INTERVAL === 0) {
+        await waitForNextTick();
+      }
+
       stats.maxDepth = Math.max(stats.maxDepth, depth);
       bumpCount(typeCounts, type);
 
@@ -595,6 +606,12 @@
         modeLabel: "Result only",
       },
     };
+  }
+
+  function waitForNextTick() {
+    return new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
   }
 
   function buildColorTokens(paintEntries) {

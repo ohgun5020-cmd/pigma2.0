@@ -44,6 +44,8 @@
   });
   const AI_TRANSLATE_MAX_CHUNK_ITEMS = 24;
   const AI_TRANSLATE_MAX_CHUNK_CHARS = 3600;
+  const AI_TRANSLATE_CHUNK_TIMEOUT_MS = 180000;
+  const AI_TRANSLATE_APPLY_YIELD_INTERVAL = 8;
   const AI_TRANSLATE_MEMORY_LIMIT = 400;
   const AI_TRANSLATE_PREVIEW_LIMIT = 120;
   const loadedFontPromiseCache = new Map();
@@ -638,6 +640,19 @@
       return "번역";
     }
     return "오타 검사";
+  }
+
+  function waitForTypoTaskTurn() {
+    return new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+  }
+
+  async function yieldTypoTaskTurn(index, interval) {
+    const step = Math.max(1, Math.floor(Number(interval) || 1));
+    if (index > 0 && index % step === 0) {
+      await waitForTypoTaskTurn();
+    }
   }
 
   function postTypoTaskStatus(task, status, message) {
@@ -2497,6 +2512,45 @@
     return result;
   }
 
+  function createAiTranslateChunkTimeoutError(chunkIndex, chunkCount, timeoutMs) {
+    const seconds = Math.max(1, Math.round(Number(timeoutMs) / 1000));
+    return new Error(
+      `AI translation request ${chunkIndex + 1}/${chunkCount} did not finish within ${seconds} seconds. Try a smaller selection or run translation again.`
+    );
+  }
+
+  function withAiTranslateChunkTimeout(requestPromise, chunkIndex, chunkCount) {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const timeoutId = setTimeout(() => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        reject(createAiTranslateChunkTimeoutError(chunkIndex, chunkCount, AI_TRANSLATE_CHUNK_TIMEOUT_MS));
+      }, AI_TRANSLATE_CHUNK_TIMEOUT_MS);
+
+      Promise.resolve(requestPromise).then(
+        (value) => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          clearTimeout(timeoutId);
+          resolve(value);
+        },
+        (error) => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          clearTimeout(timeoutId);
+          reject(error);
+        }
+      );
+    });
+  }
+
   async function requestAiTranslations(textNodes, context, proofingSettings, targetLanguage) {
     const ai = getAiHelper();
     if (!ai) {
@@ -2639,22 +2693,30 @@
       let response = null;
       try {
         try {
-          response = await ai.requestJsonTask({
-            instructions,
-            schema,
-            payload,
-            modelByProvider: AI_TRANSLATE_MODEL_BY_PROVIDER,
-          });
+          response = await withAiTranslateChunkTimeout(
+            ai.requestJsonTask({
+              instructions,
+              schema,
+              payload,
+              modelByProvider: AI_TRANSLATE_MODEL_BY_PROVIDER,
+            }),
+            chunkIndex,
+            chunkCount
+          );
         } catch (error) {
           if (!shouldRetryTypoAuditWithDefaultModel(error)) {
             throw error;
           }
 
-          response = await ai.requestJsonTask({
-            instructions,
-            schema,
-            payload,
-          });
+          response = await withAiTranslateChunkTimeout(
+            ai.requestJsonTask({
+              instructions,
+              schema,
+              payload,
+            }),
+            chunkIndex,
+            chunkCount
+          );
         }
       } catch (error) {
         throw new Error(normalizeErrorMessage(error, "AI 번역 요청에 실패했습니다."));
@@ -3071,9 +3133,12 @@
       issuesByNode.set(issue.node.id, issue);
     }
 
-    await preloadFontsForTextNodes(textNodes, issuesByNode);
+    const targetTextNodes = Array.isArray(textNodes) ? textNodes : [];
+    await preloadFontsForTextNodes(targetTextNodes, issuesByNode);
 
-    for (const node of textNodes) {
+    for (let index = 0; index < targetTextNodes.length; index += 1) {
+      await yieldTypoTaskTurn(index, AI_TRANSLATE_APPLY_YIELD_INTERVAL);
+      const node = targetTextNodes[index];
       const currentText = getTextValue(node);
       if (!currentText) {
         unchangedCount += 1;
@@ -3848,7 +3913,9 @@
     }
 
     const fontNames = collectEditableFontNames(node);
-    for (const fontName of fontNames) {
+    for (let index = 0; index < fontNames.length; index += 1) {
+      await yieldTypoTaskTurn(index, AI_TRANSLATE_APPLY_YIELD_INTERVAL);
+      const fontName = fontNames[index];
       await loadFontWithCache(fontName);
     }
   }
@@ -3880,7 +3947,9 @@
       }
     }
 
-    for (const fontName of fontNames) {
+    for (let index = 0; index < fontNames.length; index += 1) {
+      await yieldTypoTaskTurn(index, AI_TRANSLATE_APPLY_YIELD_INTERVAL);
+      const fontName = fontNames[index];
       await loadFontWithCache(fontName);
     }
   }

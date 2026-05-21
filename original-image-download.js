@@ -7,6 +7,8 @@
   const originalOnMessage = figma.ui.onmessage;
   const RESULT_PREVIEW_LIMIT = 80;
   const USAGE_PREVIEW_LIMIT = 12;
+  const ORIGINAL_IMAGE_SCAN_YIELD_INTERVAL = 64;
+  const ORIGINAL_IMAGE_READ_YIELD_INTERVAL = 4;
   let isRunning = false;
 
   if (typeof originalOnMessage !== "function") {
@@ -42,7 +44,7 @@
     isRunning = true;
 
     try {
-      const collection = collectOriginalImagesFromSelection();
+      const collection = await collectOriginalImagesFromSelection();
       const totalCount = collection.uniqueEntries.length;
 
       if (!totalCount) {
@@ -70,6 +72,10 @@
       const skipped = collection.skipped.slice();
 
       for (let index = 0; index < collection.uniqueEntries.length; index += 1) {
+        if (index > 0 && index % ORIGINAL_IMAGE_READ_YIELD_INTERVAL === 0) {
+          await waitForNextTick();
+        }
+
         const entry = collection.uniqueEntries[index];
         postStatus({
           status: "prepare",
@@ -138,7 +144,7 @@
     }
   }
 
-  function collectOriginalImagesFromSelection() {
+  async function collectOriginalImagesFromSelection() {
     const selection = Array.from(figma.currentPage.selection || []);
     if (!selection.length) {
       throw new Error("Select a frame, group, or image layer first.");
@@ -151,6 +157,7 @@
     let totalStrokeCount = 0;
     let totalImagePaintCount = 0;
     let duplicateImagePaintCount = 0;
+    let scannedNodeCount = 0;
 
     for (let rootIndex = 0; rootIndex < selection.length; rootIndex += 1) {
       const root = selection[rootIndex];
@@ -166,6 +173,17 @@
         const node = current && current.node;
         if (!node || node.removed) {
           continue;
+        }
+
+        scannedNodeCount += 1;
+        if (scannedNodeCount % ORIGINAL_IMAGE_SCAN_YIELD_INTERVAL === 0) {
+          postStatus({
+            status: "scanning",
+            currentCount: scannedNodeCount,
+            totalCount: 0,
+            message: `Scanning ${scannedNodeCount} selected layers for original images.`,
+          });
+          await waitForNextTick();
         }
 
         const imagePaints = collectNodeImagePaintEntries(node);
@@ -246,6 +264,7 @@
       totalImagePaintCount,
       duplicateFillCount: duplicateImagePaintCount,
       duplicateImagePaintCount,
+      scannedNodeCount,
       uniqueEntries,
       skipped,
     };
@@ -474,6 +493,12 @@
 
   function normalizeCount(value) {
     return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+  }
+
+  function waitForNextTick() {
+    return new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
   }
 
   function safeName(node) {

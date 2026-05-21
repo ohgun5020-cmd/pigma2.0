@@ -27,6 +27,11 @@
       return;
     }
 
+    if (isShortenReportErrorMessage(message)) {
+      reportUiShortenerError(message.message);
+      return;
+    }
+
     if (isCopyPrototypeLinkMessage(message)) {
       if (isRunning) {
         postPrototypeStatus("running", "Preparing the prototype link.");
@@ -46,8 +51,21 @@
     return !!message && message.type === "run-shorten-figma-url";
   }
 
+  function isShortenReportErrorMessage(message) {
+    return !!message && message.type === "shorten-figma-url-report-error";
+  }
+
   function isCopyPrototypeLinkMessage(message) {
     return !!message && message.type === "run-copy-prototype-link";
+  }
+
+  function reportUiShortenerError(rawMessage) {
+    const message = normalizeErrorMessage(rawMessage, "Failed to shorten the link.");
+    figma.ui.postMessage({
+      type: "shorten-figma-url-error",
+      message: message,
+    });
+    figma.notify(message, { error: true, timeout: 2600 });
   }
 
   async function runShortenFigmaUrl() {

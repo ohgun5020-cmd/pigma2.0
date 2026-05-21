@@ -11,6 +11,9 @@
   const PATCH_VERSION = 5;
   const RESULT_PREVIEW_LIMIT = 80;
   const VALUE_EPSILON = 0.0001;
+  const PIXEL_SCAN_YIELD_INTERVAL = 60;
+  const PIXEL_SCAN_STATUS_INTERVAL = 240;
+  const PIXEL_APPLY_YIELD_INTERVAL = 24;
   const EFFECT_RADIUS_KEYS = new Set(["radius", "spread", "startRadius", "endRadius"]);
   const OPACITY_PERCENT_SCALE = 100;
   const ANNOTATION_CATEGORY_LABEL = "Pigma Perfect pixel";
@@ -116,8 +119,10 @@
 
     try {
       const result = await applyPixelPerfect();
+      postStatus("running", "결과를 캐시에 저장하는 중입니다.");
       await writeCachedResult(result);
 
+      postStatus("running", "결과를 패널에 보내는 중입니다.");
       figma.ui.postMessage({
         type: "ai-pixel-perfect-result",
         result,
@@ -225,11 +230,19 @@
       throw new Error("프레임, 그룹, 레이어를 먼저 선택하세요.");
     }
 
+    postStatus("running", "선택과 최근 분석 캐시를 확인 중입니다.");
+    await waitForNextTick();
     const designReadResult = await readDesignReadCache();
     const context = buildRunContext(selection, designReadResult);
-    const collection = collectPixelCandidates(selection);
+    postStatus("running", "선택한 레이어에서 소수 좌표/크기 후보를 찾는 중입니다.");
+    await waitForNextTick();
+    const collection = await collectPixelCandidates(selection, (scannedNodeCount, candidateCount) => {
+      postStatus("running", `레이어 ${scannedNodeCount}개 스캔 중... 좌표/크기 후보 ${candidateCount}건`);
+    });
 
     if (!collection.candidates.length) {
+      postStatus("running", `레이어 ${collection.scannedNodeCount || 0}개 확인 완료. 교정할 소수 좌표/크기 후보가 없습니다.`);
+      await waitForNextTick();
       return buildPixelPerfectResult({
         selection,
         context,
@@ -240,6 +253,7 @@
         excluded: collection.excluded,
         skipped: [],
         candidateCount: 0,
+        scannedNodeCount: collection.scannedNodeCount,
         annotationSummary: {
           applied: [],
           skipped: [],
@@ -251,11 +265,20 @@
       });
     }
 
+    postStatus(
+      "running",
+      `레이어 ${collection.scannedNodeCount || 0}개에서 좌표/크기 후보 ${collection.candidates.length}건을 찾았습니다.`
+    );
+    await waitForNextTick();
     const aiDecisionSummary = await requestAiDecisions(collection.candidates, context);
     const plans = buildDecisionPlans(collection.candidates, aiDecisionSummary);
     const applied = [];
     const appliedPlans = [];
     const skipped = [];
+    let processedPlanCount = 0;
+    const shouldReportApplyProgress = plans.length > 40;
+
+    postStatus("running", `정수 좌표/크기 ${plans.length}건을 적용 중입니다.`);
 
     for (const plan of plans) {
       try {
@@ -268,10 +291,19 @@
           reason: normalizeErrorMessage(error, "Failed to apply the snap target."),
         });
       }
+      processedPlanCount += 1;
+      if (
+        processedPlanCount % PIXEL_APPLY_YIELD_INTERVAL === 0 ||
+        (shouldReportApplyProgress && processedPlanCount === plans.length)
+      ) {
+        postStatus("running", `정수 좌표/크기 적용 중... ${processedPlanCount}/${plans.length}`);
+        await waitForNextTick();
+      }
     }
 
     const annotationApplied = buildResultOnlyAnnotation(appliedPlans, "");
 
+    postStatus("running", "적용 결과를 정리하는 중입니다.");
     return buildPixelPerfectResult({
       selection,
       context,
@@ -282,6 +314,7 @@
       excluded: collection.excluded,
       skipped: skipped.concat(annotationApplied.skipped),
       candidateCount: collection.candidates.length,
+      scannedNodeCount: collection.scannedNodeCount,
       annotationSummary: annotationApplied,
     });
   }
@@ -351,6 +384,8 @@
       options.annotationSummary && typeof options.annotationSummary === "object" ? options.annotationSummary : {};
     const candidateCount =
       typeof options.candidateCount === "number" && Number.isFinite(options.candidateCount) ? options.candidateCount : 0;
+    const scannedNodeCount =
+      typeof options.scannedNodeCount === "number" && Number.isFinite(options.scannedNodeCount) ? options.scannedNodeCount : 0;
 
     return {
       version: PATCH_VERSION,
@@ -361,6 +396,7 @@
         selectionLabel: context.selectionLabel || formatSelectionLabel(selection),
         contextLabel: context.contextLabel || "General UI",
         rootCount: selection.length,
+        scannedNodeCount,
         candidateCount,
         appliedCount: applied.length,
         excludedCount: excluded.length,
@@ -373,7 +409,7 @@
         aiStatusLabel: aiSummary.aiStatusLabel || "로컬 규칙",
         aiProviderLabel: aiSummary.aiProviderLabel || "",
         aiModelLabel: aiSummary.aiModelLabel || "",
-        reviewStrategy: aiSummary.reviewStrategy || "0.5 stroke/blur 예외 유지 후 최근접 정수 스냅",
+        reviewStrategy: aiSummary.reviewStrategy || "소수 좌표/크기만 최근접 정수로 스냅",
         modeLabel: annotationSummary.modeLabel || "Result only",
         categoryLabel: annotationSummary.categoryLabel || "",
       },
@@ -413,10 +449,12 @@
     };
   }
 
-  function collectPixelCandidates(selection) {
+  async function collectPixelCandidates(selection, onProgress) {
     const candidates = [];
     const excluded = [];
     const stack = [];
+    let scannedNodeCount = 0;
+    let lastStatusNodeCount = 0;
 
     for (let index = selection.length - 1; index >= 0; index -= 1) {
       stack.push(selection[index]);
@@ -428,6 +466,7 @@
         continue;
       }
 
+      scannedNodeCount += 1;
       collectNodeCandidates(node, candidates, excluded);
 
       if (hasChildren(node)) {
@@ -435,9 +474,23 @@
           stack.push(node.children[index]);
         }
       }
+
+      if (scannedNodeCount - lastStatusNodeCount >= PIXEL_SCAN_STATUS_INTERVAL) {
+        lastStatusNodeCount = scannedNodeCount;
+        if (typeof onProgress === "function") {
+          onProgress(scannedNodeCount, candidates.length);
+        }
+        await waitForNextTick();
+      } else if (scannedNodeCount % PIXEL_SCAN_YIELD_INTERVAL === 0) {
+        await waitForNextTick();
+      }
     }
 
-    return { candidates, excluded };
+    if (typeof onProgress === "function") {
+      onProgress(scannedNodeCount, candidates.length);
+    }
+
+    return { candidates, excluded, scannedNodeCount };
   }
 
   function collectAnnotationNodes(selection) {
@@ -475,19 +528,10 @@
     const nodeName = safeName(node);
     const nodeType = String(node.type || "UNKNOWN");
     const resizable = canResizeNode(node);
+    const position = getVisualPosition(node);
+    const positionX = position && typeof position.x === "number" ? position.x : null;
+    const positionY = position && typeof position.y === "number" ? position.y : null;
 
-    maybeAddCandidate({
-      candidates,
-      excluded,
-      node,
-      nodeName,
-      nodeType,
-      fieldKey: "rotation",
-      label: "rotation",
-      value: node.rotation,
-      kind: "direct",
-      category: "rotation",
-    });
     maybeAddCandidate({
       candidates,
       excluded,
@@ -496,7 +540,7 @@
       nodeType,
       fieldKey: "x",
       label: "x",
-      value: getVisualPositionValue(node, "x"),
+      value: positionX,
       kind: "position",
       category: "position",
     });
@@ -508,7 +552,7 @@
       nodeType,
       fieldKey: "y",
       label: "y",
-      value: getVisualPositionValue(node, "y"),
+      value: positionY,
       kind: "position",
       category: "position",
     });
@@ -538,87 +582,6 @@
         category: "size",
       });
     }
-
-    collectAutoLayoutCandidates(node, nodeName, nodeType, candidates, excluded);
-    maybeAddCandidate({
-      candidates,
-      excluded,
-      node,
-      nodeName,
-      nodeType,
-      fieldKey: "strokeWeight",
-      label: "stroke",
-      value: node.strokeWeight,
-      kind: "direct",
-      category: "stroke",
-    });
-
-    maybeAddCandidate({
-      candidates,
-      excluded,
-      node,
-      nodeName,
-      nodeType,
-      fieldKey: "cornerRadius",
-      label: "corner radius",
-      value: node.cornerRadius,
-      kind: "direct",
-      category: "radius",
-    });
-    maybeAddCandidate({
-      candidates,
-      excluded,
-      node,
-      nodeName,
-      nodeType,
-      fieldKey: "topLeftRadius",
-      label: "top-left radius",
-      value: node.topLeftRadius,
-      kind: "direct",
-      category: "radius",
-    });
-    maybeAddCandidate({
-      candidates,
-      excluded,
-      node,
-      nodeName,
-      nodeType,
-      fieldKey: "topRightRadius",
-      label: "top-right radius",
-      value: node.topRightRadius,
-      kind: "direct",
-      category: "radius",
-    });
-    maybeAddCandidate({
-      candidates,
-      excluded,
-      node,
-      nodeName,
-      nodeType,
-      fieldKey: "bottomLeftRadius",
-      label: "bottom-left radius",
-      value: node.bottomLeftRadius,
-      kind: "direct",
-      category: "radius",
-    });
-    maybeAddCandidate({
-      candidates,
-      excluded,
-      node,
-      nodeName,
-      nodeType,
-      fieldKey: "bottomRightRadius",
-      label: "bottom-right radius",
-      value: node.bottomRightRadius,
-      kind: "direct",
-      category: "radius",
-    });
-
-    collectEffectCandidates(node, nodeName, nodeType, candidates, excluded);
-    collectTextCandidates(node, nodeName, nodeType, candidates, excluded);
-    collectPaintOpacityCandidates(node, nodeName, nodeType, "fills", "fill", candidates, excluded);
-    collectPaintOpacityCandidates(node, nodeName, nodeType, "strokes", "stroke paint", candidates, excluded);
-    collectLayerOpacityCandidate(node, nodeName, nodeType, candidates, excluded);
   }
 
   function collectAutoLayoutCandidates(node, nodeName, nodeType, candidates, excluded) {
@@ -985,7 +948,7 @@
       aiModelLabel: "",
       aiDecisionCount: 0,
       fallbackDecisionCount: candidateCount,
-      reviewStrategy: candidateCount > 0 ? "0.5 stroke/blur 예외 유지 후 최근접 정수 스냅" : "보정 대상 없음",
+      reviewStrategy: candidateCount > 0 ? "소수 좌표/크기만 최근접 정수로 스냅" : "좌표/크기 보정 대상 없음",
       decisionMap: new Map(),
     };
   }
@@ -1816,6 +1779,12 @@
 
   function hasChildren(node) {
     return !!node && Array.isArray(node.children) && node.children.length > 0;
+  }
+
+  function waitForNextTick() {
+    return new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
   }
 
   function normalizeErrorMessage(error, fallback) {

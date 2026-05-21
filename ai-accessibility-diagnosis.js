@@ -38,6 +38,8 @@
   const LARGE_TEXT_CONTRAST_RATIO = 3;
   const CRITICAL_NORMAL_TEXT_CONTRAST_RATIO = 2.2;
   const CRITICAL_LARGE_TEXT_CONTRAST_RATIO = 1.8;
+  const ACCESSIBILITY_SCAN_YIELD_INTERVAL = 80;
+  const ACCESSIBILITY_SCAN_STATUS_INTERVAL = 240;
   const VECTOR_TYPES = new Set([
     "VECTOR",
     "BOOLEAN_OPERATION",
@@ -191,7 +193,7 @@
     }
 
     try {
-      const analysis = analyzeCurrentSelection();
+      const analysis = await analyzeCurrentSelection(messageMode);
       let result = analysis.result;
       const annotationSupported = Array.isArray(analysis.annotationNodes) && analysis.annotationNodes.length > 0;
       const category =
@@ -345,7 +347,7 @@
     return typeof selectionSignature === "string" && selectionSignature === getSelectionSignature(figma.currentPage.selection);
   }
 
-  function analyzeCurrentSelection() {
+  async function analyzeCurrentSelection(messageMode) {
     const selection = Array.from(figma.currentPage.selection || []);
     if (!selection.length) {
       throw new Error("프레임, 그룹, 레이어를 먼저 선택해 주세요.");
@@ -449,6 +451,14 @@
       }
 
       typeStats.totalNodes += 1;
+      if (typeStats.totalNodes % ACCESSIBILITY_SCAN_STATUS_INTERVAL === 0) {
+        postStatus("running", `Scanning accessibility nodes... ${typeStats.totalNodes}`, null, messageMode);
+      }
+
+      if (typeStats.totalNodes % ACCESSIBILITY_SCAN_YIELD_INTERVAL === 0) {
+        await waitForNextTick();
+      }
+
       typeStats.maxDepth = Math.max(typeStats.maxDepth, depth);
       bumpCount(typeCounts, type);
       bumpCount(nameCounts, canonicalizeName(name));
@@ -662,6 +672,12 @@
       result,
       annotationNodes,
     };
+  }
+
+  function waitForNextTick() {
+    return new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
   }
 
   function buildAccessibilitySummary(textEntries, nodeEntries, solidFillEntries) {

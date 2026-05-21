@@ -64,10 +64,24 @@
   const PROMPT_TARGET_EXPORT_EMPTY_MESSAGE = "The selected layer export for prompt edit/generation was empty.";
   const PROMPT_PLACEMENT_APPLY_ERROR_MESSAGE = "Failed to place the generated prompt image.";
   const PROMPT_TEXT_ANCHOR_GAP = 24;
+  const AI_IMAGE_EXPORT_TIMEOUT_MS = 30000;
+  const PROMPT_DRAFT_EXPORT_TIMEOUT_MS = 30000;
+  const IMAGE_EXTEND_EXPORT_TIMEOUT_MS = 30000;
+  const IMAGE_TEXT_OVERLAY_EXPORT_TIMEOUT_MS = 30000;
+  const IMAGE_TEXT_OVERLAY_APPLY_YIELD_INTERVAL = 8;
   const IMAGE_MERGE_FAST_EXPORT_TIMEOUT_MS = 6000;
   const IMAGE_MERGE_EXPORT_TIMEOUT_MS = 30000;
   const IMAGE_MERGE_PREFERRED_EXPORT_SCALE = 2;
   const IMAGE_MERGE_MAX_EXPORT_PIXEL_COUNT = 16000000;
+  const IMAGE_MERGE_CLONE_YIELD_INTERVAL = 8;
+  const IMAGE_MERGE_SCAN_YIELD_INTERVAL = 64;
+  const BOUNDS_FIT_SCAN_YIELD_INTERVAL = 32;
+  const BOUNDS_FIT_APPLY_YIELD_INTERVAL = 8;
+  const ORIGINAL_SIZE_FIT_SCAN_YIELD_INTERVAL = 32;
+  const ORIGINAL_SIZE_FIT_APPLY_YIELD_INTERVAL = 8;
+  const AI_IMAGE_SOURCE_SCAN_YIELD_INTERVAL = 64;
+  const AI_IMAGE_APPLY_YIELD_INTERVAL = 8;
+  const REFERENCE_TEXT_SCAN_YIELD_INTERVAL = 64;
 
   if (typeof originalOnMessage !== "function") {
     return;
@@ -245,7 +259,7 @@
     pendingSession = null;
 
     try {
-      const target = collectAiImageSourceTargetFromSelection(
+      const target = await collectAiImageSourceTargetFromSelection(
         sanitizeSourceMode(message && message.sourceMode),
         message
       );
@@ -1480,13 +1494,13 @@
     figma.notify(message, { error: true, timeout: 2600 });
   }
 
-  function collectAiImageSourceTargetFromSelection(sourceMode, message) {
+  async function collectAiImageSourceTargetFromSelection(sourceMode, message) {
     if (sanitizeSourceMode(sourceMode) === "prompt-smart") {
       return collectPromptSmartTargetFromSelection(message);
     }
 
     try {
-      const imageTarget = collectSingleUpscaleTargetFromSelection();
+      const imageTarget = await collectSingleUpscaleTargetFromSelection();
       imageTarget.kind = "image-fill";
       return imageTarget;
     } catch (error) {
@@ -1671,10 +1685,14 @@
       throw new Error(PROMPT_TARGET_EXPORT_ERROR_MESSAGE);
     }
 
-    const bytes = await node.exportAsync({
-      format: "PNG",
-      useAbsoluteBounds: false,
-    });
+    const bytes = await withImageExportTimeout(
+      node.exportAsync({
+        format: "PNG",
+        useAbsoluteBounds: false,
+      }),
+      PROMPT_DRAFT_EXPORT_TIMEOUT_MS,
+      "prompt container source export"
+    );
     if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
       throw new Error(PROMPT_TARGET_EXPORT_EMPTY_MESSAGE);
     }
@@ -1742,10 +1760,14 @@
 
     if (!preferOriginalImageBytes && targetNode && !targetNode.removed && typeof targetNode.exportAsync === "function") {
       try {
-        bytes = await targetNode.exportAsync({
-          format: "PNG",
-          useAbsoluteBounds: false,
-        });
+        bytes = await withImageExportTimeout(
+          targetNode.exportAsync({
+            format: "PNG",
+            useAbsoluteBounds: false,
+          }),
+          AI_IMAGE_EXPORT_TIMEOUT_MS,
+          "AI image source export"
+        );
       } catch (error) {
         bytes = new Uint8Array(0);
       }
@@ -1759,7 +1781,11 @@
       if (!image) {
         throw new Error(IMAGE_FILL_NOT_FOUND_MESSAGE);
       }
-      bytes = await image.getBytesAsync();
+      bytes = await withImageExportTimeout(
+        image.getBytesAsync(),
+        AI_IMAGE_EXPORT_TIMEOUT_MS,
+        "AI image source byte read"
+      );
       if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
         throw new Error(IMAGE_FILL_BYTES_MISSING_MESSAGE);
       }
@@ -1837,7 +1863,7 @@
     );
   }
 
-  function collectSingleUpscaleTargetFromSelection(selectionInput) {
+  async function collectSingleUpscaleTargetFromSelection(selectionInput) {
     const selection = Array.isArray(selectionInput) ? selectionInput.filter(Boolean) : Array.from(figma.currentPage.selection || []);
     if (!selection.length) {
       throw new Error(IMAGE_TASK_NO_SELECTION_MESSAGE);
@@ -1845,6 +1871,7 @@
 
     let selectedEntry = null;
     const usages = [];
+    let scannedNodeCount = 0;
 
     for (let rootIndex = 0; rootIndex < selection.length; rootIndex += 1) {
       const root = selection[rootIndex];
@@ -1860,6 +1887,11 @@
         const node = current && current.node;
         if (!node || node.removed) {
           continue;
+        }
+
+        scannedNodeCount += 1;
+        if (scannedNodeCount % AI_IMAGE_SOURCE_SCAN_YIELD_INTERVAL === 0) {
+          await waitForNextTick();
         }
 
         const fills = getNodeFills(node);
@@ -1961,10 +1993,14 @@
     if (shapeEditNeedsPlaceholderSource(node)) {
       bytes = await exportShapeEditPlaceholderPng(node);
     } else {
-      bytes = await node.exportAsync({
-        format: "PNG",
-        useAbsoluteBounds: false,
-      });
+      bytes = await withImageExportTimeout(
+        node.exportAsync({
+          format: "PNG",
+          useAbsoluteBounds: false,
+        }),
+        PROMPT_DRAFT_EXPORT_TIMEOUT_MS,
+        "prompt shape source export"
+      );
     }
     if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
       throw new Error(SHAPE_EXPORT_EMPTY_MESSAGE);
@@ -2103,10 +2139,14 @@
     }
 
     const imageBounds = buildImageExtendFullLocalBounds(width, height);
-    const bytes = await node.exportAsync({
-      format: "PNG",
-      useAbsoluteBounds: false,
-    });
+    const bytes = await withImageExportTimeout(
+      node.exportAsync({
+        format: "PNG",
+        useAbsoluteBounds: false,
+      }),
+      IMAGE_EXTEND_EXPORT_TIMEOUT_MS,
+      "image extend reference export"
+    );
     if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
       throw new Error("Could not export the selected layer as PNG.");
     }
@@ -2255,10 +2295,14 @@
     const nodeHeight = typeof node.height === "number" && Number.isFinite(node.height) ? node.height : 0;
     const bounds = normalizeImageExtendLocalBounds(imageBounds, nodeWidth, nodeHeight);
     if (areImageExtendLocalBoundsFullNode(bounds, nodeWidth, nodeHeight)) {
-      return await node.exportAsync({
-        format: "PNG",
-        useAbsoluteBounds: false,
-      });
+      return await withImageExportTimeout(
+        node.exportAsync({
+          format: "PNG",
+          useAbsoluteBounds: false,
+        }),
+        IMAGE_EXTEND_EXPORT_TIMEOUT_MS,
+        "image extend source export"
+      );
     }
 
     const preview = figma.createFrame();
@@ -2274,11 +2318,16 @@
       clone = node.clone();
       preview.appendChild(clone);
       setImageExtendNodePosition(clone, -bounds.x, -bounds.y);
+      await waitForNextTick();
 
-      return await preview.exportAsync({
-        format: "PNG",
-        useAbsoluteBounds: false,
-      });
+      return await withImageExportTimeout(
+        preview.exportAsync({
+          format: "PNG",
+          useAbsoluteBounds: false,
+        }),
+        IMAGE_EXTEND_EXPORT_TIMEOUT_MS,
+        "image extend cropped preview export"
+      );
     } finally {
       if (clone && !clone.removed) {
         clone.remove();
@@ -2714,6 +2763,30 @@
 
   async function runImageMerge(message) {
     const clientRequestId = message && typeof message.clientRequestId === "string" ? message.clientRequestId : "";
+    if (
+      isPreparing ||
+      isApplying ||
+      isImageExtendPreparing ||
+      isImageExtendApplying ||
+      isCompositePreparing ||
+      isCompositeApplying ||
+      isBoundsFitPreparing ||
+      isBoundsFitApplying ||
+      isPromptDraftPreparing ||
+      isReferencePreparing ||
+      isTextOverlayPreparing ||
+      isTextOverlayApplying
+    ) {
+      figma.ui.postMessage({
+        type: "image-merge-error",
+        clientRequestId: clientRequestId,
+        message: IMAGE_TASK_ALREADY_RUNNING_MESSAGE,
+      });
+      figma.notify(IMAGE_TASK_ALREADY_RUNNING_MESSAGE, { error: true, timeout: 2600 });
+      return;
+    }
+
+    isCompositeApplying = true;
     try {
       const source = await exportImageMergeSelection();
       const createdImage = figma.createImage(source.bytes);
@@ -2768,6 +2841,8 @@
         message: messageText,
       });
       figma.notify(messageText, { error: true, timeout: 2600 });
+    } finally {
+      isCompositeApplying = false;
     }
   }
 
@@ -2787,6 +2862,10 @@
     }
 
     return "이미지 합치기 레이어를 만들지 못했습니다.";
+  }
+
+  function withImageExportTimeout(promise, timeoutMs, label) {
+    return withImageMergeTimeout(promise, timeoutMs, label);
   }
 
   function withImageMergeTimeout(promise, timeoutMs, label) {
@@ -2828,6 +2907,22 @@
     });
   }
 
+  function waitForNextTick() {
+    return new Promise(function (resolve) {
+      setTimeout(resolve, 0);
+    });
+  }
+
+  async function maybeYieldImageMergeScan(state) {
+    if (!state || typeof state !== "object") {
+      return;
+    }
+    state.scannedNodeCount = (Number(state.scannedNodeCount) || 0) + 1;
+    if (state.scannedNodeCount % IMAGE_MERGE_SCAN_YIELD_INTERVAL === 0) {
+      await waitForNextTick();
+    }
+  }
+
   async function exportImageMergeSelection() {
     const selection = Array.from(figma.currentPage.selection || []).filter(function (node) {
       return isImageMergeExportableNode(node);
@@ -2836,13 +2931,16 @@
       throw new Error("이미지로 병합할 프레임, 그룹, 레이어를 먼저 선택해주세요.");
     }
 
-    const exportSelection = resolveImageMergeExportSelection(selection);
+    const scanState = { scannedNodeCount: 0 };
+    const exportSelection = await resolveImageMergeExportSelection(selection, scanState);
 
-    const rects = exportSelection
-      .map(function (node) {
-        return getImageMergeNodeRect(node);
-      })
-      .filter(Boolean);
+    const rects = [];
+    for (let index = 0; index < exportSelection.length; index += 1) {
+      const rect = await getImageMergeNodeRect(exportSelection[index], scanState);
+      if (rect) {
+        rects.push(rect);
+      }
+    }
     const unionRect = unionAbsoluteRects(rects);
     if (!unionRect || !(unionRect.width > 0) || !(unionRect.height > 0)) {
       throw new Error("선택한 항목의 병합 영역을 계산하지 못했습니다.");
@@ -2922,7 +3020,7 @@
     return 1;
   }
 
-  function resolveImageMergeExportSelection(selection) {
+  async function resolveImageMergeExportSelection(selection, state) {
     if (!Array.isArray(selection) || !selection.length) {
       return [];
     }
@@ -2931,7 +3029,8 @@
     const seen = {};
     for (let index = 0; index < selection.length; index += 1) {
       const node = selection[index];
-      const exportNode = findImageMergeMaskContainer(node) || node;
+      await maybeYieldImageMergeScan(state);
+      const exportNode = (await findImageMergeMaskContainer(node, state)) || node;
       if (!isImageMergeExportableNode(exportNode) || seen[exportNode.id]) {
         continue;
       }
@@ -2974,10 +3073,10 @@
     return !!node && "children" in node && Array.isArray(node.children) && node.children.length > 0;
   }
 
-  function findImageMergeMaskContainer(node) {
+  async function findImageMergeMaskContainer(node, state) {
     let current = node;
     while (current && current.parent && current.parent.type !== "DOCUMENT") {
-      if (isImageMergeExportableNode(current) && hasImageMergeDirectMaskChild(current)) {
+      if (isImageMergeExportableNode(current) && (await hasImageMergeDirectMaskChild(current, state))) {
         return current;
       }
 
@@ -2986,7 +3085,7 @@
         break;
       }
 
-      if (isImageMergeExportableNode(parent) && hasImageMergeDirectMaskChild(parent)) {
+      if (isImageMergeExportableNode(parent) && (await hasImageMergeDirectMaskChild(parent, state))) {
         return parent;
       }
 
@@ -2996,12 +3095,13 @@
     return null;
   }
 
-  function hasImageMergeDirectMaskChild(node) {
+  async function hasImageMergeDirectMaskChild(node, state) {
     if (!node || !("children" in node) || !Array.isArray(node.children)) {
       return false;
     }
 
     for (let index = 0; index < node.children.length; index += 1) {
+      await maybeYieldImageMergeScan(state);
       const child = node.children[index];
       if (child && child.isMask === true) {
         return true;
@@ -3011,17 +3111,18 @@
     return false;
   }
 
-  function hasImageMergeMaskDescendant(node, depth) {
+  async function hasImageMergeMaskDescendant(node, depth, state) {
     if (!node || depth > 8 || !hasImageMergeChildren(node)) {
       return false;
     }
 
+    await maybeYieldImageMergeScan(state);
     for (let index = 0; index < node.children.length; index += 1) {
       const child = node.children[index];
       if (!child || child.removed) {
         continue;
       }
-      if (child.isMask === true || hasImageMergeMaskDescendant(child, depth + 1)) {
+      if (child.isMask === true || (await hasImageMergeMaskDescendant(child, depth + 1, state))) {
         return true;
       }
     }
@@ -3029,15 +3130,16 @@
     return false;
   }
 
-  function getImageMergeNodeRect(node) {
-    return getBoundsFitNodeRect(node) || getImageMergeChildrenUnionRect(node, 0);
+  async function getImageMergeNodeRect(node, state) {
+    return getBoundsFitNodeRect(node) || (await getImageMergeChildrenUnionRect(node, 0, state));
   }
 
-  function getImageMergeChildrenUnionRect(node, depth) {
+  async function getImageMergeChildrenUnionRect(node, depth, state) {
     if (!node || depth > 8 || !("children" in node) || !Array.isArray(node.children)) {
       return null;
     }
 
+    await maybeYieldImageMergeScan(state);
     const rects = [];
     for (let index = 0; index < node.children.length; index += 1) {
       const child = node.children[index];
@@ -3045,7 +3147,10 @@
         continue;
       }
 
-      const rect = getBoundsFitNodeRect(child) || getImageMergeChildrenUnionRect(child, depth + 1);
+      let rect = getBoundsFitNodeRect(child);
+      if (!rect) {
+        rect = await getImageMergeChildrenUnionRect(child, depth + 1, state);
+      }
       if (rect) {
         rects.push(rect);
       }
@@ -3103,12 +3208,13 @@
       figma.currentPage.appendChild(preview);
 
       const orderedSelection = selection.slice().sort(compareSceneNodeCanvasOrder);
+      const scanState = { scannedNodeCount: 0 };
       for (let index = 0; index < orderedSelection.length; index += 1) {
         const node = orderedSelection[index];
         if (!isImageMergeExportableNode(node)) {
           continue;
         }
-        const rect = getImageMergeNodeRect(node);
+        const rect = await getImageMergeNodeRect(node, scanState);
         if (!rect) {
           continue;
         }
@@ -3116,6 +3222,9 @@
         preview.appendChild(clone);
         clones.push(clone);
         positionImageMergePreviewClone(node, clone, unionRect, rect);
+        if (clones.length % IMAGE_MERGE_CLONE_YIELD_INTERVAL === 0) {
+          await waitForNextTick();
+        }
       }
 
       if (!clones.length) {
@@ -3207,7 +3316,9 @@
           }
 
           if (!placed) {
-            const selectedRootHasMaskStack = hasImageMergeMaskDescendant(placementAnchorNode, 0);
+            const selectedRootHasMaskStack = await hasImageMergeMaskDescendant(placementAnchorNode, 0, {
+              scannedNodeCount: 0,
+            });
             if (
               !selectedRootHasMaskStack &&
               (!("locked" in placementAnchorNode) || !placementAnchorNode.locked) &&
@@ -3586,6 +3697,10 @@
 
     try {
       for (let index = 0; index < sortedLines.length; index += 1) {
+        if (index > 0 && index % IMAGE_TEXT_OVERLAY_APPLY_YIELD_INTERVAL === 0) {
+          await waitForNextTick();
+        }
+
         const line = sortedLines[index];
         const textNode = await createImageTextOverlayTextNode(line, localBounds.width, localBounds.height, availableFonts);
         if (!textNode) {
@@ -4406,6 +4521,10 @@
     let appliedFillCount = 0;
 
     for (let index = 0; index < session.usages.length; index += 1) {
+      if (index > 0 && index % AI_IMAGE_APPLY_YIELD_INTERVAL === 0) {
+        await waitForNextTick();
+      }
+
       const usage = session.usages[index];
       const node = await figma.getNodeByIdAsync(usage.nodeId);
       if (!node || node.removed) {
@@ -5073,7 +5192,7 @@
     }
 
     if (selection.every(function (node) { return node && node.type === "TEXT"; })) {
-      const directText = collectReferenceTextFromNodes(selection, {
+      const directText = await collectReferenceTextFromNodes(selection, {
         maxNodes: 6,
         maxLength: 480,
         includeDescendants: false,
@@ -5094,7 +5213,7 @@
 
     let imageTarget = null;
     try {
-      imageTarget = collectSingleUpscaleTargetFromSelection();
+      imageTarget = await collectSingleUpscaleTargetFromSelection();
     } catch (error) {
       imageTarget = null;
     }
@@ -5103,7 +5222,7 @@
       return await buildReferenceImageSource(imageTarget);
     }
 
-    const fallbackText = collectReferenceTextFromNodes(selection, {
+    const fallbackText = await collectReferenceTextFromNodes(selection, {
       maxNodes: 8,
       maxLength: 560,
       includeDescendants: true,
@@ -5150,7 +5269,7 @@
     }
   }
 
-  function collectReferenceTextFromNodes(nodes, options) {
+  async function collectReferenceTextFromNodes(nodes, options) {
     const list = Array.isArray(nodes) ? nodes : [];
     const maxNodes =
       options && Number(options.maxNodes) > 0 ? Math.max(1, Math.floor(Number(options.maxNodes))) : 6;
@@ -5159,13 +5278,25 @@
     const includeDescendants = !(options && options.includeDescendants === false);
     const parts = [];
     const seen = {};
+    const stack = [];
+    let scannedNodeCount = 0;
 
-    function visit(node) {
-      if (!node || node.removed || parts.length >= maxNodes) {
-        return;
+    for (let index = list.length - 1; index >= 0; index -= 1) {
+      stack.push(list[index]);
+    }
+
+    while (stack.length && parts.length < maxNodes) {
+      const node = stack.pop();
+      scannedNodeCount += 1;
+      if (scannedNodeCount % REFERENCE_TEXT_SCAN_YIELD_INTERVAL === 0) {
+        await waitForNextTick();
+      }
+
+      if (!node || node.removed) {
+        continue;
       }
       if ("visible" in node && node.visible === false) {
-        return;
+        continue;
       }
 
       if (node.type === "TEXT" && typeof node.characters === "string") {
@@ -5177,19 +5308,9 @@
       }
 
       if (includeDescendants && hasChildren(node)) {
-        for (let index = 0; index < node.children.length; index += 1) {
-          visit(node.children[index]);
-          if (parts.length >= maxNodes) {
-            break;
-          }
+        for (let index = node.children.length - 1; index >= 0; index -= 1) {
+          stack.push(node.children[index]);
         }
-      }
-    }
-
-    for (let index = 0; index < list.length; index += 1) {
-      visit(list[index]);
-      if (parts.length >= maxNodes) {
-        break;
       }
     }
 
@@ -5270,7 +5391,7 @@
       return !!node && !node.removed && node.type !== "TEXT";
     });
     const selectedRangeText = visualNodes.length ? null : getSelectedTextRangeSnapshot();
-    const textPayload = collectPromptDraftTextPayload(selection, selectedRangeText);
+    const textPayload = await collectPromptDraftTextPayload(selection, selectedRangeText);
 
     if (visualNodes.length > 1) {
       throw new Error(PROMPT_SMART_SELECTION_MESSAGE);
@@ -5304,7 +5425,7 @@
     throw new Error(PROMPT_DRAFT_SOURCE_NOT_FOUND_MESSAGE);
   }
 
-  function collectPromptDraftTextPayload(selection, selectedRangeText) {
+  async function collectPromptDraftTextPayload(selection, selectedRangeText) {
     if (selectedRangeText && selectedRangeText.text) {
       return {
         text: selectedRangeText.text,
@@ -5314,7 +5435,7 @@
     }
 
     if (selection.every(function (node) { return node && node.type === "TEXT"; })) {
-      const directText = collectReferenceTextFromNodes(selection, {
+      const directText = await collectReferenceTextFromNodes(selection, {
         maxNodes: 8,
         maxLength: 600,
         includeDescendants: false,
@@ -5328,7 +5449,7 @@
       }
     }
 
-    const fallbackText = collectReferenceTextFromNodes(selection, {
+    const fallbackText = await collectReferenceTextFromNodes(selection, {
       maxNodes: 10,
       maxLength: 720,
       includeDescendants: true,
@@ -5349,10 +5470,14 @@
       throw new Error(PROMPT_TARGET_EXPORT_ERROR_MESSAGE);
     }
 
-    const bytes = await node.exportAsync({
-      format: "PNG",
-      useAbsoluteBounds: false,
-    });
+    const bytes = await withImageExportTimeout(
+      node.exportAsync({
+        format: "PNG",
+        useAbsoluteBounds: false,
+      }),
+      PROMPT_DRAFT_EXPORT_TIMEOUT_MS,
+      "prompt draft visual source export"
+    );
     if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
       throw new Error(PROMPT_TARGET_EXPORT_EMPTY_MESSAGE);
     }
@@ -5483,10 +5608,14 @@
       throw new Error("Could not export the selected layer for text overlay.");
     }
 
-    const bytes = await node.exportAsync({
-      format: "PNG",
-      useAbsoluteBounds: false,
-    });
+    const bytes = await withImageExportTimeout(
+      node.exportAsync({
+        format: "PNG",
+        useAbsoluteBounds: false,
+      }),
+      IMAGE_TEXT_OVERLAY_EXPORT_TIMEOUT_MS,
+      "image text overlay source export"
+    );
     if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
       throw new Error("The selected layer export is empty.");
     }
@@ -5562,10 +5691,15 @@
       placeholder.x = -100000;
       placeholder.y = -100000;
       figma.currentPage.appendChild(placeholder);
-      return await placeholder.exportAsync({
-        format: "PNG",
-        useAbsoluteBounds: false,
-      });
+      await waitForNextTick();
+      return await withImageExportTimeout(
+        placeholder.exportAsync({
+          format: "PNG",
+          useAbsoluteBounds: false,
+        }),
+        PROMPT_DRAFT_EXPORT_TIMEOUT_MS,
+        "prompt shape placeholder export"
+      );
     } finally {
       if (placeholder && !placeholder.removed) {
         placeholder.remove();
@@ -5599,6 +5733,7 @@
       targetNodeIds: {},
       containerNodeIds: {},
       skippedNodeIds: {},
+      scannedNodeCount: 0,
     };
 
     for (let index = 0; index < selection.length; index += 1) {
@@ -5624,6 +5759,7 @@
       skipped: [],
       targetNodeIds: {},
       skippedNodeIds: {},
+      scannedNodeCount: 0,
     };
 
     for (let index = 0; index < selection.length; index += 1) {
@@ -5639,6 +5775,10 @@
     let unchangedCount = 0;
 
     for (let index = 0; index < state.targets.length; index += 1) {
+      if (index > 0 && index % ORIGINAL_SIZE_FIT_APPLY_YIELD_INTERVAL === 0) {
+        await waitForNextTick();
+      }
+
       const status = await applyOriginalSizeFitTarget(state.targets[index], skipped);
       if (status === "applied") {
         appliedCount += 1;
@@ -5662,6 +5802,13 @@
   }
 
   async function collectOriginalSizeFitTargetsFromNode(node, state, isRootSelection) {
+    if (state && typeof state === "object") {
+      state.scannedNodeCount = (Number(state.scannedNodeCount) || 0) + 1;
+      if (state.scannedNodeCount % ORIGINAL_SIZE_FIT_SCAN_YIELD_INTERVAL === 0) {
+        await waitForNextTick();
+      }
+    }
+
     if (!node || node.removed) {
       if (isRootSelection) {
         appendOriginalSizeFitSkipped(state, node, "Could not read the selected layer.");
@@ -5784,6 +5931,13 @@
   }
 
   async function collectBoundsFitPlansFromNode(node, state, isRootSelection) {
+    if (state && typeof state === "object") {
+      state.scannedNodeCount = (Number(state.scannedNodeCount) || 0) + 1;
+      if (state.scannedNodeCount % BOUNDS_FIT_SCAN_YIELD_INTERVAL === 0) {
+        await waitForNextTick();
+      }
+    }
+
     if (!node || node.removed) {
       if (isRootSelection) {
         appendBoundsFitSkipped(buildBoundsFitSkipped(node, "The selected layer could not be read."), state);
@@ -6852,6 +7006,10 @@
     }
 
     for (let index = 0; index < session.targets.length; index += 1) {
+      if (index > 0 && index % BOUNDS_FIT_APPLY_YIELD_INTERVAL === 0) {
+        await waitForNextTick();
+      }
+
       const target = session.targets[index];
       const processed = resultByNodeId[target.nodeId];
       if (!processed && !(target && target.skipRasterAnalysis === true)) {
@@ -6897,6 +7055,10 @@
 
     const containerPlans = sortBoundsFitContainerPlans(session && Array.isArray(session.containers) ? session.containers : []);
     for (let index = 0; index < containerPlans.length; index += 1) {
+      if (index > 0 && index % BOUNDS_FIT_APPLY_YIELD_INTERVAL === 0) {
+        await waitForNextTick();
+      }
+
       const containerStatus = await applyBoundsFitContainerPlan(containerPlans[index], skipped);
       if (containerStatus === "applied") {
         appliedCount += 1;

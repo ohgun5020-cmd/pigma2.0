@@ -239,6 +239,8 @@
   let activeRequestId = "";
   let activeAbortController = null;
   const adobeTrendThumbnailPaletteCache = new Map();
+  const adobeTrendThumbnailFetchTimeoutMs = 3000;
+  const adobeTrendGuideTimeoutMs = 3500;
 
   function postPluginMessage(message) {
     shared.postPluginMessage(message);
@@ -1920,10 +1922,9 @@
     }
 
     const promise = (async () => {
-      const response = await fetch(url, {
-        signal,
+      const response = await fetchWithColorExtractTimeout(url, {
         cache: "force-cache",
-      });
+      }, adobeTrendThumbnailFetchTimeoutMs, signal);
       if (!response || !response.ok) {
         throw new Error(`Adobe thumbnail fetch failed (${response ? response.status : "?"})`);
       }
@@ -1955,6 +1956,88 @@
       }
       return [];
     }
+  }
+
+  async function fetchWithColorExtractTimeout(url, options, timeoutMs, externalSignal) {
+    const fetchOptions = Object.assign({}, options && typeof options === "object" ? options : {});
+    const safeTimeout = Math.max(1000, Math.round(Number(timeoutMs) || 1000));
+    let controller = null;
+    let timeoutId = null;
+    let abortHandler = null;
+
+    if (typeof AbortController === "function") {
+      controller = new AbortController();
+      fetchOptions.signal = controller.signal;
+      timeoutId = window.setTimeout(() => {
+        try {
+          controller.abort();
+        } catch (error) {}
+      }, safeTimeout);
+
+      if (externalSignal && typeof externalSignal.addEventListener === "function") {
+        abortHandler = () => {
+          try {
+            controller.abort();
+          } catch (error) {}
+        };
+        externalSignal.addEventListener("abort", abortHandler, { once: true });
+        if (externalSignal.aborted) {
+          abortHandler();
+        }
+      }
+    } else if (externalSignal) {
+      fetchOptions.signal = externalSignal;
+    }
+
+    try {
+      return await fetch(url, fetchOptions);
+    } finally {
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+      if (externalSignal && abortHandler && typeof externalSignal.removeEventListener === "function") {
+        externalSignal.removeEventListener("abort", abortHandler);
+      }
+    }
+  }
+
+  function resolveColorExtractSoftTimeout(promise, fallback, timeoutMs, label) {
+    const safeTimeout = Math.max(1000, Math.round(Number(timeoutMs) || 1000));
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const timerId = window.setTimeout(() => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        console.warn("[pigma] timed out " + label + "; continuing with the local palette.");
+        resolve(fallback);
+      }, safeTimeout);
+
+      Promise.resolve(promise).then(
+        (value) => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          window.clearTimeout(timerId);
+          resolve(value);
+        },
+        (error) => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          window.clearTimeout(timerId);
+          if (shared.isAbortError(error)) {
+            reject(error);
+            return;
+          }
+          console.warn("[pigma] failed " + label + "; continuing with the local palette:", error);
+          resolve(fallback);
+        }
+      );
+    });
   }
 
   function buildColorCandidates(imageData) {
@@ -2764,15 +2847,20 @@
       normalized.representative,
       normalized.companions
     );
-    const adobeTrendGuide = await buildAdobeTrendGuide(
-      payload && payload.adobeTrends,
-      payload && payload.summary,
-      normalized.analysis,
-      {
-        representative: normalized.representative,
-        companions: normalized.companions,
-      },
-      signal
+    const adobeTrendGuide = await resolveColorExtractSoftTimeout(
+      buildAdobeTrendGuide(
+        payload && payload.adobeTrends,
+        payload && payload.summary,
+        normalized.analysis,
+        {
+          representative: normalized.representative,
+          companions: normalized.companions,
+        },
+        signal
+      ),
+      null,
+      adobeTrendGuideTimeoutMs,
+      "Adobe trend guide"
     );
     const localAccentRow =
       localContext && Array.isArray(localContext.accents) && localContext.accents.length >= 3 ? localContext.accents : normalized.accents;
