@@ -6,6 +6,11 @@
 
   const originalOnMessage = figma.ui.onmessage;
   const RESULT_PREVIEW_LIMIT = 24;
+  const NODE_SCAN_YIELD_INTERVAL = 96;
+  const TEXT_APPLY_YIELD_INTERVAL = 8;
+  const BOX_MATCH_YIELD_INTERVAL = 64;
+  const FONT_SCAN_YIELD_INTERVAL = 512;
+  const FONT_LOAD_YIELD_INTERVAL = 8;
   const BUTTON_RULES = [
     { fontSize: 12, lineHeight: 16, paddingY: 6, height: 28 },
     { fontSize: 13, lineHeight: 18, paddingY: 7, height: 32 },
@@ -15,6 +20,7 @@
     { fontSize: 18, lineHeight: 28, paddingY: 14, height: 56 },
   ];
   let isRunning = false;
+  const loadedFontPromiseCache = new Map();
 
   if (typeof originalOnMessage !== "function") {
     return;
@@ -74,6 +80,19 @@
     });
   }
 
+  function waitForButtonAutoSizeTurn() {
+    return new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+  }
+
+  async function yieldButtonAutoSizeTurn(index, interval) {
+    const step = Math.max(1, Math.floor(Number(interval) || 1));
+    if (index > 0 && index % step === 0) {
+      await waitForButtonAutoSizeTurn();
+    }
+  }
+
   async function applyButtonTextAutoSize() {
     await ensureSelectionAccess();
 
@@ -82,18 +101,29 @@
       throw new Error("\uD14D\uC2A4\uD2B8\uB098 \uD14D\uC2A4\uD2B8+\uBC15\uC2A4\uB97C \uBA3C\uC800 \uC120\uD0DD\uD574 \uC8FC\uC138\uC694.");
     }
 
-    const textNodes = collectTextNodesFromSelection(selection);
+    const textNodes = await collectTextNodesFromSelection(selection);
     if (!textNodes.length) {
       throw new Error("\uBC84\uD2BC \uD06C\uAE30\uB97C \uB9DE\uCD9C \uD14D\uC2A4\uD2B8\uB97C \uD558\uB098 \uC774\uC0C1 \uC120\uD0DD\uD574 \uC8FC\uC138\uC694.");
     }
 
-    const boxNodes = collectBoxNodesFromSelection(selection);
+    const boxNodes = await collectBoxNodesFromSelection(selection);
     const usedBoxIds = {};
     const resized = [];
     const created = [];
     const skipped = [];
 
     for (let index = 0; index < textNodes.length; index += 1) {
+      await yieldButtonAutoSizeTurn(index, TEXT_APPLY_YIELD_INTERVAL);
+      if (index > 0 && index % Math.max(TEXT_APPLY_YIELD_INTERVAL * 4, 1) === 0) {
+        postStatus(
+          "running",
+          "\uBC84\uD2BC \uD14D\uC2A4\uD2B8 \uBC15\uC2A4\uB97C \uC870\uC808\uD558\uACE0 \uC788\uC2B5\uB2C8\uB2E4. (" +
+            (index + 1) +
+            "/" +
+            textNodes.length +
+            ")"
+        );
+      }
       const textNode = textNodes[index];
       try {
         const result = await fitSingleButtonText(textNode, boxNodes, usedBoxIds);
@@ -136,39 +166,42 @@
     };
   }
 
-  function collectTextNodesFromSelection(selection) {
-    const textNodes = [];
-    for (let index = 0; index < selection.length; index += 1) {
-      collectDescendantNodes(selection[index], textNodes, (node) => node && node.type === "TEXT" && !node.removed);
-    }
-    return textNodes;
+  async function collectTextNodesFromSelection(selection) {
+    return await collectDescendantNodes(selection, (node) => node && node.type === "TEXT" && !node.removed);
   }
 
-  function collectBoxNodesFromSelection(selection) {
-    const boxNodes = [];
-    for (let index = 0; index < selection.length; index += 1) {
-      collectDescendantNodes(selection[index], boxNodes, isResizableBoxNode);
-    }
-    return boxNodes;
+  async function collectBoxNodesFromSelection(selection) {
+    return await collectDescendantNodes(selection, isResizableBoxNode);
   }
 
-  function collectDescendantNodes(node, list, predicate) {
-    if (!node || node.removed) {
-      return;
+  async function collectDescendantNodes(selection, predicate) {
+    const list = [];
+    const stack = Array.isArray(selection) ? selection.slice() : [];
+    let scannedCount = 0;
+
+    while (stack.length > 0) {
+      await yieldButtonAutoSizeTurn(scannedCount, NODE_SCAN_YIELD_INTERVAL);
+      scannedCount += 1;
+      const node = stack.pop();
+      if (!node || node.removed) {
+        continue;
+      }
+      if (predicate(node)) {
+        appendUniqueNode(list, node);
+      }
+      const children = Array.isArray(node.children) ? node.children : [];
+      for (let index = children.length - 1; index >= 0; index -= 1) {
+        stack.push(children[index]);
+      }
     }
-    if (predicate(node)) {
-      appendUniqueNode(list, node);
-    }
-    const children = Array.isArray(node.children) ? node.children : [];
-    for (let index = 0; index < children.length; index += 1) {
-      collectDescendantNodes(children[index], list, predicate);
-    }
+
+    return list;
   }
 
   async function fitSingleButtonText(textNode, boxNodes, usedBoxIds) {
     await loadFontsForTextNode(textNode);
 
-    const fontSize = resolveUniformFontSize(textNode);
+    const fontSize = await resolveUniformFontSize(textNode);
     if (!(fontSize > 0)) {
       throw new Error("\uD14D\uC2A4\uD2B8\uC758 \uD3F0\uD2B8 \uD06C\uAE30\uAC00 \uC11E\uC5EC \uC788\uC5B4 \uAE30\uC900 \uB192\uC774\uB97C \uACC4\uC0B0\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.");
     }
@@ -186,7 +219,7 @@
     }
 
     const targetRect = buildTargetButtonRect(textBounds, metrics);
-    const pairedBox = findBestBoxForText(textNode, boxNodes, usedBoxIds);
+    const pairedBox = await findBestBoxForText(textNode, boxNodes, usedBoxIds);
 
     if (pairedBox) {
       const beforeBoxSize = {
@@ -268,8 +301,8 @@
   }
 
   function buildTargetButtonRect(textBounds, metrics) {
-    const paddingX = resolveTargetHorizontalPadding(metrics);
-    const paddingY = resolveTargetVerticalPadding(metrics);
+    const paddingX = resolveTargetHorizontalPadding(metrics, textBounds);
+    const paddingY = resolveTargetVerticalPadding(metrics, textBounds);
     const width = Math.max(1, Math.ceil(textBounds.width + paddingX * 2));
     const height = Math.max(1, Math.ceil(textBounds.height + paddingY * 2));
     return {
@@ -282,25 +315,35 @@
     };
   }
 
-  function resolveTargetHorizontalPadding(metrics) {
+  function resolveTargetHorizontalPadding(metrics, textBounds) {
     const fontSize = Number(metrics && metrics.fontSize) || 0;
     const paddingX = Math.max(0, Number(metrics && metrics.paddingX) || 0);
+    const visualHeight = Math.max(0, Number(textBounds && textBounds.height) || 0);
+    const visualPadding = visualHeight > 0 ? Math.round(visualHeight * 0.38) : 0;
+    let targetPadding = 0;
     if (fontSize > 0 && fontSize <= 18) {
-      return paddingX + 4;
+      targetPadding = paddingX + 8;
+    } else {
+      targetPadding = Math.max(24, Math.min(96, Math.round(fontSize * 0.85)));
     }
-    return Math.max(18, Math.min(44, Math.round(fontSize * 0.7)));
+    return Math.max(16, targetPadding, visualPadding);
   }
 
-  function resolveTargetVerticalPadding(metrics) {
+  function resolveTargetVerticalPadding(metrics, textBounds) {
     const fontSize = Number(metrics && metrics.fontSize) || 0;
     const paddingY = Math.max(0, Number(metrics && metrics.paddingY) || 0);
+    const visualHeight = Math.max(0, Number(textBounds && textBounds.height) || 0);
+    const visualPadding = visualHeight > 0 ? Math.round(visualHeight * 0.2) : 0;
+    let targetPadding = 0;
     if (fontSize > 0 && fontSize <= 18) {
-      return paddingY + 3;
+      targetPadding = paddingY + 5;
+    } else {
+      targetPadding = Math.max(16, Math.min(64, Math.round(fontSize * 0.5)));
     }
-    return Math.max(14, Math.min(34, Math.round(fontSize * 0.62)));
+    return Math.max(10, targetPadding, visualPadding);
   }
 
-  function findBestBoxForText(textNode, boxNodes, usedBoxIds) {
+  async function findBestBoxForText(textNode, boxNodes, usedBoxIds) {
     const textBounds = getAbsoluteBounds(textNode);
     if (!textBounds) {
       return null;
@@ -310,6 +353,7 @@
     let bestScore = -Infinity;
 
     for (let index = 0; index < boxNodes.length; index += 1) {
+      await yieldButtonAutoSizeTurn(index, BOX_MATCH_YIELD_INTERVAL);
       const box = boxNodes[index];
       if (!box || box.removed || box === textNode) {
         continue;
@@ -767,8 +811,27 @@
     }
 
     for (let index = 0; index < fonts.length; index += 1) {
-      await figma.loadFontAsync(fonts[index]);
+      await yieldButtonAutoSizeTurn(index, FONT_LOAD_YIELD_INTERVAL);
+      await loadFontWithCache(fonts[index]);
     }
+  }
+
+  async function loadFontWithCache(fontName) {
+    const key = getFontKey(fontName);
+    if (!key) {
+      return;
+    }
+
+    let pending = loadedFontPromiseCache.get(key);
+    if (!pending) {
+      pending = figma.loadFontAsync({
+        family: fontName.family,
+        style: fontName.style,
+      });
+      loadedFontPromiseCache.set(key, pending);
+    }
+
+    await pending;
   }
 
   function appendFontName(fonts, fontName) {
@@ -787,7 +850,17 @@
     fonts.push(fontName);
   }
 
-  function resolveUniformFontSize(node) {
+  function getFontKey(fontName) {
+    if (!fontName || typeof fontName !== "object") {
+      return "";
+    }
+    if (typeof fontName.family !== "string" || typeof fontName.style !== "string") {
+      return "";
+    }
+    return fontName.family + "\u0000" + fontName.style;
+  }
+
+  async function resolveUniformFontSize(node) {
     if (typeof node.fontSize === "number" && Number.isFinite(node.fontSize)) {
       return node.fontSize;
     }
@@ -800,6 +873,7 @@
       return null;
     }
     for (let index = 1; index < characters.length; index += 1) {
+      await yieldButtonAutoSizeTurn(index, FONT_SCAN_YIELD_INTERVAL);
       const next = node.getRangeFontSize(index, index + 1);
       if (typeof next !== "number" || Math.abs(next - first) > 0.001) {
         return null;

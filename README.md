@@ -401,6 +401,16 @@ When `ui.html` changes, also run a browser-script parse check with `new Function
   - Scope: reused the yielding text-node collector for the clear flow and made the shared annotation apply/clear helper yield while indexing nodes, preparing issue buckets, and writing annotations. Annotation category matching, legacy-prefix cleanup, and result payloads are unchanged.
   - Manual test: reload the plugin, select a small text layer or group that has an AI typo annotation from `오타 검수`/`오타 직접 수정`, and run `오타 주석 삭제`. Confirm the typo annotation is removed and the button returns to normal. If no annotation exists, confirm it reports zero removed and still returns to normal.
 
+- 2026-05-21 step 34: added cooperative yielding to the visible button-size auto-fit path.
+  - Reason: `버튼 사이즈 자동 맞춤` scans selected descendants twice, compares every text node against candidate button boxes, loads fonts, and can inspect long text character-by-character for uniform font size. Large selections should not monopolize the plugin runtime.
+  - Scope: changed descendant collection to iterative yielding scans, yielded while fitting each text node, yielded during text-to-box matching and long font-size scans, added a font-load promise cache, and made button padding scale from both font size and visible text height so scaled/large button labels do not become too tight. Pairing rules, created/resized result payloads, and geometry behavior are otherwise unchanged.
+  - Manual test: reload the plugin, select one simple text layer inside or over a button rectangle, and run `버튼 사이즈 자동 맞춤`. Confirm the existing rectangle resizes or a button box is created behind the text with comfortable button padding, and the button returns to normal. Do not use a large frame for this smoke test.
+
+- 2026-05-21 step 35: changed image extend apply to preserve the original layer by default.
+  - Reason: `이미지 영역 확장` said it preserves the original, but the runtime normalized every output mode to `use_ai_only`, so applying an extension inserted the AI result and hid the selected source layer. That made vertical originals look replaced by a wide generated layer instead of leaving the source intact.
+  - Scope: added a `preserve_original` output mode as the default UI/runtime mode, bumped the image-extend modal storage key so old `use_ai_only` preference does not silently keep replacing originals, removed the unused expansion-mask apply path, and changed the default apply path to insert one new extended image layer below the source layer without hiding, resizing, or grouping the original. The explicit `AI 결과만 사용` mode still keeps the previous replace-style behavior.
+  - Manual test: reload the plugin, select one image layer, run `이미지 영역 확장`, keep `원본 보존 + 확장 레이어`, and generate/apply a small side expansion. Confirm the original layer remains visible and unchanged above a new `... / extended layer` result, and the button returns to normal. Then optionally choose `AI 결과만 사용` once to confirm the old replace behavior is still available.
+
 1. Edit `ui.html` for UI-only changes.
    - Keep `편집하기` screen markup and styles in `ui.html`.
    - Keep `편집하기` feature logic in `ui-ai-correction.js` so Make/Import behavior stays isolated.
