@@ -145,6 +145,16 @@ Runtime note: the active AI correction UI logic currently lives inline in `ui.ht
 
 Before changing code, read this README and the relevant feature work-log section first. If a task reveals an important source-of-truth rule, build quirk, verification step, or regression note that future work should preserve, add it back to this README instead of leaving it only in chat.
 
+### Hidden Menu Policy
+
+Keep these AI feature entries hidden in the plugin UI. Do not turn them into visible paid-plan teasers or disabled/locked menu items unless the product decision explicitly changes.
+
+- `aiDesignChatGroup`: `AI 디자인 채팅`
+- `aiImageGenerateExtendGroup`: `이미지 생성/확장`
+- `aiOriginalVideoExtractButton`: `AI 영상 생성`
+
+Plan-gated disabled buttons are for visible ordinary editing tools only. The three AI entries above should stay hidden so they do not reappear while adjusting Free/Basic/Pro gating.
+
 ### PSD Shadow Export Note
 
 - Figma nodes can use four outer shadows as a deliberate 360-degree product shadow system. Preserve each shadow's own X/Y, blur, spread, color, and opacity values.
