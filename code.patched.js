@@ -4124,7 +4124,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       if (message.type === "pigma-web-auth-clear") {
         await writeWebAuth(DEFAULT_WEB_AUTH);
         await postWebAuthState();
-        figma.notify("Pigma web connection cleared.", { timeout: 1600 });
+        figma.notify("Pigma 로그아웃했습니다.", { timeout: 1600 });
         return;
       }
 
