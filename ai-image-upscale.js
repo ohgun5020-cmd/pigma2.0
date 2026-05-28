@@ -1533,6 +1533,7 @@
 
     const directImageTarget = collectDirectImageFillTarget(node, selection);
     if (directImageTarget) {
+      directImageTarget.forceRenderedSource = true;
       return directImageTarget;
     }
 
@@ -1726,6 +1727,7 @@
   async function buildUpscaleImageSource(target, options) {
     const targetNode = await figma.getNodeByIdAsync(target.entry.nodeId);
     const preferOriginalImageBytes = !!(options && options.preferOriginalImageBytes);
+    const forceRenderedSource = !!(target && target.forceRenderedSource === true);
     const sourceFill = resolveUpscaleSourceFill(targetNode, target);
     const requiresRenderedSource = sourceFill ? await isRenderedUpscaleSourceRequired(targetNode, sourceFill) : false;
     const localBounds = getImageExtendLocalBounds(targetNode);
@@ -1774,8 +1776,8 @@
     }
 
     if (!bytes.length) {
-      if (requiresRenderedSource && !preferOriginalImageBytes) {
-        throw new Error("Could not export the currently visible image bytes for upscale.");
+      if ((requiresRenderedSource || forceRenderedSource) && !preferOriginalImageBytes) {
+        throw new Error("Could not export the currently visible image bytes for prompt edit/generation.");
       }
       const image = figma.getImageByHash(target.entry.imageHash);
       if (!image) {
