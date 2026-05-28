@@ -10,7 +10,6 @@
     apiKey: "",
     openAiApiKey: "",
     geminiApiKey: "",
-    dubApiKey: "",
     openAiImageModel: "gpt-image-1.5",
     openAiImageModelPinned: false,
     geminiImageModel: "gemini-3.1-flash-image-preview",
@@ -89,8 +88,6 @@
         : legacyProvider === "gemini"
           ? legacyApiKey
           : DEFAULT_AI_SETTINGS.geminiApiKey;
-    const dubApiKey =
-      typeof source.dubApiKey === "string" ? sanitizeApiKey(source.dubApiKey) : DEFAULT_AI_SETTINGS.dubApiKey;
     const openAiImageModelPinned = source.openAiImageModelPinned === true;
     const rawOpenAiImageModel =
       typeof source.openAiImageModel === "string"
@@ -132,7 +129,6 @@
       apiKey,
       openAiApiKey,
       geminiApiKey,
-      dubApiKey,
       openAiImageModel,
       openAiImageModelPinned,
       geminiImageModel,

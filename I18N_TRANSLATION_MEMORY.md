@@ -31,13 +31,13 @@ Updated: 2026-05-08
 | --- | ---: | --- |
 | Navigation / common UI | 91 | Sections, Create, Import, Edit, Settings, Run, Apply, Cancel, Close, Preview, selection states |
 | Import / export / PSD | 49 | PSD/AI/EPS/PDF/PPT/SVG import, file picker, export/download labels, ZIP/PSD status |
-| AI settings / API | 74 | OpenAI/Gemini/Dub settings, API key status, model labels, test/apply messages |
+| AI settings / API | 74 | OpenAI/Gemini settings, API key status, model labels, test/apply messages |
 | Review tools | 47 | Accessibility review, design consistency review, typo review/fix, review-note cleanup |
 | Layer cleanup | 59 | Unlock locked layers, delete hidden layers, split long frame |
 | Align / fix | 28 | Integer pixel snap, button auto-fit, skew correction, corner radius adjustment |
 | Text tools | 46 | Translation, text highlight, line-height adjustment, OCR/text overlay related labels |
 | Image tools | 105 | Sharpen, auto tone, extract colors, reference search, merge, original size, original image save, prompt edit/generate, extend, upscale |
-| Share / video | 47 | Shorten link, prototype link, AI video, GIF/APNG conversion |
+| Share / video | 47 | Prototype link, AI video, GIF/APNG conversion |
 | Other / dynamic | 247 | Modal copy, status text, generated message patterns, corrupted Korean fallback keys |
 
 ## Translated Runtime Work
@@ -48,7 +48,7 @@ Updated: 2026-05-08
 | --- | --- |
 | `ui.html` | I18N UI stabilizer, text/attribute observer, alert/confirm translation patch, processing toast bridge, import file picker locale labels |
 | `unlock-locked-layers.js` | Running status, selection error, skipped reason, no locked-layer toast, success toast, selection label |
-| `ai-url-shortener.js` | Shorten Link / Prototype Link running status, selection validation, success toasts, Dub/is.gd/TinyURL/server errors |
+| `copy-prototype-link.js` | Prototype Link running status, selection validation, success toasts |
 | `original-image-download.js` | Original image search/save status, empty-selection toasts, read/prepare errors, download result labels |
 | `ai-color-extract.js` | Prepare/apply status, one-target validation, palette name, empty result toast, success toast, browser-analysis failure |
 | `ai-color-extract-ui.js` | Init failure, busy labels, processing toast labels, peer-busy error, UI error bridge |
@@ -62,7 +62,7 @@ These are already represented in `ui.html` translation entries and should be reu
 - Common: Sections, Create, Import, Edit, Settings, Run, Selection, Ready, Idle, Complete, Error
 - Import: Select File, No file selected, Import PSD / AI / EPS / PDF / PPT / SVG, Import to Figma
 - Export: PSD download, ZIP download, export settings, hidden layers, editable text, bitmap text
-- AI settings: Apply AI Settings, API Connection, OpenAI, Gemini, Dub, model fields, API test states
+- AI settings: Apply AI Settings, API Connection, OpenAI, Gemini, model fields, API test states
 - AI chat: AI Design Chat, Current Selection, Capture, Recapture, Send, User, suggested questions
 - Design assist: PC -> MO, MO -> PC, draft generation, dry-run, mobile/desktop draft states
 - Review: Accessibility Review, Design Consistency Review, Typo Review, Auto Fix, Clear Review Notes
@@ -71,7 +71,7 @@ These are already represented in `ui.html` translation entries and should be reu
 - Text: Text Translation, Text Highlight, Adjust Text Line Height, text extraction / text overlay
 - Image adjust: Sharpen, Auto Tone, Extract Colors, Find Reference Images, Merge Images, Save Original Image
 - Image generate/extend: Prompt Edit / Generate, Extend Image, Upscale, output size selection
-- Share/other: Shorten Link, Copy Prototype Link, copied/ready/error states
+- Share/other: Copy Prototype Link, copied/ready/error states
 - Video: AI video generation, local video import, GIF/APNG conversion, motion analysis, rendering progress
 
 ## Known Missing / Audit Targets

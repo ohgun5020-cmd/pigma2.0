@@ -198,7 +198,7 @@ Use this map for stability work and manual tests. "Visible" means the user can n
 - Visible 이미지 보정 actions: `이미지 보이는 영역 맞춤`, `원본 크기 맞춤`, `원본 이미지 저장`, `선명도 보정`, `색감 자동 보정`, `색상 추출`, `참고 이미지 검색`, `이미지 합치기`.
 - Hidden 이미지 보정 action: `이미지 업스케일 (사물)`.
 - Visible 이미지 생성/확장 actions: `프롬프트 편집/생성`, `이미지 영역 확장`, `해상도 높이기`, `이미지 텍스트 추출`.
-- Visible 공유/기타 actions: `링크 짧게 만들기`, `프로토타입 링크 복사`.
+- Visible 공유/기타 actions: `프로토타입 링크 복사`.
 - Visible 영상 actions: `AI 영상 생성`, `영상 GIF 변환`, `영상 APNG 변환`.
 
 Manual testing rule: test the visible action changed in the current step first. Run `정수 픽셀 정렬 교정` only as a regression check when shared AI-correction routing, shared UI state, or plugin-side message locks changed. Do not ask the user to test hidden/debug-only actions.
@@ -238,10 +238,10 @@ When `ui.html` changes, also run a browser-script parse check with `new Function
 
 #### Step log
 
-- 2026-05-19 step 1: handled `shorten-figma-url-report-error` in `ai-url-shortener.js`.
-  - Reason: `ui.html` could send this UI-side error report, but the plugin runtime had no matching handler.
-  - Scope: added a narrow message branch that converts the report into the existing `shorten-figma-url-error` response and Figma notification.
-  - Verification: `node -c ai-url-shortener.js`, `build-patched-main.ps1`, `verify-figma-runtime-syntax.js`, `verify-externalized-ui.js code.patched.js`, `node -c code.patched.js`, and `ui.html` inline script parse all passed.
+- 2026-05-19 step 1: handled the then-active Figma URL shortener UI error bridge.
+  - Reason: the UI could send a shortener error report, but the plugin runtime had no matching handler.
+  - Scope: added a narrow message branch for the shortener path. The shortener feature was later retired; `프로토타입 링크 복사` now uses `copy-prototype-link.js`.
+  - Verification: build/runtime syntax checks and `ui.html` inline script parse passed at the time.
   - Follow-up: the remaining design-assist orphan candidates were retired in step 2.
 - 2026-05-19 step 2: retired the remaining Design Assist UI-to-plugin sends in `ui.html`.
   - Reason: Design Assist is not used, and its disabled script still contained unreachable message sends that made routing audits noisy.

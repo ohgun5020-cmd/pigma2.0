@@ -3886,7 +3886,6 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     apiKey: "",
     openAiApiKey: "",
     geminiApiKey: "",
-    dubApiKey: "",
     openAiImageModel: "gpt-image-1.5",
     openAiImageModelPinned: false,
     geminiImageModel: "gemini-3.1-flash-image-preview",
@@ -3965,8 +3964,6 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         : legacyProvider === "gemini"
           ? legacyApiKey
           : DEFAULT_AI_SETTINGS.geminiApiKey;
-    const dubApiKey =
-      typeof source.dubApiKey === "string" ? sanitizeApiKey(source.dubApiKey) : DEFAULT_AI_SETTINGS.dubApiKey;
     const openAiImageModelPinned = source.openAiImageModelPinned === true;
     const rawOpenAiImageModel =
       typeof source.openAiImageModel === "string"
@@ -4008,7 +4005,6 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       apiKey,
       openAiApiKey,
       geminiApiKey,
-      dubApiKey,
       openAiImageModel,
       openAiImageModelPinned,
       geminiImageModel,
@@ -36494,16 +36490,11 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
 ;(() => {
   const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
-  if (globalScope.__PIGMA_FIGMA_URL_SHORTENER_PATCH__) {
+  if (globalScope.__PIGMA_COPY_PROTOTYPE_LINK_PATCH__) {
     return;
   }
 
   const originalOnMessage = figma.ui.onmessage;
-  const AI_SETTINGS_KEY = "pigma:ai-settings:v1";
-  const DUB_LINKS_API_URL = "https://api.dub.co/links";
-  const DUB_SHORTENER_PROXY_URL = "";
-  const BUNDLED_DUB_API_KEY = "dub_r1y6JZGJtEAGD5vqJ17gIOqU";
-  const shortUrlCache = {};
   let isRunning = false;
 
   if (typeof originalOnMessage !== "function") {
@@ -36511,21 +36502,6 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   }
 
   figma.ui.onmessage = async (message) => {
-    if (isShortenRequestMessage(message)) {
-      if (isRunning) {
-        postStatus("running", "Shorten Link is already running.");
-        return;
-      }
-
-      await runShortenFigmaUrl();
-      return;
-    }
-
-    if (isShortenReportErrorMessage(message)) {
-      reportUiShortenerError(message.message);
-      return;
-    }
-
     if (isCopyPrototypeLinkMessage(message)) {
       if (isRunning) {
         postPrototypeStatus("running", "Preparing the prototype link.");
@@ -36539,60 +36515,10 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return originalOnMessage(message);
   };
 
-  globalScope.__PIGMA_FIGMA_URL_SHORTENER_PATCH__ = true;
-
-  function isShortenRequestMessage(message) {
-    return !!message && message.type === "run-shorten-figma-url";
-  }
-
-  function isShortenReportErrorMessage(message) {
-    return !!message && message.type === "shorten-figma-url-report-error";
-  }
+  globalScope.__PIGMA_COPY_PROTOTYPE_LINK_PATCH__ = true;
 
   function isCopyPrototypeLinkMessage(message) {
     return !!message && message.type === "run-copy-prototype-link";
-  }
-
-  function reportUiShortenerError(rawMessage) {
-    const message = normalizeErrorMessage(rawMessage, "Failed to shorten the link.");
-    figma.ui.postMessage({
-      type: "shorten-figma-url-error",
-      message: message,
-    });
-    figma.notify(message, { error: true, timeout: 2600 });
-  }
-
-  async function runShortenFigmaUrl() {
-    isRunning = true;
-    postStatus("running", "Shortening the prototype link for the selected frame or section.");
-
-    try {
-      await ensureCurrentPageLoaded();
-      const target = collectTargetNode();
-      const longUrl = buildPrototypeLink(target);
-      const shortUrl = await getShortUrl(longUrl);
-      figma.ui.postMessage({
-        type: "shorten-figma-url-result",
-        result: {
-          selectionId: target.node.id,
-          shareNodeId: target.shareNode.id,
-          selectionLabel: safeName(target.node),
-          selectionType: safeNodeType(target.node),
-          longUrl: longUrl,
-          shortUrl: shortUrl,
-        },
-      });
-      figma.notify("Short link is ready.", { timeout: 1800 });
-    } catch (error) {
-      const message = normalizeErrorMessage(error, "Failed to shorten the link.");
-      figma.ui.postMessage({
-        type: "shorten-figma-url-error",
-        message: message,
-      });
-      figma.notify(message, { error: true, timeout: 2600 });
-    } finally {
-      isRunning = false;
-    }
   }
 
   async function runCopyPrototypeLink() {
@@ -36625,14 +36551,6 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     } finally {
       isRunning = false;
     }
-  }
-
-  function postStatus(status, message) {
-    figma.ui.postMessage({
-      type: "shorten-figma-url-status",
-      status: status,
-      message: message,
-    });
   }
 
   function postPrototypeStatus(status, message) {
@@ -36670,307 +36588,6 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       shareNode: shareNode,
       page: page,
     };
-  }
-
-  async function getShortUrl(longUrl) {
-    const normalizedLongUrl = String(longUrl || "").trim();
-    if (!normalizedLongUrl) {
-      throw new Error("Could not build a link to shorten.");
-    }
-
-    const dubApiKey = (await readDubApiKey()) || sanitizeApiKey(BUNDLED_DUB_API_KEY);
-    const cacheKey = (dubApiKey ? "dub:" : "public:") + normalizedLongUrl;
-    if (shortUrlCache[cacheKey]) {
-      return shortUrlCache[cacheKey];
-    }
-
-    let lastError = "";
-
-    if (DUB_SHORTENER_PROXY_URL) {
-      const proxyCacheKey = "proxy:" + normalizedLongUrl;
-      if (shortUrlCache[proxyCacheKey]) {
-        return shortUrlCache[proxyCacheKey];
-      }
-
-      try {
-        const proxyShortUrl = await requestProxyShortUrl(normalizedLongUrl);
-        shortUrlCache[proxyCacheKey] = proxyShortUrl;
-        return proxyShortUrl;
-      } catch (error) {
-        lastError = normalizeErrorMessage(error, "Could not shorten the link with the shortener server.");
-      }
-    }
-
-    if (dubApiKey) {
-      try {
-        const dubShortUrl = await requestDubShortUrl(normalizedLongUrl, dubApiKey);
-        shortUrlCache[cacheKey] = dubShortUrl;
-        return dubShortUrl;
-      } catch (error) {
-        lastError = normalizeErrorMessage(error, "Could not shorten the link with Dub.");
-      }
-    }
-
-    try {
-      const isGdShortUrl = await requestIsGdShortUrl(normalizedLongUrl);
-      shortUrlCache[cacheKey] = isGdShortUrl;
-      return isGdShortUrl;
-    } catch (error) {
-      const isGdError = normalizeErrorMessage(error, "Could not shorten the link with is.gd.");
-      lastError = lastError ? lastError + " / " + isGdError : isGdError;
-    }
-
-    try {
-      const tinyUrlShortUrl = await requestTinyUrlShortUrl(normalizedLongUrl);
-      shortUrlCache[cacheKey] = tinyUrlShortUrl;
-      return tinyUrlShortUrl;
-    } catch (error) {
-      const tinyUrlError = normalizeErrorMessage(error, "Could not shorten the link with TinyURL.");
-      throw new Error(lastError ? lastError + " / " + tinyUrlError : tinyUrlError);
-    }
-  }
-
-  async function readDubApiKey() {
-    try {
-      const settings = await figma.clientStorage.getAsync(AI_SETTINGS_KEY);
-      if (!settings || typeof settings !== "object") {
-        return "";
-      }
-
-      return sanitizeApiKey(settings.dubApiKey);
-    } catch (error) {
-      return "";
-    }
-  }
-
-  async function requestDubShortUrl(longUrl, apiKey) {
-    let response;
-    let text = "";
-    try {
-      response = await fetch(DUB_LINKS_API_URL, {
-        method: "POST",
-        headers: {
-          Authorization: "Bearer " + apiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          url: longUrl,
-        }),
-      });
-      text = String(await response.text()).trim();
-    } catch (error) {
-      throw new Error("Could not connect to Dub.");
-    }
-
-    let payload = null;
-    if (text) {
-      try {
-        payload = JSON.parse(text);
-      } catch (error) {
-        payload = null;
-      }
-    }
-
-    if (!response.ok) {
-      throw new Error(normalizeDubError(payload, text, response.status));
-    }
-
-    const shortLink =
-      payload && typeof payload.shortLink === "string" && payload.shortLink.trim()
-        ? payload.shortLink.trim()
-        : payload && typeof payload.shortUrl === "string" && payload.shortUrl.trim()
-          ? payload.shortUrl.trim()
-          : "";
-
-    if (!shortLink) {
-      throw new Error("Dub did not return a short link.");
-    }
-
-    if (!/^https?:\/\//i.test(shortLink)) {
-      throw new Error("Could not read the Dub response format.");
-    }
-
-    return shortLink;
-  }
-
-  async function requestProxyShortUrl(longUrl) {
-    let response;
-    let text = "";
-    try {
-      response = await fetch(DUB_SHORTENER_PROXY_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          url: longUrl,
-        }),
-      });
-      text = String(await response.text()).trim();
-    } catch (error) {
-      throw new Error("Could not connect to the shortener server.");
-    }
-
-    let payload = null;
-    if (text) {
-      try {
-        payload = JSON.parse(text);
-      } catch (error) {
-        payload = null;
-      }
-    }
-
-    if (!response.ok) {
-      throw new Error(normalizeProxyError(payload, text, response.status));
-    }
-
-    const shortUrl =
-      payload && typeof payload.shortUrl === "string" && payload.shortUrl.trim()
-        ? payload.shortUrl.trim()
-        : payload && typeof payload.shortLink === "string" && payload.shortLink.trim()
-          ? payload.shortLink.trim()
-          : "";
-
-    if (!shortUrl) {
-      throw new Error("The shortener server did not return a short link.");
-    }
-
-    if (!/^https?:\/\//i.test(shortUrl)) {
-      throw new Error("Could not read the shortener server response format.");
-    }
-
-    return shortUrl;
-  }
-
-  function normalizeDubError(payload, text, statusCode) {
-    const data = payload && typeof payload === "object" ? payload : {};
-    const message =
-      typeof data.message === "string" && data.message.trim()
-        ? data.message.trim()
-        : typeof data.error === "string" && data.error.trim()
-          ? data.error.trim()
-          : String(text || "").replace(/\s+/g, " ").trim();
-
-    if (message) {
-      return message;
-    }
-
-    if (statusCode === 401 || statusCode === 403) {
-      return "Check the Dub API key permissions.";
-    }
-
-    if (statusCode === 429) {
-      return "Dub usage or request limit was exceeded.";
-    }
-
-    return "Could not shorten the link with Dub.";
-  }
-
-  function normalizeProxyError(payload, text, statusCode) {
-    const data = payload && typeof payload === "object" ? payload : {};
-    const message =
-      typeof data.message === "string" && data.message.trim()
-        ? data.message.trim()
-        : typeof data.error === "string" && data.error.trim()
-          ? data.error.trim()
-          : String(text || "").replace(/\s+/g, " ").trim();
-
-    if (message) {
-      return message;
-    }
-
-    if (statusCode === 429) {
-      return "The shortener server usage or request limit was exceeded.";
-    }
-
-    return "Could not shorten the link with the shortener server.";
-  }
-
-  function sanitizeApiKey(value) {
-    return String(value || "")
-      .replace(/[\u0000-\u001F\u007F-\u009F]/g, "")
-      .replace(/[\u200B-\u200D\uFEFF]/g, "")
-      .replace(/\s+/g, "")
-      .replace(/^['"`]+|['"`]+$/g, "")
-      .replace(/[^\x21-\x7E]/g, "")
-      .trim();
-  }
-
-  async function requestIsGdShortUrl(longUrl) {
-    let response;
-    try {
-      response = await fetch("https://is.gd/create.php?format=simple&url=" + encodeURIComponent(longUrl), {
-        method: "GET",
-      });
-    } catch (error) {
-      throw new Error("Could not connect to is.gd.");
-    }
-
-    const text = String(await response.text()).trim();
-    if (!response.ok) {
-      throw new Error(normalizeShortenerError("is.gd", text, response.status));
-    }
-
-    if (!text) {
-      throw new Error("is.gd did not return a short link.");
-    }
-
-    if (/^Error:\s*/i.test(text)) {
-      throw new Error(text.replace(/^Error:\s*/i, "").trim() || "is.gd could not process the short link request.");
-    }
-
-    if (!/^https?:\/\//i.test(text)) {
-      throw new Error("Could not read the is.gd response format.");
-    }
-
-    return text;
-  }
-
-  async function requestTinyUrlShortUrl(longUrl) {
-    let response;
-    try {
-      response = await fetch("https://tinyurl.com/api-create.php?url=" + encodeURIComponent(longUrl), {
-        method: "GET",
-      });
-    } catch (error) {
-      throw new Error("Could not connect to TinyURL.");
-    }
-
-    const text = String(await response.text()).trim();
-    if (!response.ok) {
-      throw new Error(normalizeShortenerError("TinyURL", text, response.status));
-    }
-
-    if (!text) {
-      throw new Error("TinyURL did not return a short link.");
-    }
-
-    if (/^Error:\s*/i.test(text)) {
-      throw new Error(text.replace(/^Error:\s*/i, "").trim() || "TinyURL could not process the short link request.");
-    }
-
-    if (!/^https?:\/\//i.test(text)) {
-      throw new Error("Could not read the TinyURL response format.");
-    }
-
-    return text;
-  }
-
-  function normalizeShortenerError(providerLabel, text, statusCode) {
-    const normalized = String(text || "").replace(/^Error:\s*/i, "").replace(/\s+/g, " ").trim();
-    if (normalized) {
-      return normalized;
-    }
-
-    if (statusCode === 502) {
-      return providerLabel + " request limit was exceeded. Try again later.";
-    }
-
-    if (statusCode === 503) {
-      return providerLabel + " service is unavailable right now. Try again later.";
-    }
-
-    return providerLabel + " could not shorten the link.";
   }
 
   async function ensureCurrentPageLoaded() {

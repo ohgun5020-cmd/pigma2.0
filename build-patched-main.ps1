@@ -20,7 +20,7 @@ $detachLinkedComponentsPatch = Join-Path $root "detach-linked-components.js"
 $deleteHiddenLayersPatch = Join-Path $root "delete-hidden-layers.js"
 $clearFrameGuidesPatch = Join-Path $root "clear-frame-guides.js"
 $splitLongFramePatch = Join-Path $root "split-long-frame.js"
-$aiUrlShortenerPatch = Join-Path $root "ai-url-shortener.js"
+$copyPrototypeLinkPatch = Join-Path $root "copy-prototype-link.js"
 $aiColorExtractPatch = Join-Path $root "ai-color-extract.js"
 $originalImageDownloadPatch = Join-Path $root "original-image-download.js"
 $aiImageUpscalePatch = Join-Path $root "ai-image-upscale.js"
@@ -128,8 +128,8 @@ if (-not (Test-Path $splitLongFramePatch)) {
   throw "Missing long frame split patch: $splitLongFramePatch"
 }
 
-if (-not (Test-Path $aiUrlShortenerPatch)) {
-  throw "Missing AI URL shortener patch: $aiUrlShortenerPatch"
+if (-not (Test-Path $copyPrototypeLinkPatch)) {
+  throw "Missing copy prototype link patch: $copyPrototypeLinkPatch"
 }
 
 if (-not (Test-Path $aiColorExtractPatch)) {
@@ -262,7 +262,7 @@ $runtimeSyntaxSourceFiles = @(
   $deleteHiddenLayersPatch,
   $clearFrameGuidesPatch,
   $splitLongFramePatch,
-  $aiUrlShortenerPatch,
+  $copyPrototypeLinkPatch,
   $aiColorExtractPatch,
   $aiImageUpscalePatch
 )
@@ -2203,7 +2203,7 @@ $detachLinkedComponentsPatchContent = [System.IO.File]::ReadAllText($detachLinke
 $deleteHiddenLayersPatchContent = [System.IO.File]::ReadAllText($deleteHiddenLayersPatch, [System.Text.Encoding]::UTF8)
 $clearFrameGuidesPatchContent = [System.IO.File]::ReadAllText($clearFrameGuidesPatch, [System.Text.Encoding]::UTF8)
 $splitLongFramePatchContent = [System.IO.File]::ReadAllText($splitLongFramePatch, [System.Text.Encoding]::UTF8)
-$aiUrlShortenerPatchContent = [System.IO.File]::ReadAllText($aiUrlShortenerPatch, [System.Text.Encoding]::UTF8)
+$copyPrototypeLinkPatchContent = [System.IO.File]::ReadAllText($copyPrototypeLinkPatch, [System.Text.Encoding]::UTF8)
 $aiColorExtractPatchContent = [System.IO.File]::ReadAllText($aiColorExtractPatch, [System.Text.Encoding]::UTF8)
 $aiImageUpscalePatchContent = [System.IO.File]::ReadAllText($aiImageUpscalePatch, [System.Text.Encoding]::UTF8)
 $originalImageDownloadPatchContent = ""
@@ -2231,7 +2231,7 @@ $patchedRuntimeParts = @(
   $deleteHiddenLayersPatchContent,
   $clearFrameGuidesPatchContent,
   $splitLongFramePatchContent,
-  $aiUrlShortenerPatchContent,
+  $copyPrototypeLinkPatchContent,
   $aiColorExtractPatchContent,
   $aiImageUpscalePatchContent
 )
