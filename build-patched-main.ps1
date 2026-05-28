@@ -3,6 +3,7 @@ $source = Join-Path $root "code.js"
 $patch = Join-Path $root "psd-import-text-fix.js"
 $exportPatch = Join-Path $root "psd-export-boundary.js"
 $aiSettingsPatch = Join-Path $root "ai-settings-storage.js"
+$pigmaWebIntegrationPatch = Join-Path $root "pigma-web-integration.js"
 $aiResponsiveMemoryPatch = Join-Path $root "ai-responsive-memory.js"
 $aiResponsivePairAnalyzerPatch = Join-Path $root "ai-responsive-pair-analyzer.js"
 $aiLlmClientPatch = Join-Path $root "ai-llm-client.js"
@@ -58,6 +59,10 @@ if (-not (Test-Path $exportPatch)) {
 
 if (-not (Test-Path $aiSettingsPatch)) {
   throw "Missing AI settings patch: $aiSettingsPatch"
+}
+
+if (-not (Test-Path $pigmaWebIntegrationPatch)) {
+  throw "Missing Pigma web integration patch: $pigmaWebIntegrationPatch"
 }
 
 if (-not (Test-Path $aiResponsiveMemoryPatch)) {
@@ -245,6 +250,7 @@ $runtimeSyntaxSourceFiles = @(
   $patch,
   $exportPatch,
   $aiSettingsPatch,
+  $pigmaWebIntegrationPatch,
   $aiResponsiveMemoryPatch,
   $aiResponsivePairAnalyzerPatch,
   $aiLlmClientPatch,
@@ -2186,6 +2192,7 @@ $bundle = Replace-Section `
 $importPatch = [System.IO.File]::ReadAllText($patch, [System.Text.Encoding]::UTF8)
 $exportPatchContent = [System.IO.File]::ReadAllText($exportPatch, [System.Text.Encoding]::UTF8)
 $aiSettingsPatchContent = [System.IO.File]::ReadAllText($aiSettingsPatch, [System.Text.Encoding]::UTF8)
+$pigmaWebIntegrationPatchContent = [System.IO.File]::ReadAllText($pigmaWebIntegrationPatch, [System.Text.Encoding]::UTF8)
 $aiResponsiveMemoryPatchContent = [System.IO.File]::ReadAllText($aiResponsiveMemoryPatch, [System.Text.Encoding]::UTF8)
 $aiResponsivePairAnalyzerPatchContent = [System.IO.File]::ReadAllText($aiResponsivePairAnalyzerPatch, [System.Text.Encoding]::UTF8)
 $aiLlmClientPatchContent = [System.IO.File]::ReadAllText($aiLlmClientPatch, [System.Text.Encoding]::UTF8)
@@ -2215,6 +2222,7 @@ $patchedRuntimeParts = @(
   $importPatch,
   $exportPatchContent,
   $aiSettingsPatchContent,
+  $pigmaWebIntegrationPatchContent,
   $aiResponsiveMemoryPatchContent,
   $aiResponsivePairAnalyzerPatchContent,
   $aiLlmClientPatchContent,

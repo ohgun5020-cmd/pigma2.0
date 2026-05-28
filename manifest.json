@@ -14,8 +14,12 @@
   "networkAccess": {
     "allowedDomains": [
       "https://api.openai.com",
-      "https://generativelanguage.googleapis.com"
+      "https://generativelanguage.googleapis.com",
+      "https://oy-tools-production.up.railway.app"
     ],
-    "reasoning": "Calls user-configured AI APIs for image and video generation workflows."
+    "devAllowedDomains": [
+      "http://localhost:3000"
+    ],
+    "reasoning": "Calls user-configured AI APIs and reads PIGMA web account plan status."
   }
 }

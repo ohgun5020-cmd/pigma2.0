@@ -75,6 +75,9 @@ Safe implementation order:
   - Source of truth for the PSD export message boundary patch.
 - `ai-settings-storage.js`
   - Source of truth for plugin-side AI settings persistence via `figma.clientStorage`.
+- `pigma-web-integration.js`
+  - Source of truth for plugin-side PIGMA web connection persistence via `figma.clientStorage`.
+  - The web app remains the source of truth for account, billing, and plan status; the plugin only stores server URL + plugin token and reads the current plan for lightweight UI state and future feature gating.
 - `ai-responsive-memory.js`
   - Source of truth for responsive memory cache state and JSONL import/export plumbing.
 - `ai-responsive-pair-analyzer.js`
