@@ -69,6 +69,7 @@
   const IMAGE_EXTEND_EXPORT_TIMEOUT_MS = 30000;
   const IMAGE_TEXT_OVERLAY_EXPORT_TIMEOUT_MS = 30000;
   const IMAGE_TEXT_OVERLAY_APPLY_YIELD_INTERVAL = 8;
+  const IMAGE_TEXT_OVERLAY_MAX_TEXT_LENGTH = 5000;
   const IMAGE_MERGE_FAST_EXPORT_TIMEOUT_MS = 6000;
   const IMAGE_MERGE_EXPORT_TIMEOUT_MS = 30000;
   const IMAGE_MERGE_PREFERRED_EXPORT_SCALE = 2;
@@ -3853,7 +3854,7 @@
       });
     }
 
-    return normalized.slice(0, 120);
+    return collapseImageTextOverlayLinesToSingleLayer(normalized.slice(0, 120));
   }
 
   function sanitizeImageTextOverlayCharacters(value) {
@@ -3862,7 +3863,125 @@
     }
 
     const normalized = value.replace(/\u0000/g, "").replace(/\r\n?/g, "\n").trim();
-    return normalized ? normalized.slice(0, 500) : "";
+    return normalized ? normalized.slice(0, IMAGE_TEXT_OVERLAY_MAX_TEXT_LENGTH) : "";
+  }
+
+  function collapseImageTextOverlayLinesToSingleLayer(lines) {
+    const list = Array.isArray(lines) ? lines.filter(Boolean) : [];
+    if (!list.length) {
+      return [];
+    }
+
+    if (list.length === 1) {
+      return [list[0]];
+    }
+
+    const text = sanitizeImageTextOverlayCharacters(
+      list
+        .map(function (line) {
+          return line && typeof line.text === "string" ? line.text.trim() : "";
+        })
+        .filter(Boolean)
+        .join("\n")
+    );
+    if (!text) {
+      return [];
+    }
+
+    const leftRatio = Math.min.apply(
+      null,
+      list.map(function (line) {
+        return line.leftRatio;
+      })
+    );
+    const topRatio = Math.min.apply(
+      null,
+      list.map(function (line) {
+        return line.topRatio;
+      })
+    );
+    const rightRatio = Math.max.apply(
+      null,
+      list.map(function (line) {
+        return line.leftRatio + line.widthRatio;
+      })
+    );
+    const bottomRatio = Math.max.apply(
+      null,
+      list.map(function (line) {
+        return line.topRatio + line.heightRatio;
+      })
+    );
+    const medianHeightRatio = getMedianPositiveImageTextOverlayValue(
+      list.map(function (line) {
+        return line.heightRatio;
+      }),
+      0.028
+    );
+    const fontSizeRatio =
+      getMedianPositiveImageTextOverlayValue(
+        list.map(function (line) {
+          return line.fontSizeRatio;
+        }),
+        0
+      ) || Math.max(0.01, medianHeightRatio * 0.82);
+
+    return [
+      {
+        text: text,
+        leftRatio: sanitizeImageTextOverlayRatio(leftRatio, 0),
+        topRatio: sanitizeImageTextOverlayRatio(topRatio, 0),
+        widthRatio: Math.max(0.002, sanitizeImageTextOverlayRatio(rightRatio - leftRatio, 1)),
+        heightRatio: Math.max(0.002, sanitizeImageTextOverlayRatio(bottomRatio - topRatio, medianHeightRatio)),
+        fontSizeRatio: sanitizeImageTextOverlayRatio(fontSizeRatio, 0.018),
+        fontFamily: getFirstImageTextOverlayStringValue(list, "fontFamily"),
+        fontStyle: getFirstImageTextOverlayStringValue(list, "fontStyle"),
+        fontWeight: Math.round(getMedianPositiveImageTextOverlayValue(list.map(function (line) {
+          return line.fontWeight;
+        }), 400)),
+        fillColor: getFirstImageTextOverlayStringValue(list, "fillColor"),
+        fillOpacity: sanitizeImageTextOverlayOpacity(
+          getMedianPositiveImageTextOverlayValue(
+            list.map(function (line) {
+              return line.fillOpacity;
+            }),
+            1
+          )
+        ),
+        align: getFirstImageTextOverlayStringValue(list, "align") || "left",
+        rotation: 0,
+      },
+    ];
+  }
+
+  function getFirstImageTextOverlayStringValue(lines, key) {
+    for (let index = 0; index < lines.length; index += 1) {
+      const value = lines[index] && lines[index][key];
+      if (typeof value === "string" && value.trim()) {
+        return value.trim();
+      }
+    }
+    return "";
+  }
+
+  function getMedianPositiveImageTextOverlayValue(values, fallbackValue) {
+    const numbers = Array.isArray(values)
+      ? values.map(function (value) {
+          return Number(value);
+        }).filter(function (value) {
+          return Number.isFinite(value) && value > 0;
+        }).sort(function (leftValue, rightValue) {
+          return leftValue - rightValue;
+        })
+      : [];
+    if (!numbers.length) {
+      return Number.isFinite(fallbackValue) ? fallbackValue : 0;
+    }
+    const middleIndex = Math.floor(numbers.length / 2);
+    if (numbers.length % 2 === 1) {
+      return numbers[middleIndex];
+    }
+    return (numbers[middleIndex - 1] + numbers[middleIndex]) / 2;
   }
 
   function sanitizeImageTextOverlayRatio(value, fallbackValue) {
