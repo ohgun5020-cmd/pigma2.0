@@ -16841,6 +16841,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   const AI_TYPO_CLEAR_CACHE_KEY = "pigma:ai-typo-clear-cache:v1";
   const AI_TRANSLATE_CACHE_KEY = "pigma:ai-translate-cache:v1";
   const AI_TRANSLATE_MEMORY_KEY = "pigma:ai-translate-memory:v1";
+  const AI_TRANSLATE_TARGET_LANGUAGE_KEY = "pigma:ai-translate-target-language:v1";
   const AI_TEXT_HIGHLIGHT_DEFAULT_COLOR = "#F5FF74";
   const AI_TEXT_HIGHLIGHT_DEFAULT_TEXT_COLOR = "#111111";
   const AI_TEXT_HIGHLIGHT_DEFAULT_RADIUS = 0;
@@ -17252,6 +17253,17 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         return;
       }
 
+      if (message.type === "request-ai-translate-target-language") {
+        await postTranslateTargetLanguage();
+        return;
+      }
+
+      if (message.type === "update-ai-translate-target-language") {
+        await writeTranslateTargetLanguage(message.targetLanguage);
+        await postTranslateTargetLanguage();
+        return;
+      }
+
       if (message.type === "request-ai-text-highlight-source") {
         await postTextHighlightSource(message);
         return;
@@ -17317,6 +17329,8 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
         message.type === "request-ai-typo-clear-cache" ||
         message.type === "run-ai-typo-clear" ||
         message.type === "request-ai-translate-cache" ||
+        message.type === "request-ai-translate-target-language" ||
+        message.type === "update-ai-translate-target-language" ||
         message.type === "run-ai-translate" ||
         message.type === "apply-ai-translate-preview" ||
         message.type === "request-ai-text-highlight-source" ||
@@ -18342,6 +18356,13 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     });
   }
 
+  async function postTranslateTargetLanguage() {
+    figma.ui.postMessage({
+      type: "ai-translate-target-language",
+      targetLanguage: await readTranslateTargetLanguage(),
+    });
+  }
+
   function postTextHighlightStatus(status, message) {
     figma.ui.postMessage({
       type: "ai-text-highlight-status",
@@ -18403,6 +18424,14 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
   }
 
+  async function readTranslateTargetLanguage() {
+    try {
+      return normalizeTranslateTargetLanguage(await figma.clientStorage.getAsync(AI_TRANSLATE_TARGET_LANGUAGE_KEY));
+    } catch (error) {
+      return "en-US";
+    }
+  }
+
   async function writeTypoAuditCache(result) {
     if (!result || typeof result !== "object") {
       return null;
@@ -18457,6 +18486,21 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       await figma.clientStorage.setAsync(AI_TRANSLATE_MEMORY_KEY, normalized);
     } catch (error) {}
     return normalized;
+  }
+
+  async function writeTranslateTargetLanguage(value) {
+    const normalized = normalizeTranslateTargetLanguage(value);
+    try {
+      await figma.clientStorage.setAsync(AI_TRANSLATE_TARGET_LANGUAGE_KEY, normalized);
+    } catch (error) {}
+    return normalized;
+  }
+
+  function normalizeTranslateTargetLanguage(value) {
+    const normalized = typeof value === "string" ? value.trim() : "";
+    return normalized && Object.prototype.hasOwnProperty.call(TRANSLATION_LANGUAGE_METADATA, normalized)
+      ? normalized
+      : "en-US";
   }
 
   function matchesCurrentSelection(result) {
