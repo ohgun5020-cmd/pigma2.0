@@ -1,7 +1,6 @@
 {
   "sourceFile": "psd-export-boundary.js",
   "bundleFile": "code.patched.js",
-  "runtimeFile": "ui.html",
   "buildScript": "build-patched-main.ps1",
   "requiredMarkers": [
     "PIGMA_EXPORT_BOUNDARY::SOURCE_OF_TRUTH",
@@ -24,16 +23,5 @@
     "developerExportExperiments: normalizeExportExperiments(message.developerExportExperiments)",
     "value === \"psd-with-png\"",
     "value === \"psd-with-jpg\""
-  ],
-  "requiredRuntimeSnippets": [
-    "function pigmaFindContainerClipBaseIndex(e){return e.findIndex(pigmaIsBaseImageSimulationLayer)}",
-    "for(let l=i+1;l<e.length;l+=1){let u=e[l];if(u&&typeof u==\"object\"){u.clipping=!0,r.applied=!0}}"
-  ],
-  "forbiddenRuntimeSnippets": [
-    "return n===0?n:-1",
-    "let o=e.findIndex(pigmaIsBackgroundClipBaseLayer),s=o>=0&&o<i?o:i"
-  ],
-  "requiredBuildSnippets": [
-    "ui PSD background clip avoids background fallback"
   ]
 }

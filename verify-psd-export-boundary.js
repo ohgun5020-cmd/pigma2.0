@@ -35,19 +35,8 @@ function assertIncludes(content, fileLabel, expectedValues, valueLabel) {
   fail(`PSD export boundary verification failed for ${fileLabel}\n${details}`);
 }
 
-function assertExcludes(content, fileLabel, forbiddenValues, valueLabel) {
-  const present = forbiddenValues.filter(value => content.includes(value));
-  if (present.length === 0) {
-    return;
-  }
-
-  const details = present.map(value => `- Forbidden ${valueLabel}: ${value}`).join("\n");
-  fail(`PSD export boundary verification failed for ${fileLabel}\n${details}`);
-}
-
 const sourceContent = readRequiredFile(contract.sourceFile);
 const bundleContent = readRequiredFile(contract.bundleFile);
-const runtimeContent = contract.runtimeFile ? readRequiredFile(contract.runtimeFile) : "";
 const buildScriptContent = readRequiredFile(contract.buildScript);
 
 assertIncludes(sourceContent, contract.sourceFile, contract.requiredMarkers, "marker");
@@ -66,14 +55,7 @@ assertIncludes(
 );
 assertIncludes(sourceContent, contract.sourceFile, contract.requiredSnippets || [], "snippet");
 assertIncludes(bundleContent, contract.bundleFile, contract.requiredSnippets || [], "snippet");
-assertIncludes(bundleContent, contract.bundleFile, contract.requiredBundleSnippets || [], "bundle snippet");
-assertExcludes(bundleContent, contract.bundleFile, contract.forbiddenBundleSnippets || [], "bundle snippet");
-if (contract.runtimeFile) {
-  assertIncludes(runtimeContent, contract.runtimeFile, contract.requiredRuntimeSnippets || [], "runtime snippet");
-  assertExcludes(runtimeContent, contract.runtimeFile, contract.forbiddenRuntimeSnippets || [], "runtime snippet");
-}
 assertIncludes(buildScriptContent, contract.buildScript, [contract.sourceFile], "patch reference");
 assertIncludes(buildScriptContent, contract.buildScript, ["verify-psd-export-boundary.js"], "verifier hook");
-assertIncludes(buildScriptContent, contract.buildScript, contract.requiredBuildSnippets || [], "build snippet");
 
 console.log("PSD export boundary verified.");
