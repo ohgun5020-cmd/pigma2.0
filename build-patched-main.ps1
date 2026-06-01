@@ -18,6 +18,7 @@ $buttonTextAutoSizePatch = Join-Path $root "button-text-auto-size.js"
 $textLineHeightAdjustPatch = Join-Path $root "text-line-height-adjust.js"
 $unlockLockedLayersPatch = Join-Path $root "unlock-locked-layers.js"
 $detachLinkedComponentsPatch = Join-Path $root "detach-linked-components.js"
+$autoLayoutOffPatch = Join-Path $root "auto-layout-off.js"
 $deleteHiddenLayersPatch = Join-Path $root "delete-hidden-layers.js"
 $clearFrameGuidesPatch = Join-Path $root "clear-frame-guides.js"
 $splitLongFramePatch = Join-Path $root "split-long-frame.js"
@@ -119,6 +120,10 @@ if (-not (Test-Path $unlockLockedLayersPatch)) {
 
 if (-not (Test-Path $detachLinkedComponentsPatch)) {
   throw "Missing linked component detach patch: $detachLinkedComponentsPatch"
+}
+
+if (-not (Test-Path $autoLayoutOffPatch)) {
+  throw "Missing auto layout off patch: $autoLayoutOffPatch"
 }
 
 if (-not (Test-Path $deleteHiddenLayersPatch)) {
@@ -265,6 +270,7 @@ $runtimeSyntaxSourceFiles = @(
   $textLineHeightAdjustPatch,
   $unlockLockedLayersPatch,
   $detachLinkedComponentsPatch,
+  $autoLayoutOffPatch,
   $deleteHiddenLayersPatch,
   $clearFrameGuidesPatch,
   $splitLongFramePatch,
@@ -590,6 +596,23 @@ $bundle = Replace-Exact `
   -Replace 'function An(e,t,r){if(fe(e))return null;let o=Di(e),n=oa(e),i=n&&((n.normalizePaintOpacity===!0)||(n.normalizePaintBlendMode===!0))?n:null;if(!o)return null;let a=Fr(e,t);return!a||!o.fill&&!o.stroke?null:{kind:"shape",id:"".concat(e.id,":background-shape"),name:"Background",sourceType:"".concat(e.type,"_BACKGROUND_SHAPE"),opacity:i?i.effectiveOpacity:1,visible:!0,blendMode:at(i?i.effectiveBlendMode:"normal"),effects:null,strokeEffect:null,x:a.x,y:a.y,width:a.width,height:a.height,nodeTransform:null,shape:a,fill:o.fill,stroke:o.stroke}}' `
   -ExpectedCount 1 `
   -Label 'background shape fill blend promotion'
+
+# Keep Figma dashed strokes attached to PSD shape metadata and fallback shape
+# previews. Leaf vector/stroke-only layers are bitmap-preserved, but simple
+# background shapes can still travel through vectorStroke.
+$bundle = Replace-Exact `
+  -Text $bundle `
+  -Find 'function Di(e){if(te(e))return null;let t="fills"in e&&Array.isArray(e.fills)?wi(e.fills):null,r="strokes"in e&&Array.isArray(e.strokes)?Gr(e.strokes):null,o=null;if(r){let n=Jr(e);if(n===null)return null;o={kind:"solid",color:Ge(r),width:n,position:Or(e)}}return!t&&!o?null:{fill:t,stroke:o}}' `
+  -Replace 'function pigmaDashPattern(e){if(!e||!Array.isArray(e.dashPattern))return null;let t=e.dashPattern.map(r=>Number(r)).filter(r=>Number.isFinite(r)&&r>0);return t.length>0?t:null}function Di(e){if(te(e))return null;let t="fills"in e&&Array.isArray(e.fills)?wi(e.fills):null,r="strokes"in e&&Array.isArray(e.strokes)?Gr(e.strokes):null,o=null;if(r){let n=Jr(e);if(n===null)return null;o={kind:"solid",color:Ge(r),width:n,position:Or(e),dashPattern:pigmaDashPattern(e)}}return!t&&!o?null:{fill:t,stroke:o}}' `
+  -ExpectedCount 1 `
+  -Label 'main dashed shape stroke metadata'
+
+$bundle = Replace-Exact `
+  -Text $bundle `
+  -Find 'function me(e){if(!("strokes"in e)||!Array.isArray(e.strokes))return null;let t=Gr(e.strokes);if(!t)return null;let r=Jr(e);return r===null?null:{blendMode:oe(t.blendMode),color:Ge(t),width:r,position:Or(e)}}' `
+  -Replace 'function me(e){if(!("strokes"in e)||!Array.isArray(e.strokes))return null;let t=Gr(e.strokes);if(!t)return null;let r=Jr(e);return r===null?null:{blendMode:oe(t.blendMode),color:Ge(t),width:r,position:Or(e),dashPattern:pigmaDashPattern(e)}}' `
+  -ExpectedCount 1 `
+  -Label 'main dashed stroke effect metadata'
 
 # Reuse the export-session analysis we already computed for the current selection
 # instead of recomputing bounds and layer counts again for each root.
@@ -1029,23 +1052,58 @@ if ($uiBundle.Contains($uiExportDownloadReadyCancelFind)) {
 $editableTextParagraphRunsLegacyHelper = 'function editableTextParagraphRuns(e,t){let r=(e||"").replace(/\\r\\n?/g,"\\n").split("\\n"),o=[];for(let n=0;n<r.length;n++){let i=r[n],a=i.length+(n<r.length-1?1:0);a>0&&o.push({length:a,style:{justification:t}})}return o}'
 $editableTextParagraphRunsPreviousHelper = 'function editableTextParagraphStyle(e){return{justification:e,autoHyphenate:!1}}function editableTextParagraphRuns(e,t){let r=(e||"").replace(/\\r\\n?/g,"\\n").split("\\n"),o=[];for(let n=0;n<r.length;n++){let i=r[n],a=i.length+(n<r.length-1?1:0);a>0&&o.push({length:a,style:editableTextParagraphStyle(t)})}return o}'
 $editableTextParagraphRunsHelper = 'function editableTextParagraphStyle(e){return{justification:e,autoHyphenate:!1}}function editableTextEngineText(e){return(e||"").replace(/\r\n?|\n/g,"\r")}function editableTextParagraphRuns(e,t){let r=editableTextEngineText(e).split("\r"),o=[];for(let n=0;n<r.length;n++){let i=r[n],a=i.length+(n<r.length-1?1:0);a>0&&o.push({length:a,style:editableTextParagraphStyle(t)})}return o}'
-$editableTextEngineMetadataReplacement = $editableTextParagraphRunsHelper + 'function g1(e){let t=E1(e),n=w1(e,t),r=ym(e),i=yh(e.text.bounds,r),a=yh(e.text.boundingBox,r),o=e.text.boxBounds?bm(e,i):null,s=v1(e,n,i,a,o),c=editableTextEngineText(e.text.value),l=editableTextParagraphRuns(c,e.text.justification),u={text:c,transform:n,antiAlias:"smooth",orientation:"horizontal",gridding:"none",useFractionalGlyphWidths:!0,left:s.layerBounds.left,top:s.layerBounds.top,right:s.layerBounds.right,bottom:s.layerBounds.bottom,bounds:{left:{value:s.textBounds.left,units:"Pixels"},top:{value:s.textBounds.top,units:"Pixels"},right:{value:s.textBounds.right,units:"Pixels"},bottom:{value:s.textBounds.bottom,units:"Pixels"}},boundingBox:{left:{value:s.boundingBox.left,units:"Pixels"},top:{value:s.boundingBox.top,units:"Pixels"},right:{value:s.boundingBox.right,units:"Pixels"},bottom:{value:s.boundingBox.bottom,units:"Pixels"}},paragraphStyle:editableTextParagraphStyle(e.text.justification),paragraphStyleRuns:l,style:kh(e.text.baseStyle,t.boxBaselineShift),styleRuns:e.text.styleRuns.map(c=>({length:c.length,style:kh(c.style,t.boxBaselineShift)}))};return u.shapeType=e.text.shapeType,e.text.pointBase&&(u.pointBase=e.text.pointBase.slice()),o&&(u.boxBounds=o),u}'
+$editableTextEngineDataHelper = 'function pigmaEditableTextEngineDataBase64(e){let t=Ff().serializeEngineData(Vf().encodeEngineData(e));return typeof t=="string"?t:Lh.byteArrayToBase64(t)}'
+$editableTextIndexHelper = 'var pigmaEditableTextIndexCounter=0;function pigmaResetEditableTextIndexCounter(){pigmaEditableTextIndexCounter=0}function pigmaNextEditableTextIndex(){return pigmaEditableTextIndexCounter++}function pigmaAssignEditableTextIndex(e){return e.index=pigmaNextEditableTextIndex(),e}'
+$editableTextVerticalAlignHelper = 'function pigmaEditableTextVerticalJustification(e){switch(e){case"CENTER":return"center";case"BOTTOM":return"bottom";default:return"top"}}function pigmaEditableTextLineCount(e){return Math.max(1,editableTextEngineText(e||"").split("\r").length)}function pigmaEditableTextResolvedLineHeight(e){let t=e&&e.text&&e.text.baseStyle?e.text.baseStyle:{},n=Number(t.lineHeightPx),r=Number(t.fontSize);return Number.isFinite(n)&&n>0?n:Math.max(1,Number.isFinite(r)&&r>0?r*1.2:12)}function pigmaEditableTextBoxVerticalOffset(e,t){if(!e||!e.text||e.text.shapeType!=="box"||!t)return 0;let n=e.text.verticalJustification;if(n!=="center"&&n!=="bottom")return 0;let r=Math.max(0,Number(t[3])-Number(t[1])),i=pigmaEditableTextResolvedLineHeight(e)*pigmaEditableTextLineCount(e.text.value),a=Math.max(0,r-i);return we(n==="bottom"?a:a/2)}function pigmaOffsetEditableTextTransform(e,t){return Math.abs(t)>=.01?[e[0],e[1],e[2],e[3],we(e[4]),we(e[5]+t)]:e}'
+$editableTextEngineMetadataReplacement = $editableTextParagraphRunsHelper + $editableTextEngineDataHelper + $editableTextIndexHelper + $editableTextVerticalAlignHelper + 'function g1(e){let t=E1(e),n=w1(e,t),r=ym(e),i=yh(e.text.bounds,r),a=yh(e.text.boundingBox,r),o=e.text.boxBounds?e.text.boxBounds.map(f=>we(f)):null,s=v1(e,n,i,a,o),c=editableTextEngineText(e.text.value),l=editableTextParagraphRuns(c,e.text.justification),u={text:c,transform:pigmaOffsetEditableTextTransform(n,pigmaEditableTextBoxVerticalOffset(e,o)),antiAlias:"smooth",orientation:"horizontal",gridding:"none",useFractionalGlyphWidths:!0,left:s.layerBounds.left,top:s.layerBounds.top,right:s.layerBounds.right,bottom:s.layerBounds.bottom,bounds:{left:{value:s.textBounds.left,units:"Pixels"},top:{value:s.textBounds.top,units:"Pixels"},right:{value:s.textBounds.right,units:"Pixels"},bottom:{value:s.textBounds.bottom,units:"Pixels"}},boundingBox:{left:{value:s.boundingBox.left,units:"Pixels"},top:{value:s.boundingBox.top,units:"Pixels"},right:{value:s.boundingBox.right,units:"Pixels"},bottom:{value:s.boundingBox.bottom,units:"Pixels"}},paragraphStyle:editableTextParagraphStyle(e.text.justification),paragraphStyleRuns:l,style:kh(e.text.baseStyle,t.boxBaselineShift),styleRuns:e.text.styleRuns.map(c=>({length:c.length,style:kh(c.style,t.boxBaselineShift)}))};return u.shapeType=e.text.shapeType,e.text.pointBase&&(u.pointBase=e.text.pointBase.slice()),o&&(u.boxBounds=o),u}'
+$editableTextBoxAnchorFind = 'function v1(e,t,n,r,i){if(e.text.shapeType!=="box"||!i)return{layerBounds:n,textBounds:n,boundingBox:r};let a=b1(t,i),o=bh(a,n),s=bh(o,r);return{layerBounds:s,textBounds:o,boundingBox:s}}'
+$editableTextBoxAnchorPreviousReplace = 'function v1(e,t,n,r,i){if(e.text.shapeType!=="box"||!i)return{layerBounds:n,textBounds:n,boundingBox:r};let a=b1(t,i);return{layerBounds:a,textBounds:a,boundingBox:a}}'
+$editableTextBoxAnchorLocalOnlyReplace = 'function v1(e,t,n,r,i){if(e.text.shapeType!=="box"||!i)return{layerBounds:n,textBounds:n,boundingBox:r};let a={left:we(i[0]),top:we(i[1]),right:we(i[2]),bottom:we(i[3])};return{layerBounds:a,textBounds:a,boundingBox:a}}'
+$editableTextBoxAnchorReplace = 'function v1(e,t,n,r,i){if(e.text.shapeType!=="box"||!i)return{layerBounds:n,textBounds:n,boundingBox:r};let a={left:we(i[0]),top:we(i[1]),right:we(i[2]),bottom:we(i[3])},o=b1(t,i);return{layerBounds:o,textBounds:a,boundingBox:a}}'
+$editableTextPreviewExperimentFind = 'disableEditableTextPreview:t.disableEditableTextPreview===!0'
+$editableTextPreviewExperimentReplace = 'disableEditableTextPreview:!1'
+$editableTextPreviewGateFind = 'let b=cu(Ki(v.effects),d),P=Sh(v,d),y=t&&v.kind==="text"&&!d.disableEditableTextPreview,F=!t||v.kind!=="text"||y||!!b||P?await Xn(v.pngBytes):null,k=F&&v.kind==="text"?x1(v,F):F;'
+$editableTextPreviewGateReplace = 'let b=cu(Ki(v.effects),d),P=Sh(v,d),y=t&&v.kind==="text",F=!t||v.kind!=="text"||y||!!b||P?await Xn(v.pngBytes):null,k=F&&v.kind==="text"?x1(v,F):F;'
+$editableTextPreviewAttachFind = 'k&&!d.disableEditableTextPreview&&(T.canvas=k)'
+$editableTextPreviewAttachReplace = 'k&&(T.canvas=k)'
 $editableTextPreflightSerializeCallLegacy = 'Il.serializeEngineData(qf.encodeEngineData(T.text))'
 $editableTextPreflightSerializeCallFixed = 'Ff().serializeEngineData(Vf().encodeEngineData(T.text))'
 $editableTextPreflightLegacyFind = 'if(t&&v.kind==="text"&&(T.text=g1(v),k&&!d.disableEditableTextPreview&&(T.canvas=k)),Wn(T,v.effects,v.strokeEffect),P){if(!k)throw new Error("Procedural text effects require a decoded preview canvas.");let M=await bt(v,T,k,d,o);s.push(M.layer),u.push(...M.linkedFiles),c.push(...M.warnings),m();continue}s.push(T),m()'
 $editableTextPreflightGuardedFind = 'if(t&&v.kind==="text"){try{T.text=g1(v),Il.serializeEngineData(qf.encodeEngineData(T.text)),k&&!d.disableEditableTextPreview&&(T.canvas=k)}catch(M){let B=k;if(!B){let N=await Xn(v.pngBytes);B=v.kind==="text"?x1(v,N):N}if(!B)throw M;T.text=void 0,T.canvas=B,c.push("\"".concat(Su(v.name),"\" text metadata could not be encoded safely (").concat(M instanceof Error?M.message:String(M),"), so it fell back to a bitmap layer."))}Wn(T,v.effects,v.strokeEffect);if(P){if(!k){if(T.canvas instanceof HTMLCanvasElement)k=T.canvas;else throw new Error("Procedural text effects require a decoded preview canvas.")}let M=await bt(v,T,k,d,o);s.push(M.layer),u.push(...M.linkedFiles),c.push(...M.warnings),m();continue}s.push(T),m();continue}s.push(T),m()'
 $editableTextPreflightFixedFind = 'if(t&&v.kind==="text"){try{T.text=g1(v),typeof ji=="function"&&ji("text-engine-preflight",{layerName:v.name,fontFamily:v.text.baseStyle.fontFamily,fontStyle:v.text.baseStyle.fontStyle,shapeType:v.text.shapeType,justification:v.text.justification,paragraphRunCount:T.text.paragraphStyleRuns?T.text.paragraphStyleRuns.length:0,styleRunCount:T.text.styleRuns?T.text.styleRuns.length:0,textLength:T.text.text.length,hasPreviewCanvas:!!k}),Ff().serializeEngineData(Vf().encodeEngineData(T.text)),typeof ji=="function"&&ji("text-engine-encoded",{layerName:v.name,paragraphRunCount:T.text.paragraphStyleRuns?T.text.paragraphStyleRuns.length:0,styleRunCount:T.text.styleRuns?T.text.styleRuns.length:0,textLength:T.text.text.length,hasPreviewCanvas:!!k}),k&&!d.disableEditableTextPreview&&(T.canvas=k)}catch(M){let B=k;typeof ji=="function"&&ji("text-engine-fallback",{layerName:v.name,fontFamily:v.text.baseStyle.fontFamily,fontStyle:v.text.baseStyle.fontStyle,shapeType:v.text.shapeType,justification:v.text.justification,reason:M instanceof Error?M.message:String(M)});if(!B){let N=await Xn(v.pngBytes);B=v.kind==="text"?x1(v,N):N}if(!B)throw M;T.text=void 0,T.canvas=B,c.push("\"".concat(Su(v.name),"\" text metadata could not be encoded safely (").concat(M instanceof Error?M.message:String(M),"), so it fell back to a bitmap layer."))}Wn(T,v.effects,v.strokeEffect);if(P){if(!k){if(T.canvas instanceof HTMLCanvasElement)k=T.canvas;else throw new Error("Procedural text effects require a decoded preview canvas.")}let M=await bt(v,T,k,d,o);s.push(M.layer),u.push(...M.linkedFiles),c.push(...M.warnings),m();continue}s.push(T),m();continue}s.push(T),m()'
-$editableTextPreflightReplace = 'if(t&&v.kind==="text"){try{T.text=g1(v),typeof ji=="function"&&ji("text-engine-preflight",{layerName:v.name,fontFamily:v.text.baseStyle.fontFamily,fontStyle:v.text.baseStyle.fontStyle,shapeType:v.text.shapeType,justification:v.text.justification,paragraphRunCount:T.text.paragraphStyleRuns?T.text.paragraphStyleRuns.length:0,styleRunCount:T.text.styleRuns?T.text.styleRuns.length:0,textLength:T.text.text.length,hasPreviewCanvas:!!k}),Ff().serializeEngineData(Vf().encodeEngineData(T.text)),typeof ji=="function"&&ji("text-engine-encoded",{layerName:v.name,paragraphRunCount:T.text.paragraphStyleRuns?T.text.paragraphStyleRuns.length:0,styleRunCount:T.text.styleRuns?T.text.styleRuns.length:0,textLength:T.text.text.length,hasPreviewCanvas:!!k}),k&&!d.disableEditableTextPreview&&(T.canvas=k)}catch(M){let B=k;typeof ji=="function"&&ji("text-engine-fallback",{layerName:v.name,fontFamily:v.text.baseStyle.fontFamily,fontStyle:v.text.baseStyle.fontStyle,shapeType:v.text.shapeType,justification:v.text.justification,reason:M instanceof Error?M.message:String(M)});if(!B){let N=await Xn(v.pngBytes);B=v.kind==="text"?x1(v,N):N}if(!B)throw M;T.text=void 0,T.canvas=B,c.push("\"".concat(Su(v.name),"\" text metadata could not be encoded safely (").concat(M instanceof Error?M.message:String(M),"), so it fell back to a bitmap layer."))}Wn(T,v.effects,v.strokeEffect);if(P){if(!k){if(T.canvas instanceof HTMLCanvasElement)k=T.canvas;else throw new Error("Procedural text effects require a decoded preview canvas.")}let M=await bt(v,T,k,d,o);s.push(M.layer),u.push(...M.linkedFiles),c.push(...M.warnings),m();continue}s.push(T),m();continue}s.push(T),m()'
+$editableTextPreflightNoTxt2Find = 'if(t&&v.kind==="text"){try{T.text=g1(v),typeof ji=="function"&&ji("text-engine-preflight",{layerName:v.name,fontFamily:v.text.baseStyle.fontFamily,fontStyle:v.text.baseStyle.fontStyle,shapeType:v.text.shapeType,justification:v.text.justification,paragraphRunCount:T.text.paragraphStyleRuns?T.text.paragraphStyleRuns.length:0,styleRunCount:T.text.styleRuns?T.text.styleRuns.length:0,textLength:T.text.text.length,hasPreviewCanvas:!!k}),Ff().serializeEngineData(Vf().encodeEngineData(T.text)),typeof ji=="function"&&ji("text-engine-encoded",{layerName:v.name,paragraphRunCount:T.text.paragraphStyleRuns?T.text.paragraphStyleRuns.length:0,styleRunCount:T.text.styleRuns?T.text.styleRuns.length:0,textLength:T.text.text.length,hasPreviewCanvas:!!k}),k&&(T.canvas=k)}catch(M){let B=k;typeof ji=="function"&&ji("text-engine-fallback",{layerName:v.name,fontFamily:v.text.baseStyle.fontFamily,fontStyle:v.text.baseStyle.fontStyle,shapeType:v.text.shapeType,justification:v.text.justification,reason:M instanceof Error?M.message:String(M)});if(!B){let N=await Xn(v.pngBytes);B=v.kind==="text"?x1(v,N):N}if(!B)throw M;T.text=void 0,T.canvas=B,c.push("\"".concat(Su(v.name),"\" text metadata could not be encoded safely (").concat(M instanceof Error?M.message:String(M),"), so it fell back to a bitmap layer."))}Wn(T,v.effects,v.strokeEffect);if(P){if(!k){if(T.canvas instanceof HTMLCanvasElement)k=T.canvas;else throw new Error("Procedural text effects require a decoded preview canvas.")}let M=await bt(v,T,k,d,o);s.push(M.layer),u.push(...M.linkedFiles),c.push(...M.warnings),m();continue}s.push(T),m();continue}s.push(T),m()'
+$editableTextPreflightReplace = 'if(t&&v.kind==="text"){try{T.text=pigmaAssignEditableTextIndex(g1(v)),typeof ji=="function"&&ji("text-engine-preflight",{layerName:v.name,fontFamily:v.text.baseStyle.fontFamily,fontStyle:v.text.baseStyle.fontStyle,shapeType:v.text.shapeType,justification:v.text.justification,textIndex:T.text.index,paragraphRunCount:T.text.paragraphStyleRuns?T.text.paragraphStyleRuns.length:0,styleRunCount:T.text.styleRuns?T.text.styleRuns.length:0,textLength:T.text.text.length,hasPreviewCanvas:!!k}),T.engineData=pigmaEditableTextEngineDataBase64(T.text),typeof ji=="function"&&ji("text-engine-encoded",{layerName:v.name,textIndex:T.text.index,paragraphRunCount:T.text.paragraphStyleRuns?T.text.paragraphStyleRuns.length:0,styleRunCount:T.text.styleRuns?T.text.styleRuns.length:0,textLength:T.text.text.length,hasPreviewCanvas:!!k,hasTxt2EngineData:!!T.engineData}),k&&(T.canvas=k)}catch(M){let B=k;typeof ji=="function"&&ji("text-engine-fallback",{layerName:v.name,fontFamily:v.text.baseStyle.fontFamily,fontStyle:v.text.baseStyle.fontStyle,shapeType:v.text.shapeType,justification:v.text.justification,reason:M instanceof Error?M.message:String(M)});if(!B){let N=await Xn(v.pngBytes);B=v.kind==="text"?x1(v,N):N}if(!B)throw M;T.text=void 0,T.engineData=void 0,T.canvas=B,c.push("\"".concat(Su(v.name),"\" text metadata could not be encoded safely (").concat(M instanceof Error?M.message:String(M),"), so it fell back to a bitmap layer."))}Wn(T,v.effects,v.strokeEffect);if(P){if(!k){if(T.canvas instanceof HTMLCanvasElement)k=T.canvas;else throw new Error("Procedural text effects require a decoded preview canvas.")}let M=await bt(v,T,k,d,o);s.push(M.layer),u.push(...M.linkedFiles),c.push(...M.warnings),m();continue}s.push(T),m();continue}s.push(T),m()'
+$editableTextIndexAssignFind = 'T.text=g1(v),typeof ji=="function"&&ji("text-engine-preflight",{layerName:v.name,fontFamily:v.text.baseStyle.fontFamily,fontStyle:v.text.baseStyle.fontStyle,shapeType:v.text.shapeType,justification:v.text.justification,paragraphRunCount:T.text.paragraphStyleRuns?T.text.paragraphStyleRuns.length:0,styleRunCount:T.text.styleRuns?T.text.styleRuns.length:0,textLength:T.text.text.length,hasPreviewCanvas:!!k})'
+$editableTextIndexAssignReplace = 'T.text=pigmaAssignEditableTextIndex(g1(v)),typeof ji=="function"&&ji("text-engine-preflight",{layerName:v.name,fontFamily:v.text.baseStyle.fontFamily,fontStyle:v.text.baseStyle.fontStyle,shapeType:v.text.shapeType,justification:v.text.justification,textIndex:T.text.index,paragraphRunCount:T.text.paragraphStyleRuns?T.text.paragraphStyleRuns.length:0,styleRunCount:T.text.styleRuns?T.text.styleRuns.length:0,textLength:T.text.text.length,hasPreviewCanvas:!!k})'
+$editableTextIndexEncodedFind = 'typeof ji=="function"&&ji("text-engine-encoded",{layerName:v.name,paragraphRunCount:T.text.paragraphStyleRuns?T.text.paragraphStyleRuns.length:0,styleRunCount:T.text.styleRuns?T.text.styleRuns.length:0,textLength:T.text.text.length,hasPreviewCanvas:!!k,hasTxt2EngineData:!!T.engineData})'
+$editableTextIndexEncodedReplace = 'typeof ji=="function"&&ji("text-engine-encoded",{layerName:v.name,textIndex:T.text.index,paragraphRunCount:T.text.paragraphStyleRuns?T.text.paragraphStyleRuns.length:0,styleRunCount:T.text.styleRuns?T.text.styleRuns.length:0,textLength:T.text.text.length,hasPreviewCanvas:!!k,hasTxt2EngineData:!!T.engineData})'
+$editableTextPreflightTxt2AssignFind = 'Ff().serializeEngineData(Vf().encodeEngineData(T.text)),typeof ji=="function"&&ji("text-engine-encoded",{layerName:v.name,paragraphRunCount:T.text.paragraphStyleRuns?T.text.paragraphStyleRuns.length:0,styleRunCount:T.text.styleRuns?T.text.styleRuns.length:0,textLength:T.text.text.length,hasPreviewCanvas:!!k}),k&&(T.canvas=k)'
+$editableTextPreflightTxt2AssignReplace = 'T.engineData=pigmaEditableTextEngineDataBase64(T.text),typeof ji=="function"&&ji("text-engine-encoded",{layerName:v.name,paragraphRunCount:T.text.paragraphStyleRuns?T.text.paragraphStyleRuns.length:0,styleRunCount:T.text.styleRuns?T.text.styleRuns.length:0,textLength:T.text.text.length,hasPreviewCanvas:!!k,hasTxt2EngineData:!!T.engineData}),k&&(T.canvas=k)'
+$editableTextPreflightFallbackEngineDataFind = 'T.text=void 0,T.canvas=B,c.push("\"".concat(Su(v.name),"\" text metadata could not be encoded safely'
+$editableTextPreflightFallbackEngineDataReplace = 'T.text=void 0,T.engineData=void 0,T.canvas=B,c.push("\"".concat(Su(v.name),"\" text metadata could not be encoded safely'
 $editableTextPreflightInstrumentedLegacyFind = $editableTextPreflightReplace.Replace($editableTextPreflightSerializeCallFixed, $editableTextPreflightSerializeCallLegacy)
 $editableTextFallbackSummaryFind = 'if(jo&&(D.backgroundDebug=e.backgroundDebug.concat(s.backgroundDebug)),ji("children-built",{rootName:e.rootName,childLayerCount:s.children.length,warningCount:s.warnings.length,linkedFileCount:s.linkedFiles.length}),i={width:e.documentWidth,height:e.documentHeight,children:s.children},e.compositePngBytes){'
 $editableTextFallbackSummaryInstrumentedFind = 'let l1=s.warnings.filter(c=>c.includes("text metadata could not be encoded safely")).length;l1>0&&(typeof ji=="function"&&ji("text-engine-fallback-summary",{rootName:e.rootName,fallbackCount:l1,editableTextCount:e.editableTextCount}),typeof Bt=="function"&&Bt("warning","Text metadata fallback","Bitmap fallback: ".concat(l1," text layer(s)")));if(jo&&(D.backgroundDebug=e.backgroundDebug.concat(s.backgroundDebug)),ji("children-built",{rootName:e.rootName,childLayerCount:s.children.length,warningCount:s.warnings.length,linkedFileCount:s.linkedFiles.length,textMetadataFallbackCount:l1}),i={width:e.documentWidth,height:e.documentHeight,children:s.children},e.compositePngBytes){'
-$editableTextFallbackSummaryReplace = 'let l1=s.warnings.filter(c=>c.includes("text metadata could not be encoded safely")).length,m1=function countEditableTextLayers(c){let f=0;for(let d of c)d&&(d.text?f+=1:d.children&&(f+=countEditableTextLayers(d.children)));return f}(s.children),n1=t&&m1>0&&l1===0;l1>0&&(typeof ji=="function"&&ji("text-engine-fallback-summary",{rootName:e.rootName,fallbackCount:l1,editableTextCount:e.editableTextCount,actualTextLayerCount:m1}),typeof Bt=="function"&&Bt("warning","Text metadata fallback","Bitmap fallback: ".concat(l1," text layer(s)")));typeof ji=="function"&&ji("editable-text-build-summary",{rootName:e.rootName,candidateTextLayerCount:e.editableTextCount,actualTextLayerCount:m1,fallbackCount:l1,forcePhotoshopTextRedraw:n1}),typeof Bt=="function"&&e.editableTextCount>0&&Bt("info","Editable text build","PSD text layers: ".concat(m1," / ").concat(e.editableTextCount)),n1&&typeof Bt=="function"&&Bt("info","Photoshop text redraw","Editable text redraw enabled for ".concat(m1," layer(s)"));if(jo&&(D.backgroundDebug=e.backgroundDebug.concat(s.backgroundDebug)),ji("children-built",{rootName:e.rootName,childLayerCount:s.children.length,warningCount:s.warnings.length,linkedFileCount:s.linkedFiles.length,textMetadataFallbackCount:l1,actualTextLayerCount:m1,forcePhotoshopTextRedraw:n1}),i={width:e.documentWidth,height:e.documentHeight,children:s.children},e.compositePngBytes){'
-$editableTextInvalidateWriteFind = 'let u=(0,Lh.writePsdUint8Array)(i,{invalidateTextLayers:!1,noBackground:!0});'
-$editableTextInvalidateWriteReplace = 'let u=(0,Lh.writePsdUint8Array)(i,{invalidateTextLayers:n1,noBackground:!0});'
+$editableTextFallbackSummaryReplace = 'let l1=s.warnings.filter(c=>c.includes("text metadata could not be encoded safely")).length,m1=function countEditableTextLayers(c){let f=0;for(let d of c)d&&(d.text?f+=1:d.children&&(f+=countEditableTextLayers(d.children)));return f}(s.children),n1=!1;l1>0&&(typeof ji=="function"&&ji("text-engine-fallback-summary",{rootName:e.rootName,fallbackCount:l1,editableTextCount:e.editableTextCount,actualTextLayerCount:m1}),typeof Bt=="function"&&Bt("warning","Text metadata fallback","Bitmap fallback: ".concat(l1," text layer(s)")));typeof ji=="function"&&ji("editable-text-build-summary",{rootName:e.rootName,candidateTextLayerCount:e.editableTextCount,actualTextLayerCount:m1,fallbackCount:l1,forcePhotoshopTextRedraw:n1}),typeof Bt=="function"&&e.editableTextCount>0&&Bt("info","Editable text build","PSD text layers: ".concat(m1," / ").concat(e.editableTextCount));if(jo&&(D.backgroundDebug=e.backgroundDebug.concat(s.backgroundDebug)),ji("children-built",{rootName:e.rootName,childLayerCount:s.children.length,warningCount:s.warnings.length,linkedFileCount:s.linkedFiles.length,textMetadataFallbackCount:l1,actualTextLayerCount:m1,forcePhotoshopTextRedraw:n1}),i={width:e.documentWidth,height:e.documentHeight,children:s.children},e.compositePngBytes){'
+$editableTextIndexResetFind = 'ji("build-start",{rootName:e.rootName,allowEditableText:t,hasCompositePng:e.compositePngBytes!==null,exportNodeCount:e.exportNodeCount,documentWidth:e.documentWidth,documentHeight:e.documentHeight});let a=e.compositePngBytes?await Ow(e.compositePngBytes):null;'
+$editableTextIndexResetReplace = 'ji("build-start",{rootName:e.rootName,allowEditableText:t,hasCompositePng:e.compositePngBytes!==null,exportNodeCount:e.exportNodeCount,documentWidth:e.documentWidth,documentHeight:e.documentHeight}),pigmaResetEditableTextIndexCounter();let a=e.compositePngBytes?await Ow(e.compositePngBytes):null;'
+$editableTextRedrawFlagFind = 'n1=t&&m1>0&&l1===0;'
+$editableTextRedrawFlagReplace = 'n1=!1;'
+$editableTextRedrawNoticeFind = ',n1&&typeof Bt=="function"&&Bt("info","Photoshop text redraw","Editable text redraw enabled for ".concat(m1," layer(s)"))'
+$editableTextInvalidateWriteFind = 'let u=(0,Lh.writePsdUint8Array)(i,{invalidateTextLayers:n1,noBackground:!0});'
+$editableTextInvalidateWriteReplace = 'let u=(0,Lh.writePsdUint8Array)(i,{invalidateTextLayers:!1,noBackground:!0});'
+$editableTextInvalidateThumbnailWriteFind = 'let u=(0,Lh.writePsdUint8Array)(i,{invalidateTextLayers:n1,noBackground:!0,generateThumbnail:!0});'
+$editableTextInvalidateThumbnailWriteReplace = 'let u=(0,Lh.writePsdUint8Array)(i,{invalidateTextLayers:!1,noBackground:!0,generateThumbnail:!0});'
 $editableTextRootFallbackFind = 'catch(r){if(e.hasEditableText)try{'
 $editableTextRootFallbackReplace = 'catch(r){typeof ji=="function"&&ji("editable-text-build-root-fallback",{rootName:e.rootName,reason:r instanceof Error?r.message:String(r),editableTextCount:e.editableTextCount});typeof Bt=="function"&&e.hasEditableText&&Bt("warning","Editable text PSD fallback","Root bitmap fallback: ".concat(e.rootName));if(e.hasEditableText)try{'
 $singleLinePointTextGuardFind = 'function ni(e){let t=Math.max(1,d(e.width)),r=Math.max(1,d(e.height)),o=I(e);return o?o.width>t*1.2||o.height>r*1.05:!1}'
 $singleLinePointTextGuardReplace = 'function ni(e){let t=Math.max(1,d(e.width)),r=I(e);return r?r.width>t*1.2:!1}'
+$editableTextBoxResizeModeFind = 'function ri(e,t){return e.textAutoResize==="WIDTH_AND_HEIGHT"?!0:ni(e)?!1:oi(e,t)===1}'
+$editableTextBoxResizeModeReplace = 'function ri(e,t){return e.textAutoResize==="WIDTH_AND_HEIGHT"}'
+$editableBoxTextPreviewBoundsFind = 'async function zn(e,t,r){var a,s;let o=Ae(e,t.shapeType);if(!o)return null;let n=((a=r==null?void 0:r.riskScore)!=null?a:0)>=No?Wr(t,(s=r==null?void 0:r.riskScore)!=null?s:0):null;if(t.shapeType!=="point"){let l=I(e);if(l&&l.width>0&&l.height>0){let u=Vt(o,{x:l.x,y:l.y,width:l.width,height:l.height,useAbsoluteBounds:!1});return{bounds:ie(u,Se(Ht(t),n)),usedVisualProbe:!1}}return{bounds:ie(o,Se(Ht(t),n)),usedVisualProbe:!1}}let i=await Li(e,o,r);if(i){let l=Se(it(e,t),n);return{bounds:ie(Vt(o,i),l),usedVisualProbe:!0}}return{bounds:ie(o,Se(it(e,t),n)),usedVisualProbe:!1}}'
+$editableBoxTextPreviewBoundsReplace = 'async function zn(e,t,r){var a,s;let o=Ae(e,t.shapeType);if(!o)return null;let n=((a=r==null?void 0:r.riskScore)!=null?a:0)>=No?Wr(t,(s=r==null?void 0:r.riskScore)!=null?s:0):null;if(t.shapeType!=="point")return{bounds:o,usedVisualProbe:!1};let i=await Li(e,o,r);if(i){let l=Se(it(e,t),n);return{bounds:ie(Vt(o,i),l),usedVisualProbe:!0}}return{bounds:ie(o,Se(it(e,t),n)),usedVisualProbe:!1}}'
+$editableTextAutoLayoutCloneFind = 'async function $n(e){if(!Wn(e))return null;let t=Zn(e);if(!t)return null;await we(e);let r=e.clone();try{return figma.currentPage.appendChild(r),r.visible=!0,r.textAutoResize="NONE",r.resizeWithoutConstraints(d(t.width),d(t.height)),Xn(e,r,t.x,t.y),Kn(e,r),r}catch(o){throw r.removed||r.remove(),o}}'
+$editableTextAutoLayoutCloneReplace = 'function pigmaTextHasAutoLayoutContext(e){let t=e.parent;for(;t&&t.type!=="PAGE"&&t.type!=="DOCUMENT";){if("layoutMode"in t&&t.layoutMode&&t.layoutMode!=="NONE")return!0;t=t.parent}return!1}function pigmaTextUsesFlexibleSizing(e){return"layoutSizingHorizontal"in e&&(e.layoutSizingHorizontal==="FILL"||e.layoutSizingHorizontal==="HUG")||"layoutSizingVertical"in e&&(e.layoutSizingVertical==="FILL"||e.layoutSizingVertical==="HUG")}function pigmaShouldDetachEditableBoxText(e){return e.type==="TEXT"&&e.textAutoResize!=="WIDTH_AND_HEIGHT"&&e.textAutoResize!=="TRUNCATE"&&e.textTruncation!=="ENDING"&&(pigmaTextHasAutoLayoutContext(e)||pigmaTextUsesFlexibleSizing(e))}function pigmaStableEditableTextBounds(e){let t=k(e);if(t&&t.width>0&&t.height>0)return{x:t.x,y:t.y,width:t.width,height:t.height,useAbsoluteBounds:!0};let r=I(e);return r&&r.width>0&&r.height>0?{x:r.x,y:r.y,width:r.width,height:r.height,useAbsoluteBounds:!1}:null}async function $n(e){let t=Wn(e),r=t?Zn(e):pigmaShouldDetachEditableBoxText(e)?pigmaStableEditableTextBounds(e):null;if(!r)return null;await we(e);let o=e.clone();try{return figma.currentPage.appendChild(o),o.visible=!0,o.textAutoResize="NONE",o.resizeWithoutConstraints(d(r.width),d(r.height)),Xn(e,o,r.x,r.y),t&&Kn(e,o),o}catch(n){throw o.removed||o.remove(),n}}'
 $runtimePhotoshopFontNameFind = 'function sa(e){let t=la(e);if(t)return t;let r=e.family.replace(/[^A-Za-z0-9]/g,""),o=e.style.replace(/[^A-Za-z0-9]/g,"");return r==="Arial"?o==="Bold"?"Arial-BoldMT":o==="Italic"?"Arial-ItalicMT":o==="BoldItalic"?"Arial-BoldItalicMT":"ArialMT":r?!o||o==="Regular"?"".concat(r,"-Regular"):"".concat(r,"-").concat(o):"ArialMT"}function la(e){let t=e.family.trim().toLowerCase(),r=e.style.trim().toLowerCase();return t==="italianno"&&r==="regular"?"Italianno Regular":null}'
 $runtimePhotoshopFontNameReplace = 'function pigmaNormalizePhotoshopFontToken(e){return String(e||"").trim().replace(/[\s_-]+/g,"").toLowerCase()}function pigmaPhotoshopStyleName(e){let t=pigmaNormalizePhotoshopFontToken(e),r={regular:"Regular",roman:"Regular",normal:"Regular",thin:"Thin",extralight:"ExtraLight",ultralight:"ExtraLight",light:"Light",demilight:"DemiLight",semilight:"SemiLight",medium:"Medium",semibold:"SemiBold",demibold:"DemiBold",bold:"Bold",extrabold:"ExtraBold",black:"Black",heavy:"Heavy"}[t];if(r)return r;let o=String(e||"Regular").replace(/[^A-Za-z0-9]+/g,"");return o||"Regular"}function pigmaKnownPhotoshopFontName(e){let t=String(e&&e.family||"").trim(),r=String(e&&e.style||"Regular").trim(),o=t.toLowerCase(),n=pigmaNormalizePhotoshopFontToken(r),i=o==="lg ei headline ttf"?"LGEIHeadlineTTF":o==="lg ei headline"?"LGEIHeadline":"";if(i){let s={regular:"Regular",bold:"Bold",semibold:"Semibold",light:"Light",thin:"Thin"}[n]||pigmaPhotoshopStyleName(r);return"".concat(i,"-").concat(s)}let a={"noto sans kr":"NotoSansKR","noto serif kr":"NotoSerifKR","noto sans sc":"NotoSansSC","noto serif sc":"NotoSerifSC","noto sans tc":"NotoSansTC","noto serif tc":"NotoSerifTC","noto sans jp":"NotoSansJP","noto serif jp":"NotoSerifJP","noto sans hk":"NotoSansHK","noto serif hk":"NotoSerifHK","noto sans cjk kr":"NotoSansCJKkr","noto serif cjk kr":"NotoSerifCJKkr","noto sans cjk sc":"NotoSansCJKsc","noto serif cjk sc":"NotoSerifCJKsc","noto sans cjk tc":"NotoSansCJKtc","noto serif cjk tc":"NotoSerifCJKtc","noto sans cjk jp":"NotoSansCJKjp","noto serif cjk jp":"NotoSerifCJKjp","noto sans cjk hk":"NotoSansCJKhk","noto serif cjk hk":"NotoSerifCJKhk"}[o];if(a){let s=pigmaPhotoshopStyleName(r);a==="NotoSerifKR"&&n==="black"&&(s="Heavy");return"".concat(a,"-").concat(s)}return null}function sa(e){let t=la(e);if(t)return t;let r=pigmaKnownPhotoshopFontName(e);if(r)return r;let o=e.family.replace(/[^A-Za-z0-9]/g,""),n=e.style.replace(/[^A-Za-z0-9]/g,"");return o==="Arial"?n==="Bold"?"Arial-BoldMT":n==="Italic"?"Arial-ItalicMT":n==="BoldItalic"?"Arial-BoldItalicMT":"ArialMT":o?!n||n==="Regular"?"".concat(o,"-Regular"):"".concat(o,"-").concat(n):"ArialMT"}function la(e){let t=e.family.trim().toLowerCase(),r=e.style.trim().toLowerCase();return t==="italianno"&&r==="regular"?"Italianno Regular":null}'
 $uiEditableTextFontNameFind = 'function resolveEditableTextFontName(e){let t=typeof(e==null?void 0:e.photoshopFontName)=="string"?e.photoshopFontName.trim():"",n=typeof(e==null?void 0:e.fontFamily)=="string"?e.fontFamily.trim():"",r=typeof(e==null?void 0:e.fontStyle)=="string"?e.fontStyle.trim():"",i=n.replace(/[^A-Za-z0-9]/g,""),a=r.replace(/[^A-Za-z0-9]/g,""),o=!r||/^regular$/i.test(r),s=i?o?"".concat(i,"-Regular"):"".concat(i,"-").concat(a):"",u=n?o?n:"".concat(n," ").concat(r):"";return n&&/\s/.test(n)&&t===s&&u.length>0?u:t||u||"ArialMT"}'
@@ -1064,6 +1122,10 @@ $pigmaPhotoshopFontResolver = ("var pigmaPhotoshopFontMap=" + $fontPostScriptMap
 $runtimePhotoshopFontNameReplace = $pigmaPhotoshopFontResolver + 'function sa(e){let t=la(e);if(t)return t;let r=pigmaKnownPhotoshopFontName(e);if(r)return r;let o=e.family.replace(/[^A-Za-z0-9]/g,""),n=e.style.replace(/[^A-Za-z0-9]/g,"");return o==="Arial"?n==="Bold"?"Arial-BoldMT":n==="Italic"?"Arial-ItalicMT":n==="BoldItalic"?"Arial-BoldItalicMT":"ArialMT":o?!n||n==="Regular"?"".concat(o,"-Regular"):"".concat(o,"-").concat(n):"ArialMT"}function la(e){let t=e.family.trim().toLowerCase(),r=e.style.trim().toLowerCase();return t==="italianno"&&r==="regular"?"Italianno Regular":null}'
 $runtimeTextStyleFontWeightFind = 'function si(e){let t=di(e.fills);return t?{photoshopFontName:sa(e.fontName),fontFamily:e.fontName.family,fontStyle:e.fontName.style,fontSize:Math.max(1,e.fontSize),fillColor:t,lineHeightPx:aa(e.lineHeight,e.fontSize),tracking:ci(e.letterSpacing,e.fontSize),fontCaps:ui(e.textCase),underline:e.textDecoration==="UNDERLINE",strikethrough:e.textDecoration==="STRIKETHROUGH"}:null}'
 $runtimeTextStyleFontWeightReplace = 'function si(e){let t=di(e.fills);return t?{photoshopFontName:sa(e.fontName),fontFamily:e.fontName.family,fontStyle:e.fontName.style,fontWeight:pigmaPhotoshopFontWeight(e.fontName.style),fontSize:Math.max(1,e.fontSize),fillColor:t,lineHeightPx:aa(e.lineHeight,e.fontSize),tracking:ci(e.letterSpacing,e.fontSize),fontCaps:ui(e.textCase),underline:e.textDecoration==="UNDERLINE",strikethrough:e.textDecoration==="STRIKETHROUGH"}:null}'
+$runtimeTextVerticalJustificationHelperFind = 'function ia(e){switch(e){case"CENTER":return"center";case"RIGHT":return"right";case"JUSTIFIED":return"justify-left";default:return"left"}}'
+$runtimeTextVerticalJustificationHelperReplace = $runtimeTextVerticalJustificationHelperFind + 'function pigmaEditableTextVerticalJustification(e){switch(e){case"CENTER":return"center";case"BOTTOM":return"bottom";default:return"top"}}'
+$runtimeTextVerticalJustificationFieldFind = 'textTruncation:o.textTruncation,maxLines:o.maxLines,justification:ia(e.textAlignHorizontal),baseStyle'
+$runtimeTextVerticalJustificationFieldReplace = 'textTruncation:o.textTruncation,maxLines:o.maxLines,verticalJustification:pigmaEditableTextVerticalJustification(e.textAlignVertical),justification:ia(e.textAlignHorizontal),baseStyle'
 $uiEditableTextFontNameBody = @'
 function resolveEditableTextFontName(e){let t=typeof(e==null?void 0:e.photoshopFontName)=="string"?e.photoshopFontName.trim():"",n=typeof(e==null?void 0:e.fontFamily)=="string"?e.fontFamily.trim():"",r=typeof(e==null?void 0:e.fontStyle)=="string"?e.fontStyle.trim():"",i=pigmaKnownPhotoshopFontName(n,r);if(i)return i;let a=n.replace(/[^A-Za-z0-9]/g,""),o=r.replace(/[^A-Za-z0-9]/g,""),s=!r||/^regular$/i.test(r),u=a?s?"".concat(a,"-Regular"):"".concat(a,"-").concat(o):"",l=n?s?n:"".concat(n," ").concat(r):"";return t||u||l||"ArialMT"}
 function pigmaEditableTextHasMappedFontFace(e){let t=typeof(e==null?void 0:e.fontFamily)=="string"?e.fontFamily.trim():"",n=typeof(e==null?void 0:e.fontStyle)=="string"?e.fontStyle.trim():"";return!!pigmaMappedPhotoshopFontName(t,n)}
@@ -1099,8 +1161,8 @@ $uiBackgroundClipGroupLegacyReplace = 'if(v.kind==="group"){let M=await vm(v.chi
 $uiBackgroundClipGroupReplace = 'if(v.kind==="group"){let M=await vm(v.children,t,n.concat(v.name),r,i,a,(h=v.mask)!=null?h:o);if(M.children.length===0){m();continue}let A=v.mask?await pigmaApplyContainerClipToBackground(M.children,r,i):{linkedFiles:[],warnings:[]},B={name:v.name,opacity:v.opacity,hidden:!v.visible,blendMode:v.blendMode,opened:!1,children:M.children};try{Object.defineProperty(B,"__pigmaSourceGroup",{value:v,enumerable:!1})}catch(O){}v.mask&&(B.mask=await Qm(v.mask)),Wn(B,v.effects,v.strokeEffect),u.push(...M.linkedFiles,...A.linkedFiles),l.push(...M.backgroundDebug),c.push(...M.warnings,...A.warnings),s.push(B),m();continue}'
 $psdCompositePreviewFind = 'function d1(e){return e.exportPackageMode==="bundle-with-rasters"}'
 $psdCompositePreviewReplace = 'function d1(e){return e.exportPackageMode==="bundle-with-rasters"||e.exportPackageMode==="psd-only"}'
-$psdThumbnailWriteFind = 'let u=(0,Lh.writePsdUint8Array)(i,{invalidateTextLayers:n1,noBackground:!0});'
-$psdThumbnailWriteReplace = 'let u=(0,Lh.writePsdUint8Array)(i,{invalidateTextLayers:n1,noBackground:!0,generateThumbnail:!0});'
+$psdThumbnailWriteFind = 'let u=(0,Lh.writePsdUint8Array)(i,{invalidateTextLayers:!1,noBackground:!0});'
+$psdThumbnailWriteReplace = 'let u=(0,Lh.writePsdUint8Array)(i,{invalidateTextLayers:!1,noBackground:!0,generateThumbnail:!0});'
 $psdThumbnailMatteFind = 'function ex(e){var t=(0,Oe.createCanvas)(10,10),n=1;e.width>e.height?(t.width=160,t.height=Math.floor(e.height*(t.width/e.width)),n=t.width/e.width):(t.height=160,t.width=Math.floor(e.width*(t.height/e.height)),n=t.height/e.height);var r=t.getContext("2d");return r.scale(n,n),e.imageData?r.drawImage((0,Oe.imageDataToCanvas)(e.imageData),0,0):e.canvas&&r.drawImage(e.canvas,0,0),t}'
 $psdThumbnailMatteReplace = 'function ex(e){var t=(0,Oe.createCanvas)(10,10),n=1;e.width>e.height?(t.width=160,t.height=Math.floor(e.height*(t.width/e.width)),n=t.width/e.width):(t.height=160,t.width=Math.floor(e.width*(t.height/e.height)),n=t.height/e.height);var r=t.getContext("2d");return r.fillStyle="#fff",r.fillRect(0,0,t.width,t.height),r.scale(n,n),e.imageData?r.drawImage((0,Oe.imageDataToCanvas)(e.imageData),0,0):e.canvas&&r.drawImage(e.canvas,0,0),t}'
 $uiSelectionBridgeStartupFind = 'qn({type:"request-preferences",detectedLocale:w0()});m0();Le();'
@@ -1209,6 +1271,32 @@ if ($bundle.Contains($runtimeTextStyleFontWeightFind)) {
   throw 'Could not patch runtime editable text font weight metadata.'
 }
 
+if ($bundle.Contains($runtimeTextVerticalJustificationHelperFind)) {
+  $bundle = Replace-Exact `
+    -Text $bundle `
+    -Find $runtimeTextVerticalJustificationHelperFind `
+    -Replace $runtimeTextVerticalJustificationHelperReplace `
+    -ExpectedCount 1 `
+    -Label 'runtime editable text vertical justification helper'
+} elseif ($bundle.Contains('function pigmaEditableTextVerticalJustification(')) {
+  # Already patched in this bundle variant.
+} else {
+  throw 'Could not patch runtime editable text vertical justification helper.'
+}
+
+if ($bundle.Contains($runtimeTextVerticalJustificationFieldFind)) {
+  $bundle = Replace-Exact `
+    -Text $bundle `
+    -Find $runtimeTextVerticalJustificationFieldFind `
+    -Replace $runtimeTextVerticalJustificationFieldReplace `
+    -ExpectedCount 1 `
+    -Label 'runtime editable text vertical justification payload'
+} elseif ($bundle.Contains($runtimeTextVerticalJustificationFieldReplace)) {
+  # Already patched in this bundle variant.
+} else {
+  throw 'Could not patch runtime editable text vertical justification payload.'
+}
+
 if ($bundle.Contains($singleLinePointTextGuardFind)) {
   $bundle = Replace-Exact `
     -Text $bundle `
@@ -1220,6 +1308,41 @@ if ($bundle.Contains($singleLinePointTextGuardFind)) {
   # Already patched in this bundle variant.
 } else {
   throw 'Could not patch single-line editable text point mode.'
+}
+
+if ($bundle.Contains($editableTextBoxResizeModeFind)) {
+  $bundle = Replace-Exact `
+    -Text $bundle `
+    -Find $editableTextBoxResizeModeFind `
+    -Replace $editableTextBoxResizeModeReplace `
+    -ExpectedCount 1 `
+    -Label 'editable text box resize mode guard'
+} elseif ($bundle.Contains($editableTextBoxResizeModeReplace)) {
+  # Already patched in this bundle variant.
+} else {
+  throw 'Could not patch editable text box resize mode guard.'
+}
+
+if ($bundle.Contains($editableBoxTextPreviewBoundsFind)) {
+  $bundle = Replace-Exact `
+    -Text $bundle `
+    -Find $editableBoxTextPreviewBoundsFind `
+    -Replace $editableBoxTextPreviewBoundsReplace `
+    -ExpectedCount 1 `
+    -Label 'main editable box text preview bounds'
+} elseif (-not $bundle.Contains($editableBoxTextPreviewBoundsReplace)) {
+  throw 'Could not patch main editable box text preview bounds.'
+}
+
+if ($bundle.Contains($editableTextAutoLayoutCloneFind)) {
+  $bundle = Replace-Exact `
+    -Text $bundle `
+    -Find $editableTextAutoLayoutCloneFind `
+    -Replace $editableTextAutoLayoutCloneReplace `
+    -ExpectedCount 1 `
+    -Label 'editable text auto-layout clone prep'
+} elseif (-not $bundle.Contains($editableTextAutoLayoutCloneReplace)) {
+  throw 'Could not patch editable text auto-layout clone prep.'
 }
 
 if ($bundle.Contains($editableTextParagraphRunsLegacyHelper)) {
@@ -1240,6 +1363,31 @@ $bundle = Collapse-RepeatedSnippetBeforeMarker `
   -Text $bundle `
   -Snippet $editableTextParagraphRunsHelper `
   -Marker 'function g1(e){'
+
+if ($bundle.Contains($editableTextBoxAnchorFind)) {
+  $bundle = Replace-Exact `
+    -Text $bundle `
+    -Find $editableTextBoxAnchorFind `
+    -Replace $editableTextBoxAnchorReplace `
+    -ExpectedCount 1 `
+    -Label 'editable text box bounds anchor'
+} elseif ($bundle.Contains($editableTextBoxAnchorPreviousReplace)) {
+  $bundle = Replace-Exact `
+    -Text $bundle `
+    -Find $editableTextBoxAnchorPreviousReplace `
+    -Replace $editableTextBoxAnchorReplace `
+    -ExpectedCount 1 `
+    -Label 'editable text box bounds anchor previous patch'
+} elseif ($bundle.Contains($editableTextBoxAnchorLocalOnlyReplace)) {
+  $bundle = Replace-Exact `
+    -Text $bundle `
+    -Find $editableTextBoxAnchorLocalOnlyReplace `
+    -Replace $editableTextBoxAnchorReplace `
+    -ExpectedCount 1 `
+    -Label 'editable text box bounds anchor local-only patch'
+} elseif ($bundle.Contains('function v1(') -and -not $bundle.Contains($editableTextBoxAnchorReplace)) {
+  throw 'Could not patch editable text box bounds anchor.'
+}
 
 if ($bundle.Contains($editableTextPreflightLegacyFind)) {
   $bundle = Replace-Exact `
@@ -1262,6 +1410,13 @@ if ($bundle.Contains($editableTextPreflightLegacyFind)) {
     -Replace $editableTextPreflightReplace `
     -ExpectedCount 1 `
     -Label 'editable text preflight fallback instrumented legacy'
+} elseif ($bundle.Contains($editableTextPreflightNoTxt2Find)) {
+  $bundle = Replace-Exact `
+    -Text $bundle `
+    -Find $editableTextPreflightNoTxt2Find `
+    -Replace $editableTextPreflightReplace `
+    -ExpectedCount 1 `
+    -Label 'editable text Txt2 engine data'
 } elseif ($bundle.Contains($editableTextPreflightFixedFind)) {
   $bundle = Replace-Exact `
     -Text $bundle `
@@ -1269,6 +1424,65 @@ if ($bundle.Contains($editableTextPreflightLegacyFind)) {
     -Replace $editableTextPreflightReplace `
     -ExpectedCount 1 `
     -Label 'editable text preflight fallback fixed'
+}
+if ($bundle.Contains($editableTextPreflightTxt2AssignFind)) {
+  $bundle = Replace-Exact `
+    -Text $bundle `
+    -Find $editableTextPreflightTxt2AssignFind `
+    -Replace $editableTextPreflightTxt2AssignReplace `
+    -ExpectedCount 1 `
+    -Label 'editable text Txt2 engine data assignment'
+}
+if ($bundle.Contains($editableTextPreflightFallbackEngineDataFind)) {
+  $bundle = Replace-Exact `
+    -Text $bundle `
+    -Find $editableTextPreflightFallbackEngineDataFind `
+    -Replace $editableTextPreflightFallbackEngineDataReplace `
+    -ExpectedCount 1 `
+    -Label 'editable text fallback engineData clear'
+}
+if ($bundle.Contains($editableTextIndexAssignFind)) {
+  $bundle = Replace-Exact `
+    -Text $bundle `
+    -Find $editableTextIndexAssignFind `
+    -Replace $editableTextIndexAssignReplace `
+    -ExpectedCount 1 `
+    -Label 'editable text unique TextIndex assignment'
+}
+if ($bundle.Contains($editableTextIndexEncodedFind)) {
+  $bundle = Replace-Exact `
+    -Text $bundle `
+    -Find $editableTextIndexEncodedFind `
+    -Replace $editableTextIndexEncodedReplace `
+    -ExpectedCount 1 `
+    -Label 'editable text unique TextIndex encoded log'
+}
+
+if ($bundle.Contains($editableTextPreviewExperimentFind)) {
+  $bundle = Replace-Exact `
+    -Text $bundle `
+    -Find $editableTextPreviewExperimentFind `
+    -Replace $editableTextPreviewExperimentReplace `
+    -ExpectedCount 1 `
+    -Label 'editable text preview experiment disabled'
+} elseif ($bundle.Contains($editableTextPreviewExperimentReplace)) {
+  # Already patched in this bundle variant.
+}
+if ($bundle.Contains($editableTextPreviewGateFind)) {
+  $bundle = Replace-Exact `
+    -Text $bundle `
+    -Find $editableTextPreviewGateFind `
+    -Replace $editableTextPreviewGateReplace `
+    -ExpectedCount 1 `
+    -Label 'editable text preview decode forced'
+}
+if ($bundle.Contains($editableTextPreviewAttachFind)) {
+  $bundle = Replace-Exact `
+    -Text $bundle `
+    -Find $editableTextPreviewAttachFind `
+    -Replace $editableTextPreviewAttachReplace `
+    -ExpectedCount 1 `
+    -Label 'editable text preview canvas forced'
 }
 
 # Bitmap/image layers use the generic T canvas layer path. That path used to
@@ -1302,6 +1516,31 @@ $uiBundle = Collapse-RepeatedSnippetBeforeMarker `
   -Snippet $editableTextParagraphRunsHelper `
   -Marker 'function g1(e){'
 
+if ($uiBundle.Contains($editableTextBoxAnchorFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $editableTextBoxAnchorFind `
+    -Replace $editableTextBoxAnchorReplace `
+    -ExpectedCount 1 `
+    -Label 'ui editable text box bounds anchor'
+} elseif ($uiBundle.Contains($editableTextBoxAnchorPreviousReplace)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $editableTextBoxAnchorPreviousReplace `
+    -Replace $editableTextBoxAnchorReplace `
+    -ExpectedCount 1 `
+    -Label 'ui editable text box bounds anchor previous patch'
+} elseif ($uiBundle.Contains($editableTextBoxAnchorLocalOnlyReplace)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $editableTextBoxAnchorLocalOnlyReplace `
+    -Replace $editableTextBoxAnchorReplace `
+    -ExpectedCount 1 `
+    -Label 'ui editable text box bounds anchor local-only patch'
+} elseif (-not $uiBundle.Contains($editableTextBoxAnchorReplace)) {
+  throw 'Could not patch UI editable text box bounds anchor.'
+}
+
 if ($uiBundle.Contains($editableTextPreflightLegacyFind)) {
   $uiBundle = Replace-Exact `
     -Text $uiBundle `
@@ -1323,6 +1562,13 @@ if ($uiBundle.Contains($editableTextPreflightLegacyFind)) {
     -Replace $editableTextPreflightReplace `
     -ExpectedCount 1 `
     -Label 'ui editable text preflight fallback instrumented legacy'
+} elseif ($uiBundle.Contains($editableTextPreflightNoTxt2Find)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $editableTextPreflightNoTxt2Find `
+    -Replace $editableTextPreflightReplace `
+    -ExpectedCount 1 `
+    -Label 'ui editable text Txt2 engine data'
 } elseif ($uiBundle.Contains($editableTextPreflightFixedFind)) {
   $uiBundle = Replace-Exact `
     -Text $uiBundle `
@@ -1330,6 +1576,75 @@ if ($uiBundle.Contains($editableTextPreflightLegacyFind)) {
     -Replace $editableTextPreflightReplace `
     -ExpectedCount 1 `
     -Label 'ui editable text preflight fallback fixed'
+}
+if ($uiBundle.Contains($editableTextPreflightTxt2AssignFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $editableTextPreflightTxt2AssignFind `
+    -Replace $editableTextPreflightTxt2AssignReplace `
+    -ExpectedCount 1 `
+    -Label 'ui editable text Txt2 engine data assignment'
+}
+if ($uiBundle.Contains($editableTextPreflightFallbackEngineDataFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $editableTextPreflightFallbackEngineDataFind `
+    -Replace $editableTextPreflightFallbackEngineDataReplace `
+    -ExpectedCount 1 `
+    -Label 'ui editable text fallback engineData clear'
+}
+if ($uiBundle.Contains($editableTextIndexAssignFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $editableTextIndexAssignFind `
+    -Replace $editableTextIndexAssignReplace `
+    -ExpectedCount 1 `
+    -Label 'ui editable text unique TextIndex assignment'
+}
+if ($uiBundle.Contains($editableTextIndexEncodedFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $editableTextIndexEncodedFind `
+    -Replace $editableTextIndexEncodedReplace `
+    -ExpectedCount 1 `
+    -Label 'ui editable text unique TextIndex encoded log'
+}
+
+if ($uiBundle.Contains($editableTextPreviewExperimentFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $editableTextPreviewExperimentFind `
+    -Replace $editableTextPreviewExperimentReplace `
+    -ExpectedCount 1 `
+    -Label 'ui editable text preview experiment disabled'
+} elseif ($uiBundle.Contains($editableTextPreviewExperimentReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI editable text preview experiment flag.'
+}
+if ($uiBundle.Contains($editableTextPreviewGateFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $editableTextPreviewGateFind `
+    -Replace $editableTextPreviewGateReplace `
+    -ExpectedCount 1 `
+    -Label 'ui editable text preview decode forced'
+} elseif ($uiBundle.Contains($editableTextPreviewGateReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI editable text preview decode gate.'
+}
+if ($uiBundle.Contains($editableTextPreviewAttachFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $editableTextPreviewAttachFind `
+    -Replace $editableTextPreviewAttachReplace `
+    -ExpectedCount 1 `
+    -Label 'ui editable text preview canvas forced'
+} elseif ($uiBundle.Contains($editableTextPreviewAttachReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI editable text preview canvas attach.'
 }
 
 if ($uiBundle.Contains($editableTextMissingCloseFind)) {
@@ -1351,7 +1666,12 @@ if ($uiBundle.Contains($bitmapLayerNativeEffectsFind)) {
 }
 
 $uiColorDodgeShapeOpacityFind = 'function B1(e,t,n,r=null){var a,o;let i={name:e.name,left:e.x,top:e.y,right:e.x+e.width,bottom:e.y+e.height,opacity:e.opacity,hidden:!e.visible,blendMode:wr(e.blendMode),vectorOrigination:iw(e),vectorMask:{fillStartsWithAllPixels:!1,paths:[Lw(e,t,n)]}};return r&&(i.canvas=r,i.usingAlignedRendering=!0),e.fill&&(i.fillOpacity=Em(e.fill),i.vectorFill=Dm(e.fill,e.width,e.height,e.nodeTransform)),i.vectorStroke={fillEnabled:!!e.fill,strokeEnabled:!!e.stroke,lineWidth:{value:e.stroke?e.stroke.width:1,units:"Pixels"},lineAlignment:e.stroke?e.stroke.position:"center",opacity:e.stroke?e.stroke.color.a/255:1,content:{type:"color",color:Sr(_1(e.fill,(o=(a=e.stroke)==null?void 0:a.color)!=null?o:null))},resolution:72},Wn(i,e.effects,e.strokeEffect),i}'
-$uiColorDodgeShapeOpacityReplace = 'function pigmaShapeUsesLayerOpacityForFill(e){return e&&String(e.blendMode||"").toLowerCase()==="color dodge"}function pigmaShapeFillOpacity(e){return Em(e&&e.fill)}function pigmaShapeLayerOpacity(e){let t=typeof e.opacity=="number"?e.opacity:1,n=pigmaShapeFillOpacity(e);return pigmaShapeUsesLayerOpacityForFill(e)?ae(t*n,0,1):t}function pigmaShapeLayerFillOpacity(e){return pigmaShapeUsesLayerOpacityForFill(e)?1:pigmaShapeFillOpacity(e)}function B1(e,t,n,r=null){var a,o;let i={name:e.name,left:e.x,top:e.y,right:e.x+e.width,bottom:e.y+e.height,opacity:pigmaShapeLayerOpacity(e),hidden:!e.visible,blendMode:wr(e.blendMode),vectorOrigination:iw(e),vectorMask:{fillStartsWithAllPixels:!1,paths:[Lw(e,t,n)]}};return r&&(i.canvas=r,i.usingAlignedRendering=!0),e.fill&&(i.fillOpacity=pigmaShapeLayerFillOpacity(e),i.vectorFill=Dm(e.fill,e.width,e.height,e.nodeTransform)),i.vectorStroke={fillEnabled:!!e.fill,strokeEnabled:!!e.stroke,lineWidth:{value:e.stroke?e.stroke.width:1,units:"Pixels"},lineAlignment:e.stroke?e.stroke.position:"center",opacity:e.stroke?e.stroke.color.a/255:1,content:{type:"color",color:Sr(_1(e.fill,(o=(a=e.stroke)==null?void 0:a.color)!=null?o:null))},resolution:72},Wn(i,e.effects,e.strokeEffect),i}'
+$uiColorDodgeShapeOpacityPreviousReplace = 'function pigmaShapeUsesLayerOpacityForFill(e){return e&&String(e.blendMode||"").toLowerCase()==="color dodge"}function pigmaShapeFillOpacity(e){return Em(e&&e.fill)}function pigmaShapeLayerOpacity(e){let t=typeof e.opacity=="number"?e.opacity:1,n=pigmaShapeFillOpacity(e);return pigmaShapeUsesLayerOpacityForFill(e)?ae(t*n,0,1):t}function pigmaShapeLayerFillOpacity(e){return pigmaShapeUsesLayerOpacityForFill(e)?1:pigmaShapeFillOpacity(e)}function B1(e,t,n,r=null){var a,o;let i={name:e.name,left:e.x,top:e.y,right:e.x+e.width,bottom:e.y+e.height,opacity:pigmaShapeLayerOpacity(e),hidden:!e.visible,blendMode:wr(e.blendMode),vectorOrigination:iw(e),vectorMask:{fillStartsWithAllPixels:!1,paths:[Lw(e,t,n)]}};return r&&(i.canvas=r,i.usingAlignedRendering=!0),e.fill&&(i.fillOpacity=pigmaShapeLayerFillOpacity(e),i.vectorFill=Dm(e.fill,e.width,e.height,e.nodeTransform)),i.vectorStroke={fillEnabled:!!e.fill,strokeEnabled:!!e.stroke,lineWidth:{value:e.stroke?e.stroke.width:1,units:"Pixels"},lineAlignment:e.stroke?e.stroke.position:"center",opacity:e.stroke?e.stroke.color.a/255:1,content:{type:"color",color:Sr(_1(e.fill,(o=(a=e.stroke)==null?void 0:a.color)!=null?o:null))},resolution:72},Wn(i,e.effects,e.strokeEffect),i}'
+$uiColorDodgeShapeOpacityReplace = 'function pigmaShapeUsesLayerOpacityForFill(e){return e&&String(e.blendMode||"").toLowerCase()==="color dodge"}function pigmaShapeFillOpacity(e){return Em(e&&e.fill)}function pigmaShapeLayerOpacity(e){let t=typeof e.opacity=="number"?e.opacity:1,n=pigmaShapeFillOpacity(e);return pigmaShapeUsesLayerOpacityForFill(e)?ae(t*n,0,1):t}function pigmaShapeLayerFillOpacity(e){return pigmaShapeUsesLayerOpacityForFill(e)?1:pigmaShapeFillOpacity(e)}function B1(e,t,n,r=null){var a,o;let i={name:e.name,left:e.x,top:e.y,right:e.x+e.width,bottom:e.y+e.height,opacity:pigmaShapeLayerOpacity(e),hidden:!e.visible,blendMode:wr(e.blendMode),vectorOrigination:iw(e),vectorMask:{fillStartsWithAllPixels:!1,paths:[Lw(e,t,n)]}};return r&&(i.canvas=r),e.fill&&(i.fillOpacity=pigmaShapeLayerFillOpacity(e),i.vectorFill=Dm(e.fill,e.width,e.height,e.nodeTransform)),i.vectorStroke={fillEnabled:!!e.fill,strokeEnabled:!!e.stroke,lineWidth:{value:e.stroke?e.stroke.width:1,units:"Pixels"},lineAlignment:e.stroke?e.stroke.position:"center",opacity:e.stroke?e.stroke.color.a/255:1,content:{type:"color",color:Sr(_1(e.fill,(o=(a=e.stroke)==null?void 0:a.color)!=null?o:null))},resolution:72},Wn(i,e.effects,e.strokeEffect),i}'
+$uiShapePreviewVectorMetadataFind = 'let V=B1(v,r,i,N);if(N&&B){let A=await bt(v,V,N,d,o),O=pigmaExplodeDropShadowLayer(v,A.layer);s.push(O||A.layer),u.push(...A.linkedFiles),c.push(...A.warnings)}else{let A=pigmaExplodeDropShadowLayer(v,V);s.push(A||V)}m();continue}'
+$uiShapePreviewVectorMetadataReplace = 'let V=N?ku(v,N,v.x,v.y):B1(v,r,i,null);if(N&&B){let A=await bt(v,V,N,d,o),O=pigmaExplodeDropShadowLayer(v,A.layer);s.push(O||A.layer),u.push(...A.linkedFiles),c.push(...A.warnings)}else{let A=pigmaExplodeDropShadowLayer(v,V);s.push(A||V)}m();continue}'
+$uiVectorPreviewMetadataFind = 'function Qo(e){let t=e!=null?e:{};return{disableShapePreviewCanvas:t.disableShapePreviewCanvas===!0,forceBitmapVectorPreview:t.forceBitmapVectorPreview===!0,disableEditableTextPreview:!1,disableLayerBlur:t.disableLayerBlur===!0,disableProgressiveLayerBlur:t.disableProgressiveLayerBlur===!0,disableBackgroundBlur:t.disableBackgroundBlur===!0,disableNoise:t.disableNoise===!0,disableTexture:t.disableTexture===!0}}'
+$uiVectorPreviewMetadataReplace = 'function Qo(e){let t=e!=null?e:{};return{disableShapePreviewCanvas:t.disableShapePreviewCanvas===!0,forceBitmapVectorPreview:!0,disableEditableTextPreview:!1,disableLayerBlur:t.disableLayerBlur===!0,disableProgressiveLayerBlur:t.disableProgressiveLayerBlur===!0,disableBackgroundBlur:t.disableBackgroundBlur===!0,disableNoise:t.disableNoise===!0,disableTexture:t.disableTexture===!0}}'
 if ($uiBundle.Contains($uiColorDodgeShapeOpacityFind)) {
   $uiBundle = Replace-Exact `
     -Text $uiBundle `
@@ -1359,10 +1679,76 @@ if ($uiBundle.Contains($uiColorDodgeShapeOpacityFind)) {
     -Replace $uiColorDodgeShapeOpacityReplace `
     -ExpectedCount 1 `
     -Label 'ui color dodge shape fill opacity mapping'
+} elseif ($uiBundle.Contains($uiColorDodgeShapeOpacityPreviousReplace)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiColorDodgeShapeOpacityPreviousReplace `
+    -Replace $uiColorDodgeShapeOpacityReplace `
+    -ExpectedCount 1 `
+    -Label 'ui shape preview unknown metadata strip'
 } elseif ($uiBundle.Contains($uiColorDodgeShapeOpacityReplace)) {
   # Already patched in this UI bundle variant.
+} elseif ($uiBundle.Contains('function pigmaPsdLineDashSet(')) {
+  # Already upgraded to the dashed stroke variant, which includes the color
+  # dodge shape opacity mapping.
 } else {
   throw 'Could not patch UI color dodge shape fill opacity mapping.'
+}
+
+$uiShapePreviewDashFind = 'function Cw(e){let t=it(e.width,e.height,"shape preview"),n=t.getContext("2d");if(!n)throw new Error("Unable to create a 2D canvas for a shape preview.");if(Cu(n,e.width,e.height,e.shape),e.fill){let r=Xm(n,e.fill,e.width,e.height,e.nodeTransform);r&&(n.globalAlpha=Ym(e.fill),n.fillStyle=r,n.fill())}return e.stroke&&e.stroke.width>0&&(n.globalAlpha=e.stroke.color.a/255,n.lineWidth=e.stroke.width,n.strokeStyle=Tu(e.stroke.color),n.stroke()),t}'
+$uiShapePreviewDashReplace = 'function Cw(e){let t=it(e.width,e.height,"shape preview"),n=t.getContext("2d");if(!n)throw new Error("Unable to create a 2D canvas for a shape preview.");if(Cu(n,e.width,e.height,e.shape),e.fill){let r=Xm(n,e.fill,e.width,e.height,e.nodeTransform);r&&(n.globalAlpha=Ym(e.fill),n.fillStyle=r,n.fill())}return e.stroke&&e.stroke.width>0&&(n.globalAlpha=e.stroke.color.a/255,n.lineWidth=e.stroke.width,n.strokeStyle=Tu(e.stroke.color),Array.isArray(e.stroke.dashPattern)&&e.stroke.dashPattern.length>0&&n.setLineDash(e.stroke.dashPattern),n.stroke()),t}'
+if ($uiBundle.Contains($uiShapePreviewDashFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiShapePreviewDashFind `
+    -Replace $uiShapePreviewDashReplace `
+    -ExpectedCount 1 `
+    -Label 'ui dashed shape preview canvas'
+} elseif ($uiBundle.Contains($uiShapePreviewDashReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI dashed shape preview canvas.'
+}
+
+$uiShapeVectorStrokeDashFind = 'function pigmaShapeLayerOpacity(e){let t=typeof e.opacity=="number"?e.opacity:1,n=pigmaShapeFillOpacity(e);return pigmaShapeUsesLayerOpacityForFill(e)?ae(t*n,0,1):t}function pigmaShapeLayerFillOpacity(e){return pigmaShapeUsesLayerOpacityForFill(e)?1:pigmaShapeFillOpacity(e)}function B1(e,t,n,r=null){var a,o;let i={name:e.name,left:e.x,top:e.y,right:e.x+e.width,bottom:e.y+e.height,opacity:pigmaShapeLayerOpacity(e),hidden:!e.visible,blendMode:wr(e.blendMode),vectorOrigination:iw(e),vectorMask:{fillStartsWithAllPixels:!1,paths:[Lw(e,t,n)]}};return r&&(i.canvas=r),e.fill&&(i.fillOpacity=pigmaShapeLayerFillOpacity(e),i.vectorFill=Dm(e.fill,e.width,e.height,e.nodeTransform)),i.vectorStroke={fillEnabled:!!e.fill,strokeEnabled:!!e.stroke,lineWidth:{value:e.stroke?e.stroke.width:1,units:"Pixels"},lineAlignment:e.stroke?e.stroke.position:"center",opacity:e.stroke?e.stroke.color.a/255:1,content:{type:"color",color:Sr(_1(e.fill,(o=(a=e.stroke)==null?void 0:a.color)!=null?o:null))},resolution:72},Wn(i,e.effects,e.strokeEffect),i}'
+$uiShapeVectorStrokeDashReplace = 'function pigmaShapeLayerOpacity(e){let t=typeof e.opacity=="number"?e.opacity:1,n=pigmaShapeFillOpacity(e);return pigmaShapeUsesLayerOpacityForFill(e)?ae(t*n,0,1):t}function pigmaShapeLayerFillOpacity(e){return pigmaShapeUsesLayerOpacityForFill(e)?1:pigmaShapeFillOpacity(e)}function pigmaPsdLineDashSet(e){return e&&Array.isArray(e.dashPattern)&&e.dashPattern.length>0?e.dashPattern.map(t=>({value:t,units:"Pixels"})):void 0}function pigmaApplyPsdLineDash(e,t){let n=pigmaPsdLineDashSet(t);return n&&(e.lineDashSet=n,e.lineDashOffset={value:0,units:"Pixels"}),e}function B1(e,t,n,r=null){var a,o;let i={name:e.name,left:e.x,top:e.y,right:e.x+e.width,bottom:e.y+e.height,opacity:pigmaShapeLayerOpacity(e),hidden:!e.visible,blendMode:wr(e.blendMode),vectorOrigination:iw(e),vectorMask:{fillStartsWithAllPixels:!1,paths:[Lw(e,t,n)]}};return r&&(i.canvas=r),e.fill&&(i.fillOpacity=pigmaShapeLayerFillOpacity(e),i.vectorFill=Dm(e.fill,e.width,e.height,e.nodeTransform)),i.vectorStroke=pigmaApplyPsdLineDash({fillEnabled:!!e.fill,strokeEnabled:!!e.stroke,lineWidth:{value:e.stroke?e.stroke.width:1,units:"Pixels"},lineAlignment:e.stroke?e.stroke.position:"center",opacity:e.stroke?e.stroke.color.a/255:1,content:{type:"color",color:Sr(_1(e.fill,(o=(a=e.stroke)==null?void 0:a.color)!=null?o:null))},resolution:72},e.stroke),Wn(i,e.effects,e.strokeEffect),i}'
+if ($uiBundle.Contains($uiShapeVectorStrokeDashFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiShapeVectorStrokeDashFind `
+    -Replace $uiShapeVectorStrokeDashReplace `
+    -ExpectedCount 1 `
+    -Label 'ui dashed PSD vector stroke metadata'
+} elseif ($uiBundle.Contains($uiShapeVectorStrokeDashReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI dashed PSD vector stroke metadata.'
+}
+
+if ($uiBundle.Contains($uiShapePreviewVectorMetadataFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiShapePreviewVectorMetadataFind `
+    -Replace $uiShapePreviewVectorMetadataReplace `
+    -ExpectedCount 1 `
+    -Label 'ui shape preview rasterized layer metadata'
+} elseif ($uiBundle.Contains($uiShapePreviewVectorMetadataReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI shape preview rasterized layer metadata.'
+}
+
+if ($uiBundle.Contains($uiVectorPreviewMetadataFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiVectorPreviewMetadataFind `
+    -Replace $uiVectorPreviewMetadataReplace `
+    -ExpectedCount 1 `
+    -Label 'ui vector preview rasterized metadata guard'
+} elseif ($uiBundle.Contains($uiVectorPreviewMetadataReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI vector preview rasterized metadata guard.'
 }
 
 if ($uiBundle.Contains($uiSelectionBridgeStartupFind) -and -not $uiBundle.Contains('function pigmaRequestSelectionBridge()')) {
@@ -1546,13 +1932,51 @@ if ($uiBundle.Contains($editableTextFallbackSummaryFind)) {
     -Label 'ui text metadata fallback summary instrumented'
 }
 
+if ($uiBundle.Contains($editableTextRedrawFlagFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $editableTextRedrawFlagFind `
+    -Replace $editableTextRedrawFlagReplace `
+    -ExpectedCount 1 `
+    -Label 'ui editable text redraw flag disabled'
+}
+
+if ($uiBundle.Contains($editableTextRedrawNoticeFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $editableTextRedrawNoticeFind `
+    -Replace '' `
+    -ExpectedCount 1 `
+    -Label 'ui editable text redraw notice removed'
+}
+
+if ($uiBundle.Contains($editableTextIndexResetFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $editableTextIndexResetFind `
+    -Replace $editableTextIndexResetReplace `
+    -ExpectedCount 1 `
+    -Label 'ui editable text TextIndex reset'
+} elseif (-not $uiBundle.Contains('pigmaResetEditableTextIndexCounter();let a=e.compositePngBytes')) {
+  throw 'Could not patch UI editable text TextIndex reset.'
+}
+
 if ($uiBundle.Contains($editableTextInvalidateWriteFind)) {
   $uiBundle = Replace-Exact `
     -Text $uiBundle `
     -Find $editableTextInvalidateWriteFind `
     -Replace $editableTextInvalidateWriteReplace `
     -ExpectedCount 1 `
-    -Label 'ui editable text redraw write option'
+    -Label 'ui editable text invalidation disabled'
+}
+
+if ($uiBundle.Contains($editableTextInvalidateThumbnailWriteFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $editableTextInvalidateThumbnailWriteFind `
+    -Replace $editableTextInvalidateThumbnailWriteReplace `
+    -ExpectedCount 1 `
+    -Label 'ui editable text thumbnail invalidation disabled'
 }
 
 if ($uiBundle.Contains($psdCompositePreviewFind)) {
@@ -2172,14 +2596,14 @@ $bundle = Replace-Section `
   -Text $bundle `
   -StartMarker 'async function qn(' `
   -EndMarker 'async function Jn(' `
-  -Replacement 'async function qn(e,t,r=null){var g,y;let o=oa(e),n=e.type==="TEXT"?Gi(e,t.documentBounds):null,i=(g=n!=null?n:tt(e))!=null?g:v(e),a=o!=null&&o.warning?o.warning:null;if(a&&t.warnings.add(a),!t.longFrameMode){let T=await pigmaExportMultiFillGroup(e,t,r,i);if(T)return T}if(t.longFrameMode&&i&&pe(e)&&De(i)){t.currentLeaf+=1,Y(t,f(e));let T=await pt(e,i,{normalizePaintOpacity:(o==null?void 0:o.normalizePaintOpacity)===!0,normalizePaintBlendMode:(o==null?void 0:o.normalizePaintBlendMode)===!0});return t.warnings.add(Te(f(e),T.length)),Be(e.id,f(e),e.type,o?o.effectiveOpacity:j(e),e.visible,at(o?o.effectiveBlendMode:K(e)),T)}let s=await hr(e,t,r),l=s.effects,u=_(l),c=me(e),p=progressiveBlurShouldRasterize(l),d=Re(e)?Nr(e):null,m=(e.type==="LINE"||e.type==="VECTOR")&&!!c&&!(d!=null&&d.fill),h=o||l||c||u?p?{normalizePaintOpacity:(o==null?void 0:o.normalizePaintOpacity)===!0,normalizePaintBlendMode:(o==null?void 0:o.normalizePaintBlendMode)===!0}:{normalizePaintOpacity:(o==null?void 0:o.normalizePaintOpacity)===!0,normalizePaintBlendMode:(o==null?void 0:o.normalizePaintBlendMode)===!0,removeSupportedEffects:s.removeSupportedEffects||!!u,removeSupportedStroke:!!c&&!m}:void 0,Bounds=p?(n!=null?n:v(e)):n!=null?n:(o||l||c||u)&&(y=tt(e))!=null?y:void 0;p&&t.warnings.add(''"''.concat(f(e),''" kept its layer blur as a bitmap layer for closer Photoshop matching.''));let E=n&&e.type==="TEXT"?await Qn(e,t,n,h):await Me(e,t,Bounds,h);return E?{kind:"bitmap",id:e.id,name:f(e),sourceType:e.type,opacity:o?o.effectiveOpacity:j(e),visible:e.visible,blendMode:at(o?o.effectiveBlendMode:K(e)),effects:p?null:l,strokeEffect:p||m?null:c,x:E.x,y:E.y,width:E.width,height:E.height,nodeTransform:de(e,t.documentBounds,E.x,E.y),pngBytes:E.pngBytes}:null}' `
+  -Replacement 'async function qn(e,t,r=null){var g,y;let o=oa(e),n=e.type==="TEXT"?Gi(e,t.documentBounds):null,i=(g=n!=null?n:tt(e))!=null?g:v(e),a=o!=null&&o.warning?o.warning:null;if(a&&t.warnings.add(a),!t.longFrameMode){let T=await pigmaExportMultiFillGroup(e,t,r,i);if(T)return T}if(t.longFrameMode&&i&&pe(e)&&De(i)){t.currentLeaf+=1,Y(t,f(e));let T=await pt(e,i,{normalizePaintOpacity:(o==null?void 0:o.normalizePaintOpacity)===!0,normalizePaintBlendMode:(o==null?void 0:o.normalizePaintBlendMode)===!0});return t.warnings.add(Te(f(e),T.length)),Be(e.id,f(e),e.type,o?o.effectiveOpacity:j(e),e.visible,at(o?o.effectiveBlendMode:K(e)),T)}let s=await hr(e,t,r),l=s.effects,u=_(l),c=me(e),p=progressiveBlurShouldRasterize(l),d=Re(e)?Nr(e):null,m=!!c&&Re(e)&&!(d!=null&&d.fill),h=o||l||c||u?p?{normalizePaintOpacity:(o==null?void 0:o.normalizePaintOpacity)===!0,normalizePaintBlendMode:(o==null?void 0:o.normalizePaintBlendMode)===!0}:{normalizePaintOpacity:(o==null?void 0:o.normalizePaintOpacity)===!0,normalizePaintBlendMode:(o==null?void 0:o.normalizePaintBlendMode)===!0,removeSupportedEffects:s.removeSupportedEffects||!!u,removeSupportedStroke:!!c&&!m}:void 0,Bounds=p?(n!=null?n:v(e)):n!=null?n:(o||l||c||u)&&(y=tt(e))!=null?y:void 0;p&&t.warnings.add(''"''.concat(f(e),''" kept its layer blur as a bitmap layer for closer Photoshop matching.''));let E=n&&e.type==="TEXT"?await Qn(e,t,n,h):await Me(e,t,Bounds,h);return E?{kind:"bitmap",id:e.id,name:f(e),sourceType:e.type,opacity:o?o.effectiveOpacity:j(e),visible:e.visible,blendMode:at(o?o.effectiveBlendMode:K(e)),effects:p?null:l,strokeEffect:p||m?null:c,x:E.x,y:E.y,width:E.width,height:E.height,nodeTransform:de(e,t.documentBounds,E.x,E.y),pngBytes:E.pngBytes}:null}' `
   -Label 'layer blur bitmap flatten export'
 
 $bundle = Replace-Section `
   -Text $bundle `
   -StartMarker 'async function xr(' `
   -EndMarker 'function Xe(' `
-  -Replacement 'async function xr(e,t){var n,i;let r=e.type==="TEXT"&&(n=ge(e,!1))!=null?n:v(e);if(!r)return t.warnings.add(''"''.concat(f(e),''" was skipped because it has no exportable bounds.'')),null;let a=oa(e),s=a!=null&&a.warning?a.warning:null;s&&t.warnings.add(s);let l=await hr(e,t,null),u=l.effects,c=_(u),p=me(e),g=progressiveBlurShouldRasterize(u),y=Re(e)?Nr(e):null,m=(e.type==="LINE"||e.type==="VECTOR")&&!!p&&!(y!=null&&y.fill),h=a||u||p||c?g?{normalizePaintOpacity:(a==null?void 0:a.normalizePaintOpacity)===!0,normalizePaintBlendMode:(a==null?void 0:a.normalizePaintBlendMode)===!0}:{normalizePaintOpacity:(a==null?void 0:a.normalizePaintOpacity)===!0,normalizePaintBlendMode:(a==null?void 0:a.normalizePaintBlendMode)===!0,removeSupportedEffects:l.removeSupportedEffects||!!c,removeSupportedStroke:!!p&&!m}:void 0,T=g?((i=v(e))!=null?i:r):a||u||p||c?((i=tt(e))!=null?i:r):r;if(t.longFrameMode&&pe(e)&&De(r)){t.currentLeaf+=1,Y(t,f(e));let C=await pt(e,r,h,t.documentBounds);return t.warnings.add(Te(f(e),C.length)),Be(e.id,f(e),e.type,a?a.effectiveOpacity:j(e),e.visible,at(a?a.effectiveBlendMode:K(e)),C)}g&&t.warnings.add(''"''.concat(f(e),''" kept its layer blur as a bitmap layer for closer Photoshop matching.''));let E=await Me(e,t,T,h);return E?{kind:"bitmap",id:e.id,name:f(e),sourceType:e.type,opacity:a?a.effectiveOpacity:j(e),visible:e.visible,blendMode:at(a?a.effectiveBlendMode:K(e)),effects:g?null:u,strokeEffect:g||m?null:p,x:E.x,y:E.y,width:E.width,height:E.height,nodeTransform:de(e,t.documentBounds,E.x,E.y),pngBytes:E.pngBytes}:null}' `
+  -Replacement 'async function xr(e,t){var n,i;let r=e.type==="TEXT"&&(n=ge(e,!1))!=null?n:v(e);if(!r)return t.warnings.add(''"''.concat(f(e),''" was skipped because it has no exportable bounds.'')),null;let a=oa(e),s=a!=null&&a.warning?a.warning:null;s&&t.warnings.add(s);let l=await hr(e,t,null),u=l.effects,c=_(u),p=me(e),g=progressiveBlurShouldRasterize(u),y=Re(e)?Nr(e):null,m=!!p&&Re(e)&&!(y!=null&&y.fill),h=a||u||p||c?g?{normalizePaintOpacity:(a==null?void 0:a.normalizePaintOpacity)===!0,normalizePaintBlendMode:(a==null?void 0:a.normalizePaintBlendMode)===!0}:{normalizePaintOpacity:(a==null?void 0:a.normalizePaintOpacity)===!0,normalizePaintBlendMode:(a==null?void 0:a.normalizePaintBlendMode)===!0,removeSupportedEffects:l.removeSupportedEffects||!!c,removeSupportedStroke:!!p&&!m}:void 0,T=g?((i=v(e))!=null?i:r):a||u||p||c?((i=tt(e))!=null?i:r):r;if(t.longFrameMode&&pe(e)&&De(r)){t.currentLeaf+=1,Y(t,f(e));let C=await pt(e,r,h,t.documentBounds);return t.warnings.add(Te(f(e),C.length)),Be(e.id,f(e),e.type,a?a.effectiveOpacity:j(e),e.visible,at(a?a.effectiveBlendMode:K(e)),C)}g&&t.warnings.add(''"''.concat(f(e),''" kept its layer blur as a bitmap layer for closer Photoshop matching.''));let E=await Me(e,t,T,h);return E?{kind:"bitmap",id:e.id,name:f(e),sourceType:e.type,opacity:a?a.effectiveOpacity:j(e),visible:e.visible,blendMode:at(a?a.effectiveBlendMode:K(e)),effects:g?null:u,strokeEffect:g||m?null:p,x:E.x,y:E.y,width:E.width,height:E.height,nodeTransform:de(e,t.documentBounds,E.x,E.y),pngBytes:E.pngBytes}:null}' `
   -Label 'safe layered bitmap live effects export'
 
 $bundle = Replace-Section `
@@ -2207,6 +2631,7 @@ $buttonTextAutoSizePatchContent = [System.IO.File]::ReadAllText($buttonTextAutoS
 $textLineHeightAdjustPatchContent = [System.IO.File]::ReadAllText($textLineHeightAdjustPatch, [System.Text.Encoding]::UTF8)
 $unlockLockedLayersPatchContent = [System.IO.File]::ReadAllText($unlockLockedLayersPatch, [System.Text.Encoding]::UTF8)
 $detachLinkedComponentsPatchContent = [System.IO.File]::ReadAllText($detachLinkedComponentsPatch, [System.Text.Encoding]::UTF8)
+$autoLayoutOffPatchContent = [System.IO.File]::ReadAllText($autoLayoutOffPatch, [System.Text.Encoding]::UTF8)
 $deleteHiddenLayersPatchContent = [System.IO.File]::ReadAllText($deleteHiddenLayersPatch, [System.Text.Encoding]::UTF8)
 $clearFrameGuidesPatchContent = [System.IO.File]::ReadAllText($clearFrameGuidesPatch, [System.Text.Encoding]::UTF8)
 $splitLongFramePatchContent = [System.IO.File]::ReadAllText($splitLongFramePatch, [System.Text.Encoding]::UTF8)
@@ -2236,6 +2661,7 @@ $patchedRuntimeParts = @(
   $textLineHeightAdjustPatchContent,
   $unlockLockedLayersPatchContent,
   $detachLinkedComponentsPatchContent,
+  $autoLayoutOffPatchContent,
   $deleteHiddenLayersPatchContent,
   $clearFrameGuidesPatchContent,
   $splitLongFramePatchContent,

@@ -35,10 +35,26 @@ function assertIncludes(content, fileLabel, expectedValues, valueLabel) {
   fail(`Text export guard verification failed for ${fileLabel}\n${details}`);
 }
 
+function assertExcludes(content, fileLabel, forbiddenValues, valueLabel) {
+  const present = forbiddenValues.filter(value => content.includes(value));
+  if (present.length === 0) {
+    return;
+  }
+
+  const details = present.map(value => `- Forbidden ${valueLabel}: ${value}`).join("\n");
+  fail(`Text export guard verification failed for ${fileLabel}\n${details}`);
+}
+
 const runtimeContent = readRequiredFile(contract.runtimeFile);
+const mainBundleContent = contract.mainBundleFile ? readRequiredFile(contract.mainBundleFile) : "";
 const buildScriptContent = readRequiredFile(contract.buildScript);
 
 assertIncludes(runtimeContent, contract.runtimeFile, contract.requiredRuntimeSnippets || [], "runtime snippet");
+assertExcludes(runtimeContent, contract.runtimeFile, contract.forbiddenRuntimeSnippets || [], "runtime snippet");
+if (contract.mainBundleFile) {
+  assertIncludes(mainBundleContent, contract.mainBundleFile, contract.requiredMainBundleSnippets || [], "main bundle snippet");
+  assertExcludes(mainBundleContent, contract.mainBundleFile, contract.forbiddenMainBundleSnippets || [], "main bundle snippet");
+}
 assertIncludes(buildScriptContent, contract.buildScript, contract.requiredBuildSnippets || [], "build snippet");
 
 console.log("Text export guard verified.");

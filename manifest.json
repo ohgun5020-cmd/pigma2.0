@@ -1,6 +1,6 @@
 {
-  "name": "Pigma 2.1 Test - Figma to PSD",
-  "id": "pigma21-test-local-20260529",
+  "name": "Pigma 2.3 Test - Figma to PSD",
+  "id": "pigma23-test-local-20260601",
   "api": "1.0.0",
   "main": "code.patched.js",
   "capabilities": [],

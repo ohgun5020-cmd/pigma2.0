@@ -700,6 +700,15 @@ When UI behavior changes, reload the local plugin in Figma after rebuilding.
   - `generateThumbnail:!0`
   - the white thumbnail matte fill before thumbnail draw
 
+## PSD Photoshop Compatibility
+
+- The Photoshop "unknown data" warning is separate from the "Update All Text Layers" prompt.
+- If a new PSD opens with the unknown-data warning, inspect additional layer info keys before changing text metadata. Recent samples first pointed at shape preview metadata: `sn2P` was emitted when shape preview canvases set `usingAlignedRendering`; later samples still warned after `sn2P` was removed and only shape vector keys (`vscg`, `vmsk`, `vogk`, `vstk`, `iOpa`) remained on the background shape.
+- The rebuild patch must keep generated `ui.html` shape preview handoff at `r&&(i.canvas=r)` and must not reintroduce `r&&(i.canvas=r,i.usingAlignedRendering=!0)`.
+- Normal shape previews should be emitted as bitmap layers with `let V=N?ku(v,N,v.x,v.y):B1(v,r,i,null)`, so default exports do not carry the native vector shape metadata that triggers this warning in Photoshop.
+- Vector previews are also forced through bitmap preview export with `forceBitmapVectorPreview:!0`; editable text metadata remains separate and should still use the TySh/Txt2 path.
+- `text-export-guard.contract.json` intentionally checks this even though the warning is not text-only, because the failure mode shows up during editable-text PSD QA.
+
 ## Version Bump Summary
 
 - Folder target moved to `2.0`
