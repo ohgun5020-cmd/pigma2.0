@@ -4945,6 +4945,12 @@
     return cloneImagePaintWithHashAndVisibility(fill, imageHash, true);
   }
 
+  function cloneVideoPaintWithHash(fill, videoHash) {
+    const cloned = clonePaintWithVisibility(fill, true);
+    cloned.videoHash = videoHash;
+    return cloned;
+  }
+
   function buildVisibleImageFill(imageHash) {
     return {
       type: "IMAGE",
@@ -5024,6 +5030,25 @@
     return cloned;
   }
 
+  function cloneOriginalSizeFitVideoPaint(fill) {
+    if (!fill || !isVideoPaint(fill) || !fill.videoHash) {
+      return null;
+    }
+
+    const cloned = cloneVideoPaintWithHash(fill, fill.videoHash);
+    cloned.scaleMode = "FILL";
+    if ("videoTransform" in cloned) {
+      delete cloned.videoTransform;
+    }
+    if ("scalingFactor" in cloned) {
+      delete cloned.scalingFactor;
+    }
+    if ("rotation" in cloned) {
+      delete cloned.rotation;
+    }
+    return cloned;
+  }
+
   function doesOriginalSizeFitNeedPaintReset(fill) {
     if (!fill || !isImagePaint(fill)) {
       return false;
@@ -5032,6 +5057,25 @@
       return true;
     }
     if ("imageTransform" in fill && !!fill.imageTransform) {
+      return true;
+    }
+    if ("scalingFactor" in fill && Number(fill.scalingFactor) !== 1) {
+      return true;
+    }
+    if ("rotation" in fill && Math.abs(Number(fill.rotation) || 0) > 0.01) {
+      return true;
+    }
+    return false;
+  }
+
+  function doesOriginalSizeFitNeedVideoPaintReset(fill) {
+    if (!fill || !isVideoPaint(fill)) {
+      return false;
+    }
+    if (fill.scaleMode !== "FILL") {
+      return true;
+    }
+    if ("videoTransform" in fill && !!fill.videoTransform) {
       return true;
     }
     if ("scalingFactor" in fill && Number(fill.scalingFactor) !== 1) {
@@ -5789,7 +5833,7 @@
   async function applyOriginalSizeFitToSelection(message) {
     const selection = Array.from(figma.currentPage.selection || []).filter(Boolean);
     if (!selection.length) {
-      throw new Error("Select an image layer to fit to original size first.");
+      throw new Error("Select an image layer, video layer, or component instance to fit first.");
     }
 
     const state = {
@@ -5868,6 +5912,26 @@
       return false;
     }
 
+    if (node.type === "INSTANCE") {
+      const target = await analyzeOriginalSizeFitInstanceNode(node, isRootSelection);
+      if (target && target.target) {
+        appendOriginalSizeFitTarget(target.target, state);
+        return true;
+      }
+
+      if (target && target.skipped && isRootSelection) {
+        appendOriginalSizeFitSkipped(state, node, target.skipped.reason);
+      }
+      return false;
+    }
+
+    if (node.type === "COMPONENT" || node.type === "COMPONENT_SET") {
+      if (isRootSelection) {
+        appendOriginalSizeFitSkipped(state, node, "Main components already define their current size.");
+      }
+      return false;
+    }
+
     if (hasChildren(node)) {
       let hasEligibleDescendant = false;
       for (let index = 0; index < node.children.length; index += 1) {
@@ -5880,7 +5944,7 @@
         appendOriginalSizeFitSkipped(
           state,
           node,
-          "Could not find an image fill layer to fit to original size in the selection."
+          "Could not find an image fill, video fill, or component instance to fit in the selection."
         );
       }
       return hasEligibleDescendant;
@@ -5908,38 +5972,115 @@
     }
 
     if ("rotation" in node && typeof node.rotation === "number" && Math.abs(node.rotation) > 0.01) {
-      return buildOriginalSizeFitSkipped(node, "Rotated image layers are not supported yet.");
+      return buildOriginalSizeFitSkipped(node, "Rotated layers are not supported yet.");
     }
 
     const fills = getNodeFills(node);
     const fillIndex = getPrimaryVisibleImageFillIndex(fills);
-    if (fillIndex < 0) {
-      return isRootSelection ? buildOriginalSizeFitSkipped(node, "Could not find an image fill.") : null;
+    if (fillIndex >= 0) {
+      const fill = fills[fillIndex];
+      const image = fill && fill.imageHash ? figma.getImageByHash(fill.imageHash) : null;
+      if (!image || typeof image.getSizeAsync !== "function") {
+        return buildOriginalSizeFitSkipped(node, "Could not find the original image object.");
+      }
+
+      const size = await image.getSizeAsync();
+      const sourceWidth = size && typeof size.width === "number" ? size.width : 0;
+      const sourceHeight = size && typeof size.height === "number" ? size.height : 0;
+      if (!(sourceWidth > 0) || !(sourceHeight > 0)) {
+        return buildOriginalSizeFitSkipped(node, "Could not read the original image size.");
+      }
+
+      return {
+        target: {
+          kind: "image",
+          nodeId: node.id,
+          nodeName: safeName(node),
+          fillIndex: fillIndex,
+          originalHash: fill.imageHash,
+          sourceWidth: sourceWidth,
+          sourceHeight: sourceHeight,
+        },
+      };
     }
 
-    const fill = fills[fillIndex];
-    const image = fill && fill.imageHash ? figma.getImageByHash(fill.imageHash) : null;
-    if (!image || typeof image.getSizeAsync !== "function") {
-      return buildOriginalSizeFitSkipped(node, "Could not find the original image object.");
+    const videoFillIndex = getPrimaryVisibleVideoFillIndex(fills);
+    if (videoFillIndex >= 0) {
+      const videoFill = fills[videoFillIndex];
+      if (!videoFill || !videoFill.videoHash) {
+        return buildOriginalSizeFitSkipped(node, "Could not find the source video fill.");
+      }
+
+      return {
+        target: {
+          kind: "video",
+          nodeId: node.id,
+          nodeName: safeName(node),
+          fillIndex: videoFillIndex,
+          originalHash: videoFill.videoHash,
+        },
+      };
     }
 
-    const size = await image.getSizeAsync();
-    const sourceWidth = size && typeof size.width === "number" ? size.width : 0;
-    const sourceHeight = size && typeof size.height === "number" ? size.height : 0;
+    return isRootSelection ? buildOriginalSizeFitSkipped(node, "Could not find an image fill or video fill.") : null;
+  }
+
+  async function analyzeOriginalSizeFitInstanceNode(node, isRootSelection) {
+    if (!node || node.removed) {
+      return buildOriginalSizeFitSkipped(node, "Could not read the selected component instance.");
+    }
+
+    if (!canResizeBoundsFitNode(node)) {
+      return buildOriginalSizeFitSkipped(node, "This component instance cannot be resized.");
+    }
+
+    if ("rotation" in node && typeof node.rotation === "number" && Math.abs(node.rotation) > 0.01) {
+      return buildOriginalSizeFitSkipped(node, "Rotated component instances are not supported yet.");
+    }
+
+    const component = await getOriginalSizeFitMainComponent(node);
+    if (!component || component.removed) {
+      return isRootSelection ? buildOriginalSizeFitSkipped(node, "Could not find the main component for this instance.") : null;
+    }
+
+    const sourceWidth = typeof component.width === "number" && Number.isFinite(component.width) ? component.width : 0;
+    const sourceHeight = typeof component.height === "number" && Number.isFinite(component.height) ? component.height : 0;
     if (!(sourceWidth > 0) || !(sourceHeight > 0)) {
-      return buildOriginalSizeFitSkipped(node, "Could not read the original image size.");
+      return buildOriginalSizeFitSkipped(node, "Could not read the main component size.");
     }
 
     return {
       target: {
+        kind: "instance",
         nodeId: node.id,
         nodeName: safeName(node),
-        fillIndex: fillIndex,
-        originalHash: fill.imageHash,
+        componentId: typeof component.id === "string" ? component.id : "",
+        componentName: safeName(component),
         sourceWidth: sourceWidth,
         sourceHeight: sourceHeight,
       },
     };
+  }
+
+  async function getOriginalSizeFitMainComponent(node) {
+    if (!node || node.type !== "INSTANCE") {
+      return null;
+    }
+
+    if (typeof node.getMainComponentAsync === "function") {
+      try {
+        const component = await node.getMainComponentAsync();
+        if (component) {
+          return component;
+        }
+      } catch (error) {}
+    }
+
+    try {
+      return node.mainComponent || null;
+    } catch (error) {
+      return null;
+    }
   }
 
   function appendOriginalSizeFitTarget(target, state) {
@@ -7136,6 +7277,14 @@
   }
 
   async function applyOriginalSizeFitTarget(target, skipped) {
+    if (target && target.kind === "instance") {
+      return await applyOriginalSizeFitInstanceTarget(target, skipped);
+    }
+
+    if (target && target.kind === "video") {
+      return await applyOriginalSizeFitVideoTarget(target, skipped);
+    }
+
     const node = await figma.getNodeByIdAsync(target.nodeId);
     if (!node || node.removed) {
       skipped.push({
@@ -7217,6 +7366,139 @@
         nodeId: target.nodeId,
         nodeName: safeName(node),
         reason: normalizeErrorMessage(error, ORIGINAL_SIZE_FIT_APPLY_ERROR_MESSAGE, {
+          operationLabel: "Fit Original Size",
+          operationKind: "original-size-fit",
+        }),
+      });
+      return "skipped";
+    }
+  }
+
+  async function applyOriginalSizeFitVideoTarget(target, skipped) {
+    const node = await figma.getNodeByIdAsync(target.nodeId);
+    if (!node || node.removed) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: target.nodeName,
+        reason: "Could not find the video layer again.",
+      });
+      return "skipped";
+    }
+
+    const fills = getNodeFills(node);
+    let targetIndex = -1;
+    if (target.fillIndex >= 0 && target.fillIndex < fills.length) {
+      const directFill = fills[target.fillIndex];
+      if (isVideoPaint(directFill) && directFill.videoHash === target.originalHash) {
+        targetIndex = target.fillIndex;
+      }
+    }
+    if (targetIndex < 0) {
+      targetIndex = findVisibleVideoFillIndexByHash(fills, target.originalHash);
+    }
+    if (targetIndex < 0) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: "Could not find the original video fill again.",
+      });
+      return "skipped";
+    }
+
+    const resetPaint = cloneOriginalSizeFitVideoPaint(fills[targetIndex]);
+    if (!resetPaint) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: "Could not reset the video fill settings.",
+      });
+      return "skipped";
+    }
+
+    if (!doesOriginalSizeFitNeedVideoPaintReset(fills[targetIndex])) {
+      return "unchanged";
+    }
+
+    try {
+      const nextFills = fills.slice();
+      nextFills[targetIndex] = resetPaint;
+      node.fills = nextFills;
+      return "applied";
+    } catch (error) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: normalizeErrorMessage(error, "Could not reset the selected video fill.", {
+          operationLabel: "Fit Original Size",
+          operationKind: "original-size-fit",
+        }),
+      });
+      return "skipped";
+    }
+  }
+
+  async function applyOriginalSizeFitInstanceTarget(target, skipped) {
+    const node = await figma.getNodeByIdAsync(target.nodeId);
+    if (!node || node.removed) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: target.nodeName,
+        reason: "Could not find the component instance again.",
+      });
+      return "skipped";
+    }
+
+    if (node.type !== "INSTANCE") {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: "The selected layer is no longer a component instance.",
+      });
+      return "skipped";
+    }
+
+    if (!canResizeBoundsFitNode(node)) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: "This component instance cannot be resized.",
+      });
+      return "skipped";
+    }
+
+    const sourceWidth = Number(target.sourceWidth) > 0 ? Number(target.sourceWidth) : 0;
+    const sourceHeight = Number(target.sourceHeight) > 0 ? Number(target.sourceHeight) : 0;
+    if (!(sourceWidth > 0) || !(sourceHeight > 0)) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: "Could not read the main component size.",
+      });
+      return "skipped";
+    }
+
+    const currentWidth = typeof node.width === "number" && Number.isFinite(node.width) ? node.width : 0;
+    const currentHeight = typeof node.height === "number" && Number.isFinite(node.height) ? node.height : 0;
+    const scaleFactor = "scaleFactor" in node && typeof node.scaleFactor === "number" ? node.scaleFactor : 1;
+    const needsScaleReset = Number.isFinite(scaleFactor) && Math.abs(scaleFactor - 1) > 0.001;
+    const needsResize = Math.abs(currentWidth - sourceWidth) > 0.01 || Math.abs(currentHeight - sourceHeight) > 0.01;
+    if (!needsResize && !needsScaleReset) {
+      return "unchanged";
+    }
+
+    try {
+      if (needsScaleReset) {
+        try {
+          node.scaleFactor = 1;
+        } catch (scaleError) {}
+      }
+      resizeBoundsFitNode(node, sourceWidth, sourceHeight, false);
+      return "applied";
+    } catch (error) {
+      skipped.push({
+        nodeId: target.nodeId,
+        nodeName: safeName(node),
+        reason: normalizeErrorMessage(error, "Could not resize the component instance to its main component size.", {
           operationLabel: "Fit Original Size",
           operationKind: "original-size-fit",
         }),
@@ -7978,7 +8260,7 @@
         return first.reason.trim();
       }
     }
-    return "Could not find an image fill layer to fit to original size in the selection.";
+    return "Could not find an image fill, video fill, or component instance to fit in the selection.";
   }
 
   function buildImageCompositeEmptySelectionMessage(layers, skipped) {
@@ -8169,6 +8451,30 @@
     return -1;
   }
 
+  function getPrimaryVisibleVideoFillIndex(fills) {
+    const fillIndices = getFillIndicesInUiOrder(fills);
+    for (let index = 0; index < fillIndices.length; index += 1) {
+      const fillIndex = fillIndices[index];
+      const fill = fills[fillIndex];
+      if (isVideoPaint(fill) && fill.videoHash) {
+        return fillIndex;
+      }
+    }
+    return -1;
+  }
+
+  function findVisibleVideoFillIndexByHash(fills, videoHash) {
+    const fillIndices = getFillIndicesInUiOrder(fills);
+    for (let index = 0; index < fillIndices.length; index += 1) {
+      const fillIndex = fillIndices[index];
+      const fill = fills[fillIndex];
+      if (isVideoPaint(fill) && fill.videoHash === videoHash) {
+        return fillIndex;
+      }
+    }
+    return -1;
+  }
+
   function hasVisiblePaints(paints) {
     if (!Array.isArray(paints) || !paints.length) {
       return false;
@@ -8236,12 +8542,14 @@
     const label = normalizeOriginalSizeFitOperationLabel(operationLabel);
 
     if (!appliedCount && unchangedCount > 0 && skippedCount === 0) {
-      figma.notify("The selected image is already at original size.", { timeout: 2200 });
+      figma.notify("The selected layer is already at its original or reset size.", { timeout: 2200 });
       return;
     }
 
     if (!appliedCount && skippedCount > 0) {
-      figma.notify(label + " could not find an eligible image layer to apply.", { timeout: 2200 });
+      figma.notify(label + " could not find an eligible image, video, or component instance to apply.", {
+        timeout: 2200,
+      });
       return;
     }
 
@@ -8494,6 +8802,10 @@
 
   function isImagePaint(fill) {
     return !!fill && fill.visible !== false && fill.type === "IMAGE";
+  }
+
+  function isVideoPaint(fill) {
+    return !!fill && fill.visible !== false && fill.type === "VIDEO";
   }
 
   function getFillIndicesInUiOrder(fills) {
