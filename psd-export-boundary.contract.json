@@ -27,10 +27,7 @@
   ],
   "requiredRuntimeSnippets": [
     "function pigmaFindContainerClipBaseIndex(e){return e.findIndex(pigmaIsBaseImageSimulationLayer)}",
-    "function pigmaBuildGroupRasterSmartObject(",
-    "function pigmaBuildClippedGroupSmartObject(",
-    "if(pigmaIsLayerGroup(u)){let c=await pigmaBuildClippedGroupSmartObject(u,t,n);",
-    "u.clipping=!0,r.applied=!0"
+    "for(let l=i+1;l<e.length;l+=1){let u=e[l];if(u&&typeof u==\"object\"){u.clipping=!0,r.applied=!0}}"
   ],
   "forbiddenRuntimeSnippets": [
     "return n===0?n:-1",
