@@ -6,9 +6,11 @@
 
   const originalOnMessage = figma.ui.onmessage;
   const AI_SETTINGS_KEY = "pigma:ai-settings:v1";
+  const WEB_AUTH_KEY = "pigma:web-auth:v1";
   const AI_LLM_RUN_LOG_KEY = "pigma:ai-llm-run-log:v1";
   const AI_LLM_RUN_LOG_LIMIT = 40;
   const AI_LLM_REQUEST_TIMEOUT_MS = 45000;
+  const DEFAULT_SERVER_URL = "https://oy-tools-production.up.railway.app";
   const DEFAULT_AI_SETTINGS = Object.freeze({
     enabled: false,
     provider: "openai",
@@ -22,6 +24,7 @@
   const DEFAULT_MODEL_BY_PROVIDER = Object.freeze({
     openai: "gpt-5-mini",
     gemini: "gemini-2.5-flash",
+    "server-openai": "pigma-server-ai",
   });
   const FALLBACK_MODELS_BY_PROVIDER = Object.freeze({
     openai: ["gpt-5-mini", "gpt-4.1-mini"],
@@ -68,15 +71,17 @@
   async function hasConfiguredAiAsync() {
     const settings = await getAiSettingsAsync();
     const runInfo = getResolvedRunInfo(settings);
-    return settings.enabled === true && runInfo.apiKey.length > 0;
+    if (settings.enabled === true && runInfo.apiKey.length > 0) {
+      return true;
+    }
+    return Boolean(await getServerAiRunInfoAsync());
   }
 
   async function requestJsonTask(options) {
     const settings = await getAiSettingsAsync();
-    if (settings.enabled !== true) {
-      return null;
-    }
-    const attemptRunInfos = buildTextTaskRunInfos(settings, options);
+    const localRunInfos = settings.enabled === true ? buildTextTaskRunInfos(settings, options) : [];
+    const serverRunInfo = await getServerAiRunInfoAsync();
+    const attemptRunInfos = localRunInfos.length > 0 ? localRunInfos : serverRunInfo ? [serverRunInfo] : [];
     if (!attemptRunInfos.length) {
       return null;
     }
@@ -93,13 +98,22 @@
 
       try {
         let result = null;
-        result = await requestJsonTaskViaUiBridge({
-          provider,
-          model,
-          apiKey: runInfo.apiKey,
-          prompt,
-          meta: requestMeta,
-        });
+        if (runInfo.serverAi === true) {
+          result = await requestJsonTaskViaServerAi({
+            runInfo,
+            prompt,
+            meta: requestMeta,
+            options,
+          });
+        } else {
+          result = await requestJsonTaskViaUiBridge({
+            provider,
+            model,
+            apiKey: runInfo.apiKey,
+            prompt,
+            meta: requestMeta,
+          });
+        }
         const durationMs = Math.max(0, Date.now() - startedAt);
         const quality = summarizeJsonResponseQuality(result, options && options.schema);
 
@@ -270,6 +284,39 @@
     return runInfos;
   }
 
+  async function getServerAiRunInfoAsync() {
+    const webAuth = await readWebAuthAsync();
+    if (!webAuth.accessToken) {
+      return null;
+    }
+
+    return {
+      provider: "server-openai",
+      apiKey: "",
+      model: "pigma-server-ai",
+      serverAi: true,
+      serverUrl: webAuth.serverUrl,
+      accessToken: webAuth.accessToken,
+      providerProfile: buildProviderProfile("", "server-openai", "pigma-server-ai", "server-ai", "proxy"),
+    };
+  }
+
+  async function readWebAuthAsync() {
+    try {
+      return normalizeWebAuth(await figma.clientStorage.getAsync(WEB_AUTH_KEY));
+    } catch (error) {
+      return normalizeWebAuth(null);
+    }
+  }
+
+  function normalizeWebAuth(value) {
+    const source = value && typeof value === "object" ? value : {};
+    return {
+      serverUrl: normalizeServerUrl(source.serverUrl),
+      accessToken: sanitizeAccessToken(source.accessToken),
+    };
+  }
+
   function normalizeAiSettings(value) {
     const source = value && typeof value === "object" ? value : {};
     const legacyProvider = source.provider === "gemini" ? "gemini" : DEFAULT_AI_SETTINGS.provider;
@@ -421,6 +468,73 @@
     });
   }
 
+  async function requestJsonTaskViaServerAi(payload) {
+    const runInfo = payload && payload.runInfo && typeof payload.runInfo === "object" ? payload.runInfo : {};
+    const prompt = typeof payload.prompt === "string" ? payload.prompt : "";
+    const serverUrl = normalizeServerUrl(runInfo.serverUrl);
+    const accessToken = sanitizeAccessToken(runInfo.accessToken);
+
+    if (!accessToken) {
+      throw new Error("PIGMA web login is required for server AI.");
+    }
+    if (!prompt) {
+      throw new Error("AI prompt is empty.");
+    }
+
+    const response = await fetch(`${serverUrl}/api/plugin/ai`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        input: prompt,
+        maxOutputTokens: payload.options && payload.options.maxOutputTokens,
+      }),
+    });
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      const errorMessage =
+        data && typeof data === "object" && typeof data.error === "string" && data.error
+          ? data.error
+          : `Server AI returned HTTP ${response.status}.`;
+      const code = data && typeof data === "object" && typeof data.code === "string" ? data.code : "";
+      throw new Error(code ? `${errorMessage} (${code})` : errorMessage);
+    }
+
+    const text = data && typeof data === "object" && typeof data.text === "string" ? data.text : "";
+    return parseJsonObjectText(text);
+  }
+
+  function parseJsonObjectText(text) {
+    const raw = String(text || "").trim();
+    if (!raw) {
+      throw new Error("Server AI returned an empty response.");
+    }
+
+    try {
+      return JSON.parse(raw);
+    } catch (error) {}
+
+    const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (fenced && fenced[1]) {
+      try {
+        return JSON.parse(fenced[1].trim());
+      } catch (error) {}
+    }
+
+    const firstBrace = raw.indexOf("{");
+    const lastBrace = raw.lastIndexOf("}");
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+      try {
+        return JSON.parse(raw.slice(firstBrace, lastBrace + 1));
+      } catch (error) {}
+    }
+
+    throw new Error("Server AI did not return valid JSON.");
+  }
+
   function createRequestId() {
     return "ai-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
   }
@@ -483,6 +597,30 @@
       .trim();
   }
 
+  function sanitizeAccessToken(value) {
+    return String(value || "")
+      .replace(/[\u0000-\u001F\u007F-\u009F]/g, "")
+      .replace(/[\u200B-\u200D\uFEFF]/g, "")
+      .replace(/\s+/g, "")
+      .replace(/^['"`]+|['"`]+$/g, "")
+      .trim();
+  }
+
+  function normalizeServerUrl(value) {
+    let next = String(value || DEFAULT_SERVER_URL).trim().replace(/\/+$/g, "");
+    if (!next) {
+      next = DEFAULT_SERVER_URL;
+    }
+    if (!/^https?:\/\//i.test(next)) {
+      next = `https://${next}`;
+    }
+    try {
+      return new URL(next).origin;
+    } catch (error) {
+      return DEFAULT_SERVER_URL;
+    }
+  }
+
   function normalizeApiKeyCharacters(value) {
     return String(value || "")
       .replace(/[\u0000-\u001F\u007F-\u009F]/g, "")
@@ -497,7 +635,7 @@
     const taskType = normalizeTaskType(options && options.taskType);
     const taskContext = normalizeTaskContext(options && options.taskContext);
     const plannerVersion = normalizePlannerVersion(options && options.plannerVersion);
-    const provider = runInfo && runInfo.provider === "gemini" ? "gemini" : "openai";
+    const provider = runInfo && runInfo.provider === "gemini" ? "gemini" : runInfo && runInfo.serverAi === true ? "server-openai" : "openai";
     const model = runInfo && typeof runInfo.model === "string" ? runInfo.model : DEFAULT_MODEL_BY_PROVIDER[provider];
     return {
       taskType: taskType,
@@ -538,7 +676,7 @@
     if (normalized) {
       return normalized;
     }
-    const safeProvider = provider === "gemini" ? "gemini" : "openai";
+    const safeProvider = provider === "gemini" ? "gemini" : provider === "server-openai" ? "server-openai" : "openai";
     const safeModel = String(model || DEFAULT_MODEL_BY_PROVIDER[safeProvider]).replace(/\s+/g, "-").trim();
     const safeTaskType = normalizeTaskType(taskType);
     const safePlannerVersion = normalizePlannerVersion(plannerVersion).replace(/\s+/g, "-");
@@ -656,7 +794,7 @@
       id: String(source.id || createRequestId()),
       createdAt: String(source.createdAt || new Date().toISOString()),
       ok: source.ok === true,
-      provider: source.provider === "gemini" ? "gemini" : "openai",
+      provider: source.provider === "gemini" ? "gemini" : source.provider === "server-openai" ? "server-openai" : "openai",
       model: String(source.model || ""),
       taskType: normalizeTaskType(source.taskType),
       taskContext: normalizeTaskContext(source.taskContext),
