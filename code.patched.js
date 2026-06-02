@@ -46370,7 +46370,8 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
     const needsResize = Math.abs(currentWidth - sourceWidth) > 0.01 || Math.abs(currentHeight - sourceHeight) > 0.01;
     const needsFillReset = doesOriginalSizeFitNeedPaintReset(fills[targetIndex]);
-    if (!needsResize && !needsFillReset) {
+    const needsRotationReset = doesOriginalSizeFitNeedNodeRotationReset(node);
+    if (!needsResize && !needsFillReset && !needsRotationReset) {
       return "unchanged";
     }
 
@@ -46378,8 +46379,8 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       const nextFills = fills.slice();
       nextFills[targetIndex] = resetPaint;
       node.fills = nextFills;
-      if (needsResize) {
-        resizeOriginalSizeFitNodePreservingTransform(node, sourceWidth, sourceHeight, true);
+      if (needsResize || needsRotationReset) {
+        applyOriginalSizeFitNodeGeometry(node, sourceWidth, sourceHeight, true);
       }
       return "applied";
     } catch (error) {
@@ -46503,19 +46504,19 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     const scaleFactor = "scaleFactor" in node && typeof node.scaleFactor === "number" ? node.scaleFactor : 1;
     const needsScaleReset = Number.isFinite(scaleFactor) && Math.abs(scaleFactor - 1) > 0.001;
     const needsResize = Math.abs(currentWidth - sourceWidth) > 0.01 || Math.abs(currentHeight - sourceHeight) > 0.01;
-    if (!needsResize && !needsScaleReset) {
+    const needsRotationReset = doesOriginalSizeFitNeedNodeRotationReset(node);
+    if (!needsResize && !needsScaleReset && !needsRotationReset) {
       return "unchanged";
     }
 
     try {
-      const transformSnapshot = captureOriginalSizeFitTransformSnapshot(node);
+      const center = getOriginalSizeFitAbsoluteCenter(node);
       if (needsScaleReset) {
         try {
           node.scaleFactor = 1;
         } catch (scaleError) {}
       }
-      resizeBoundsFitNode(node, sourceWidth, sourceHeight, false);
-      restoreOriginalSizeFitTransformSnapshot(node, transformSnapshot);
+      applyOriginalSizeFitNodeGeometry(node, sourceWidth, sourceHeight, false, center);
       return "applied";
     } catch (error) {
       skipped.push({
@@ -47148,78 +47149,27 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     throw new Error("Could not resize the selected layer.");
   }
 
-  function resizeOriginalSizeFitNodePreservingTransform(node, width, height, preferWithoutConstraints) {
-    const transformSnapshot = captureOriginalSizeFitTransformSnapshot(node);
+  function applyOriginalSizeFitNodeGeometry(node, width, height, preferWithoutConstraints, centerOverride) {
+    const center = centerOverride || getOriginalSizeFitAbsoluteCenter(node);
+    resetOriginalSizeFitNodeRotation(node);
     resizeBoundsFitNode(node, width, height, preferWithoutConstraints);
-    restoreOriginalSizeFitTransformSnapshot(node, transformSnapshot);
+    restoreOriginalSizeFitAbsoluteCenter(node, center);
   }
 
-  function captureOriginalSizeFitTransformSnapshot(node) {
-    if (!shouldPreserveOriginalSizeFitNodeTransform(node)) {
-      return null;
-    }
-
-    const center = getOriginalSizeFitAbsoluteCenter(node);
-    const relativeLinear = getOriginalSizeFitRelativeLinear(node);
-    const rotation = "rotation" in node && typeof node.rotation === "number" && Number.isFinite(node.rotation) ? node.rotation : null;
-    if (!center && !relativeLinear && rotation === null) {
-      return null;
-    }
-
-    return {
-      center: center,
-      relativeLinear: relativeLinear,
-      rotation: rotation,
-    };
+  function doesOriginalSizeFitNeedNodeRotationReset(node) {
+    return !!node && "rotation" in node && typeof node.rotation === "number" && Math.abs(node.rotation) > 0.01;
   }
 
-  function shouldPreserveOriginalSizeFitNodeTransform(node) {
-    if (!node || node.removed) {
-      return false;
+  function resetOriginalSizeFitNodeRotation(node) {
+    if (!doesOriginalSizeFitNeedNodeRotationReset(node)) {
+      return;
     }
 
-    if ("rotation" in node && typeof node.rotation === "number" && Math.abs(node.rotation) > 0.01) {
-      return true;
+    try {
+      node.rotation = 0;
+    } catch (error) {
+      throw new Error("Could not reset the selected layer rotation.");
     }
-
-    const relativeLinear = getOriginalSizeFitRelativeLinear(node);
-    if (!relativeLinear) {
-      return false;
-    }
-
-    return (
-      Math.abs(relativeLinear.a - 1) > 0.0001 ||
-      Math.abs(relativeLinear.b) > 0.0001 ||
-      Math.abs(relativeLinear.c) > 0.0001 ||
-      Math.abs(relativeLinear.d - 1) > 0.0001
-    );
-  }
-
-  function getOriginalSizeFitRelativeLinear(node) {
-    if (!node || !("relativeTransform" in node) || !Array.isArray(node.relativeTransform) || node.relativeTransform.length < 2) {
-      return null;
-    }
-
-    const row0 = Array.isArray(node.relativeTransform[0]) ? node.relativeTransform[0] : null;
-    const row1 = Array.isArray(node.relativeTransform[1]) ? node.relativeTransform[1] : null;
-    if (!row0 || !row1 || row0.length < 2 || row1.length < 2) {
-      return null;
-    }
-
-    const a = Number(row0[0]);
-    const c = Number(row0[1]);
-    const b = Number(row1[0]);
-    const d = Number(row1[1]);
-    if (![a, b, c, d].every(Number.isFinite)) {
-      return null;
-    }
-
-    return {
-      a: a,
-      b: b,
-      c: c,
-      d: d,
-    };
   }
 
   function getOriginalSizeFitAbsoluteCenter(node) {
@@ -47252,20 +47202,8 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     };
   }
 
-  function restoreOriginalSizeFitTransformSnapshot(node, snapshot) {
-    if (!node || !snapshot) {
-      return;
-    }
-
-    if (snapshot.rotation !== null && "rotation" in node) {
-      try {
-        node.rotation = snapshot.rotation;
-      } catch (rotationError) {}
-    }
-
-    restoreOriginalSizeFitRelativeLinear(node, snapshot.relativeLinear);
-
-    if (!snapshot.center) {
+  function restoreOriginalSizeFitAbsoluteCenter(node, center) {
+    if (!node || !center) {
       return;
     }
 
@@ -47274,36 +47212,13 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       return;
     }
 
-    const shiftX = snapshot.center.x - nextCenter.x;
-    const shiftY = snapshot.center.y - nextCenter.y;
+    const shiftX = center.x - nextCenter.x;
+    const shiftY = center.y - nextCenter.y;
     if (Math.abs(shiftX) <= 0.001 && Math.abs(shiftY) <= 0.001) {
       return;
     }
 
     moveOriginalSizeFitNodeByAbsoluteDelta(node, shiftX, shiftY);
-  }
-
-  function restoreOriginalSizeFitRelativeLinear(node, relativeLinear) {
-    if (
-      !node ||
-      !relativeLinear ||
-      !("relativeTransform" in node) ||
-      !Array.isArray(node.relativeTransform) ||
-      node.relativeTransform.length < 2
-    ) {
-      return;
-    }
-
-    const row0 = Array.isArray(node.relativeTransform[0]) ? node.relativeTransform[0] : null;
-    const row1 = Array.isArray(node.relativeTransform[1]) ? node.relativeTransform[1] : null;
-    if (!row0 || !row1 || row0.length < 3 || row1.length < 3) {
-      return;
-    }
-
-    node.relativeTransform = [
-      [relativeLinear.a, relativeLinear.c, roundBoundsFitMetric(Number(row0[2]) || 0)],
-      [relativeLinear.b, relativeLinear.d, roundBoundsFitMetric(Number(row1[2]) || 0)],
-    ];
   }
 
   function moveOriginalSizeFitNodeByAbsoluteDelta(node, absoluteShiftX, absoluteShiftY) {
