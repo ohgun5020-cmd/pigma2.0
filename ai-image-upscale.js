@@ -5971,10 +5971,6 @@
       return buildOriginalSizeFitSkipped(node, "This layer cannot be resized.");
     }
 
-    if ("rotation" in node && typeof node.rotation === "number" && Math.abs(node.rotation) > 0.01) {
-      return buildOriginalSizeFitSkipped(node, "Rotated layers are not supported yet.");
-    }
-
     const fills = getNodeFills(node);
     const fillIndex = getPrimaryVisibleImageFillIndex(fills);
     if (fillIndex >= 0) {
@@ -6032,10 +6028,6 @@
 
     if (!canResizeBoundsFitNode(node)) {
       return buildOriginalSizeFitSkipped(node, "This component instance cannot be resized.");
-    }
-
-    if ("rotation" in node && typeof node.rotation === "number" && Math.abs(node.rotation) > 0.01) {
-      return buildOriginalSizeFitSkipped(node, "Rotated component instances are not supported yet.");
     }
 
     const component = await getOriginalSizeFitMainComponent(node);
