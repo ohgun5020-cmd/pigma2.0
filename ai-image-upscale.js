@@ -7350,7 +7350,7 @@
       nextFills[targetIndex] = resetPaint;
       node.fills = nextFills;
       if (needsResize) {
-        resizeBoundsFitNode(node, sourceWidth, sourceHeight, true);
+        resizeOriginalSizeFitNodePreservingTransform(node, sourceWidth, sourceHeight, true);
       }
       return "applied";
     } catch (error) {
@@ -7479,12 +7479,14 @@
     }
 
     try {
+      const transformSnapshot = captureOriginalSizeFitTransformSnapshot(node);
       if (needsScaleReset) {
         try {
           node.scaleFactor = 1;
         } catch (scaleError) {}
       }
       resizeBoundsFitNode(node, sourceWidth, sourceHeight, false);
+      restoreOriginalSizeFitTransformSnapshot(node, transformSnapshot);
       return "applied";
     } catch (error) {
       skipped.push({
@@ -8115,6 +8117,227 @@
     }
 
     throw new Error("Could not resize the selected layer.");
+  }
+
+  function resizeOriginalSizeFitNodePreservingTransform(node, width, height, preferWithoutConstraints) {
+    const transformSnapshot = captureOriginalSizeFitTransformSnapshot(node);
+    resizeBoundsFitNode(node, width, height, preferWithoutConstraints);
+    restoreOriginalSizeFitTransformSnapshot(node, transformSnapshot);
+  }
+
+  function captureOriginalSizeFitTransformSnapshot(node) {
+    if (!shouldPreserveOriginalSizeFitNodeTransform(node)) {
+      return null;
+    }
+
+    const center = getOriginalSizeFitAbsoluteCenter(node);
+    const relativeLinear = getOriginalSizeFitRelativeLinear(node);
+    const rotation = "rotation" in node && typeof node.rotation === "number" && Number.isFinite(node.rotation) ? node.rotation : null;
+    if (!center && !relativeLinear && rotation === null) {
+      return null;
+    }
+
+    return {
+      center: center,
+      relativeLinear: relativeLinear,
+      rotation: rotation,
+    };
+  }
+
+  function shouldPreserveOriginalSizeFitNodeTransform(node) {
+    if (!node || node.removed) {
+      return false;
+    }
+
+    if ("rotation" in node && typeof node.rotation === "number" && Math.abs(node.rotation) > 0.01) {
+      return true;
+    }
+
+    const relativeLinear = getOriginalSizeFitRelativeLinear(node);
+    if (!relativeLinear) {
+      return false;
+    }
+
+    return (
+      Math.abs(relativeLinear.a - 1) > 0.0001 ||
+      Math.abs(relativeLinear.b) > 0.0001 ||
+      Math.abs(relativeLinear.c) > 0.0001 ||
+      Math.abs(relativeLinear.d - 1) > 0.0001
+    );
+  }
+
+  function getOriginalSizeFitRelativeLinear(node) {
+    if (!node || !("relativeTransform" in node) || !Array.isArray(node.relativeTransform) || node.relativeTransform.length < 2) {
+      return null;
+    }
+
+    const row0 = Array.isArray(node.relativeTransform[0]) ? node.relativeTransform[0] : null;
+    const row1 = Array.isArray(node.relativeTransform[1]) ? node.relativeTransform[1] : null;
+    if (!row0 || !row1 || row0.length < 2 || row1.length < 2) {
+      return null;
+    }
+
+    const a = Number(row0[0]);
+    const c = Number(row0[1]);
+    const b = Number(row1[0]);
+    const d = Number(row1[1]);
+    if (![a, b, c, d].every(Number.isFinite)) {
+      return null;
+    }
+
+    return {
+      a: a,
+      b: b,
+      c: c,
+      d: d,
+    };
+  }
+
+  function getOriginalSizeFitAbsoluteCenter(node) {
+    if (!node || !Array.isArray(node.absoluteTransform) || node.absoluteTransform.length < 2) {
+      return null;
+    }
+
+    const width = typeof node.width === "number" && Number.isFinite(node.width) ? node.width : 0;
+    const height = typeof node.height === "number" && Number.isFinite(node.height) ? node.height : 0;
+    if (!(width > 0) || !(height > 0)) {
+      return null;
+    }
+
+    const row0 = Array.isArray(node.absoluteTransform[0]) ? node.absoluteTransform[0] : null;
+    const row1 = Array.isArray(node.absoluteTransform[1]) ? node.absoluteTransform[1] : null;
+    if (!row0 || !row1 || row0.length < 3 || row1.length < 3) {
+      return null;
+    }
+
+    const a = Number(row0[0]) || 0;
+    const c = Number(row0[1]) || 0;
+    const tx = Number(row0[2]) || 0;
+    const b = Number(row1[0]) || 0;
+    const d = Number(row1[1]) || 0;
+    const ty = Number(row1[2]) || 0;
+
+    return {
+      x: roundBoundsFitMetric(tx + a * width * 0.5 + c * height * 0.5),
+      y: roundBoundsFitMetric(ty + b * width * 0.5 + d * height * 0.5),
+    };
+  }
+
+  function restoreOriginalSizeFitTransformSnapshot(node, snapshot) {
+    if (!node || !snapshot) {
+      return;
+    }
+
+    if (snapshot.rotation !== null && "rotation" in node) {
+      try {
+        node.rotation = snapshot.rotation;
+      } catch (rotationError) {}
+    }
+
+    restoreOriginalSizeFitRelativeLinear(node, snapshot.relativeLinear);
+
+    if (!snapshot.center) {
+      return;
+    }
+
+    const nextCenter = getOriginalSizeFitAbsoluteCenter(node);
+    if (!nextCenter) {
+      return;
+    }
+
+    const shiftX = snapshot.center.x - nextCenter.x;
+    const shiftY = snapshot.center.y - nextCenter.y;
+    if (Math.abs(shiftX) <= 0.001 && Math.abs(shiftY) <= 0.001) {
+      return;
+    }
+
+    moveOriginalSizeFitNodeByAbsoluteDelta(node, shiftX, shiftY);
+  }
+
+  function restoreOriginalSizeFitRelativeLinear(node, relativeLinear) {
+    if (
+      !node ||
+      !relativeLinear ||
+      !("relativeTransform" in node) ||
+      !Array.isArray(node.relativeTransform) ||
+      node.relativeTransform.length < 2
+    ) {
+      return;
+    }
+
+    const row0 = Array.isArray(node.relativeTransform[0]) ? node.relativeTransform[0] : null;
+    const row1 = Array.isArray(node.relativeTransform[1]) ? node.relativeTransform[1] : null;
+    if (!row0 || !row1 || row0.length < 3 || row1.length < 3) {
+      return;
+    }
+
+    node.relativeTransform = [
+      [relativeLinear.a, relativeLinear.c, roundBoundsFitMetric(Number(row0[2]) || 0)],
+      [relativeLinear.b, relativeLinear.d, roundBoundsFitMetric(Number(row1[2]) || 0)],
+    ];
+  }
+
+  function moveOriginalSizeFitNodeByAbsoluteDelta(node, absoluteShiftX, absoluteShiftY) {
+    const parentDelta = convertOriginalSizeFitAbsoluteDeltaToParentLocal(node && node.parent, absoluteShiftX, absoluteShiftY);
+    if (!parentDelta) {
+      throw new Error("Could not restore the rotated layer position.");
+    }
+
+    if ("x" in node && typeof node.x === "number" && "y" in node && typeof node.y === "number") {
+      node.x = roundBoundsFitMetric(node.x + parentDelta.x);
+      node.y = roundBoundsFitMetric(node.y + parentDelta.y);
+      return;
+    }
+
+    if ("relativeTransform" in node && Array.isArray(node.relativeTransform) && node.relativeTransform.length >= 2) {
+      const row0 = Array.isArray(node.relativeTransform[0]) ? node.relativeTransform[0] : null;
+      const row1 = Array.isArray(node.relativeTransform[1]) ? node.relativeTransform[1] : null;
+      if (row0 && row1 && row0.length >= 3 && row1.length >= 3) {
+        node.relativeTransform = [
+          [row0[0], row0[1], roundBoundsFitMetric((Number(row0[2]) || 0) + parentDelta.x)],
+          [row1[0], row1[1], roundBoundsFitMetric((Number(row1[2]) || 0) + parentDelta.y)],
+        ];
+        return;
+      }
+    }
+
+    throw new Error("Could not restore the rotated layer position.");
+  }
+
+  function convertOriginalSizeFitAbsoluteDeltaToParentLocal(parent, absoluteShiftX, absoluteShiftY) {
+    const dx = Number(absoluteShiftX) || 0;
+    const dy = Number(absoluteShiftY) || 0;
+    if (!parent || parent.type === "PAGE") {
+      return {
+        x: roundBoundsFitMetric(dx),
+        y: roundBoundsFitMetric(dy),
+      };
+    }
+
+    const transform = Array.isArray(parent.absoluteTransform) ? parent.absoluteTransform : null;
+    if (!transform || transform.length < 2) {
+      return null;
+    }
+
+    const row0 = Array.isArray(transform[0]) ? transform[0] : null;
+    const row1 = Array.isArray(transform[1]) ? transform[1] : null;
+    if (!row0 || !row1 || row0.length < 2 || row1.length < 2) {
+      return null;
+    }
+
+    const a = Number(row0[0]) || 0;
+    const c = Number(row0[1]) || 0;
+    const b = Number(row1[0]) || 0;
+    const d = Number(row1[1]) || 0;
+    const det = a * d - b * c;
+    if (!Number.isFinite(det) || Math.abs(det) < 0.000001) {
+      return null;
+    }
+
+    return {
+      x: roundBoundsFitMetric((d * dx - c * dy) / det),
+      y: roundBoundsFitMetric((-b * dx + a * dy) / det),
+    };
   }
 
   function normalizeBoundsFitResults(value) {
