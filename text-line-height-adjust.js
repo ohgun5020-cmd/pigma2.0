@@ -270,7 +270,7 @@
 
     const last = MATERIAL_LATIN_LINE_HEIGHT_ANCHORS[MATERIAL_LATIN_LINE_HEIGHT_ANCHORS.length - 1];
     if (size >= last.size) {
-      return last.lineHeight;
+      return Math.max(1, Math.round(size * (last.lineHeight / last.size)));
     }
 
     for (let index = 1; index < MATERIAL_LATIN_LINE_HEIGHT_ANCHORS.length; index += 1) {

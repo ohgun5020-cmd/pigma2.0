@@ -72,8 +72,17 @@
   const IMAGE_TEXT_OVERLAY_MAX_TEXT_LENGTH = 5000;
   const IMAGE_MERGE_FAST_EXPORT_TIMEOUT_MS = 6000;
   const IMAGE_MERGE_EXPORT_TIMEOUT_MS = 30000;
+  const IMAGE_MERGE_BALANCED_FAST_EXPORT_TIMEOUT_MS = 18000;
+  const IMAGE_MERGE_BALANCED_EXPORT_TIMEOUT_MS = 45000;
+  const IMAGE_MERGE_STABLE_FAST_EXPORT_TIMEOUT_MS = 45000;
+  const IMAGE_MERGE_STABLE_EXPORT_TIMEOUT_MS = 75000;
   const IMAGE_MERGE_PREFERRED_EXPORT_SCALE = 2;
   const IMAGE_MERGE_MAX_EXPORT_PIXEL_COUNT = 16000000;
+  const IMAGE_MERGE_SMALL_PIXEL_COUNT = 4000000;
+  const IMAGE_MERGE_LARGE_PIXEL_COUNT = 12000000;
+  const IMAGE_MERGE_SMALL_NODE_COUNT = 80;
+  const IMAGE_MERGE_LARGE_NODE_COUNT = 240;
+  const IMAGE_MERGE_COMPLEXITY_SCAN_LIMIT = 1200;
   const IMAGE_MERGE_CLONE_YIELD_INTERVAL = 8;
   const IMAGE_MERGE_SCAN_YIELD_INTERVAL = 64;
   const BOUNDS_FIT_SCAN_YIELD_INTERVAL = 32;
@@ -2708,7 +2717,7 @@
 
     isCompositeApplying = true;
     try {
-      const source = await exportImageMergeSelection();
+      const source = await exportImageMergeSelection(clientRequestId);
       const createdImage = figma.createImage(source.bytes);
       if (!createdImage || !createdImage.hash) {
         throw new Error("이미지 합치기 결과를 Figma 이미지로 만들지 못했습니다.");
@@ -2843,7 +2852,137 @@
     }
   }
 
-  async function exportImageMergeSelection() {
+  async function measureImageMergeSelectionComplexity(selection, state) {
+    const result = {
+      nodeCount: 0,
+      maxDepth: 0,
+      scanLimitReached: false,
+    };
+    if (!Array.isArray(selection) || !selection.length) {
+      return result;
+    }
+
+    for (let index = 0; index < selection.length; index += 1) {
+      await measureImageMergeNodeComplexity(selection[index], state, result, IMAGE_MERGE_COMPLEXITY_SCAN_LIMIT);
+      if (result.scanLimitReached) {
+        break;
+      }
+    }
+
+    return result;
+  }
+
+  async function measureImageMergeNodeComplexity(root, state, result, limit) {
+    if (!root || !result || result.scanLimitReached) {
+      return;
+    }
+
+    const stack = [{ node: root, depth: 0 }];
+    while (stack.length > 0) {
+      const entry = stack.pop();
+      const node = entry && entry.node ? entry.node : null;
+      if (!node || node.removed) {
+        continue;
+      }
+
+      result.nodeCount += 1;
+      result.maxDepth = Math.max(result.maxDepth, Number(entry.depth) || 0);
+      if (result.nodeCount >= limit) {
+        result.scanLimitReached = true;
+        return;
+      }
+
+      await maybeYieldImageMergeScan(state);
+      if (!hasImageMergeChildren(node)) {
+        continue;
+      }
+
+      for (let index = node.children.length - 1; index >= 0; index -= 1) {
+        const child = node.children[index];
+        if (child && !child.removed) {
+          stack.push({ node: child, depth: (Number(entry.depth) || 0) + 1 });
+        }
+      }
+    }
+  }
+
+  function buildImageMergeProfile(unionRect, selection, complexity) {
+    const width = unionRect && Number(unionRect.width) > 0 ? Number(unionRect.width) : 0;
+    const height = unionRect && Number(unionRect.height) > 0 ? Number(unionRect.height) : 0;
+    const pixelCount = width * height;
+    const rootCount = Array.isArray(selection) ? selection.length : 0;
+    const nodeCount = complexity && Number(complexity.nodeCount) > 0 ? Number(complexity.nodeCount) : rootCount;
+    const scanLimitReached = !!(complexity && complexity.scanLimitReached);
+    const stable =
+      scanLimitReached ||
+      pixelCount >= IMAGE_MERGE_LARGE_PIXEL_COUNT ||
+      nodeCount >= IMAGE_MERGE_LARGE_NODE_COUNT ||
+      rootCount >= 12;
+    const balanced =
+      !stable &&
+      (pixelCount >= IMAGE_MERGE_SMALL_PIXEL_COUNT || nodeCount >= IMAGE_MERGE_SMALL_NODE_COUNT || rootCount >= 4);
+
+    if (stable) {
+      return {
+        mode: "stable",
+        pixelCount: pixelCount,
+        nodeCount: nodeCount,
+        rootCount: rootCount,
+        maxPreferredScale: 1,
+        directExportTimeoutMs: IMAGE_MERGE_STABLE_FAST_EXPORT_TIMEOUT_MS,
+        frameExportTimeoutMs: IMAGE_MERGE_STABLE_EXPORT_TIMEOUT_MS,
+        cloneYieldInterval: 4,
+        useSliceFastPath: true,
+        progressLabel: "큰 이미지 병합 중...",
+      };
+    }
+
+    if (balanced) {
+      return {
+        mode: "balanced",
+        pixelCount: pixelCount,
+        nodeCount: nodeCount,
+        rootCount: rootCount,
+        maxPreferredScale: 1.5,
+        directExportTimeoutMs: IMAGE_MERGE_BALANCED_FAST_EXPORT_TIMEOUT_MS,
+        frameExportTimeoutMs: IMAGE_MERGE_BALANCED_EXPORT_TIMEOUT_MS,
+        cloneYieldInterval: 6,
+        useSliceFastPath: true,
+        progressLabel: "이미지 병합 중...",
+      };
+    }
+
+    return {
+      mode: "fast",
+      pixelCount: pixelCount,
+      nodeCount: nodeCount,
+      rootCount: rootCount,
+      maxPreferredScale: IMAGE_MERGE_PREFERRED_EXPORT_SCALE,
+      directExportTimeoutMs: IMAGE_MERGE_FAST_EXPORT_TIMEOUT_MS,
+      frameExportTimeoutMs: IMAGE_MERGE_EXPORT_TIMEOUT_MS,
+      cloneYieldInterval: IMAGE_MERGE_CLONE_YIELD_INTERVAL,
+      useSliceFastPath: false,
+      progressLabel: "빠르게 병합 중...",
+    };
+  }
+
+  function postImageMergeProgress(clientRequestId, profile) {
+    if (!clientRequestId || !profile) {
+      return;
+    }
+
+    figma.ui.postMessage({
+      type: "image-merge-progress",
+      clientRequestId: clientRequestId,
+      mode: profile.mode,
+      message: profile.progressLabel,
+      pixelCount: profile.pixelCount,
+      nodeCount: profile.nodeCount,
+      rootCount: profile.rootCount,
+    });
+  }
+
+  async function exportImageMergeSelection(clientRequestId) {
     const selection = Array.from(figma.currentPage.selection || []).filter(function (node) {
       return isImageMergeExportableNode(node);
     });
@@ -2866,12 +3005,17 @@
       throw new Error("선택한 항목의 병합 영역을 계산하지 못했습니다.");
     }
 
-    const exportScale = resolveImageMergeExportScale(unionRect);
+    const complexity = await measureImageMergeSelectionComplexity(exportSelection, scanState);
+    const mergeProfile = buildImageMergeProfile(unionRect, exportSelection, complexity);
+    postImageMergeProgress(clientRequestId, mergeProfile);
+
+    const exportScale = resolveImageMergeExportScale(unionRect, mergeProfile);
     const exportSettings = buildImageMergeExportSettings(exportScale);
 
     const bytes =
-      (await tryExportImageMergeDirectSelection(exportSelection, exportSettings)) ||
-      (await exportImageMergeFrameSelection(exportSelection, unionRect, exportSettings));
+      (await tryExportImageMergeDirectSelection(exportSelection, exportSettings, mergeProfile)) ||
+      (await tryExportImageMergeSliceSelection(exportSelection, unionRect, exportSettings, mergeProfile)) ||
+      (await exportImageMergeFrameSelection(exportSelection, unionRect, exportSettings, mergeProfile));
 
     if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
       throw new Error("이미지 합치기 PNG가 비어 있습니다.");
@@ -2921,7 +3065,7 @@
     return settings;
   }
 
-  function resolveImageMergeExportScale(unionRect) {
+  function resolveImageMergeExportScale(unionRect, profile) {
     const width = unionRect && Number(unionRect.width) > 0 ? Number(unionRect.width) : 0;
     const height = unionRect && Number(unionRect.height) > 0 ? Number(unionRect.height) : 0;
     const area = width * height;
@@ -2930,11 +3074,13 @@
     }
 
     const maxScale = Math.sqrt(IMAGE_MERGE_MAX_EXPORT_PIXEL_COUNT / area);
-    const scale = Math.min(IMAGE_MERGE_PREFERRED_EXPORT_SCALE, maxScale);
-    if (scale >= 1.75) {
+    const preferredScale =
+      profile && Number(profile.maxPreferredScale) > 0 ? Number(profile.maxPreferredScale) : IMAGE_MERGE_PREFERRED_EXPORT_SCALE;
+    const scale = Math.min(preferredScale, maxScale);
+    if (scale >= 2 && maxScale >= 2) {
       return 2;
     }
-    if (scale >= 1.35) {
+    if (scale >= 1.5 && maxScale >= 1.5) {
       return 1.5;
     }
     return 1;
@@ -2971,15 +3117,19 @@
     );
   }
 
-  async function tryExportImageMergeDirectSelection(selection, exportSettings) {
+  async function tryExportImageMergeDirectSelection(selection, exportSettings, profile) {
     if (!Array.isArray(selection) || selection.length !== 1 || !isImageMergeExportableNode(selection[0])) {
       return null;
     }
 
     try {
+      const timeoutMs =
+        profile && Number(profile.directExportTimeoutMs) > 0
+          ? Number(profile.directExportTimeoutMs)
+          : IMAGE_MERGE_FAST_EXPORT_TIMEOUT_MS;
       const bytes = await withImageMergeTimeout(
         selection[0].exportAsync(exportSettings),
-        IMAGE_MERGE_FAST_EXPORT_TIMEOUT_MS,
+        timeoutMs,
         "이미지 합치기 빠른 export"
       );
       return bytes && typeof bytes.length === "number" && bytes.length > 0 ? bytes : null;
@@ -2987,6 +3137,93 @@
       console.warn("[pigma] image merge direct export fallback:", normalizeErrorMessage(error, "direct export failed"));
       return null;
     }
+  }
+
+  async function tryExportImageMergeSliceSelection(selection, unionRect, exportSettings, profile) {
+    if (!profile || profile.useSliceFastPath !== true || !canUseImageMergeSliceFastPath(selection, unionRect)) {
+      return null;
+    }
+
+    let slice = null;
+    try {
+      slice = figma.createSlice();
+      slice.name = "__pigma-image-merge-slice__";
+      slice.x = unionRect.x;
+      slice.y = unionRect.y;
+      slice.resize(Math.max(1, unionRect.width), Math.max(1, unionRect.height));
+      if (slice.parent !== figma.currentPage) {
+        figma.currentPage.appendChild(slice);
+      }
+
+      const timeoutMs =
+        profile && Number(profile.frameExportTimeoutMs) > 0
+          ? Number(profile.frameExportTimeoutMs)
+          : IMAGE_MERGE_EXPORT_TIMEOUT_MS;
+      const bytes = await withImageMergeTimeout(slice.exportAsync(exportSettings), timeoutMs, "이미지 합치기 slice export");
+      return bytes && typeof bytes.length === "number" && bytes.length > 0 ? bytes : null;
+    } catch (error) {
+      console.warn("[pigma] image merge slice export fallback:", normalizeErrorMessage(error, "slice export failed"));
+      return null;
+    } finally {
+      if (slice && !slice.removed) {
+        slice.remove();
+      }
+    }
+  }
+
+  function canUseImageMergeSliceFastPath(selection, unionRect) {
+    if (
+      !Array.isArray(selection) ||
+      selection.length < 2 ||
+      !unionRect ||
+      !(unionRect.width > 0) ||
+      !(unionRect.height > 0) ||
+      typeof figma.createSlice !== "function" ||
+      !figma.currentPage ||
+      !Array.isArray(figma.currentPage.children)
+    ) {
+      return false;
+    }
+
+    const selectedIds = {};
+    for (let index = 0; index < selection.length; index += 1) {
+      const node = selection[index];
+      if (!isImageMergeExportableNode(node) || node.parent !== figma.currentPage) {
+        return false;
+      }
+      selectedIds[node.id] = true;
+    }
+
+    for (let index = 0; index < figma.currentPage.children.length; index += 1) {
+      const sibling = figma.currentPage.children[index];
+      if (
+        !sibling ||
+        sibling.removed ||
+        sibling.visible === false ||
+        sibling.type === "SLICE" ||
+        selectedIds[sibling.id]
+      ) {
+        continue;
+      }
+
+      const siblingRect = getBoundsFitNodeRect(sibling);
+      if (siblingRect && imageMergeRectsIntersect(siblingRect, unionRect)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  function imageMergeRectsIntersect(left, right) {
+    return (
+      !!left &&
+      !!right &&
+      left.x < right.x + right.width &&
+      left.x + left.width > right.x &&
+      left.y < right.y + right.height &&
+      left.y + left.height > right.y
+    );
   }
 
   function hasImageMergeChildren(node) {
@@ -3114,7 +3351,7 @@
     throw new Error("Could not position the preview clone for image merge.");
   }
 
-  async function exportImageMergeFrameSelection(selection, unionRect, exportSettings) {
+  async function exportImageMergeFrameSelection(selection, unionRect, exportSettings, profile) {
     const preview = figma.createFrame();
     const clones = [];
     try {
@@ -3129,6 +3366,10 @@
 
       const orderedSelection = selection.slice().sort(compareSceneNodeCanvasOrder);
       const scanState = { scannedNodeCount: 0 };
+      const cloneYieldInterval =
+        profile && Number(profile.cloneYieldInterval) > 0
+          ? Number(profile.cloneYieldInterval)
+          : IMAGE_MERGE_CLONE_YIELD_INTERVAL;
       for (let index = 0; index < orderedSelection.length; index += 1) {
         const node = orderedSelection[index];
         if (!isImageMergeExportableNode(node)) {
@@ -3142,7 +3383,7 @@
         preview.appendChild(clone);
         clones.push(clone);
         positionImageMergePreviewClone(node, clone, unionRect, rect);
-        if (clones.length % IMAGE_MERGE_CLONE_YIELD_INTERVAL === 0) {
+        if (clones.length % cloneYieldInterval === 0) {
           await waitForNextTick();
         }
       }
@@ -3151,9 +3392,13 @@
         throw new Error("병합 가능한 선택 레이어를 찾지 못했습니다.");
       }
 
+      const timeoutMs =
+        profile && Number(profile.frameExportTimeoutMs) > 0
+          ? Number(profile.frameExportTimeoutMs)
+          : IMAGE_MERGE_EXPORT_TIMEOUT_MS;
       return await withImageMergeTimeout(
         preview.exportAsync(exportSettings),
-        IMAGE_MERGE_EXPORT_TIMEOUT_MS,
+        timeoutMs,
         "이미지 합치기 preview export"
       );
     } finally {
@@ -5137,6 +5382,32 @@
     return cloned;
   }
 
+  function cloneBoundsFitRenderedImagePaint(fill, processed) {
+    if (!fill || !isImagePaint(fill) || !processed) {
+      return null;
+    }
+
+    const bytes = normalizeBytes(processed.bytes);
+    if (!bytes.length) {
+      return null;
+    }
+
+    const image = figma.createImage(bytes);
+    if (!image || typeof image.hash !== "string" || !image.hash) {
+      return null;
+    }
+
+    return cloneBoundsFitImagePaint(fill, image.hash);
+  }
+
+  function cloneBoundsFitAppliedImagePaint(fill, target, processed) {
+    if (target && target.analysisMode === "rendered-node") {
+      return cloneBoundsFitRenderedImagePaint(fill, processed);
+    }
+
+    return cloneBoundsFitPreservedImagePaint(fill, target, processed);
+  }
+
   function notifyApplyResult(result, operationLabel) {
     const summary = result && result.summary ? result.summary : {};
     const appliedFillCount =
@@ -6740,7 +7011,7 @@
     );
   }
 
-  function getBoundsFitAnalysisContext(node) {
+  function getBoundsFitAnalysisContext(node, options) {
     const nodeRect = getBoundsFitNodeRect(node);
     if (!nodeRect) {
       return null;
@@ -6753,7 +7024,7 @@
       height: nodeRect.height,
     };
     let clipped = false;
-    let current = node.parent;
+    let current = options && options.ignoreParentClips === true ? null : node.parent;
 
     while (current) {
       if ("clipsContent" in current && current.clipsContent === true) {
@@ -6779,6 +7050,17 @@
       offsetX: roundBoundsFitMetric(visibleRect.x - nodeRect.x),
       offsetY: roundBoundsFitMetric(visibleRect.y - nodeRect.y),
     };
+  }
+
+  function hasBoundsFitClippingAncestor(node) {
+    let current = node && node.parent ? node.parent : null;
+    while (current) {
+      if ("clipsContent" in current && current.clipsContent === true) {
+        return true;
+      }
+      current = current.parent;
+    }
+    return false;
   }
 
   function positionBoundsFitPreviewClone(sourceNode, clonedNode, visibleRect) {
@@ -6994,9 +7276,11 @@
     }
 
     const renderedExportScale = resolveBoundsFitRenderedExportScale(nodeWidth, nodeHeight, sourceWidth, sourceHeight);
-    // Bounds-fit must follow the pixels currently visible on canvas. Raw getImageByHash() bytes can lag
-    // behind in-editor image edits such as background removal, so we always analyze the rendered node.
-    const analysisContext = getBoundsFitAnalysisContext(node);
+    // Bounds-fit trims the selected image layer itself. Ancestor frames may hide where the layer is
+    // placed on canvas, but they should not crop the original image content being fitted.
+    const analysisContext = getBoundsFitAnalysisContext(node, {
+      ignoreParentClips: true,
+    });
     if (!analysisContext) {
       return buildBoundsFitSkipped(node, "Could not calculate the visible bounds for analysis.");
     }
@@ -7064,9 +7348,29 @@
     let rasterAnalysisOffsetY = analysisContext.offsetY;
     let rasterAnalysisWidth = analysisContext.visibleRect.width;
     let rasterAnalysisHeight = analysisContext.visibleRect.height;
+    const needsIsolatedRenderedExport = hasBoundsFitClippingAncestor(node);
+    const renderedExportContext = needsIsolatedRenderedExport
+      ? {
+          nodeRect: analysisContext.nodeRect,
+          visibleRect: analysisContext.nodeRect,
+          clipped: true,
+          offsetX: 0,
+          offsetY: 0,
+        }
+      : analysisContext;
 
     try {
-      bytes = await node.exportAsync(exportSettings);
+      if (needsIsolatedRenderedExport) {
+        bytes = await exportBoundsFitRenderedAnalysisBytes(node, renderedExportContext, renderedExportScale);
+        if (bytes && typeof bytes.length === "number" && bytes.length > 0) {
+          rasterAnalysisOffsetX = 0;
+          rasterAnalysisOffsetY = 0;
+          rasterAnalysisWidth = analysisContext.visibleRect.width;
+          rasterAnalysisHeight = analysisContext.visibleRect.height;
+        }
+      } else {
+        bytes = await node.exportAsync(exportSettings);
+      }
     } catch (error) {
       let previewExportError = null;
       try {
@@ -7075,10 +7379,7 @@
         // currently visible pixels and keeps bounds-fit usable for those layers.
         bytes = await exportBoundsFitRenderedAnalysisBytes(
           node,
-          {
-            visibleRect: analysisContext.visibleRect,
-            clipped: true,
-          },
+          renderedExportContext,
           renderedExportScale
         );
         if (bytes && typeof bytes.length === "number" && bytes.length > 0) {
@@ -7585,7 +7886,7 @@
 
     try {
       const nextFills = fills.slice();
-      const cropPaint = cloneBoundsFitPreservedImagePaint(nextFills[targetIndex], target, processed);
+      const cropPaint = cloneBoundsFitAppliedImagePaint(nextFills[targetIndex], target, processed);
       if (!cropPaint) {
         skipped.push({
           nodeId: target.nodeId,
@@ -7980,11 +8281,16 @@
         continue;
       }
 
-      let childRect = getBoundsFitNodeRect(child);
-      if (!childRect) {
+      const rawChildRect = getBoundsFitNodeRect(child);
+      if (!rawChildRect) {
         continue;
       }
 
+      if (isBoundsFitPreferredContentNode(child)) {
+        preferredRects.push(rawChildRect);
+      }
+
+      let childRect = rawChildRect;
       if (clipRect) {
         childRect = intersectBoundsFitRects(childRect, clipRect);
         if (!childRect) {
@@ -8000,9 +8306,6 @@
       }
 
       fallbackRects.push(childRect);
-      if (isBoundsFitPreferredContentNode(child)) {
-        preferredRects.push(childRect);
-      }
     }
   }
 

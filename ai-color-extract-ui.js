@@ -112,6 +112,7 @@
   const geminiModel = "gemini-2.5-flash-lite";
   const processingToast = shared.ensureProcessingToast();
   const toastOwnerKey = "ai-image:aiColorExtractButton";
+  const serverAiBridge = window.__PIGMA_SERVER_AI_BRIDGE__;
   const peerButtons = [
     "aiImageReferenceSearchButton",
     "aiOriginalImageDownloadButton",
@@ -741,14 +742,58 @@
     return parseJsonResponseText(getGeminiText(data));
   }
 
+  async function requestServerAiColorPalette(payload, signal) {
+    if (!serverAiBridge || typeof serverAiBridge.requestJson !== "function") {
+      throw new Error("Pigma 서버 AI 연결을 사용할 수 없습니다.");
+    }
+    const prompt = buildColorExtractPrompt(payload);
+    const image = await prepareImagePayloadForAi(payload && payload.image);
+    const text = await serverAiBridge.requestJson(
+      {
+        instructions:
+          "You are an assistant inside a Figma plugin. Return concise structured JSON only, following the requested shape.",
+        input: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "input_text",
+                text: prompt,
+              },
+              {
+                type: "input_image",
+                image_url: `data:${image.mimeType};base64,${image.base64}`,
+              },
+            ],
+          },
+        ],
+        maxOutputTokens: 1600,
+      },
+      signal
+    );
+    return parseJsonResponseText(text);
+  }
+
   function hasOpenAiColorFallback(settings) {
     return !!(settings && typeof settings.openAiApiKey === "string" && settings.openAiApiKey.trim());
   }
 
   async function requestAiColorPalette(payload, signal) {
-    const settings = shared.requireReadySettings();
-    const providerInfo = shared.resolveUpscaleProvider(settings);
+    let settings = null;
+    let providerInfo = null;
+    try {
+      settings = shared.requireReadySettings();
+      providerInfo = shared.resolveUpscaleProvider(settings);
+    } catch (error) {
+      if (serverAiBridge && typeof serverAiBridge.hasConnection === "function" && serverAiBridge.hasConnection()) {
+        return await requestServerAiColorPalette(payload, signal);
+      }
+      throw error;
+    }
     if (!providerInfo) {
+      if (serverAiBridge && typeof serverAiBridge.hasConnection === "function" && serverAiBridge.hasConnection()) {
+        return await requestServerAiColorPalette(payload, signal);
+      }
       throw new Error("\uC124\uC815\uC5D0 Gemini \uB610\uB294 OpenAI API \uD0A4\uB97C \uBA3C\uC800 \uC785\uB825\uD574 \uC8FC\uC138\uC694.");
     }
 
@@ -770,6 +815,9 @@
           payload,
           signal
         );
+      }
+      if (serverAiBridge && typeof serverAiBridge.hasConnection === "function" && serverAiBridge.hasConnection()) {
+        return requestServerAiColorPalette(payload, signal);
       }
       throw error;
     }
