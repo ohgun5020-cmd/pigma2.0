@@ -2,6 +2,7 @@ $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $source = Join-Path $root "code.js"
 $patch = Join-Path $root "psd-import-text-fix.js"
 $exportPatch = Join-Path $root "psd-export-boundary.js"
+$shapeLayerExportPatch = Join-Path $root "psd-shape-layer-export.js"
 $aiSettingsPatch = Join-Path $root "ai-settings-storage.js"
 $pigmaWebIntegrationPatch = Join-Path $root "pigma-web-integration.js"
 $aiResponsiveMemoryPatch = Join-Path $root "ai-responsive-memory.js"
@@ -44,6 +45,8 @@ $textHighlightBoundsContract = Join-Path $root "text-highlight-bounds.contract.j
 $textHighlightBoundsVerifier = Join-Path $root "verify-text-highlight-bounds.js"
 $exportBoundaryContract = Join-Path $root "psd-export-boundary.contract.json"
 $exportBoundaryVerifier = Join-Path $root "verify-psd-export-boundary.js"
+$shapeLayerExportContract = Join-Path $root "psd-shape-layer-export.contract.json"
+$shapeLayerExportVerifier = Join-Path $root "verify-psd-shape-layer-export.js"
 $figmaRuntimeSyntaxVerifier = Join-Path $root "verify-figma-runtime-syntax.js"
 $fontPostScriptMapBuilder = Join-Path $root "build-font-postscript-map.js"
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
@@ -58,6 +61,10 @@ if (-not (Test-Path $patch)) {
 
 if (-not (Test-Path $exportPatch)) {
   throw "Missing export patch: $exportPatch"
+}
+
+if (-not (Test-Path $shapeLayerExportPatch)) {
+  throw "Missing PSD shape layer export patch: $shapeLayerExportPatch"
 }
 
 if (-not (Test-Path $aiSettingsPatch)) {
@@ -227,6 +234,14 @@ if (-not (Test-Path $exportBoundaryVerifier)) {
   throw "Missing export boundary verifier: $exportBoundaryVerifier"
 }
 
+if (-not (Test-Path $shapeLayerExportContract)) {
+  throw "Missing PSD shape layer export contract: $shapeLayerExportContract"
+}
+
+if (-not (Test-Path $shapeLayerExportVerifier)) {
+  throw "Missing PSD shape layer export verifier: $shapeLayerExportVerifier"
+}
+
 if (-not (Test-Path $figmaRuntimeSyntaxVerifier)) {
   throw "Missing Figma runtime syntax verifier: $figmaRuntimeSyntaxVerifier"
 }
@@ -269,6 +284,7 @@ if ($LASTEXITCODE -ne 0) {
 $runtimeSyntaxSourceFiles = @(
   $patch,
   $exportPatch,
+  $shapeLayerExportPatch,
   $aiSettingsPatch,
   $pigmaWebIntegrationPatch,
   $aiResponsiveMemoryPatch,
@@ -1787,8 +1803,14 @@ $uiColorDodgeShapeOpacityPreviousReplace = 'function pigmaShapeUsesLayerOpacityF
 $uiColorDodgeShapeOpacityReplace = 'function pigmaShapeUsesLayerOpacityForFill(e){return e&&String(e.blendMode||"").toLowerCase()==="color dodge"}function pigmaShapeFillOpacity(e){return Em(e&&e.fill)}function pigmaShapeLayerOpacity(e){let t=typeof e.opacity=="number"?e.opacity:1,n=pigmaShapeFillOpacity(e);return pigmaShapeUsesLayerOpacityForFill(e)?ae(t*n,0,1):t}function pigmaShapeLayerFillOpacity(e){return pigmaShapeUsesLayerOpacityForFill(e)?1:pigmaShapeFillOpacity(e)}function B1(e,t,n,r=null){var a,o;let i={name:e.name,left:e.x,top:e.y,right:e.x+e.width,bottom:e.y+e.height,opacity:pigmaShapeLayerOpacity(e),hidden:!e.visible,blendMode:wr(e.blendMode),vectorOrigination:iw(e),vectorMask:{fillStartsWithAllPixels:!1,paths:[Lw(e,t,n)]}};return r&&(i.canvas=r),e.fill&&(i.fillOpacity=pigmaShapeLayerFillOpacity(e),i.vectorFill=Dm(e.fill,e.width,e.height,e.nodeTransform)),i.vectorStroke={fillEnabled:!!e.fill,strokeEnabled:!!e.stroke,lineWidth:{value:e.stroke?e.stroke.width:1,units:"Pixels"},lineAlignment:e.stroke?e.stroke.position:"center",opacity:e.stroke?e.stroke.color.a/255:1,content:{type:"color",color:Sr(_1(e.fill,(o=(a=e.stroke)==null?void 0:a.color)!=null?o:null))},resolution:72},Wn(i,e.effects,e.strokeEffect),i}'
 $uiShapePreviewVectorMetadataFind = 'let V=B1(v,r,i,N);if(N&&B){let A=await bt(v,V,N,d,o),O=pigmaExplodeDropShadowLayer(v,A.layer);s.push(O||A.layer),u.push(...A.linkedFiles),c.push(...A.warnings)}else{let A=pigmaExplodeDropShadowLayer(v,V);s.push(A||V)}m();continue}'
 $uiShapePreviewVectorMetadataReplace = 'let V=N?ku(v,N,v.x,v.y):B1(v,r,i,null);if(N&&B){let A=await bt(v,V,N,d,o),O=pigmaExplodeDropShadowLayer(v,A.layer);s.push(O||A.layer),u.push(...A.linkedFiles),c.push(...A.warnings)}else{let A=pigmaExplodeDropShadowLayer(v,V);s.push(A||V)}m();continue}'
-$uiVectorPreviewMetadataFind = 'function Qo(e){let t=e!=null?e:{};return{disableShapePreviewCanvas:t.disableShapePreviewCanvas===!0,forceBitmapVectorPreview:t.forceBitmapVectorPreview===!0,disableEditableTextPreview:!1,disableLayerBlur:t.disableLayerBlur===!0,disableProgressiveLayerBlur:t.disableProgressiveLayerBlur===!0,disableBackgroundBlur:t.disableBackgroundBlur===!0,disableNoise:t.disableNoise===!0,disableTexture:t.disableTexture===!0}}'
-$uiVectorPreviewMetadataReplace = 'function Qo(e){let t=e!=null?e:{};return{disableShapePreviewCanvas:t.disableShapePreviewCanvas===!0,forceBitmapVectorPreview:!0,disableEditableTextPreview:!1,disableLayerBlur:t.disableLayerBlur===!0,disableProgressiveLayerBlur:t.disableProgressiveLayerBlur===!0,disableBackgroundBlur:t.disableBackgroundBlur===!0,disableNoise:t.disableNoise===!0,disableTexture:t.disableTexture===!0}}'
+$uiVectorPreviewMetadataReplace = 'function Qo(e){let t=e!=null?e:{};return{disableShapePreviewCanvas:t.disableShapePreviewCanvas===!0,forceBitmapVectorPreview:t.forceBitmapVectorPreview===!0,disableEditableTextPreview:!1,disableLayerBlur:t.disableLayerBlur===!0,disableProgressiveLayerBlur:t.disableProgressiveLayerBlur===!0,disableBackgroundBlur:t.disableBackgroundBlur===!0,disableNoise:t.disableNoise===!0,disableTexture:t.disableTexture===!0}}'
+$uiVectorPreviewMetadataLegacyReplace = 'function Qo(e){let t=e!=null?e:{};return{disableShapePreviewCanvas:t.disableShapePreviewCanvas===!0,forceBitmapVectorPreview:!0,disableEditableTextPreview:!1,disableLayerBlur:t.disableLayerBlur===!0,disableProgressiveLayerBlur:t.disableProgressiveLayerBlur===!0,disableBackgroundBlur:t.disableBackgroundBlur===!0,disableNoise:t.disableNoise===!0,disableTexture:t.disableTexture===!0}}'
+$uiNativeShapeBeforeBitmapFind = 'async function aw(e,t,n,r,i,a=null){if(i.forceBitmapVectorPreview){let f=await Xn(e.pngBytes);return{layer:ku(e,f,e.x+e.previewOffsetX,e.y+e.previewOffsetY,null),linkedFiles:[],warnings:[]}}let o=await ow(e),s=o.canvas,u=gw(e.svgString,e.width,e.height),l=cu(Ki(e.effects),i),c=e.previewOffsetX!==0||e.previewOffsetY!==0||o.visibleWidth!==e.width||o.visibleHeight!==e.height;if(du(l)){'
+$uiNativeShapeBeforeBitmapReplace = 'async function aw(e,t,n,r,i,a=null){let pigmaNativeShapeCandidate=e.strategy==="shape"&&e.fill&&gw(e.svgString,e.width,e.height);if(i.forceBitmapVectorPreview&&!pigmaNativeShapeCandidate){let f=await Xn(e.pngBytes);return{layer:ku(e,f,e.x+e.previewOffsetX,e.y+e.previewOffsetY,null),linkedFiles:[],warnings:[]}}let o=await ow(e),s=o.canvas,u=pigmaNativeShapeCandidate,l=cu(Ki(e.effects),i),c=e.previewOffsetX!==0||e.previewOffsetY!==0||o.visibleWidth!==e.width||o.visibleHeight!==e.height;if(du(l)){'
+$uiNativeShapeSizeGuardFind = 'function gw(e,t,n){if(t>512||n>512||t*n>18e4)return!1;'
+$uiNativeShapeSizeGuardReplace = 'function gw(e,t,n){if(t<=0||n<=0)return!1;'
+$uiNativeShapePreviewAlignmentFind = 'if(e.strategy==="shape"&&!l&&e.fill&&!c&&u)try{let f=Sh(e,i),d=sw(e,f?s:null,t,n),p=f?await bt(e,d,s,i,a):{layer:d,linkedFiles:[],warnings:[]};return{layer:p.layer,linkedFiles:p.linkedFiles,warnings:p.warnings}}catch(f){}'
+$uiNativeShapePreviewAlignmentReplace = 'if(e.strategy==="shape"&&!l&&e.fill&&u)try{let f=Sh(e,i),d=sw(e,f?s:null,t,n),p=f?await bt(e,d,s,i,a):{layer:d,linkedFiles:[],warnings:[]};return{layer:p.layer,linkedFiles:p.linkedFiles,warnings:p.warnings}}catch(f){}'
 if ($uiBundle.Contains($uiColorDodgeShapeOpacityFind)) {
   $uiBundle = Replace-Exact `
     -Text $uiBundle `
@@ -1855,17 +1877,56 @@ if ($uiBundle.Contains($uiShapePreviewVectorMetadataFind)) {
   throw 'Could not patch UI shape preview rasterized layer metadata.'
 }
 
-if ($uiBundle.Contains($uiVectorPreviewMetadataFind)) {
+if ($uiBundle.Contains($uiVectorPreviewMetadataLegacyReplace)) {
   $uiBundle = Replace-Exact `
     -Text $uiBundle `
-    -Find $uiVectorPreviewMetadataFind `
+    -Find $uiVectorPreviewMetadataLegacyReplace `
     -Replace $uiVectorPreviewMetadataReplace `
     -ExpectedCount 1 `
-    -Label 'ui vector preview rasterized metadata guard'
+    -Label 'ui vector preview respects bitmap toggle'
 } elseif ($uiBundle.Contains($uiVectorPreviewMetadataReplace)) {
   # Already patched in this UI bundle variant.
 } else {
-  throw 'Could not patch UI vector preview rasterized metadata guard.'
+  throw 'Could not patch UI vector preview bitmap toggle.'
+}
+
+if ($uiBundle.Contains($uiNativeShapeBeforeBitmapFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiNativeShapeBeforeBitmapFind `
+    -Replace $uiNativeShapeBeforeBitmapReplace `
+    -ExpectedCount 1 `
+    -Label 'ui vector export native Photoshop shape before bitmap mode'
+} elseif ($uiBundle.Contains($uiNativeShapeBeforeBitmapReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI native Photoshop shape vector export.'
+}
+
+if ($uiBundle.Contains($uiNativeShapeSizeGuardFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiNativeShapeSizeGuardFind `
+    -Replace $uiNativeShapeSizeGuardReplace `
+    -ExpectedCount 1 `
+    -Label 'ui native Photoshop shape size guard'
+} elseif ($uiBundle.Contains($uiNativeShapeSizeGuardReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI native Photoshop shape size guard.'
+}
+
+if ($uiBundle.Contains($uiNativeShapePreviewAlignmentFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiNativeShapePreviewAlignmentFind `
+    -Replace $uiNativeShapePreviewAlignmentReplace `
+    -ExpectedCount 1 `
+    -Label 'ui native Photoshop shape preview alignment gate'
+} elseif ($uiBundle.Contains($uiNativeShapePreviewAlignmentReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI native Photoshop shape preview alignment gate.'
 }
 
 if ($uiBundle.Contains($uiSelectionBridgeStartupFind) -and -not $uiBundle.Contains('function pigmaRequestSelectionBridge()')) {
@@ -2882,12 +2943,35 @@ $bundle = Replace-Exact `
   -ExpectedCount 1 `
   -Label 'filled shape strategy keeps supported strokes'
 
+$shapeNativeSizeGuardFind = 'function gw(e,t,n){if(t>512||n>512||t*n>18e4)return!1;'
+$shapeNativeSizeGuardReplace = 'function gw(e,t,n){if(t<=0||n<=0)return!1;'
+if ($bundle.Contains($shapeNativeSizeGuardFind)) {
+  $bundle = Replace-Exact `
+    -Text $bundle `
+    -Find $shapeNativeSizeGuardFind `
+    -Replace $shapeNativeSizeGuardReplace `
+    -ExpectedCount 1 `
+    -Label 'native Photoshop shape size guard'
+} elseif ($bundle.Contains($shapeNativeSizeGuardReplace)) {
+  # Already patched in this bundle variant.
+} else {
+  # Native shape size gate is owned by the externalized UI in this bundle variant.
+}
+
 $shapeVectorPreviewFind = 'if(e.strategy==="shape"&&!l&&e.fill&&!c&&u)try{let f=sw(e,s,t,n),d=await bt(e,f,s,i,a);return{layer:d.layer,linkedFiles:d.linkedFiles,warnings:d.warnings}}catch(f){}'
-$shapeVectorPreviewReplace = 'if(e.strategy==="shape"&&!l&&e.fill&&!c&&u)try{let f=Sh(e,i),d=sw(e,f?s:null,t,n),p=f?await bt(e,d,s,i,a):{layer:d,linkedFiles:[],warnings:[]};return{layer:p.layer,linkedFiles:p.linkedFiles,warnings:p.warnings}}catch(f){}'
+$shapeVectorPreviewLegacyReplace = 'if(e.strategy==="shape"&&!l&&e.fill&&!c&&u)try{let f=Sh(e,i),d=sw(e,f?s:null,t,n),p=f?await bt(e,d,s,i,a):{layer:d,linkedFiles:[],warnings:[]};return{layer:p.layer,linkedFiles:p.linkedFiles,warnings:p.warnings}}catch(f){}'
+$shapeVectorPreviewReplace = 'if(e.strategy==="shape"&&!l&&e.fill&&u)try{let f=Sh(e,i),d=sw(e,f?s:null,t,n),p=f?await bt(e,d,s,i,a):{layer:d,linkedFiles:[],warnings:[]};return{layer:p.layer,linkedFiles:p.linkedFiles,warnings:p.warnings}}catch(f){}'
 if ($bundle.Contains($shapeVectorPreviewFind)) {
   $bundle = Replace-Exact `
     -Text $bundle `
     -Find $shapeVectorPreviewFind `
+    -Replace $shapeVectorPreviewReplace `
+    -ExpectedCount 1 `
+    -Label 'shape vector preview canvas gate'
+} elseif ($bundle.Contains($shapeVectorPreviewLegacyReplace)) {
+  $bundle = Replace-Exact `
+    -Text $bundle `
+    -Find $shapeVectorPreviewLegacyReplace `
     -Replace $shapeVectorPreviewReplace `
     -ExpectedCount 1 `
     -Label 'shape vector preview canvas gate'
@@ -3055,6 +3139,7 @@ $bundle = Replace-Section `
 
 $importPatch = [System.IO.File]::ReadAllText($patch, [System.Text.Encoding]::UTF8)
 $exportPatchContent = [System.IO.File]::ReadAllText($exportPatch, [System.Text.Encoding]::UTF8)
+$shapeLayerExportPatchContent = [System.IO.File]::ReadAllText($shapeLayerExportPatch, [System.Text.Encoding]::UTF8)
 $aiSettingsPatchContent = [System.IO.File]::ReadAllText($aiSettingsPatch, [System.Text.Encoding]::UTF8)
 $pigmaWebIntegrationPatchContent = [System.IO.File]::ReadAllText($pigmaWebIntegrationPatch, [System.Text.Encoding]::UTF8)
 $aiResponsiveMemoryPatchContent = [System.IO.File]::ReadAllText($aiResponsiveMemoryPatch, [System.Text.Encoding]::UTF8)
@@ -3087,6 +3172,7 @@ $patchedRuntimeParts = @(
   $bundle,
   $importPatch,
   $exportPatchContent,
+  $shapeLayerExportPatchContent,
   $aiSettingsPatchContent,
   $pigmaWebIntegrationPatchContent,
   $aiResponsiveMemoryPatchContent,
@@ -3148,6 +3234,11 @@ if ($LASTEXITCODE -ne 0) {
 & node $exportBoundaryVerifier
 if ($LASTEXITCODE -ne 0) {
   throw "PSD export boundary verification failed."
+}
+
+& node $shapeLayerExportVerifier
+if ($LASTEXITCODE -ne 0) {
+  throw "PSD shape layer export verification failed."
 }
 
 & node -c $destination

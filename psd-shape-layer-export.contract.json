@@ -1,0 +1,42 @@
+{
+  "sourceFile": "psd-shape-layer-export.js",
+  "bundleFile": "code.patched.js",
+  "buildScript": "build-patched-main.ps1",
+  "requiredMarkers": [
+    "PIGMA_PSD_SHAPE_LAYER_EXPORT::SOURCE_OF_TRUTH",
+    "PIGMA_PSD_SHAPE_LAYER_EXPORT::MESSAGE_NORMALIZER",
+    "PIGMA_PSD_SHAPE_LAYER_EXPORT::PHOTOSHOP_SHAPE_GATE",
+    "PIGMA_PSD_SHAPE_LAYER_EXPORT::PHOTOSHOP_FIGMA_SHAPE_MAP"
+  ],
+  "requiredFunctions": [
+    "normalizeShapeLayerExportMessage",
+    "shouldAllowPhotoshopShapeLayers",
+    "containsPhotoshopShapeCandidate",
+    "isSimplePhotoshopShapeCandidate",
+    "buildFigmaToPhotoshopShapeKindMap",
+    "getPhotoshopShapeKindForFigmaType"
+  ],
+  "requiredSnippets": [
+    "message.type === \"request-export\"",
+    "forceBitmapVectorPreview: false",
+    "PHOTOSHOP_SHAPE_KIND_TO_FIGMA_TYPES",
+    "RECTANGLE",
+    "ELLIPSE",
+    "POLYGON",
+    "STAR",
+    "BOOLEAN_OPERATION",
+    "SOLID"
+  ],
+  "uiFile": "ui.html",
+  "requiredUiSnippets": [
+    "forceBitmapVectorPreview:t.forceBitmapVectorPreview===!0",
+    "pigmaNativeShapeCandidate=e.strategy===\"shape\"&&e.fill&&gw(",
+    "if(i.forceBitmapVectorPreview&&!pigmaNativeShapeCandidate)",
+    "function gw(e,t,n){if(t<=0||n<=0)return!1;",
+    "if(e.strategy===\"shape\"&&!l&&e.fill&&u)"
+  ],
+  "forbiddenUiSnippets": [
+    "t>512||n>512||t*n>18e4",
+    "e.strategy===\"shape\"&&!l&&e.fill&&!c&&u"
+  ]
+}
