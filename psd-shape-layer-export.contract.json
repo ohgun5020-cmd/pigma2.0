@@ -10,22 +10,49 @@
   ],
   "requiredFunctions": [
     "normalizeShapeLayerExportMessage",
+    "shouldForceBitmapVectorPreview",
+    "withBitmapVectorPreview",
     "shouldAllowPhotoshopShapeLayers",
+    "scanCurrentSelectionForShapeCandidates",
     "containsPhotoshopShapeCandidate",
+    "createShapeCandidateScanState",
     "isSimplePhotoshopShapeCandidate",
+    "isPhotoshopShapeTransformSafe",
+    "isAxisAlignedTransform",
     "buildFigmaToPhotoshopShapeKindMap",
     "getPhotoshopShapeKindForFigmaType"
   ],
   "requiredSnippets": [
     "message.type === \"request-export\"",
-    "forceBitmapVectorPreview: false",
+    "withBitmapVectorPreview(message, true)",
+    "withBitmapVectorPreview(message, false)",
     "PHOTOSHOP_SHAPE_KIND_TO_FIGMA_TYPES",
     "RECTANGLE",
     "ELLIPSE",
     "POLYGON",
     "STAR",
     "BOOLEAN_OPERATION",
-    "SOLID"
+    "SOLID",
+    "TRANSFORM_AXIS_EPSILON",
+    "foundUnsupported",
+    "foundSupported"
+  ],
+  "baseFile": "code.js",
+  "requiredBaseSnippets": [
+    "fe(e)||!pigmaIsShapeBackgroundTransformSafe(e)",
+    "function pigmaIsShapeBackgroundTransformSafe(e)",
+    "Math.abs(o)<=.001",
+    "Math.abs(n)<=.001"
+  ],
+  "requiredBundleSnippets": [
+    "function pigmaShouldFlattenTransformedClipContainer(e)",
+    "pigmaShouldFlattenTransformedClipContainer(e)",
+    "was flattened because PSD cannot preserve a transformed clipping container as editable child layers."
+  ],
+  "requiredBuildSnippets": [
+    "transformed clipping container flatten helper",
+    "pigmaShouldFlattenTransformedClipContainer(e)",
+    "was flattened because PSD cannot preserve a transformed clipping container as editable child layers."
   ],
   "uiFile": "ui.html",
   "requiredUiSnippets": [

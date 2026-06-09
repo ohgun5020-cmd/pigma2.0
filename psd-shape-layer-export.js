@@ -1,8 +1,8 @@
 ;(() => {
   // PIGMA_PSD_SHAPE_LAYER_EXPORT::SOURCE_OF_TRUTH
   // Keeps Photoshop shape-layer export gating outside ui.html. The PSD writer
-  // already knows how to emit vectorFill/vectorMask layers; this patch only
-  // prevents simple Figma shapes from being forced down the bitmap fallback.
+  // can emit vectorFill/vectorMask layers, but transformed Figma shapes need
+  // to stay as bitmap previews when Photoshop cannot represent the transform.
   // PIGMA_PSD_SHAPE_LAYER_EXPORT::MESSAGE_NORMALIZER
   // PIGMA_PSD_SHAPE_LAYER_EXPORT::PHOTOSHOP_SHAPE_GATE
   // PIGMA_PSD_SHAPE_LAYER_EXPORT::PHOTOSHOP_FIGMA_SHAPE_MAP
@@ -21,6 +21,7 @@
   );
   const VECTOR_SHAPE_TYPE_SET = new Set(Object.keys(FIGMA_TO_PHOTOSHOP_SHAPE_KIND));
   const MAX_SHAPE_SCAN_COUNT = 600;
+  const TRANSFORM_AXIS_EPSILON = 0.001;
 
   if (globalScope[PATCH_FLAG]) {
     return;
@@ -42,18 +43,36 @@
   };
 
   function normalizeShapeLayerExportMessage(message) {
-    if (!shouldAllowPhotoshopShapeLayers(message)) {
+    if (!message || typeof message !== "object") {
       return message;
     }
 
+    const scan = scanCurrentSelectionForShapeCandidates();
+
+    if (shouldForceBitmapVectorPreview(scan)) {
+      return withBitmapVectorPreview(message, true);
+    }
+
+    if (!shouldAllowPhotoshopShapeLayers(message, scan)) {
+      return message;
+    }
+
+    return withBitmapVectorPreview(message, false);
+  }
+
+  function shouldForceBitmapVectorPreview(scan) {
+    return !!scan && (scan.foundUnsupported || scan.exhausted);
+  }
+
+  function withBitmapVectorPreview(message, forceBitmapVectorPreview) {
     return Object.assign({}, message, {
       developerExportExperiments: Object.assign({}, message.developerExportExperiments, {
-        forceBitmapVectorPreview: false
+        forceBitmapVectorPreview
       })
     });
   }
 
-  function shouldAllowPhotoshopShapeLayers(message) {
+  function shouldAllowPhotoshopShapeLayers(message, scan = null) {
     if (!message || !message.developerExportExperiments) {
       return false;
     }
@@ -62,34 +81,59 @@
       return false;
     }
 
+    const result = scan || scanCurrentSelectionForShapeCandidates();
+    return result.foundSupported && !result.foundUnsupported && !result.exhausted;
+  }
+
+  function scanCurrentSelectionForShapeCandidates() {
     const selection = figma.currentPage && Array.isArray(figma.currentPage.selection)
       ? figma.currentPage.selection
       : [];
+    const scan = createShapeCandidateScanState();
 
     for (const node of selection) {
-      if (containsPhotoshopShapeCandidate(node)) {
-        return true;
+      visitShapeCandidate(node, scan);
+      if (scan.foundUnsupported || scan.exhausted) {
+        break;
       }
     }
 
-    return false;
+    return scan;
   }
 
   function containsPhotoshopShapeCandidate(root) {
-    const state = { count: 0, found: false };
+    const state = createShapeCandidateScanState();
     visitShapeCandidate(root, state);
-    return state.found;
+    return state.foundSupported && !state.foundUnsupported && !state.exhausted;
+  }
+
+  function createShapeCandidateScanState() {
+    return {
+      count: 0,
+      exhausted: false,
+      foundSupported: false,
+      foundUnsupported: false
+    };
   }
 
   function visitShapeCandidate(node, state) {
-    if (!node || state.found || state.count >= MAX_SHAPE_SCAN_COUNT) {
+    if (!node || state.foundUnsupported || state.exhausted) {
+      return;
+    }
+
+    if (state.count >= MAX_SHAPE_SCAN_COUNT) {
+      state.exhausted = true;
       return;
     }
 
     state.count += 1;
 
     if (isSimplePhotoshopShapeCandidate(node)) {
-      state.found = true;
+      if (isPhotoshopShapeTransformSafe(node)) {
+        state.foundSupported = true;
+      } else {
+        state.foundUnsupported = true;
+      }
       return;
     }
 
@@ -99,7 +143,7 @@
 
     for (const child of node.children) {
       visitShapeCandidate(child, state);
-      if (state.found || state.count >= MAX_SHAPE_SCAN_COUNT) {
+      if (state.foundUnsupported || state.exhausted) {
         return;
       }
     }
@@ -127,6 +171,43 @@
     }
 
     return hasExactlyOneVisibleSolidFill(node.fills);
+  }
+
+  function isPhotoshopShapeTransformSafe(node) {
+    const transform = Array.isArray(node && node.absoluteTransform)
+      ? node.absoluteTransform
+      : Array.isArray(node && node.relativeTransform)
+        ? node.relativeTransform
+        : null;
+
+    return isAxisAlignedTransform(transform);
+  }
+
+  function isAxisAlignedTransform(transform) {
+    if (
+      !Array.isArray(transform) ||
+      transform.length < 2 ||
+      !Array.isArray(transform[0]) ||
+      !Array.isArray(transform[1])
+    ) {
+      return false;
+    }
+
+    const xx = Number(transform[0][0]);
+    const xy = Number(transform[0][1]);
+    const yx = Number(transform[1][0]);
+    const yy = Number(transform[1][1]);
+
+    if (![xx, xy, yx, yy].every(Number.isFinite)) {
+      return false;
+    }
+
+    return (
+      Math.abs(xx) > TRANSFORM_AXIS_EPSILON &&
+      Math.abs(yy) > TRANSFORM_AXIS_EPSILON &&
+      Math.abs(xy) <= TRANSFORM_AXIS_EPSILON &&
+      Math.abs(yx) <= TRANSFORM_AXIS_EPSILON
+    );
   }
 
   function hasExactlyOneVisibleSolidFill(fills) {

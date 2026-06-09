@@ -48,6 +48,7 @@ function assertExcludes(content, fileLabel, forbiddenValues, valueLabel) {
 const sourceContent = readRequiredFile(contract.sourceFile);
 const bundleContent = readRequiredFile(contract.bundleFile);
 const buildScriptContent = readRequiredFile(contract.buildScript);
+const baseContent = contract.baseFile ? readRequiredFile(contract.baseFile) : "";
 const uiContent = contract.uiFile ? readRequiredFile(contract.uiFile) : "";
 
 assertIncludes(sourceContent, contract.sourceFile, contract.requiredMarkers, "marker");
@@ -66,6 +67,12 @@ assertIncludes(
 );
 assertIncludes(sourceContent, contract.sourceFile, contract.requiredSnippets || [], "snippet");
 assertIncludes(bundleContent, contract.bundleFile, contract.requiredSnippets || [], "snippet");
+if (contract.baseFile) {
+  assertIncludes(baseContent, contract.baseFile, contract.requiredBaseSnippets || [], "base snippet");
+  assertIncludes(bundleContent, contract.bundleFile, contract.requiredBaseSnippets || [], "base snippet");
+}
+assertIncludes(bundleContent, contract.bundleFile, contract.requiredBundleSnippets || [], "bundle snippet");
+assertIncludes(buildScriptContent, contract.buildScript, contract.requiredBuildSnippets || [], "build snippet");
 assertIncludes(uiContent, contract.uiFile || "ui", contract.requiredUiSnippets || [], "UI snippet");
 assertExcludes(uiContent, contract.uiFile || "ui", contract.forbiddenUiSnippets || [], "UI snippet");
 assertIncludes(buildScriptContent, contract.buildScript, [contract.sourceFile], "patch reference");
