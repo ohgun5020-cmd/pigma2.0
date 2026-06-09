@@ -11,6 +11,7 @@
   const TEXT_PREVIEW_EDGE_LENGTH = 10;
   const TEXT_CONTENT_LIMIT = 2400;
   const SOURCE_EXPORT_EDGE = 1536;
+  const LARGE_SELECTION_STATE_LIMIT = 80;
   const originalOnMessage = typeof figma.ui.onmessage === "function" ? figma.ui.onmessage : null;
 
   const designChatOnMessage = async (message) => {
@@ -39,6 +40,9 @@
   globalScope.__PIGMA_AI_DESIGN_CHAT_PATCH__ = true;
 
   figma.on("selectionchange", () => {
+    if (shouldSkipAutomaticSelectionState()) {
+      return;
+    }
     postSelectionState();
   });
   figma.on("currentpagechange", () => {
@@ -208,7 +212,48 @@
   }
 
   function buildSelectionState() {
+    const selection = getCurrentSelection();
+    if (selection.length >= LARGE_SELECTION_STATE_LIMIT) {
+      return buildLargeSelectionState(selection);
+    }
     return buildSelectionStateFromRoots(getSelectedRoots());
+  }
+
+  function buildLargeSelectionState(selection) {
+    const roots = Array.isArray(selection) ? selection.filter(Boolean) : [];
+    const count = roots.length;
+    const first = roots[0] || null;
+    const firstName = first ? safeName(first) : "";
+    const firstType = first ? getNodeTypeSafe(first) : "Selection";
+    const last = roots[count - 1] || first;
+    return {
+      ready: count > 0,
+      selectionSignature: getLargeSelectionSignature(roots),
+      selectionLabel: count > 1 ? `${firstName || "Selection"} + ${count - 1} more` : firstName,
+      selectionCount: count,
+      selectionTypeLabel: count > 1 ? `${formatNodeType(firstType)} x ${count}` : formatNodeType(firstType),
+      captureMode: count > 1 ? "combined" : firstType === "TEXT" ? "text" : "single",
+      captureModeLabel: count > 1 ? "?듯빀 ?붾㈃" : firstType === "TEXT" ? "?띿뒪???⑥씪" : "?⑥씪 ?좏깮",
+      width: 0,
+      height: 0,
+      textPreview: "",
+      textContent: "",
+      hint: "Large selection summary is kept lightweight until you request a capture.",
+      roots: first
+        ? [
+            {
+              id: first.id,
+              name: firstName,
+              type: firstType,
+            },
+          ]
+        : [],
+      annotationTargetCount: 0,
+      sourceType: firstType === "TEXT" ? "text" : "mixed",
+      bounds: null,
+      firstNodeId: first && first.id ? first.id : "",
+      lastNodeId: last && last.id ? last.id : "",
+    };
   }
 
   function buildSelectionStateFromRoots(roots) {
@@ -272,7 +317,7 @@
   }
 
   function getSelectedRoots() {
-    const selection = Array.from(figma.currentPage.selection || []).filter((node) => isSelectableNode(node));
+    const selection = getCurrentSelection();
     if (!selection.length) {
       return [];
     }
@@ -719,8 +764,31 @@
   }
 
   function buildSelectionFallbackState() {
-    const roots = Array.from(figma.currentPage.selection || []).filter((node) => isSelectableNode(node));
+    const roots = getCurrentSelection();
+    if (roots.length >= LARGE_SELECTION_STATE_LIMIT) {
+      return buildLargeSelectionState(roots);
+    }
     return buildSelectionStateFromRoots(roots);
+  }
+
+  function getCurrentSelection() {
+    return Array.from(figma.currentPage.selection || []).filter((node) => isSelectableNode(node));
+  }
+
+  function shouldSkipAutomaticSelectionState() {
+    try {
+      return Number(globalScope.__PIGMA_SELECT_ALL_TEXT_SKIP_SELECTION_SYNC_UNTIL__ || 0) > Date.now();
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function getLargeSelectionSignature(selection) {
+    const roots = Array.isArray(selection) ? selection : [];
+    const first = roots[0] || null;
+    const last = roots[roots.length - 1] || first;
+    const pageId = figma.currentPage && figma.currentPage.id ? figma.currentPage.id : "";
+    return `large:${pageId}:${roots.length}:${first && first.id ? first.id : ""}:${last && last.id ? last.id : ""}`;
   }
 
   function buildFileName(value) {

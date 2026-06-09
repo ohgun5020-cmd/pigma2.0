@@ -58,11 +58,83 @@ Safe implementation order:
 - `ui.html`
   - Single source of truth for UI edits.
   - Also owns the PSD/AI/EPS/PDF/SVG import dispatcher, including the PDF.js-backed AI/PDF SVG-first path and the Ghostscript/PDF.js-backed EPS SVG-first path with bitmap fallback rules.
-- `vendor/pdfjs`
-  - Vendored PDF.js runtime used by the UI-side AI/PDF/SVG conversion path.
-- `vendor/ghostpdl`
-  - Vendored Ghostscript WASM runtime used to convert PostScript EPS into PDF before reusing the SVG conversion path.
-  - License note: this vendor is AGPL-3.0-or-later unless replaced with a commercial build.
+- PDF.js web assets
+  - PDF.js is no longer bundled into the plugin folder. Upload the external `pdfjs` folder, then point `window.__PIGMA_PDFJS_ASSET_BASE_URL__` at that hosted directory.
+  - Current public asset base: `https://pub-8e2f2ec9d22c4c97b52fe244b86bc4cf.r2.dev/pdfjs/`.
+- Ghostscript web assets
+  - Ghostscript is no longer bundled into the plugin folder. Upload `gs.js`, `gs.wasm`, and `LICENSE` from the external `ghostpdl` folder, then point `window.__PIGMA_GHOSTSCRIPT_ASSET_BASE_URL__` at that hosted directory.
+  - Current public asset base: `https://pub-8e2f2ec9d22c4c97b52fe244b86bc4cf.r2.dev/ghostpdl/`.
+  - R2/CORS note: browser/Figma runtime loading needs `GET` and `HEAD` allowed from `*` or from Figma origins.
+  - License note: Ghostscript is AGPL-3.0-or-later unless replaced with a commercial build.
+
+## Remote Asset And Notice Strategy
+
+Use Cloudflare R2 only for data that can safely fail without corrupting PSD/export results, or for large runtime assets that would otherwise push the plugin over Figma's package size limit.
+
+Good R2 candidates:
+
+- Large import runtimes: PDF.js module/worker, PDF.js cmaps, PDF.js standard fonts, Ghostscript JS/WASM.
+- Future large AI/EPS/PDF helper assets, workers, WASM files, model-independent dictionaries, and sample import files.
+- Public release notes, update notices, maintenance messages, tutorial images, and downloadable test assets.
+- A small non-executable JSON notice file for the Settings tab, for example `notices/pigma-notices.json`.
+- A small version metadata block for Settings footer status, such as latest public version, minimum supported version, and the Community update URL.
+
+Keep inside the plugin bundle:
+
+- PSD conversion rules, text placement formulas, font line-height correction logic, and any code that affects export fidelity.
+- Font-specific correction tables for LG EI Text, LG EI Headline, Inter, Roboto, and similar fonts.
+- Any fallback needed for offline or restricted-network usage.
+
+Rationale:
+
+- Notice/release-note JSON is low risk because the plugin can ignore it when the network is unavailable.
+- Version metadata is display-only. The actual plugin package version still comes from the published Figma plugin build.
+- Font and PSD correction logic should stay local because export quality must not depend on network speed, R2 availability, cache state, or a remote JSON mismatch.
+- Do not fetch and execute remote JavaScript from R2. Remote files should be static runtimes already declared by the plugin flow, static assets, or JSON data that is parsed defensively.
+- The Settings tab can add a "Notices" category that reads remote release notes when available and falls back to a local "No current notices" state.
+
+Current notices URL:
+
+- `https://pub-8e2f2ec9d22c4c97b52fe244b86bc4cf.r2.dev/notices/pigma-notices.json`
+
+Local source before upload:
+
+- `C:\Users\메이크잇_03\Desktop\pigma-ghostscript-web-assets\notices\pigma-notices.json`
+
+Recommended notice JSON shape:
+
+```json
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-06-08T00:00:00Z",
+  "defaultLocale": "en",
+  "version": {
+    "latest": "2.8.0",
+    "minimumSupported": "2.8.0",
+    "channel": "stable",
+    "message": "Latest public build is available from the Figma Community listing.",
+    "communityUrl": "https://www.figma.com/community/plugin/1645743599892655504"
+  },
+  "items": [
+    {
+      "id": "pdf-eps-assets-r2",
+      "type": "release",
+      "severity": "info",
+      "title": "Pigma 2.8 update",
+      "body": "",
+      "bullets": [
+        "PDF import has been updated.",
+        "AI import has been updated.",
+        "EPS import has been updated.",
+        "PSD export keeps text and font results reliable."
+      ],
+      "publishedAt": "2026-06-08T00:00:00Z",
+      "visible": true
+    }
+  ]
+}
+```
+
 - `code.js`
   - Base main/plugin bundle.
 - `code.patched.js`
@@ -105,7 +177,7 @@ Safe implementation order:
 - `externalize-embedded-ui.js`
   - Replaces embedded `figma.showUI(...)` HTML with `__html__`.
 - `sync-pdfjs-inline-assets.js`
-  - Syncs the bundled PDF.js module and worker into the generated `ui.html` inline asset block used by the AI import adapter in Figma's UI runtime.
+  - Removes any stale inline PDF.js asset block from `ui.html`; PDF.js is loaded from the hosted web-assets directory at runtime.
 - `verify-externalized-ui.js`
   - Fails if a bundle stops using `figma.showUI(__html__, ...)`.
 - `text-import-guard.contract.json`

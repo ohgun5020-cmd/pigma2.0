@@ -1,6 +1,6 @@
 {
   "name": "Pigma - Figma to PSD",
-  "id": "pigma28-test-local-20260602",
+  "id": "1645743599892655504",
   "api": "1.0.0",
   "main": "code.patched.js",
   "capabilities": [],
@@ -15,11 +15,15 @@
     "allowedDomains": [
       "https://api.openai.com",
       "https://generativelanguage.googleapis.com",
-      "https://oy-tools-production.up.railway.app"
+      "https://oy-tools-production.up.railway.app",
+      "https://pub-8e2f2ec9d22c4c97b52fe244b86bc4cf.r2.dev",
+      "https://cc-api-behance.adobe.io",
+      "https://stock.adobe.io",
+      "https://colorhunt.co"
     ],
     "devAllowedDomains": [
       "http://localhost:3000"
     ],
-    "reasoning": "Calls user-configured AI APIs and reads PIGMA web account plan status."
+    "reasoning": "Calls user-configured AI APIs, reads PIGMA web account plan status, fetches design reference/color palette data, and can load externally hosted PDF.js and Ghostscript import assets."
   }
 }

@@ -38,6 +38,8 @@
   const BOUNDS_FIT_APPLY_IN_PROGRESS_MESSAGE = "Bounds fit is already applying a result.";
   const BOUNDS_FIT_SESSION_EXPIRED_MESSAGE = "The bounds-fit session expired. Please run it again.";
   const BOUNDS_FIT_APPLY_ERROR_MESSAGE = "Failed to apply the bounds-fit result.";
+  const BOUNDS_FIT_PRESERVE_ORIGINAL_IMAGE_MESSAGE =
+    "Bounds-fit skipped this image because fitting it would require creating a new raster image and changing the original image resolution.";
   const ORIGINAL_SIZE_FIT_APPLY_ERROR_MESSAGE = "Could not apply Fit Original Size.";
   const UI_REPORTED_IMAGE_ERROR_FALLBACK = "The image task failed before a usable result was returned.";
   const IMAGE_TASK_NO_SELECTION_MESSAGE = "Select at least one node before running this image task.";
@@ -68,8 +70,11 @@
   const PROMPT_DRAFT_EXPORT_TIMEOUT_MS = 30000;
   const IMAGE_EXTEND_EXPORT_TIMEOUT_MS = 30000;
   const IMAGE_TEXT_OVERLAY_EXPORT_TIMEOUT_MS = 30000;
-  const IMAGE_TEXT_OVERLAY_APPLY_YIELD_INTERVAL = 8;
   const IMAGE_TEXT_OVERLAY_MAX_TEXT_LENGTH = 5000;
+  const IMAGE_TEXT_LAYER_MIN_WIDTH = 120;
+  const IMAGE_TEXT_LAYER_MAX_WIDTH = 720;
+  const IMAGE_TEXT_LAYER_DEFAULT_WIDTH = 360;
+  const IMAGE_TEXT_LAYER_DEFAULT_FONT_SIZE = 18;
   const IMAGE_MERGE_FAST_EXPORT_TIMEOUT_MS = 6000;
   const IMAGE_MERGE_EXPORT_TIMEOUT_MS = 30000;
   const IMAGE_MERGE_BALANCED_FAST_EXPORT_TIMEOUT_MS = 18000;
@@ -3788,130 +3793,186 @@
 
   async function applyImageTextOverlayToSelection(session, lines) {
     const skipped = [];
-    const node = await figma.getNodeByIdAsync(session.targetNodeId);
-    if (!node || node.removed) {
+    const line = buildSimpleImageTextLayerLine(lines);
+    if (!line) {
       skipped.push({
-        nodeId: session.targetNodeId,
-        nodeName: session.targetNodeName,
-        reason: "Could not find the selected layer again.",
+        nodeId: session && session.targetNodeId ? session.targetNodeId : "",
+        nodeName: session && session.targetNodeName ? session.targetNodeName : "",
+        reason: "No detected text was provided.",
       });
       return buildImageTextOverlayApplyResult(session, null, 0, skipped);
     }
 
-    if ("locked" in node && node.locked) {
-      skipped.push({
-        nodeId: node.id,
-        nodeName: safeName(node),
-        reason: "Locked layers are not supported for text overlay.",
-      });
-      return buildImageTextOverlayApplyResult(session, null, 0, skipped);
-    }
-
-    if ("rotation" in node && typeof node.rotation === "number" && Math.abs(node.rotation) > 0.01) {
-      skipped.push({
-        nodeId: node.id,
-        nodeName: safeName(node),
-        reason: "Rotated layers are not supported for text overlay yet.",
-      });
-      return buildImageTextOverlayApplyResult(session, null, 0, skipped);
-    }
-
-    if (!node.parent || !canUseImageExtendParent(node.parent)) {
-      skipped.push({
-        nodeId: node.id,
-        nodeName: safeName(node),
-        reason: "The current parent container does not support grouping the text overlay result.",
-      });
-      return buildImageTextOverlayApplyResult(session, null, 0, skipped);
-    }
-
-    if (
-      "layoutMode" in node.parent &&
-      typeof node.parent.layoutMode === "string" &&
-      node.parent.layoutMode !== "NONE"
-    ) {
-      skipped.push({
-        nodeId: node.id,
-        nodeName: safeName(node),
-        reason: "Auto-layout parents are not supported for text overlay yet.",
-      });
-      return buildImageTextOverlayApplyResult(session, null, 0, skipped);
-    }
-
-    const localBounds = getImageExtendLocalBounds(node);
-    if (!localBounds) {
-      skipped.push({
-        nodeId: node.id,
-        nodeName: safeName(node),
-        reason: "Could not determine the selected layer position.",
-      });
-      return buildImageTextOverlayApplyResult(session, null, 0, skipped);
-    }
-
-    const parent = node.parent;
-    const overlay = createImageTextOverlayContainer(node, localBounds);
-    const sortedLines = lines.slice().sort(function (leftLine, rightLine) {
-      if (Math.abs(leftLine.topRatio - rightLine.topRatio) > 0.0005) {
-        return leftLine.topRatio - rightLine.topRatio;
-      }
-      return leftLine.leftRatio - rightLine.leftRatio;
-    });
     const availableFonts = await getImageTextOverlayAvailableFontsSafely();
-    let createdCount = 0;
-    let group = null;
+    let textNode = null;
 
     try {
-      for (let index = 0; index < sortedLines.length; index += 1) {
-        if (index > 0 && index % IMAGE_TEXT_OVERLAY_APPLY_YIELD_INTERVAL === 0) {
-          await waitForNextTick();
-        }
-
-        const line = sortedLines[index];
-        const textNode = await createImageTextOverlayTextNode(line, localBounds.width, localBounds.height, availableFonts);
-        if (!textNode) {
-          skipped.push({
-            nodeId: node.id,
-            nodeName: safeName(node),
-            reason: "Skipped a text line because its font could not be loaded.",
-          });
-          continue;
-        }
-
-        overlay.appendChild(textNode);
-        textNode.x = roundBoundsFitMetric(localBounds.width * line.leftRatio);
-        textNode.y = roundBoundsFitMetric(localBounds.height * line.topRatio);
-        createdCount += 1;
+      const placement = await resolveSimpleImageTextLayerPlacement(session);
+      textNode = await createSimpleImageTextLayerNode(line, placement.bounds, availableFonts);
+      if (!textNode) {
+        throw new Error("Could not load a font for the text layer.");
       }
 
-      if (!createdCount) {
-        overlay.remove();
-        skipped.push({
-          nodeId: node.id,
-          nodeName: safeName(node),
-          reason: "No editable text layers could be created from the detected text.",
-        });
-        return buildImageTextOverlayApplyResult(session, null, createdCount, skipped);
-      }
-
-      const nodeIndex = findNodeChildIndex(parent, node.id);
-      parent.insertChild(nodeIndex >= 0 ? nodeIndex + 1 : parent.children.length, overlay);
-      group = figma.group([node, overlay], parent);
-      group.name = safeName(node) + " / text overlay";
-      tagImageTextOverlayNode(group, "group");
-      tagImageTextOverlayNode(overlay, "overlay");
-      figma.currentPage.selection = [group];
-      figma.viewport.scrollAndZoomIntoView([group]);
-      return buildImageTextOverlayApplyResult(session, group, createdCount, skipped);
+      placement.parent.insertChild(placement.insertIndex, textNode);
+      setImageExtendNodePosition(textNode, placement.x, placement.y);
+      tagImageTextOverlayNode(textNode, "text-layer");
+      figma.currentPage.selection = [textNode];
+      figma.viewport.scrollAndZoomIntoView([textNode]);
+      return buildImageTextOverlayApplyResult(session, textNode, 1, skipped);
     } catch (error) {
-      if (overlay && !overlay.removed) {
-        overlay.remove();
+      if (textNode && !textNode.removed) {
+        textNode.remove();
       }
       skipped.push({
-        nodeId: node.id,
-        nodeName: safeName(node),
-        reason: normalizeErrorMessage(error, "Failed to create the text overlay group."),
+        nodeId: session && session.targetNodeId ? session.targetNodeId : "",
+        nodeName: session && session.targetNodeName ? session.targetNodeName : "",
+        reason: normalizeErrorMessage(error, "Failed to create the text layer."),
       });
-      return buildImageTextOverlayApplyResult(session, null, createdCount, skipped);
+      return buildImageTextOverlayApplyResult(session, null, 0, skipped);
+    }
+  }
+
+  function buildSimpleImageTextLayerLine(lines) {
+    const list = Array.isArray(lines) ? lines : [];
+    const text = sanitizeImageTextOverlayCharacters(
+      list
+        .map(function (line) {
+          return line && typeof line.text === "string" ? line.text.trim() : "";
+        })
+        .filter(Boolean)
+        .join("\n")
+    );
+    if (!text) {
+      return null;
+    }
+
+    const firstLine = list.length ? list[0] : {};
+    return {
+      text: text,
+      leftRatio: sanitizeImageTextOverlayRatio(firstLine.leftRatio, 0),
+      topRatio: sanitizeImageTextOverlayRatio(firstLine.topRatio, 0),
+      widthRatio: sanitizeImageTextOverlayRatio(firstLine.widthRatio, 1),
+      heightRatio: sanitizeImageTextOverlayRatio(firstLine.heightRatio, 0.2),
+      fontSizeRatio: sanitizeImageTextOverlayRatio(firstLine.fontSizeRatio, 0),
+      fontFamily: sanitizeImageTextOverlayFontFamily(firstLine.fontFamily),
+      fontStyle: sanitizeImageTextOverlayFontStyle(firstLine.fontStyle),
+      fontWeight: sanitizeImageTextOverlayFontWeight(firstLine.fontWeight),
+      fillColor: typeof firstLine.fillColor === "string" ? firstLine.fillColor.trim() : "",
+      fillOpacity: sanitizeImageTextOverlayOpacity(firstLine.fillOpacity),
+      align: sanitizeImageTextOverlayAlign(firstLine.align),
+      rotation: 0,
+    };
+  }
+
+  async function resolveSimpleImageTextLayerPlacement(session) {
+    const node =
+      session && session.targetNodeId ? await figma.getNodeByIdAsync(session.targetNodeId).catch(function () { return null; }) : null;
+    const localBounds = node && !node.removed ? getImageExtendLocalBounds(node) : null;
+    if (node && !node.removed && node.parent && canUseImageExtendParent(node.parent) && !isAutoLayoutNode(node.parent) && localBounds) {
+      const nodeIndex = findNodeChildIndex(node.parent, node.id);
+      return {
+        parent: node.parent,
+        insertIndex: nodeIndex >= 0 ? nodeIndex + 1 : node.parent.children.length,
+        x: localBounds.x,
+        y: localBounds.y,
+        bounds: localBounds,
+      };
+    }
+
+    const absoluteBounds = getSimpleImageTextLayerAbsoluteBounds(node);
+    return {
+      parent: figma.currentPage,
+      insertIndex: figma.currentPage.children.length,
+      x: absoluteBounds.x,
+      y: absoluteBounds.y,
+      bounds: absoluteBounds,
+    };
+  }
+
+  function getSimpleImageTextLayerAbsoluteBounds(node) {
+    const bounds =
+      node && !node.removed && "absoluteBoundingBox" in node && node.absoluteBoundingBox ? node.absoluteBoundingBox : null;
+    if (bounds && bounds.width > 0 && bounds.height > 0) {
+      return {
+        x: roundBoundsFitMetric(bounds.x),
+        y: roundBoundsFitMetric(bounds.y),
+        width: roundBoundsFitMetric(bounds.width),
+        height: roundBoundsFitMetric(bounds.height),
+      };
+    }
+
+    const center = figma.viewport && figma.viewport.center ? figma.viewport.center : { x: 0, y: 0 };
+    return {
+      x: roundBoundsFitMetric(center.x - IMAGE_TEXT_LAYER_DEFAULT_WIDTH / 2),
+      y: roundBoundsFitMetric(center.y),
+      width: IMAGE_TEXT_LAYER_DEFAULT_WIDTH,
+      height: IMAGE_TEXT_LAYER_DEFAULT_WIDTH,
+    };
+  }
+
+  async function createSimpleImageTextLayerNode(line, placementBounds, availableFonts) {
+    const characters = sanitizeImageTextOverlayCharacters(line && line.text);
+    if (!characters) {
+      return null;
+    }
+
+    const fontName = await loadImageTextOverlayFont(line, availableFonts);
+    if (!fontName) {
+      return null;
+    }
+
+    const textNode = figma.createText();
+    const targetWidth = placementBounds && placementBounds.width > 0 ? placementBounds.width : IMAGE_TEXT_LAYER_DEFAULT_WIDTH;
+    const targetHeight = placementBounds && placementBounds.height > 0 ? placementBounds.height : IMAGE_TEXT_LAYER_DEFAULT_WIDTH;
+    const width = resolveSimpleImageTextLayerWidth(line, targetWidth);
+    const fontSize = resolveSimpleImageTextLayerFontSize(line, targetHeight);
+    textNode.fontName = fontName;
+    textNode.fontSize = fontSize;
+    textNode.characters = characters;
+    textNode.name = buildImageTextOverlayLayerName(characters);
+    applyImageTextOverlayTextAlign(textNode, line.align);
+    applySimpleImageTextLayerSizing(textNode, width, fontSize);
+
+    const fillPaint = createImageTextOverlayPaint(line);
+    textNode.fills = [fillPaint || createSolidPaintFromColor("000000", 1)];
+    return textNode;
+  }
+
+  function resolveSimpleImageTextLayerWidth(line, targetWidth) {
+    const baseWidth = Number.isFinite(targetWidth) && targetWidth > 0 ? targetWidth : IMAGE_TEXT_LAYER_DEFAULT_WIDTH;
+    const ratioWidth = line && Number(line.widthRatio) > 0 ? baseWidth * Number(line.widthRatio) : 0;
+    const preferredWidth = ratioWidth > 0 ? ratioWidth : baseWidth;
+    return Math.max(
+      IMAGE_TEXT_LAYER_MIN_WIDTH,
+      Math.min(IMAGE_TEXT_LAYER_MAX_WIDTH, roundBoundsFitMetric(preferredWidth))
+    );
+  }
+
+  function resolveSimpleImageTextLayerFontSize(line, targetHeight) {
+    const ratio = Number(line && line.fontSizeRatio);
+    if (Number.isFinite(ratio) && ratio > 0 && Number.isFinite(targetHeight) && targetHeight > 0) {
+      return Math.max(8, Math.min(48, roundBoundsFitMetric(targetHeight * ratio)));
+    }
+
+    return IMAGE_TEXT_LAYER_DEFAULT_FONT_SIZE;
+  }
+
+  function applySimpleImageTextLayerSizing(textNode, width, fontSize) {
+    if (!textNode) {
+      return;
+    }
+
+    try {
+      if ("textAutoResize" in textNode) {
+        textNode.textAutoResize = "HEIGHT";
+      }
+      if (typeof textNode.resize === "function") {
+        textNode.resize(Math.max(1, roundBoundsFitMetric(width)), Math.max(1, roundBoundsFitMetric(fontSize * 1.4)));
+      }
+    } catch (error) {
+      if ("textAutoResize" in textNode) {
+        textNode.textAutoResize = "WIDTH_AND_HEIGHT";
+      }
     }
   }
 
@@ -4016,8 +4077,8 @@
 
   function buildImageTextOverlayApplyResult(session, group, createdCount, skipped) {
     const appliedCount = group ? 1 : 0;
-    const groupName = group && typeof group.name === "string" ? group.name : "";
-    const groupId = group && typeof group.id === "string" ? group.id : "";
+    const resultNodeName = group && typeof group.name === "string" ? group.name : "";
+    const resultNodeId = group && typeof group.id === "string" ? group.id : "";
     return {
       processedAt: new Date().toISOString(),
       summary: {
@@ -4026,8 +4087,12 @@
         appliedCount: appliedCount,
         createdTextCount: Math.max(0, Math.floor(Number(createdCount) || 0)),
         skippedCount: Array.isArray(skipped) ? skipped.length : 0,
-        groupId: groupId,
-        groupName: groupName,
+        resultNodeId: resultNodeId,
+        resultNodeName: resultNodeName,
+        textLayerId: resultNodeId,
+        textLayerName: resultNodeName,
+        groupId: "",
+        groupName: "",
       },
       skipped: Array.isArray(skipped) ? skipped.slice(0, 24) : [],
     };
@@ -4045,16 +4110,13 @@
       typeof summary.skippedCount === "number" && Number.isFinite(summary.skippedCount) ? summary.skippedCount : 0;
 
     if (!appliedCount) {
-      figma.notify("No editable text overlay could be created.", { timeout: 2400 });
+      figma.notify("텍스트 레이어를 생성하지 못했습니다.", { timeout: 2400 });
       return;
     }
 
-    let message = (operationLabel || "Text overlay") + " complete (" + createdTextCount + " text layer";
-    if (createdTextCount !== 1) {
-      message += "s";
-    }
+    let message = (operationLabel || "텍스트 레이어 생성") + " 완료 (" + createdTextCount + "개";
     if (skippedCount > 0) {
-      message += ", " + skippedCount + " skipped";
+      message += ", " + skippedCount + "개 건너뜀";
     }
     figma.notify(message + ")", { timeout: 2600 });
   }
@@ -5337,27 +5399,10 @@
       return null;
     }
 
-    const useRenderedAnalysis = target.analysisMode === "rendered-node";
-    const sourceWidth =
-      useRenderedAnalysis && Number(processed.sourceWidth) > 0
-        ? Number(processed.sourceWidth)
-        : Number(target.sourceWidth) > 0
-          ? Number(target.sourceWidth)
-          : 0;
-    const sourceHeight =
-      useRenderedAnalysis && Number(processed.sourceHeight) > 0
-        ? Number(processed.sourceHeight)
-        : Number(target.sourceHeight) > 0
-          ? Number(target.sourceHeight)
-          : 0;
-    const rasterOffsetX =
-      useRenderedAnalysis || !Number.isFinite(Number(target.rasterAnalysisOffsetX))
-        ? 0
-        : Number(target.rasterAnalysisOffsetX);
-    const rasterOffsetY =
-      useRenderedAnalysis || !Number.isFinite(Number(target.rasterAnalysisOffsetY))
-        ? 0
-        : Number(target.rasterAnalysisOffsetY);
+    const sourceWidth = Number(target.sourceWidth) > 0 ? Number(target.sourceWidth) : 0;
+    const sourceHeight = Number(target.sourceHeight) > 0 ? Number(target.sourceHeight) : 0;
+    const rasterOffsetX = Number.isFinite(Number(target.rasterAnalysisOffsetX)) ? Number(target.rasterAnalysisOffsetX) : 0;
+    const rasterOffsetY = Number.isFinite(Number(target.rasterAnalysisOffsetY)) ? Number(target.rasterAnalysisOffsetY) : 0;
     const cropX = rasterOffsetX + (Number(processed.cropX) || 0);
     const cropY = rasterOffsetY + (Number(processed.cropY) || 0);
     const cropWidth = Number(processed.cropWidth) > 0 ? Number(processed.cropWidth) : 0;
@@ -5382,27 +5427,9 @@
     return cloned;
   }
 
-  function cloneBoundsFitRenderedImagePaint(fill, processed) {
-    if (!fill || !isImagePaint(fill) || !processed) {
-      return null;
-    }
-
-    const bytes = normalizeBytes(processed.bytes);
-    if (!bytes.length) {
-      return null;
-    }
-
-    const image = figma.createImage(bytes);
-    if (!image || typeof image.hash !== "string" || !image.hash) {
-      return null;
-    }
-
-    return cloneBoundsFitImagePaint(fill, image.hash);
-  }
-
   function cloneBoundsFitAppliedImagePaint(fill, target, processed) {
     if (target && target.analysisMode === "rendered-node") {
-      return cloneBoundsFitRenderedImagePaint(fill, processed);
+      return null;
     }
 
     return cloneBoundsFitPreservedImagePaint(fill, target, processed);
@@ -5479,16 +5506,19 @@
     return /원본\s*크기|original\s*size/i.test(operationLabel);
   }
 
+  function isLocalImageOperation(options) {
+    const operationKind =
+      options && typeof options.operationKind === "string" ? options.operationKind.replace(/\s+/g, " ").trim().toLowerCase() : "";
+    if (operationKind === "local-image") {
+      return true;
+    }
+    const operationLabel = sanitizeOperationLabel(options && options.operationLabel);
+    return /선명도|색감\s*자동\s*보정|auto\s*tone|local/i.test(operationLabel);
+  }
+
   function sanitizeSourceMode(value) {
     const mode = typeof value === "string" ? value.replace(/\s+/g, " ").trim().toLowerCase() : "";
     return mode === "shape-or-image" || mode === "prompt-smart" ? mode : "image-fill-only";
-  }
-
-  function shouldPreferOriginalUpscaleSource(message) {
-    if (message && message.preferOriginalImageBytes === true) {
-      return true;
-    }
-    return isSharpenOperationLabel(message && message.operationLabel) || isUpscaleOperationLabel(message && message.operationLabel);
   }
 
   function sanitizePromptOutputSize(value) {
@@ -5498,7 +5528,7 @@
 
   function isSharpenOperationLabel(value) {
     const label = sanitizeOperationLabel(value);
-    return label === "샤프닝" || /sharpen/i.test(label);
+    return label === "샤프닝" || /선명도|sharpen/i.test(label);
   }
 
   function isUpscaleOperationLabel(value) {
@@ -5510,7 +5540,10 @@
     if (message && message.preferOriginalImageBytes === true) {
       return true;
     }
-    return isSharpenOperationLabel(message && message.operationLabel) || isUpscaleOperationLabel(message && message.operationLabel);
+    if (message && message.preferOriginalImageBytes === false) {
+      return false;
+    }
+    return isUpscaleOperationLabel(message && message.operationLabel);
   }
 
   function buildPromptPlacementDimensions(outputSize) {
@@ -5880,7 +5913,7 @@
       source.summary = source.summary || {};
       source.summary.canCreateOverlay = true;
       source.summary.overlayReason = "";
-      source.summary.overlayMode = "group-selection";
+      source.summary.overlayMode = "single-text-layer";
       return {
         source: source,
         overlaySession: overlaySession,
@@ -5909,7 +5942,7 @@
     }
 
     if (selection.length !== 1) {
-      throw new Error("Text overlay currently supports exactly one selected layer.");
+      throw new Error("Image text extraction currently supports exactly one selected layer.");
     }
 
     const node = selection[0];
@@ -5917,28 +5950,8 @@
       throw new Error("Could not read the selected layer.");
     }
 
-    if ("locked" in node && node.locked) {
-      throw new Error("Locked layers are not supported for text overlay.");
-    }
-
-    if ("rotation" in node && typeof node.rotation === "number" && Math.abs(node.rotation) > 0.01) {
-      throw new Error("Rotated layers are not supported for text overlay yet.");
-    }
-
-    if (!node.parent || !canUseImageExtendParent(node.parent)) {
-      throw new Error("The current parent container does not support grouping the text overlay result.");
-    }
-
-    if (
-      "layoutMode" in node.parent &&
-      typeof node.parent.layoutMode === "string" &&
-      node.parent.layoutMode !== "NONE"
-    ) {
-      throw new Error("Auto-layout parents are not supported for text overlay yet.");
-    }
-
     if (typeof node.exportAsync !== "function") {
-      throw new Error("The selected layer cannot be exported for text overlay.");
+      throw new Error("The selected layer cannot be exported for image text extraction.");
     }
 
     const localBounds = getImageExtendLocalBounds(node);
@@ -7094,12 +7107,6 @@
     throw new Error("Could not position the preview clone for bounds-fit analysis.");
   }
 
-  function resolveBoundsFitRenderedExportScale(nodeWidth, nodeHeight, sourceWidth, sourceHeight) {
-    // Bounds-fit only needs the currently visible pixels to shrink the layer.
-    // Exporting at the on-canvas size is the most stable path for edited Figma images.
-    return 1;
-  }
-
   function resolveBoundsFitSourceImageAnalysis(fill, nodeWidth, nodeHeight, sourceWidth, sourceHeight, analysisContext) {
     if (!fill || !(nodeWidth > 0) || !(nodeHeight > 0) || !(sourceWidth > 0) || !(sourceHeight > 0) || !analysisContext) {
       return null;
@@ -7107,8 +7114,19 @@
 
     const scaleMode = typeof fill.scaleMode === "string" ? fill.scaleMode : "FILL";
     const fillRotation = typeof fill.rotation === "number" && Number.isFinite(fill.rotation) ? fill.rotation : 0;
-    if (!!fill.imageTransform || Math.abs(fillRotation) > 0.01 || scaleMode === "CROP" || scaleMode === "TILE") {
+    if (Math.abs(fillRotation) > 0.01 || scaleMode === "TILE") {
       return null;
+    }
+
+    if (!!fill.imageTransform || scaleMode === "CROP") {
+      return resolveBoundsFitTransformedSourceImageAnalysis(
+        fill,
+        nodeWidth,
+        nodeHeight,
+        sourceWidth,
+        sourceHeight,
+        analysisContext
+      );
     }
 
     const localVisibleRect = {
@@ -7160,6 +7178,110 @@
       rasterAnalysisWidth: roundBoundsFitMetric(visibleImageRect.width / uniformScale),
       rasterAnalysisHeight: roundBoundsFitMetric(visibleImageRect.height / uniformScale),
     };
+  }
+
+  function resolveBoundsFitTransformedSourceImageAnalysis(fill, nodeWidth, nodeHeight, sourceWidth, sourceHeight, analysisContext) {
+    const transform = normalizeBoundsFitImageTransform(fill && fill.imageTransform);
+    if (!transform) {
+      return null;
+    }
+
+    const row0 = transform[0];
+    const row1 = transform[1];
+    const scaleX = Number(row0[0]);
+    const skewX = Number(row0[1]);
+    const translateX = Number(row0[2]);
+    const skewY = Number(row1[0]);
+    const scaleY = Number(row1[1]);
+    const translateY = Number(row1[2]);
+
+    if (
+      !Number.isFinite(scaleX) ||
+      !Number.isFinite(scaleY) ||
+      !Number.isFinite(skewX) ||
+      !Number.isFinite(skewY) ||
+      !Number.isFinite(translateX) ||
+      !Number.isFinite(translateY)
+    ) {
+      return null;
+    }
+
+    if (!(scaleX > 0) || !(scaleY > 0) || Math.abs(skewX) > 0.0001 || Math.abs(skewY) > 0.0001) {
+      return null;
+    }
+
+    const localVisibleRect = {
+      x: Number.isFinite(Number(analysisContext.offsetX)) ? Number(analysisContext.offsetX) : 0,
+      y: Number.isFinite(Number(analysisContext.offsetY)) ? Number(analysisContext.offsetY) : 0,
+      width: Number(analysisContext.visibleRect && analysisContext.visibleRect.width) || 0,
+      height: Number(analysisContext.visibleRect && analysisContext.visibleRect.height) || 0,
+    };
+
+    if (!(localVisibleRect.width > 0) || !(localVisibleRect.height > 0)) {
+      return null;
+    }
+
+    const rawRasterRect = {
+      x: (translateX + scaleX * (localVisibleRect.x / nodeWidth)) * sourceWidth,
+      y: (translateY + scaleY * (localVisibleRect.y / nodeHeight)) * sourceHeight,
+      width: scaleX * (localVisibleRect.width / nodeWidth) * sourceWidth,
+      height: scaleY * (localVisibleRect.height / nodeHeight) * sourceHeight,
+    };
+
+    const rasterRect = intersectBoundsFitRects(rawRasterRect, {
+      x: 0,
+      y: 0,
+      width: sourceWidth,
+      height: sourceHeight,
+    });
+    if (!rasterRect) {
+      return null;
+    }
+
+    const normalizedLeft = rasterRect.x / sourceWidth;
+    const normalizedTop = rasterRect.y / sourceHeight;
+    const normalizedRight = (rasterRect.x + rasterRect.width) / sourceWidth;
+    const normalizedBottom = (rasterRect.y + rasterRect.height) / sourceHeight;
+    const localLeft = ((normalizedLeft - translateX) / scaleX) * nodeWidth;
+    const localTop = ((normalizedTop - translateY) / scaleY) * nodeHeight;
+    const localRight = ((normalizedRight - translateX) / scaleX) * nodeWidth;
+    const localBottom = ((normalizedBottom - translateY) / scaleY) * nodeHeight;
+    const localWidth = localRight - localLeft;
+    const localHeight = localBottom - localTop;
+
+    if (!(localWidth > 0) || !(localHeight > 0)) {
+      return null;
+    }
+
+    return {
+      analysisOffsetX: roundBoundsFitMetric(localLeft),
+      analysisOffsetY: roundBoundsFitMetric(localTop),
+      analysisWidth: roundBoundsFitMetric(localWidth),
+      analysisHeight: roundBoundsFitMetric(localHeight),
+      rasterAnalysisOffsetX: roundBoundsFitMetric(rasterRect.x),
+      rasterAnalysisOffsetY: roundBoundsFitMetric(rasterRect.y),
+      rasterAnalysisWidth: roundBoundsFitMetric(rasterRect.width),
+      rasterAnalysisHeight: roundBoundsFitMetric(rasterRect.height),
+    };
+  }
+
+  function normalizeBoundsFitImageTransform(value) {
+    if (!value) {
+      return [
+        [1, 0, 0],
+        [0, 1, 0],
+      ];
+    }
+
+    if (!Array.isArray(value) || value.length < 2 || !Array.isArray(value[0]) || !Array.isArray(value[1])) {
+      return null;
+    }
+
+    if (value[0].length < 3 || value[1].length < 3) {
+      return null;
+    }
+
+    return value;
   }
 
   async function exportBoundsFitRenderedAnalysisBytes(node, analysisContext, exportScale) {
@@ -7275,7 +7397,6 @@
       return buildBoundsFitSkipped(node, "Could not read the source image size.");
     }
 
-    const renderedExportScale = resolveBoundsFitRenderedExportScale(nodeWidth, nodeHeight, sourceWidth, sourceHeight);
     // Bounds-fit trims the selected image layer itself. Ancestor frames may hide where the layer is
     // placed on canvas, but they should not crop the original image content being fitted.
     const analysisContext = getBoundsFitAnalysisContext(node, {
@@ -7330,137 +7451,7 @@
       };
     }
 
-    const exportSettings = {
-      format: "PNG",
-      useAbsoluteBounds: true,
-    };
-    if (Math.abs(renderedExportScale - 1) > 0.01) {
-      exportSettings.constraint = {
-        type: "SCALE",
-        value: renderedExportScale,
-      };
-    }
-
-    let bytes = new Uint8Array(0);
-    let analysisMode = "rendered-node";
-    let mimeType = "image/png";
-    let rasterAnalysisOffsetX = analysisContext.offsetX;
-    let rasterAnalysisOffsetY = analysisContext.offsetY;
-    let rasterAnalysisWidth = analysisContext.visibleRect.width;
-    let rasterAnalysisHeight = analysisContext.visibleRect.height;
-    const needsIsolatedRenderedExport = hasBoundsFitClippingAncestor(node);
-    const renderedExportContext = needsIsolatedRenderedExport
-      ? {
-          nodeRect: analysisContext.nodeRect,
-          visibleRect: analysisContext.nodeRect,
-          clipped: true,
-          offsetX: 0,
-          offsetY: 0,
-        }
-      : analysisContext;
-
-    try {
-      if (needsIsolatedRenderedExport) {
-        bytes = await exportBoundsFitRenderedAnalysisBytes(node, renderedExportContext, renderedExportScale);
-        if (bytes && typeof bytes.length === "number" && bytes.length > 0) {
-          rasterAnalysisOffsetX = 0;
-          rasterAnalysisOffsetY = 0;
-          rasterAnalysisWidth = analysisContext.visibleRect.width;
-          rasterAnalysisHeight = analysisContext.visibleRect.height;
-        }
-      } else {
-        bytes = await node.exportAsync(exportSettings);
-      }
-    } catch (error) {
-      let previewExportError = null;
-      try {
-        // Some edited fills (notably background-removed assets in crop mode) can fail
-        // direct exportAsync(). Exporting a temporary preview clone still captures the
-        // currently visible pixels and keeps bounds-fit usable for those layers.
-        bytes = await exportBoundsFitRenderedAnalysisBytes(
-          node,
-          renderedExportContext,
-          renderedExportScale
-        );
-        if (bytes && typeof bytes.length === "number" && bytes.length > 0) {
-          rasterAnalysisOffsetX = 0;
-          rasterAnalysisOffsetY = 0;
-          rasterAnalysisWidth = analysisContext.visibleRect.width;
-          rasterAnalysisHeight = analysisContext.visibleRect.height;
-        }
-      } catch (previewError) {
-        previewExportError = previewError;
-      }
-
-      if (bytes && typeof bytes.length === "number" && bytes.length > 0) {
-        // Recovered with the preview export path.
-      } else {
-        const scaleMode = typeof fill.scaleMode === "string" ? fill.scaleMode : "FILL";
-        const fillRotation = typeof fill.rotation === "number" && Number.isFinite(fill.rotation) ? fill.rotation : 0;
-        const canFallbackToSourceImage =
-          scaleMode !== "CROP" &&
-          scaleMode !== "TILE" &&
-          !fill.imageTransform &&
-          Math.abs(fillRotation) <= 0.01 &&
-          hasMatchingAspectRatio(nodeWidth, nodeHeight, sourceWidth, sourceHeight);
-        if (!canFallbackToSourceImage) {
-          return buildBoundsFitSkipped(
-            node,
-            normalizeErrorMessage(
-              previewExportError,
-              normalizeErrorMessage(error, "Could not export the currently visible image bytes.")
-            )
-          );
-        }
-
-        bytes = await image.getBytesAsync();
-        if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
-          return buildBoundsFitSkipped(node, "Could not read the source image bytes.");
-        }
-
-        analysisMode = "source-image";
-        mimeType = detectImageMimeType(bytes);
-        const scaleX = sourceWidth / nodeWidth;
-        const scaleY = sourceHeight / nodeHeight;
-        rasterAnalysisOffsetX = roundBoundsFitMetric(analysisContext.offsetX * scaleX);
-        rasterAnalysisOffsetY = roundBoundsFitMetric(analysisContext.offsetY * scaleY);
-        rasterAnalysisWidth = roundBoundsFitMetric(analysisContext.visibleRect.width * scaleX);
-        rasterAnalysisHeight = roundBoundsFitMetric(analysisContext.visibleRect.height * scaleY);
-      }
-    }
-    if (!bytes || typeof bytes.length !== "number" || bytes.length <= 0) {
-      return buildBoundsFitSkipped(node, "Could not export the currently visible image bytes.");
-    }
-
-    return {
-      target: {
-        nodeId: node.id,
-        nodeName: safeName(node),
-        targetKind: "image-fill",
-        analysisMode: analysisMode,
-        fillIndex: fillIndex,
-        originalHash: fill.imageHash,
-        sourceWidth: sourceWidth,
-        sourceHeight: sourceHeight,
-        analysisOffsetX: analysisContext.offsetX,
-        analysisOffsetY: analysisContext.offsetY,
-        analysisWidth: analysisContext.visibleRect.width,
-        analysisHeight: analysisContext.visibleRect.height,
-        rasterAnalysisOffsetX: rasterAnalysisOffsetX,
-        rasterAnalysisOffsetY: rasterAnalysisOffsetY,
-        rasterAnalysisWidth: rasterAnalysisWidth,
-        rasterAnalysisHeight: rasterAnalysisHeight,
-        fileName: buildFileName(
-          {
-            nodeName: safeName(node),
-            imageHash: fill.imageHash,
-          },
-          "png"
-        ),
-        mimeType: mimeType,
-        bytes: bytes,
-      },
-    };
+    return buildBoundsFitSkipped(node, BOUNDS_FIT_PRESERVE_ORIGINAL_IMAGE_MESSAGE);
   }
 
   async function applyBoundsFitResultsToSelection(session, rawResults) {
@@ -7891,7 +7882,7 @@
         skipped.push({
           nodeId: target.nodeId,
           nodeName: safeName(node),
-          reason: "Could not preserve the original IMAGE fill while fitting visible bounds.",
+          reason: BOUNDS_FIT_PRESERVE_ORIGINAL_IMAGE_MESSAGE,
         });
         return "skipped";
       }
@@ -9196,6 +9187,10 @@
       if (sharpenSpecificMessage) {
         return sharpenSpecificMessage;
       }
+    }
+
+    if (isLocalImageOperation(options)) {
+      return text;
     }
 
     if (/(payload|request size|20 ?mb|inline[_ ]data|aspect[_ -]?ratio|too large)/i.test(text)) {

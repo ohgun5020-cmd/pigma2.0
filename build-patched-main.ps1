@@ -29,7 +29,8 @@ $originalImageDownloadPatch = Join-Path $root "original-image-download.js"
 $aiImageUpscalePatch = Join-Path $root "ai-image-upscale.js"
 $destination = Join-Path $root "code.patched.js"
 $uiSource = Join-Path $root "ui.html"
-$pdfJsInlineAssetSync = Join-Path $root "sync-pdfjs-inline-assets.js"
+$pdfJsInlineAssetCleanup = Join-Path $root "sync-pdfjs-inline-assets.js"
+$ghostscriptInlineAssetCleanup = Join-Path $root "sync-ghostscript-inline-assets.js"
 $gifEncoderInlineAssetSync = Join-Path $root "sync-gifenc-inline-assets.js"
 $apngInlineAssetSync = Join-Path $root "sync-apng-inline-assets.js"
 $presentationInlineAssetSync = Join-Path $root "sync-presentation-inline-assets.js"
@@ -166,8 +167,12 @@ if ((-not $hasOriginalImageDownloadPatch) -and $uiSourceText.Contains("run-origi
   throw "UI still references original image download, but the source patch is missing: $originalImageDownloadPatch"
 }
 
-if (-not (Test-Path $pdfJsInlineAssetSync)) {
-  throw "Missing PDF.js inline asset sync script: $pdfJsInlineAssetSync"
+if (-not (Test-Path $pdfJsInlineAssetCleanup)) {
+  throw "Missing PDF.js inline asset cleanup script: $pdfJsInlineAssetCleanup"
+}
+
+if (-not (Test-Path $ghostscriptInlineAssetCleanup)) {
+  throw "Missing Ghostscript inline asset cleanup script: $ghostscriptInlineAssetCleanup"
 }
 
 if (-not (Test-Path $gifEncoderInlineAssetSync)) {
@@ -226,9 +231,14 @@ if (-not (Test-Path $figmaRuntimeSyntaxVerifier)) {
   throw "Missing Figma runtime syntax verifier: $figmaRuntimeSyntaxVerifier"
 }
 
-& node $pdfJsInlineAssetSync
+& node $pdfJsInlineAssetCleanup
 if ($LASTEXITCODE -ne 0) {
-  throw "Failed to sync inline PDF.js assets into ui.html"
+  throw "Failed to remove inline PDF.js assets from ui.html"
+}
+
+& node $ghostscriptInlineAssetCleanup
+if ($LASTEXITCODE -ne 0) {
+  throw "Failed to remove inline Ghostscript assets from ui.html"
 }
 
 & node $gifEncoderInlineAssetSync
@@ -1209,6 +1219,7 @@ $uiEditableTextBaselineShiftReplace = $uiEditableTextBaselineShiftReplace.Replac
 $uiEditableTextBaselineShiftLgEiTextUnifiedNoCapPreviousReplace = $uiEditableTextBaselineShiftReplace.Replace('s=.55+.65*o+i*(.25+.55*o)+.008*a,u=t*(.45+.2*i)+16*i*(1-pigmaEditableTextLgEiTextSmooth((t-48)/8));return Math.min(i*t*s,u)', 's=.55+.65*o+i*(.25+.55*o)+.008*a;return i*t*s')
 $uiEditableTextBaselineShiftLgEiTextEditorGatePreviousReplace = $uiEditableTextBaselineShiftReplace
 $uiEditableTextBaselineShiftReplace = $uiEditableTextBaselineShiftReplace.Replace('function pigmaEditableTextLgEiTextLineHeightPressure(t,n){let r=pigmaEditableTextLgEiTextRatio(n),i=Math.max(0,r-1);if(i<=.001)return 0;let a=Math.max(0,t-48),o=pigmaEditableTextLgEiTextSmooth((t-46)/3),s=.55+.65*o+i*(.25+.55*o)+.008*a,u=t*(.45+.2*i)+16*i*(1-pigmaEditableTextLgEiTextSmooth((t-48)/8));return Math.min(i*t*s,u)}', 'function pigmaEditableTextLgEiTextLineHeightPressure(t,n){let r=pigmaEditableTextLgEiTextRatio(n),i=Math.max(0,r-1.05);if(i<=.001)return 0;let a=Math.max(0,t-48),o=16+.15*a;return i*o}').Replace('function pigmaEditableTextLgEiTextLineHeightPressure(t,n){let r=pigmaEditableTextLgEiTextRatio(n),i=Math.max(0,r-1.05);if(i<=.001)return 0;let a=Math.max(0,t-40),o=Math.max(0,t-48),s=2+a*.18+o*.05;return i*Math.min(8,s)}', 'function pigmaEditableTextLgEiTextLineHeightPressure(t,n){let r=pigmaEditableTextLgEiTextRatio(n),i=Math.max(0,r-1.05);if(i<=.001)return 0;let a=Math.max(0,t-48),o=16+.15*a;return i*o}').Replace('let a=pigmaEditableTextLgEiTextLowBaseline(t,r),o=i-pigmaEditableTextLgEiTextLineHeightPressure(t,r),s=pigmaEditableTextLgEiTextSmooth((t-46)/3);return pigmaEditableTextLgEiTextClampBaseline(t,a*(1-s)+o*s)', 'let a=pigmaEditableTextLgEiTextLowBaseline(t,r)+pigmaEditableTextLgEiTextLineHeightPressure(t,r);return pigmaEditableTextLgEiTextClampBaseline(t,a)').Replace('let a=pigmaEditableTextLgEiTextLowBaseline(t,r),o=i+pigmaEditableTextLgEiTextLineHeightPressure(t,r),s=pigmaEditableTextLgEiTextSmooth(t-47);return pigmaEditableTextLgEiTextClampBaseline(t,a*(1-s)+o*s)', 'let a=pigmaEditableTextLgEiTextLowBaseline(t,r)+pigmaEditableTextLgEiTextLineHeightPressure(t,r);return pigmaEditableTextLgEiTextClampBaseline(t,a)').Replace('if(r<=1.05)return pigmaEditableTextLgEiTextClampBaseline(t,i);let a=', 'if(r<=1.05)return pigmaEditableTextLgEiTextClampBaseline(t,pigmaEditableTextLgEiTextLowBaseline(t,r));let a=').Replace('function pigmaEditableTextLgEiTextAutoBaselineShift(t){let n=pigmaEditableTextLgEiTextLowBaseline(t,1.25),r=pigmaEditableTextLgEiTextBaseBaseline(t)-pigmaEditableTextLgEiTextAutoPressure(t),i=pigmaEditableTextLgEiTextSmooth((t-40)/24);return -pigmaEditableTextLgEiTextClampBaseline(t,n*(1-i)+r*i)}', 'function pigmaEditableTextLgEiTextAutoBaselineShift(t){let n=pigmaEditableTextLgEiTextLowBaseline(t,1.25)+Math.min(3,Math.max(0,t-48)*.18);return -pigmaEditableTextLgEiTextClampBaseline(t,n)}').Replace('function pigmaEditableTextLgEiTextAutoBaselineShift(t){let n=pigmaEditableTextLgEiTextLowBaseline(t,1.25),r=pigmaEditableTextLgEiTextBaseBaseline(t)+pigmaEditableTextLgEiTextLineHeightPressure(t,1.18),i=pigmaEditableTextLgEiTextSmooth(t-47);return -pigmaEditableTextLgEiTextClampBaseline(t,n*(1-i)+r*i)}', 'function pigmaEditableTextLgEiTextAutoBaselineShift(t){let n=pigmaEditableTextLgEiTextLowBaseline(t,1.25)+Math.min(3,Math.max(0,t-48)*.18);return -pigmaEditableTextLgEiTextClampBaseline(t,n)}').Replace('function pigmaEditableTextResolvedBaselineShift(e,t=0){let n=Number(e&&e.baselineShift),r=Number(t),i=Number.isFinite(n)?n:0,a=Number.isFinite(r)?r:0,o=Math.abs(a)>=.01?0:pigmaEditableTextLgEiBaselineShift(e);return we(i+a+o)}', 'function pigmaEditableTextResolvedBaselineShift(e,t=0){let n=Number(e&&e.baselineShift),r=Number(t),i=Number.isFinite(n)?n:0,a=Number.isFinite(r)?r:0,o=pigmaEditableTextLgEiBaselineShift(e);if(pigmaEditableTextIsLgEiTextFamily(e)&&Math.abs(o)>=.01)return we(i+o);return we(i+a+(Math.abs(a)>=.01?0:o))}')
+$uiEditableTextBaselineShiftReplace = $uiEditableTextBaselineShiftReplace.Replace('if(pigmaEditableTextIsLgEiTextFamily(e)&&Math.abs(o)>=.01)return we(i+o)', 'if(pigmaEditableTextIsLgEiFamily(e)&&Math.abs(o)>=.01)return we(i+o)')
 $uiEditableTextBaselineShiftLgEiTextExactLowPreviousReplace = $uiEditableTextBaselineShiftReplace.Replace('if(r<=1.05)return pigmaEditableTextLgEiTextClampBaseline(t,pigmaEditableTextLgEiTextLowBaseline(t,r));let a=', 'if(r<=1.05)return pigmaEditableTextLgEiTextClampBaseline(t,i);let a=')
 $uiEditableTextBaselineShiftLgEiTextLowBaselinePreviousReplace = $uiEditableTextBaselineShiftLgEiTextExactLowPreviousReplace.Replace('function pigmaEditableTextLgEiTextLineHeightPressure(t,n){let r=pigmaEditableTextLgEiTextRatio(n),i=Math.max(0,r-1.05);if(i<=.001)return 0;let a=Math.max(0,t-48),o=16+.15*a;return i*o}', 'function pigmaEditableTextLgEiTextLineHeightPressure(t,n){let r=pigmaEditableTextLgEiTextRatio(n),i=Math.max(0,r-1.05);if(i<=.001)return 0;let a=Math.max(0,t-40),o=Math.max(0,t-48),s=2+a*.18+o*.05;return i*Math.min(8,s)}').Replace('let a=pigmaEditableTextLgEiTextLowBaseline(t,r)+pigmaEditableTextLgEiTextLineHeightPressure(t,r);return pigmaEditableTextLgEiTextClampBaseline(t,a)', 'let a=pigmaEditableTextLgEiTextLowBaseline(t,r),o=i+pigmaEditableTextLgEiTextLineHeightPressure(t,r),s=pigmaEditableTextLgEiTextSmooth(t-47);return pigmaEditableTextLgEiTextClampBaseline(t,a*(1-s)+o*s)').Replace('function pigmaEditableTextLgEiTextAutoBaselineShift(t){let n=pigmaEditableTextLgEiTextLowBaseline(t,1.25)+Math.min(3,Math.max(0,t-48)*.18);return -pigmaEditableTextLgEiTextClampBaseline(t,n)}', 'function pigmaEditableTextLgEiTextAutoBaselineShift(t){let n=pigmaEditableTextLgEiTextLowBaseline(t,1.25),r=pigmaEditableTextLgEiTextBaseBaseline(t)+pigmaEditableTextLgEiTextLineHeightPressure(t,1.18),i=pigmaEditableTextLgEiTextSmooth(t-47);return -pigmaEditableTextLgEiTextClampBaseline(t,n*(1-i)+r*i)}')
 $uiEditableTextBaselineShiftLgEiTextHighlightPreviousReplace = $uiEditableTextBaselineShiftReplace
@@ -1335,6 +1346,11 @@ if ($bundle.Contains($runtimePhotoshopFontNameFind)) {
   # Already patched in this bundle variant.
 } else {
   throw 'Could not patch runtime Photoshop font name resolver.'
+}
+$runtimeFontMapStart = $bundle.IndexOf('var pigmaPhotoshopFontMap=')
+$runtimeFontMapEnd = if ($runtimeFontMapStart -ge 0) { $bundle.IndexOf(';function pigmaNormalizePhotoshopFontToken', $runtimeFontMapStart) } else { -1 }
+if ($runtimeFontMapStart -ge 0 -and $runtimeFontMapEnd -gt $runtimeFontMapStart) {
+  $bundle = $bundle.Substring(0, $runtimeFontMapStart) + 'var pigmaPhotoshopFontMap=' + $fontPostScriptMapJson + $bundle.Substring($runtimeFontMapEnd)
 }
 
 if ($bundle.Contains($runtimeTextStyleFontWeightFind)) {
@@ -2268,6 +2284,11 @@ if ($uiBundle.Contains($uiEditableTextFontNameFind)) {
 } else {
   throw 'Could not patch UI editable text Photoshop font name resolver.'
 }
+$uiFontMapStart = $uiBundle.IndexOf('var pigmaPhotoshopFontMap=')
+$uiFontMapEnd = if ($uiFontMapStart -ge 0) { $uiBundle.IndexOf(';function pigmaNormalizePhotoshopFontToken', $uiFontMapStart) } else { -1 }
+if ($uiFontMapStart -ge 0 -and $uiFontMapEnd -gt $uiFontMapStart) {
+  $uiBundle = $uiBundle.Substring(0, $uiFontMapStart) + 'var pigmaPhotoshopFontMap=' + $fontPostScriptMapJson + $uiBundle.Substring($uiFontMapEnd)
+}
 
 if ($uiBundle.Contains($uiEditableTextBaselineShiftFind)) {
   $uiBundle = Replace-Exact `
@@ -2472,6 +2493,26 @@ if ($uiBundle.Contains($uiEditableTextBaselineShiftFind)) {
 } else {
   throw 'Could not patch UI editable text baseline shift.'
 }
+$uiBundle = $uiBundle.Replace(
+  'if(pigmaEditableTextIsLgEiTextFamily(e)&&Math.abs(o)>=.01)return we(i+o)',
+  'if(pigmaEditableTextIsLgEiFamily(e)&&Math.abs(o)>=.01)return we(i+o)'
+)
+$uiBundle = $uiBundle.Replace(
+  'function pigmaEditableTextIsLgEiHeadlineFamily(e){let t=pigmaNormalizePhotoshopFontToken(e&&e.fontFamily);return t==="lgeiheadline"||t==="lgeiheadlinettf"}',
+  'function pigmaEditableTextIsLgEiHeadlineFamily(e){let t=pigmaNormalizePhotoshopFontToken(e&&e.fontFamily);return t==="lgeiheadline"||t==="lgeiheadlinettf"||t==="caveat"||t==="crimsontext"||t==="figmahand"||t==="pacifico"||t==="playfairdisplay"||t==="sourceserifpro"}'
+)
+$uiBundle = $uiBundle.Replace(
+  'function pigmaEditableTextIsLgEiTextFamily(e){let t=pigmaNormalizePhotoshopFontToken(e&&e.fontFamily);return t==="lgeitext"||t==="lgeitextttf"}',
+  'function pigmaEditableTextIsLgEiTextFamily(e){let t=pigmaNormalizePhotoshopFontToken(e&&e.fontFamily);return t==="lgeitext"||t==="lgeitextttf"||t==="inter"||t==="interdisplay"||t==="anonymouspro"||t==="ibmplexmono"||t==="roboto"||t==="robotomono"||t==="segoeui"}'
+)
+$uiBundle = $uiBundle.Replace(
+  'function pigmaEditableTextIsLgEiTextFamily(e){let t=pigmaNormalizePhotoshopFontToken(e&&e.fontFamily);return t==="lgeitext"||t==="lgeitextttf"||t==="inter"||t==="interdisplay"}',
+  'function pigmaEditableTextIsLgEiTextFamily(e){let t=pigmaNormalizePhotoshopFontToken(e&&e.fontFamily);return t==="lgeitext"||t==="lgeitextttf"||t==="inter"||t==="interdisplay"||t==="anonymouspro"||t==="ibmplexmono"||t==="roboto"||t==="robotomono"||t==="segoeui"}'
+)
+$uiBundle = $uiBundle.Replace(
+  'function pigmaEditableTextResolvedBaselineShift(e,t=0){let n=Number(e&&e.baselineShift),r=Number(t),i=Number.isFinite(n)?n:0,a=Number.isFinite(r)?r:0,o=pigmaEditableTextLgEiBaselineShift(e);if(pigmaEditableTextIsLgEiFamily(e)&&Math.abs(o)>=.01)return we(i+o);return we(i+a+(Math.abs(a)>=.01?0:o))}',
+  'function pigmaEditableTextResolvedBaselineShift(e,t=0){let n=Number(e&&e.baselineShift),r=Number(t),i=Number.isFinite(n)?n:0,a=Number.isFinite(r)?r:0,o=pigmaEditableTextLgEiBaselineShift(e);if(pigmaEditableTextIsLgEiHeadlineFamily(e)){let s=Number(e&&e.fontSize),u=pigmaEditableTextLgEiLineHeightPx(e);if(Number.isFinite(s)&&s>0&&u!==null&&u/s<=1.05&&Math.abs(a)>=.01)return we(i+a)}if(pigmaEditableTextIsLgEiFamily(e)&&Math.abs(o)>=.01)return we(i+o);return we(i+a+(Math.abs(a)>=.01?0:o))}'
+)
 
 $uiEditableTextLgEiTextLargeSizeDriftFind = 'function pigmaEditableTextLgEiTextLargeLowRatioDrift(t,n){let r=pigmaEditableTextLgEiTextRatio(n),i=Math.min(1,Math.max(0,(1.45-r)/.45)),a=Math.min(3,Math.max(0,t-52)*.24);return a*i}'
 $uiEditableTextLgEiTextLargeSizeDriftReplace = 'function pigmaEditableTextLgEiTextLargeLowRatioDrift(t,n){let r=pigmaEditableTextLgEiTextRatio(n),i=Math.min(1,Math.max(0,(1.45-r)/.45)),a=Math.min(3,Math.max(0,t-52)*.24);return a*i}function pigmaEditableTextLgEiTextLargeSizeDrift(t,n){let r=pigmaEditableTextLgEiTextRatio(n),i=pigmaEditableTextLgEiTextSmooth((t-64)/2);if(i<=.001)return 0;let a=Math.max(0,t-64),o=7+.16*a,s=Math.min(.2,Math.max(0,r-1.05)),u=s*(16+1.4*a),l=Math.max(0,r-1.25),c=pigmaEditableTextLgEiTextSmooth((t-96)/32)*l*(22+.45*a);return i*(o+u+c)}function pigmaEditableTextLgEiTextAutoLargeSizeDrift(t){let n=pigmaEditableTextLgEiTextSmooth((t-64)/2);if(n<=.001)return 0;let r=Math.max(0,t-64);return n*(3.2+.48*r)}'
@@ -2494,6 +2535,26 @@ if ($uiBundle.Contains($uiEditableTextLgEiTextLargeSizeDriftPreviousReplace)) {
     -Label 'ui editable text LG EI Text 119-128 high-ratio drift'
 }
 
+$uiEditableTextLgEiTextLargeSizeDriftCurrentFind = 'function pigmaEditableTextLgEiTextLargeLowRatioDrift(t,n){let r=pigmaEditableTextLgEiTextRatio(n),i=Math.min(1,Math.max(0,(1.45-r)/.45)),a=Math.min(3,Math.max(0,t-52)*.24);return a*i}function pigmaEditableTextLgEiTextLargeSizeDrift(t,n){let r=pigmaEditableTextLgEiTextRatio(n),i=pigmaEditableTextLgEiTextSmooth((t-64)/2);if(i<=.001)return 0;let a=Math.max(0,t-64),o=7+.16*a,s=Math.min(.2,Math.max(0,r-1.05)),u=s*(16+1.4*a),l=Math.max(0,r-1.25),c=pigmaEditableTextLgEiTextSmooth((t-96)/32)*l*(22+.45*a);return i*(o+u+c)}function pigmaEditableTextLgEiTextAutoLargeSizeDrift(t){let n=pigmaEditableTextLgEiTextSmooth((t-64)/2);if(n<=.001)return 0;let r=Math.max(0,t-64);return n*(3.2+.48*r)}'
+$uiEditableTextLgEiTextLargeSizeDriftTunedReplace = 'function pigmaEditableTextLgEiTextLargeLowRatioDrift(t,n){let r=pigmaEditableTextLgEiTextRatio(n),i=Math.min(1,Math.max(0,(1.45-r)/.45)),a=Math.min(3,Math.max(0,t-52)*.24);return a*i}function pigmaEditableTextLgEiTextLargeSizeDrift(t,n){let r=pigmaEditableTextLgEiTextRatio(n),i=pigmaEditableTextLgEiTextSmooth((t-64)/2);if(i<=.001)return 0;let a=Math.max(0,t-64),o=7+.16*a,s=Math.min(.2,Math.max(0,r-1.05)),u=s*(16+1.4*a),l=Math.max(0,r-1.25),c=pigmaEditableTextLgEiTextSmooth((t-88)/32)*l*(34+.65*a),f=pigmaEditableTextLgEiTextSmooth((t-72)/56)*Math.max(0,1.5-r)*(36+.36*a);return i*(o+u+c+f)}function pigmaEditableTextLgEiTextAutoLargeSizeDrift(t){let n=pigmaEditableTextLgEiTextSmooth((t-64)/2);if(n<=.001)return 0;let r=Math.max(0,t-64),i=pigmaEditableTextLgEiTextSmooth((t-88)/40)*(8+.18*r);return n*(3.2+.48*r+i)}'
+if ($uiBundle.Contains($uiEditableTextLgEiTextLargeSizeDriftCurrentFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiEditableTextLgEiTextLargeSizeDriftCurrentFind `
+    -Replace $uiEditableTextLgEiTextLargeSizeDriftTunedReplace `
+    -ExpectedCount 1 `
+    -Label 'ui editable text LG EI Text 65-128 tuned drift'
+}
+$uiEditableTextLgEiTextLargeSizeDriftTunedPreviousFind = 'function pigmaEditableTextLgEiTextLargeLowRatioDrift(t,n){let r=pigmaEditableTextLgEiTextRatio(n),i=Math.min(1,Math.max(0,(1.45-r)/.45)),a=Math.min(3,Math.max(0,t-52)*.24);return a*i}function pigmaEditableTextLgEiTextLargeSizeDrift(t,n){let r=pigmaEditableTextLgEiTextRatio(n),i=pigmaEditableTextLgEiTextSmooth((t-64)/2);if(i<=.001)return 0;let a=Math.max(0,t-64),o=7+.16*a,s=Math.min(.2,Math.max(0,r-1.05)),u=s*(16+1.4*a),l=Math.max(0,r-1.25),c=pigmaEditableTextLgEiTextSmooth((t-88)/32)*l*(34+.65*a),f=pigmaEditableTextLgEiTextSmooth((t-72)/56)*Math.max(0,1.5-r)*(30+.3*a);return i*(o+u+c+f)}function pigmaEditableTextLgEiTextAutoLargeSizeDrift(t){let n=pigmaEditableTextLgEiTextSmooth((t-64)/2);if(n<=.001)return 0;let r=Math.max(0,t-64),i=pigmaEditableTextLgEiTextSmooth((t-88)/40)*(8+.18*r);return n*(3.2+.48*r+i)}'
+if ($uiBundle.Contains($uiEditableTextLgEiTextLargeSizeDriftTunedPreviousFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiEditableTextLgEiTextLargeSizeDriftTunedPreviousFind `
+    -Replace $uiEditableTextLgEiTextLargeSizeDriftTunedReplace `
+    -ExpectedCount 1 `
+    -Label 'ui editable text LG EI Text 65-128 tuned drift refresh'
+}
+
 $uiEditableTextLgEiText65FormulaFind = 'function pigmaEditableTextLgEiTextBaselineFormula(t,n){let r=pigmaEditableTextLgEiTextRatio(n),i=pigmaEditableTextLgEiTextLargeLowRatioDrift(t,r);if(r<=1.05)return pigmaEditableTextLgEiTextClampBaseline(t,pigmaEditableTextLgEiTextLowBaseline(t,r)+i);let a=pigmaEditableTextLgEiTextLowBaseline(t,r)+pigmaEditableTextLgEiTextLineHeightPressure(t,r)+i;return pigmaEditableTextLgEiTextClampBaseline(t,a)}'
 $uiEditableTextLgEiText65FormulaReplace = 'function pigmaEditableTextLgEiTextBaselineFormula(t,n){let r=pigmaEditableTextLgEiTextRatio(n),i=pigmaEditableTextLgEiTextLargeLowRatioDrift(t,r)+pigmaEditableTextLgEiTextLargeSizeDrift(t,r);if(r<=1.05)return pigmaEditableTextLgEiTextClampBaseline(t,pigmaEditableTextLgEiTextLowBaseline(t,r)+i);let a=pigmaEditableTextLgEiTextLowBaseline(t,r)+pigmaEditableTextLgEiTextLineHeightPressure(t,r)+i;return pigmaEditableTextLgEiTextClampBaseline(t,a)}'
 if ($uiBundle.Contains($uiEditableTextLgEiText65FormulaFind)) {
@@ -2514,6 +2575,53 @@ if ($uiBundle.Contains($uiEditableTextLgEiText65AutoFind)) {
     -Replace $uiEditableTextLgEiText65AutoReplace `
     -ExpectedCount 1 `
     -Label 'ui editable text LG EI Text 65-128 auto baseline drift'
+}
+
+$uiEditableTextLgEiHeadlineFormulaStart = 'function pigmaEditableTextLgEiHeadlineRatio('
+$uiEditableTextLgEiHeadlineFormulaEnd = 'function pigmaEditableTextLgEiTextRatio('
+$uiEditableTextLgEiHeadlineFormulaReplace = 'function pigmaEditableTextLgEiHeadlineRatio(t){return Math.min(2,Math.max(1,Number.isFinite(t)?t:1))}function pigmaEditableTextLgEiHeadlineSmooth(t){return t=t<0?0:t>1?1:t,t*t*(3-2*t)}function pigmaEditableTextLgEiHeadlineClampBaseline(t,n){return we(Math.min(t*1.1,Math.max(-t*.8,n)))}function pigmaEditableTextLgEiHeadlineAutoRatio(t){return 1.125+.055*pigmaEditableTextLgEiHeadlineSmooth((t-8)/56)}function pigmaEditableTextLgEiHeadlineBaseBaseline(t){let n=8.4+1.8*pigmaEditableTextLgEiHeadlineSmooth((t-18)/2)+3.8*pigmaEditableTextLgEiHeadlineSmooth((t-24)/4),r=5.2+2*pigmaEditableTextLgEiHeadlineSmooth((t-48)/8),i=pigmaEditableTextLgEiHeadlineSmooth((t-32)/8),a=5.5*(1-pigmaEditableTextLgEiHeadlineSmooth((t-30)/8)),o=3.5*pigmaEditableTextLgEiHeadlineSmooth((t-34)/8)*(1-pigmaEditableTextLgEiHeadlineSmooth((t-48)/8));return n*(1-i)+r*i+a-o}function pigmaEditableTextLgEiHeadlineLineHeightPressure(t,n){let r=pigmaEditableTextLgEiHeadlineRatio(n),i=Math.max(0,r-1);if(i<=.001)return 0;let a=Math.max(0,r-1.25),o=pigmaEditableTextLgEiHeadlineSmooth((t-32)/8),s=1-o,u=Math.max(0,t-48),l=18*s+26*o+.12*u,c=14*s+18*o+.1*Math.max(0,t-64);return -(i*l+a*c)}function pigmaEditableTextLgEiHeadlineLargeSizeDrift(t,n){let r=pigmaEditableTextLgEiHeadlineRatio(n),i=Math.max(0,t-64),a=pigmaEditableTextLgEiHeadlineSmooth(i/16);if(a<=.001)return 0;let o=Math.max(0,r-1),s=Math.max(0,r-1.25);return -a*(o*(4+.08*i)+s*(6+.1*i))}function pigmaEditableTextLgEiHeadlineBaselineFormula(t,n){let r=pigmaEditableTextLgEiHeadlineRatio(n),i=pigmaEditableTextLgEiHeadlineBaseBaseline(t)+pigmaEditableTextLgEiHeadlineLineHeightPressure(t,r)+pigmaEditableTextLgEiHeadlineLargeSizeDrift(t,r);return pigmaEditableTextLgEiHeadlineClampBaseline(t,i)}function pigmaEditableTextLgEiAutoBaselineShift(t){return -pigmaEditableTextLgEiHeadlineBaselineFormula(t,pigmaEditableTextLgEiHeadlineAutoRatio(t))}function pigmaEditableTextLgEiExactBaselineShift(t,n){return -pigmaEditableTextLgEiHeadlineBaselineFormula(t,n/t)}function pigmaEditableTextLgEiHeadlineLeadingFormula(t,n){let r=pigmaEditableTextLgEiHeadlineRatio(n),i=Math.max(0,r-1);if(i<=.001)return 0;let a=Math.max(0,t-18),o=pigmaEditableTextLgEiHeadlineSmooth((t-32)/16),s=Math.max(0,t-48),u=i*(.42*Math.min(18,a)*(1-.45*o)+.16*s)+Math.max(0,r-1.25)*(.18*Math.min(32,a)+.08*s);return Math.max(0,we(u))}function pigmaEditableTextLgEiAutoLeadingDelta(t){return -pigmaEditableTextLgEiHeadlineLeadingFormula(t,pigmaEditableTextLgEiHeadlineAutoRatio(t))}function pigmaEditableTextLgEiExactLeadingDelta(t,n){return -pigmaEditableTextLgEiHeadlineLeadingFormula(t,n/t)}'
+$uiEditableTextLgEiHeadlineFormulaReplace = $uiEditableTextLgEiHeadlineFormulaReplace.Replace('function pigmaEditableTextLgEiHeadlineLineHeightPressure(t,n){let r=pigmaEditableTextLgEiHeadlineRatio(n),i=Math.max(0,r-1);if(i<=.001)return 0;let a=Math.max(0,r-1.25),o=pigmaEditableTextLgEiHeadlineSmooth((t-32)/8),s=1-o,u=Math.max(0,t-48),l=18*s+26*o+.12*u,c=14*s+18*o+.1*Math.max(0,t-64);return -(i*l+a*c)}', 'function pigmaEditableTextLgEiHeadlineLineHeightPressure(t,n){let r=pigmaEditableTextLgEiHeadlineRatio(n),i=Math.max(0,r-1);if(i<=.001)return 0;let rise=pigmaEditableTextLgEiHeadlineSmooth(i/.1),fall=1-.42*pigmaEditableTextLgEiHeadlineSmooth((r-1.33)/.17),size=2.4+.075*t+.018*Math.max(0,t-96);return size*rise*fall}')
+$uiEditableTextLgEiHeadlineFormulaReplace = $uiEditableTextLgEiHeadlineFormulaReplace.Replace('let rise=pigmaEditableTextLgEiHeadlineSmooth(i/.1),fall=1-.42*pigmaEditableTextLgEiHeadlineSmooth((r-1.33)/.17),size=2.4+.075*t+.018*Math.max(0,t-96);return size*rise*fall', 'let rise=pigmaEditableTextLgEiHeadlineSmooth(i/.1),fall=1-.42*pigmaEditableTextLgEiHeadlineSmooth((r-1.33)/.17),large=pigmaEditableTextLgEiHeadlineSmooth((t-64)/27),size=2.4+.075*t+.018*Math.max(0,t-96),baseLift=large*rise*(.105*t-1.1),ratioLift=large*Math.max(0,r-1.11)/.39*(.095*t+.04*Math.max(0,t-96));return size*rise*fall+baseLift+ratioLift')
+$uiEditableTextLgEiHeadlineFormulaReplace = $uiEditableTextLgEiHeadlineFormulaReplace.Replace('function pigmaEditableTextLgEiHeadlineLargeSizeDrift(t,n){let r=pigmaEditableTextLgEiHeadlineRatio(n),i=Math.max(0,t-64),a=pigmaEditableTextLgEiHeadlineSmooth(i/16);if(a<=.001)return 0;let o=Math.max(0,r-1),s=Math.max(0,r-1.25);return -a*(o*(4+.08*i)+s*(6+.1*i))}', 'function pigmaEditableTextLgEiHeadlineLargeSizeDrift(t,n){return 0}')
+$uiEditableTextLgEiHeadlineFormulaReplace = $uiEditableTextLgEiHeadlineFormulaReplace.Replace('function pigmaEditableTextLgEiHeadlineLargeSizeDrift(t,n){return 0}function pigmaEditableTextLgEiHeadlineBaselineFormula(t,n){let r=pigmaEditableTextLgEiHeadlineRatio(n),i=pigmaEditableTextLgEiHeadlineBaseBaseline(t)+pigmaEditableTextLgEiHeadlineLineHeightPressure(t,r)+pigmaEditableTextLgEiHeadlineLargeSizeDrift(t,r);return pigmaEditableTextLgEiHeadlineClampBaseline(t,i)}', 'function pigmaEditableTextLgEiHeadlineLargeSizeDrift(t,n){return 0}function pigmaEditableTextLgEiHeadlineInterp(t,n,r){for(let i=1;i<n.length;i+=1)if(t<=n[i]){let a=(t-n[i-1])/(n[i]-n[i-1]);return a=pigmaEditableTextLgEiHeadlineSmooth(a),r[i-1]*(1-a)+r[i]*a}return r[r.length-1]}function pigmaEditableTextLgEiHeadlineRatioInterp(t,n){let r=[1,1.11,1.2,1.25,1.33,1.5];if(t<=r[0])return n[0];for(let i=1;i<r.length;i+=1)if(t<=r[i]){let a=(t-r[i-1])/(r[i]-r[i-1]);return n[i-1]*(1-a)+n[i]*a}return n[n.length-1]}function pigmaEditableTextLgEiHeadlineMidSizeCorrection(t,n){if(t<32||t>64)return 0;let r=pigmaEditableTextLgEiHeadlineRatio(n),i=[32,33,34,35,36,37,38,39,40,41,42,43,44,45,55,56,57,64],a=pigmaEditableTextLgEiHeadlineInterp(t,i,[-7,-5.5,-5,-4,-1.5,0,2.5,5.5,6.5,7,7.5,8,8,8.5,0,-.5,0,0]),o=pigmaEditableTextLgEiHeadlineInterp(t,i,[-6,-6,-6.5,-4.5,-3.5,-1.5,1,2,2.5,3,3,4,4,3.5,4,4,4,0]),s=pigmaEditableTextLgEiHeadlineInterp(t,i,[-6,-6,-4.5,-3.5,-2.5,1,1,2,3,3.5,3.5,5,5,4.5,4.5,4.5,4.5,0]),u=pigmaEditableTextLgEiHeadlineInterp(t,i,[-5.5,-5.5,-4.5,-1.5,-1,0,1,2.5,3.5,4,4.5,5.5,5.5,5,5.5,5,5,0]),l=pigmaEditableTextLgEiHeadlineInterp(t,i,[-5,-5,-4,-.5,-.5,2,1.5,3,4,5,5,6,6.5,6,6.5,6,6.5,0]),c=pigmaEditableTextLgEiHeadlineInterp(t,i,[-3.5,-2.5,-.5,0,1.5,3.5,4.5,7.5,8.5,9.5,9.5,10,10,11,9,8.5,9,0]);return pigmaEditableTextLgEiHeadlineRatioInterp(r,[a,o,s,u,l,c])}function pigmaEditableTextLgEiHeadlineBaselineFormula(t,n){let r=pigmaEditableTextLgEiHeadlineRatio(n),i=pigmaEditableTextLgEiHeadlineBaseBaseline(t)+pigmaEditableTextLgEiHeadlineLineHeightPressure(t,r)+pigmaEditableTextLgEiHeadlineLargeSizeDrift(t,r)+pigmaEditableTextLgEiHeadlineMidSizeCorrection(t,r);return pigmaEditableTextLgEiHeadlineClampBaseline(t,i)}')
+$uiEditableTextLgEiHeadlineFormulaStartIndex = $uiBundle.IndexOf($uiEditableTextLgEiHeadlineFormulaStart)
+$uiEditableTextLgEiHeadlineFormulaEndIndex = if ($uiEditableTextLgEiHeadlineFormulaStartIndex -ge 0) { $uiBundle.IndexOf($uiEditableTextLgEiHeadlineFormulaEnd, $uiEditableTextLgEiHeadlineFormulaStartIndex) } else { -1 }
+if ($uiEditableTextLgEiHeadlineFormulaStartIndex -ge 0 -and $uiEditableTextLgEiHeadlineFormulaEndIndex -gt $uiEditableTextLgEiHeadlineFormulaStartIndex) {
+  $uiBundle = $uiBundle.Substring(0, $uiEditableTextLgEiHeadlineFormulaStartIndex) + $uiEditableTextLgEiHeadlineFormulaReplace + $uiBundle.Substring($uiEditableTextLgEiHeadlineFormulaEndIndex)
+} elseif ($uiBundle.Contains($uiEditableTextLgEiHeadlineFormulaStart)) {
+  throw 'Could not patch UI editable text LG EI Headline ratio formula boundaries.'
+}
+$uiBundle = $uiBundle.Replace(
+  'function pigmaEditableTextLgEiExactBaselineShift(t,n){return -pigmaEditableTextLgEiHeadlineBaselineFormula(t,n/t)}',
+  'function pigmaEditableTextLgEiHeadlineExactCorrection(t,n){let r=pigmaEditableTextLgEiHeadlineRatio(n),i=pigmaEditableTextLgEiHeadlineSmooth((t-64)/27);return i*pigmaEditableTextLgEiHeadlineRatioInterp(r,[0,-5.2,0,4.4,5.4,11.2])}function pigmaEditableTextLgEiExactBaselineShift(t,n){return -pigmaEditableTextLgEiHeadlineBaselineFormula(t,n/t)-pigmaEditableTextLgEiHeadlineExactCorrection(t,n/t)}'
+)
+$uiEditableTextLgEiHeadlineMidSizeCurrent = 'function pigmaEditableTextLgEiHeadlineMidSizeCorrection(t,n){if(t<32||t>64)return 0;let r=pigmaEditableTextLgEiHeadlineRatio(n),i=[32,33,34,35,36,37,38,39,40,41,42,43,44,45,55,56,57,64],a=pigmaEditableTextLgEiHeadlineInterp(t,i,[-7,-5.5,-5,-4,-1.5,0,2.5,5.5,6.5,7,7.5,8,8,8.5,0,-.5,0,0]),o=pigmaEditableTextLgEiHeadlineInterp(t,i,[-6,-6,-6.5,-4.5,-3.5,-1.5,1,2,2.5,3,3,4,4,3.5,4,4,4,0]),s=pigmaEditableTextLgEiHeadlineInterp(t,i,[-6,-6,-4.5,-3.5,-2.5,1,1,2,3,3.5,3.5,5,5,4.5,4.5,4.5,4.5,0]),u=pigmaEditableTextLgEiHeadlineInterp(t,i,[-5.5,-5.5,-4.5,-1.5,-1,0,1,2.5,3.5,4,4.5,5.5,5.5,5,5.5,5,5,0]),l=pigmaEditableTextLgEiHeadlineInterp(t,i,[-5,-5,-4,-.5,-.5,2,1.5,3,4,5,5,6,6.5,6,6.5,6,6.5,0]),c=pigmaEditableTextLgEiHeadlineInterp(t,i,[-3.5,-2.5,-.5,0,1.5,3.5,4.5,7.5,8.5,9.5,9.5,10,10,11,9,8.5,9,0]);return pigmaEditableTextLgEiHeadlineRatioInterp(r,[a,o,s,u,l,c])}'
+$uiEditableTextLgEiHeadlineMidSizeSmoothed = 'function pigmaEditableTextLgEiHeadlineMidSizeCorrection(t,n){if(t<30||t>64)return 0;let r=pigmaEditableTextLgEiHeadlineRatio(n),i=[32,33,34,35,36,37,38,39,40,41,42,43,44,45,55,56,57,64],a=pigmaEditableTextLgEiHeadlineInterp(t,i,[-7,-5.5,-5,-4,-1.5,0,2.5,5.5,6.5,7,7.5,8,8,8.5,0,-.5,0,0]),o=pigmaEditableTextLgEiHeadlineInterp(t,i,[-6,-6,-6.5,-4.5,-3.5,-1.5,1,2,2.5,3,3,4,4,3.5,4,4,4,0]),s=pigmaEditableTextLgEiHeadlineInterp(t,i,[-6,-6,-4.5,-3.5,-2.5,1,1,2,3,3.5,3.5,5,5,4.5,4.5,4.5,4.5,0]),u=pigmaEditableTextLgEiHeadlineInterp(t,i,[-5.5,-5.5,-4.5,-1.5,-1,0,1,2.5,3.5,4,4.5,5.5,5.5,5,5.5,5,5,0]),l=pigmaEditableTextLgEiHeadlineInterp(t,i,[-5,-5,-4,-.5,-.5,2,1.5,3,4,5,5,6,6.5,6,6.5,6,6.5,0]),c=pigmaEditableTextLgEiHeadlineInterp(t,i,[-3.5,-2.5,-.5,0,1.5,3.5,4.5,7.5,8.5,9.5,9.5,10,10,11,9,8.5,9,0]),f=pigmaEditableTextLgEiHeadlineSmooth((t-30)/2);return f*pigmaEditableTextLgEiHeadlineRatioInterp(r,[a,o,s,u,l,c])}'
+if ($uiBundle.Contains($uiEditableTextLgEiHeadlineMidSizeCurrent)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiEditableTextLgEiHeadlineMidSizeCurrent `
+    -Replace $uiEditableTextLgEiHeadlineMidSizeSmoothed `
+    -ExpectedCount 1 `
+    -Label 'ui editable text LG EI Headline mid-size smooth ramp'
+} elseif (-not $uiBundle.Contains($uiEditableTextLgEiHeadlineMidSizeSmoothed)) {
+  throw 'Could not patch UI editable text LG EI Headline mid-size smooth ramp.'
+}
+$uiEditableTextLgEiHeadlineLeadingCurrent = 'function pigmaEditableTextLgEiHeadlineLeadingFormula(t,n){let r=pigmaEditableTextLgEiHeadlineRatio(n),i=Math.max(0,r-1);if(i<=.001)return 0;let a=Math.max(0,t-18),o=pigmaEditableTextLgEiHeadlineSmooth((t-32)/16),s=Math.max(0,t-48),u=i*(.42*Math.min(18,a)*(1-.45*o)+.16*s)+Math.max(0,r-1.25)*(.18*Math.min(32,a)+.08*s);return Math.max(0,we(u))}function pigmaEditableTextLgEiAutoLeadingDelta(t){return -pigmaEditableTextLgEiHeadlineLeadingFormula(t,pigmaEditableTextLgEiHeadlineAutoRatio(t))}function pigmaEditableTextLgEiExactLeadingDelta(t,n){return -pigmaEditableTextLgEiHeadlineLeadingFormula(t,n/t)}'
+$uiEditableTextLgEiHeadlineLeadingLegacy = 'function pigmaEditableTextLgEiHeadlineLeadingFormula(t,n){let r=pigmaEditableTextLgEiHeadlineRatio(n),i=Math.max(0,r-1.21);if(i<=.001)return 0;let a=Math.min(14,Math.max(0,t-18)),o=pigmaEditableTextLgEiHeadlineSmooth((t-32)/16),s=Math.max(0,t-48),u=i*(.75*a*(1-.55*o)+.08*s);return Math.max(0,we(u))}function pigmaEditableTextLgEiAutoLeadingDelta(t){let n=.07*Math.max(0,t-18)+.02*Math.max(0,t-32)-.03*Math.max(0,t-64)+.025*Math.max(0,t-80);return -we(Math.max(0,n))}function pigmaEditableTextLgEiExactLeadingDelta(t,n){return -pigmaEditableTextLgEiHeadlineLeadingFormula(t,n/t)}'
+$uiBundle = $uiBundle.Replace(
+  $uiEditableTextLgEiHeadlineLeadingCurrent + 'function pigmaEditableTextLgEiTextRatio(',
+  'function pigmaEditableTextLgEiTextRatio('
+)
+if ($uiBundle.Contains($uiEditableTextLgEiHeadlineLeadingLegacy)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiEditableTextLgEiHeadlineLeadingLegacy `
+    -Replace $uiEditableTextLgEiHeadlineLeadingCurrent `
+    -ExpectedCount 1 `
+    -Label 'ui editable text LG EI Headline leading formula'
+} elseif (-not $uiBundle.Contains($uiEditableTextLgEiHeadlineLeadingCurrent)) {
+  throw 'Could not patch UI editable text LG EI Headline leading formula.'
 }
 
 if ($uiBundle.Contains($uiBackgroundClipHelperFind)) {
