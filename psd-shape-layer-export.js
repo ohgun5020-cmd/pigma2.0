@@ -1,8 +1,9 @@
 ;(() => {
   // PIGMA_PSD_SHAPE_LAYER_EXPORT::SOURCE_OF_TRUTH
   // Keeps Photoshop shape-layer export gating outside ui.html. The PSD writer
-  // can emit vectorFill/vectorMask layers, but transformed Figma shapes need
-  // to stay as bitmap previews when Photoshop cannot represent the transform.
+  // can emit vectorFill/vectorMask layers. The PSD writer converts exported SVG
+  // paths into Photoshop vector masks, so affine transforms such as rotation and
+  // scale are safe; only degenerate transforms should force bitmap previews.
   // PIGMA_PSD_SHAPE_LAYER_EXPORT::MESSAGE_NORMALIZER
   // PIGMA_PSD_SHAPE_LAYER_EXPORT::PHOTOSHOP_SHAPE_GATE
   // PIGMA_PSD_SHAPE_LAYER_EXPORT::PHOTOSHOP_FIGMA_SHAPE_MAP
@@ -21,7 +22,7 @@
   );
   const VECTOR_SHAPE_TYPE_SET = new Set(Object.keys(FIGMA_TO_PHOTOSHOP_SHAPE_KIND));
   const MAX_SHAPE_SCAN_COUNT = 600;
-  const TRANSFORM_AXIS_EPSILON = 0.001;
+  const TRANSFORM_DETERMINANT_EPSILON = 0.000001;
 
   if (globalScope[PATCH_FLAG]) {
     return;
@@ -180,10 +181,10 @@
         ? node.relativeTransform
         : null;
 
-    return isAxisAlignedTransform(transform);
+    return isFiniteAffineTransform(transform);
   }
 
-  function isAxisAlignedTransform(transform) {
+  function isFiniteAffineTransform(transform) {
     if (
       !Array.isArray(transform) ||
       transform.length < 2 ||
@@ -202,12 +203,7 @@
       return false;
     }
 
-    return (
-      Math.abs(xx) > TRANSFORM_AXIS_EPSILON &&
-      Math.abs(yy) > TRANSFORM_AXIS_EPSILON &&
-      Math.abs(xy) <= TRANSFORM_AXIS_EPSILON &&
-      Math.abs(yx) <= TRANSFORM_AXIS_EPSILON
-    );
+    return Math.abs(xx * yy - xy * yx) > TRANSFORM_DETERMINANT_EPSILON;
   }
 
   function hasExactlyOneVisibleSolidFill(fills) {

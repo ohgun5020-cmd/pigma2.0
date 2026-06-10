@@ -18,7 +18,7 @@
     "createShapeCandidateScanState",
     "isSimplePhotoshopShapeCandidate",
     "isPhotoshopShapeTransformSafe",
-    "isAxisAlignedTransform",
+    "isFiniteAffineTransform",
     "buildFigmaToPhotoshopShapeKindMap",
     "getPhotoshopShapeKindForFigmaType"
   ],
@@ -33,7 +33,8 @@
     "STAR",
     "BOOLEAN_OPERATION",
     "SOLID",
-    "TRANSFORM_AXIS_EPSILON",
+    "TRANSFORM_DETERMINANT_EPSILON",
+    "xx * yy - xy * yx",
     "foundUnsupported",
     "foundSupported"
   ],
@@ -47,12 +48,15 @@
   "requiredBundleSnippets": [
     "function pigmaShouldFlattenTransformedClipContainer(e)",
     "pigmaShouldFlattenTransformedClipContainer(e)",
-    "was flattened because PSD cannot preserve a transformed clipping container as editable child layers."
+    "pigmaBuildTransformedClipSmartObject(e,t,r)",
+    "TRANSFORMED_CLIP_SMART_OBJECT",
+    "was wrapped as a layered smart object because PSD cannot preserve transformed clipping containers directly."
   ],
   "requiredBuildSnippets": [
     "transformed clipping container flatten helper",
     "pigmaShouldFlattenTransformedClipContainer(e)",
-    "was flattened because PSD cannot preserve a transformed clipping container as editable child layers."
+    "pigmaBuildTransformedClipSmartObject(e,t,r)",
+    "was wrapped as a layered smart object because PSD cannot preserve transformed clipping containers directly."
   ],
   "uiFile": "ui.html",
   "requiredUiSnippets": [

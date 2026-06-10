@@ -767,6 +767,130 @@ $bundle = Replace-Exact `
   -ExpectedCount 1 `
   -Label 'safe layered split frame preserve'
 
+$maskGroupSmartObjectExportReplacement = @'
+async function gr(e,t,r=null){
+  let o=[],n=ue(e,t.hiddenLayerMode);
+  for(let i of n){let a=await Mn(i,t,r);a&&o.push(a)}
+  return o
+}
+async function Mn(e,t,r=null){return e.kind==="node"?await ct(e.node,t,r):await In(e,t,r)}
+function pigmaMaskSmartObjectCandidates(e,t){return e.maskedNodes.filter(r=>he(r)&&!(t.hiddenLayerMode==="ignore-hidden"&&!q(r)))}
+function pigmaSmartObjectChildContext(e,t){
+  return{root:e.root,documentBounds:t,totalLeaves:e.totalLeaves,currentLeaf:e.currentLeaf,warnings:e.warnings,editableTextCount:e.editableTextCount,preservedGroupCount:e.preservedGroupCount,hiddenLayerMode:e.hiddenLayerMode,settings:e.settings,backgroundDebug:e.backgroundDebug,rootName:e.rootName,rootIndex:e.rootIndex,rootCount:e.rootCount,lastProgressPostedAt:e.lastProgressPostedAt,longFrameMode:e.longFrameMode}
+}
+function pigmaCommitSmartObjectChildContext(e,t){
+  e.currentLeaf=t.currentLeaf,e.editableTextCount=t.editableTextCount,e.preservedGroupCount=t.preservedGroupCount,e.lastProgressPostedAt=t.lastProgressPostedAt
+}
+function pigmaUnionBounds(e,t){
+  if(!e)return t;
+  if(!t)return e;
+  let r=Math.min(e.x,t.x),o=Math.min(e.y,t.y),n=Math.max(e.x+e.width,t.x+t.width),i=Math.max(e.y+e.height,t.y+t.height);
+  return{x:r,y:o,width:n-r,height:i-o,useAbsoluteBounds:!1}
+}
+function pigmaSmartObjectNodeBounds(e){
+  if(!e)return null;
+  if(Re(e))return ft(e)||v(e);
+  if("absoluteTransform"in e&&"width"in e&&"height"in e){let t=ce(e);if(t)return t}
+  let r=k(e);
+  return r&&r.width>0&&r.height>0?{x:r.x,y:r.y,width:r.width,height:r.height,useAbsoluteBounds:!0}:v(e)
+}
+function pigmaSmartObjectEntryBounds(e){
+  if(!e)return null;
+  if(e.kind==="node")return pigmaSmartObjectNodeBounds(e.node);
+  if(e.kind==="mask"||e.kind==="mask-group"){
+    let t=Lr(e.maskNode,xt(e.maskNode));
+    for(let r of e.maskedNodes)t=pigmaUnionBounds(t,pigmaSmartObjectNodeBounds(r));
+    return t
+  }
+  return pigmaSmartObjectNodeBounds(e)
+}
+function pigmaSmartObjectDocumentBounds(e,t){
+  let r=t;
+  for(let o of e)r=pigmaUnionBounds(r,pigmaSmartObjectEntryBounds(o));
+  return r?{x:r.x,y:r.y,width:r.width,height:r.height,useAbsoluteBounds:!1}:null
+}
+async function pigmaCloneSmartObjectNode(e,t,r){
+  if(!await preloadTreeFontsSafely(e))return null;
+  let o=e.clone();
+  return t.appendChild(o),Vr(e,o,r),o
+}
+async function pigmaCloneSmartObjectEntry(e,t,r){
+  if(!e)return null;
+  if(e.kind==="node"){let o=await pigmaCloneSmartObjectNode(e.node,t,r);return o?{kind:"node",node:o}:null}
+  if(e.kind==="mask"||e.kind==="mask-group"){
+    let o=await pigmaCloneSmartObjectNode(e.maskNode,t,r);
+    if(!o)return null;
+    let n=[];
+    for(let i of e.maskedNodes){let a=await pigmaCloneSmartObjectNode(i,t,r);a&&n.push(a)}
+    return n.length>0?{kind:"mask",maskNode:o,maskedNodes:n}:null
+  }
+  let o=await pigmaCloneSmartObjectNode(e,t,r);
+  return o?{kind:"node",node:o}:null
+}
+async function pigmaBuildSmartObjectDocument(e,t,r){
+  if(!r||!Array.isArray(e)||e.length===0||r.width<=0||r.height<=0)return null;
+  let s=pigmaSmartObjectDocumentBounds(e,r);
+  if(!s)return null;
+  let o=pigmaSmartObjectChildContext(t,s),n=[],i=figma.createFrame();
+  try{
+    i.clipsContent=!1,i.fills=[],i.strokes=[],i.name="__pigma-smart-object-layer-source__",i.resize(Math.max(1,d(s.width)),Math.max(1,d(s.height))),figma.currentPage.appendChild(i),i.x=s.x,i.y=s.y;
+    for(let a of e){let l=await pigmaCloneSmartObjectEntry(a,i,s),u=l&&l.kind?await Mn(l,o,r):l?await ct(l,o,r):null;u&&n.push(u)}
+  }finally{i.removed||i.remove()}
+  return pigmaCommitSmartObjectChildContext(t,o),n.length>0?{width:Math.max(1,d(s.width)),height:Math.max(1,d(s.height)),offsetX:x(r.x-s.x),offsetY:x(r.y-s.y),visibleWidth:Math.max(1,d(r.width)),visibleHeight:Math.max(1,d(r.height)),documentBounds:s,children:n}:null
+}
+async function pigmaBuildTransformedClipMask(e,t){
+  if(!t||t.width<=0||t.height<=0||!("absoluteTransform"in e)||!("width"in e)||!("height"in e))return null;
+  let r=Math.max(1,d(t.width)),o=Math.max(1,d(t.height)),n=figma.createFrame(),i=figma.createRectangle();
+  try{
+    n.clipsContent=!1,n.fills=[],n.strokes=[],n.name="__pigma-smart-object-clip-mask__",n.resize(r,o),figma.currentPage.appendChild(n),n.x=t.x,n.y=t.y;
+    i.name="__pigma-smart-object-clip-shape__",i.fills=[{type:"SOLID",color:{r:1,g:1,b:1},opacity:1}],i.strokes=[],i.resize(Math.max(1,e.width),Math.max(1,e.height));
+    "topLeftRadius"in e&&(i.topLeftRadius=e.topLeftRadius,i.topRightRadius=e.topRightRadius,i.bottomRightRadius=e.bottomRightRadius,i.bottomLeftRadius=e.bottomLeftRadius);
+    n.appendChild(i),Vr(e,i,t);
+    let a=await n.exportAsync({format:"PNG",useAbsoluteBounds:!1});
+    return{kind:"bitmap",mode:"alpha",x:0,y:0,width:r,height:o,pngBytes:a}
+  }catch(a){return null}
+  finally{n.removed||n.remove()}
+}
+async function pigmaBuildMaskSmartObjectNode(e,t,r,o){
+  if(!r||!o||o.length<3||t.longFrameMode)return null;
+  let n=Math.max(1,d(r.width)),i=Math.max(1,d(r.height)),a=await pigmaBuildSmartObjectDocument(o,t,r);
+  if(!a)return null;
+  let s=figma.createFrame();
+  try{
+    s.clipsContent=!0,s.fills=[],s.strokes=[],s.name="__pigma-mask-smart-object__",s.resize(n,i),figma.currentPage.appendChild(s),s.x=x(r.x),s.y=x(r.y);
+    for(let l of o.slice().reverse()){if(!await preloadTreeFontsSafely(l))return null;let u=l.clone();s.appendChild(u),Vr(l,u,r)}
+    let c=await s.exportAsync({format:"PNG",useAbsoluteBounds:!1});
+    return{kind:"bitmap",id:"".concat(e.maskNode.id,":mask-smart-object"),name:"".concat(f(e.maskNode)," Smart Object"),sourceType:"MASK_SMART_OBJECT",opacity:1,visible:!0,blendMode:"normal",effects:null,strokeEffect:null,x:x(r.x-t.documentBounds.x),y:x(r.y-t.documentBounds.y),width:n,height:i,nodeTransform:null,pngBytes:c,smartObject:!0,smartObjectDocument:a}
+  }catch(l){return null}
+  finally{s.removed||s.remove()}
+}
+async function pigmaBuildTransformedClipSmartObject(e,t,r=null){
+  let o=await qn(e,t,r);
+  if(!o||o.kind!=="bitmap")return o;
+  let n={x:x(o.x+t.documentBounds.x),y:x(o.y+t.documentBounds.y),width:o.width,height:o.height,useAbsoluteBounds:!1},i=await pigmaBuildSmartObjectDocument(ue(e,t.hiddenLayerMode),t,n);
+  if(i){
+    let a=await pigmaBuildTransformedClipMask(e,i.documentBounds);
+    a?i.children=[{kind:"group",id:"".concat(e.id,":smart-object-clip-group"),name:f(e),sourceType:"TRANSFORMED_CLIP_CONTAINER",opacity:1,visible:!0,blendMode:"pass through",effects:null,strokeEffect:null,mask:a,children:i.children}]:t.warnings.add("\"".concat(f(e),"\" kept full Smart Object layer geometry, but its internal clipping mask could not be rebuilt."));
+    delete i.documentBounds,o.smartObject=!0,o.smartObjectDocument=i
+  }else t.warnings.add("\"".concat(f(e),"\" was flattened because its transformed clipping container could not build layered Smart Object contents."));
+  return o.id="".concat(e.id,":transformed-clip-smart-object"),o.name=f(e),o.sourceType="TRANSFORMED_CLIP_SMART_OBJECT",o
+}
+async function In(e,t,r=null){
+  var s;let o=(s=Lr(e.maskNode,xt(e.maskNode)))!=null?s:r,n=pigmaMaskSmartObjectCandidates(e,t),i=n.length>=3?await pigmaBuildMaskSmartObjectNode(e,t,o,n):null,a=i?[i]:[];
+  if(!i)for(let l of e.maskedNodes){let u=await ct(l,t,o);u&&a.push(u)}
+  if(a.length===0)return null;
+  let c=await Si(e.maskNode,t);
+  return c?(t.preservedGroupCount+=1,{kind:"group",id:"".concat(e.maskNode.id,":mask-group"),name:f(e.maskNode),sourceType:"MASK_OBJECT",opacity:1,visible:e.maskNode.visible,blendMode:"pass through",effects:null,strokeEffect:null,mask:c,children:a}):(t.warnings.add("\"".concat(f(e.maskNode),"\" could not be reconstructed as a PSD mask.")),null)
+}
+'@
+
+$bundle = Replace-Section `
+  -Text $bundle `
+  -StartMarker 'async function gr(' `
+  -EndMarker 'async function Rn(' `
+  -Replacement $maskGroupSmartObjectExportReplacement `
+  -Label 'mask group smart object export'
+
 # Long-frame and clone-based export helpers can append detached trees that still
 # contain unloaded text fonts. Preload descendant fonts before cloning or
 # reparenting those trees so FrameNode/PageNode.appendChild does not throw.
@@ -1029,7 +1153,8 @@ if ($uiBundle.Contains($uiExportButtonLabelFind)) {
 }
 
 $uiExportCancelClickFind = Convert-JsUnicodeEscapes 'mr.onclick=()=>{let e=nn(),t=Fu();Xi(!0),D.busy=!0,D.statusTone="idle",D.statusMessage=L("PSD \uB9CC\uB4E4\uAE30 \uC900\uBE44 \uC911\uC785\uB2C8\uB2E4."),Ho(),qn({type:"request-export",hiddenLayerMode:e.hiddenLayerMode,settings:e,includeCompositePng:d1(e),developerExportExperiments:t})}'
-$uiExportCancelClickReplace = 'mr.onclick=()=>{if(D.busy){D.exportCancelRequested||(D.exportCancelRequested=!0,D.statusTone="idle",D.statusMessage=L("\uC911\uC9C0 \uC694\uCCAD\uB428. \uD604\uC7AC \uB2E8\uACC4 \uC815\uB9AC \uC911..."),Ho(),qn({type:"request-export-cancel"}));return}let e=nn(),t=Fu();Xi(!0),D.exportCancelRequested=!1,D.exportCancelNoticeShown=!1,D.busy=!0,D.statusTone="idle",D.statusMessage=L("PSD \uB9CC\uB4E4\uAE30 \uC900\uBE44 \uC911\uC785\uB2C8\uB2E4."),Ho(),qn({type:"request-export",hiddenLayerMode:e.hiddenLayerMode,settings:e,includeCompositePng:d1(e),developerExportExperiments:t})}'
+$uiExportCancelClickPreviousReplace = 'mr.onclick=()=>{if(D.busy){D.exportCancelRequested||(D.exportCancelRequested=!0,D.statusTone="idle",D.statusMessage=L("\uC911\uC9C0 \uC694\uCCAD\uB428. \uD604\uC7AC \uB2E8\uACC4 \uC815\uB9AC \uC911..."),Ho(),qn({type:"request-export-cancel"}));return}let e=nn(),t=Fu();Xi(!0),D.exportCancelRequested=!1,D.exportCancelNoticeShown=!1,D.busy=!0,D.statusTone="idle",D.statusMessage=L("PSD \uB9CC\uB4E4\uAE30 \uC900\uBE44 \uC911\uC785\uB2C8\uB2E4."),Ho(),qn({type:"request-export",hiddenLayerMode:e.hiddenLayerMode,settings:e,includeCompositePng:d1(e),developerExportExperiments:t})}'
+$uiExportCancelClickReplace = 'mr.onclick=()=>{if(D.busy){D.exportCancelRequested||(D.exportCancelRequested=!0,D.statusTone="idle",D.statusMessage=L("\uC911\uC9C0 \uC694\uCCAD\uB428. \uD604\uC7AC \uB2E8\uACC4 \uC815\uB9AC \uC911..."),Ho(),qn({type:"request-export-cancel"}));return}let e=nn(),t=Fu();Xi(!0),D.exportCancelRequested=!1,D.exportCancelNoticeShown=!1,D.exportAssemblyFailed=!1,D.busy=!0,D.statusTone="idle",D.statusMessage=L("PSD \uB9CC\uB4E4\uAE30 \uC900\uBE44 \uC911\uC785\uB2C8\uB2E4."),Ho(),qn({type:"request-export",hiddenLayerMode:e.hiddenLayerMode,settings:e,includeCompositePng:d1(e),developerExportExperiments:t})}'
 if ($uiBundle.Contains($uiExportCancelClickFind)) {
   $uiBundle = Replace-Exact `
     -Text $uiBundle `
@@ -1037,14 +1162,22 @@ if ($uiBundle.Contains($uiExportCancelClickFind)) {
     -Replace $uiExportCancelClickReplace `
     -ExpectedCount 1 `
     -Label 'ui PSD cancel click handler'
+} elseif ($uiBundle.Contains($uiExportCancelClickPreviousReplace)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiExportCancelClickPreviousReplace `
+    -Replace $uiExportCancelClickReplace `
+    -ExpectedCount 1 `
+    -Label 'ui PSD cancel click handler assembly reset'
 } elseif ($uiBundle.Contains($uiExportCancelClickReplace)) {
   # Already patched in this UI bundle variant.
 } else {
   throw 'Could not patch UI PSD cancel click handler.'
 }
 
-$uiExportRootCancelFind = 'n.rootCount>1&&(await e1(n,r),br([r])),n.builtFiles.push(r),n.builtFiles.length<n.rootCount&&qn({type:"request-next-export-root"}),D.statusTone="idle",hu();return'
-$uiExportRootCancelReplace = 'n.rootCount>1&&(await e1(n,r),br([r])),n.builtFiles.push(r);if(D.exportCancelRequested){Xi(!0),qn({type:"request-export-cancel"}),D.exportCancelRequested=!1,D.busy=!1,D.activeExportStartedAt=null,D.statusTone="idle",D.statusMessage=L("\u0050\u0053\u0044 \uB9CC\uB4E4\uAE30\uB97C \uCDE8\uC18C\uD588\uC2B5\uB2C8\uB2E4."),D.exportCancelNoticeShown||(D.exportCancelNoticeShown=!0,Bt("info",L("\uB0B4\uBCF4\uB0B4\uAE30 \uCDE8\uC18C"),D.statusMessage)),Le();return}n.builtFiles.length<n.rootCount&&qn({type:"request-next-export-root"}),D.statusTone="idle",hu();return'
+$uiExportRootCancelFind = 'case"export-root-ready":{let n=mh(e.fileName,e.rootCount),r=await om(e.payload,n.rootCount>1,n.includeRasterBundle);n.rootCount>1&&(await e1(n,r),br([r])),n.builtFiles.push(r),n.builtFiles.length<n.rootCount&&qn({type:"request-next-export-root"}),D.statusTone="idle",hu();return}'
+$uiExportRootCancelPreviousReplace = 'case"export-root-ready":{let n=mh(e.fileName,e.rootCount),r=await om(e.payload,n.rootCount>1,n.includeRasterBundle);n.rootCount>1&&(await e1(n,r),br([r])),n.builtFiles.push(r);if(D.exportCancelRequested){Xi(!0),qn({type:"request-export-cancel"}),D.exportCancelRequested=!1,D.busy=!1,D.activeExportStartedAt=null,D.statusTone="idle",D.statusMessage=L("\u0050\u0053\u0044 \uB9CC\uB4E4\uAE30\uB97C \uCDE8\uC18C\uD588\uC2B5\uB2C8\uB2E4."),D.exportCancelNoticeShown||(D.exportCancelNoticeShown=!0,Bt("info",L("\uB0B4\uBCF4\uB0B4\uAE30 \uCDE8\uC18C"),D.statusMessage)),Le();return}n.builtFiles.length<n.rootCount&&qn({type:"request-next-export-root"}),D.statusTone="idle",hu();return}'
+$uiExportRootCancelReplace = 'case"export-root-ready":{let n=mh(e.fileName,e.rootCount),r=null;try{r=await om(e.payload,n.rootCount>1,n.includeRasterBundle),n.rootCount>1&&(await e1(n,r),br([r])),n.builtFiles.push(r)}catch(i){D.exportAssemblyFailed=!0,r&&br([r]),Xi(!0),qn({type:"request-export-cancel"}),D.exportCancelRequested=!1,D.busy=!1,D.activeExportStartedAt=null,D.statusTone="error",D.statusMessage=It(D.locale,i instanceof Error?i.message:L("\uBE0C\uB77C\uC6B0\uC800 \u0055\u0049\uC5D0\uC11C \u0050\u0053\u0044 \uC870\uB9BD\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.")),Bt("error",L("\u0050\u0053\u0044 \uC870\uB9BD \uC2E4\uD328"),D.statusMessage),Le();return}if(D.exportCancelRequested){Xi(!0),qn({type:"request-export-cancel"}),D.exportCancelRequested=!1,D.busy=!1,D.activeExportStartedAt=null,D.statusTone="idle",D.statusMessage=L("\u0050\u0053\u0044 \uB9CC\uB4E4\uAE30\uB97C \uCDE8\uC18C\uD588\uC2B5\uB2C8\uB2E4."),D.exportCancelNoticeShown||(D.exportCancelNoticeShown=!0,Bt("info",L("\uB0B4\uBCF4\uB0B4\uAE30 \uCDE8\uC18C"),D.statusMessage)),Le();return}n.builtFiles.length<n.rootCount&&qn({type:"request-next-export-root"}),D.statusTone="idle",hu();return}'
 if ($uiBundle.Contains($uiExportRootCancelFind)) {
   $uiBundle = Replace-Exact `
     -Text $uiBundle `
@@ -1052,6 +1185,13 @@ if ($uiBundle.Contains($uiExportRootCancelFind)) {
     -Replace $uiExportRootCancelReplace `
     -ExpectedCount 1 `
     -Label 'ui PSD cancel after root build'
+} elseif ($uiBundle.Contains($uiExportRootCancelPreviousReplace)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiExportRootCancelPreviousReplace `
+    -Replace $uiExportRootCancelReplace `
+    -ExpectedCount 1 `
+    -Label 'ui PSD root build error guard'
 } elseif ($uiBundle.Contains($uiExportRootCancelReplace)) {
   # Already patched in this UI bundle variant.
 } else {
@@ -1059,7 +1199,8 @@ if ($uiBundle.Contains($uiExportRootCancelFind)) {
 }
 
 $uiExportFinishedCancelFind = 'case"export-finished":{let n=mh(e.fileName,e.rootCount);yn=null,await t1(e.fileName,n);return}'
-$uiExportFinishedCancelReplace = 'case"export-finished":{let n=mh(e.fileName,e.rootCount);if(D.exportCancelRequested){Xi(!0),qn({type:"request-export-cancel"}),D.exportCancelRequested=!1,D.busy=!1,D.activeExportStartedAt=null,D.statusTone="idle",D.statusMessage=L("\u0050\u0053\u0044 \uB9CC\uB4E4\uAE30\uB97C \uCDE8\uC18C\uD588\uC2B5\uB2C8\uB2E4."),D.exportCancelNoticeShown||(D.exportCancelNoticeShown=!0,Bt("info",L("\uB0B4\uBCF4\uB0B4\uAE30 \uCDE8\uC18C"),D.statusMessage)),Le();return}yn=null,await t1(e.fileName,n);return}'
+$uiExportFinishedCancelPreviousReplace = 'case"export-finished":{let n=mh(e.fileName,e.rootCount);if(D.exportCancelRequested){Xi(!0),qn({type:"request-export-cancel"}),D.exportCancelRequested=!1,D.busy=!1,D.activeExportStartedAt=null,D.statusTone="idle",D.statusMessage=L("\u0050\u0053\u0044 \uB9CC\uB4E4\uAE30\uB97C \uCDE8\uC18C\uD588\uC2B5\uB2C8\uB2E4."),D.exportCancelNoticeShown||(D.exportCancelNoticeShown=!0,Bt("info",L("\uB0B4\uBCF4\uB0B4\uAE30 \uCDE8\uC18C"),D.statusMessage)),Le();return}yn=null,await t1(e.fileName,n);return}'
+$uiExportFinishedCancelReplace = 'case"export-finished":{if(D.exportAssemblyFailed){D.exportAssemblyFailed=!1,Xi(!0);return}let n=mh(e.fileName,e.rootCount);if(D.exportCancelRequested){Xi(!0),qn({type:"request-export-cancel"}),D.exportCancelRequested=!1,D.busy=!1,D.activeExportStartedAt=null,D.statusTone="idle",D.statusMessage=L("\u0050\u0053\u0044 \uB9CC\uB4E4\uAE30\uB97C \uCDE8\uC18C\uD588\uC2B5\uB2C8\uB2E4."),D.exportCancelNoticeShown||(D.exportCancelNoticeShown=!0,Bt("info",L("\uB0B4\uBCF4\uB0B4\uAE30 \uCDE8\uC18C"),D.statusMessage)),Le();return}yn=null,await t1(e.fileName,n);return}'
 if ($uiBundle.Contains($uiExportFinishedCancelFind)) {
   $uiBundle = Replace-Exact `
     -Text $uiBundle `
@@ -1067,6 +1208,13 @@ if ($uiBundle.Contains($uiExportFinishedCancelFind)) {
     -Replace $uiExportFinishedCancelReplace `
     -ExpectedCount 1 `
     -Label 'ui PSD cancel before final bundle'
+} elseif ($uiBundle.Contains($uiExportFinishedCancelPreviousReplace)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiExportFinishedCancelPreviousReplace `
+    -Replace $uiExportFinishedCancelReplace `
+    -ExpectedCount 1 `
+    -Label 'ui PSD final stale assembly guard'
 } elseif ($uiBundle.Contains($uiExportFinishedCancelReplace)) {
   # Already patched in this UI bundle variant.
 } else {
@@ -1074,7 +1222,8 @@ if ($uiBundle.Contains($uiExportFinishedCancelFind)) {
 }
 
 $uiExportErrorCancelFind = Convert-JsUnicodeEscapes 'case"export-error":wu("error"),Xi(!0),D.busy=!1,D.activeExportStartedAt=null,D.statusTone="error",D.statusMessage=It(D.locale,e.message),Bt("error",L("\uB0B4\uBCF4\uB0B4\uAE30 \uC2E4\uD328"),D.statusMessage),Le()'
-$uiExportErrorCancelReplace = 'case"export-error":wu(e.cancelled?"success":"error"),Xi(!0),D.exportCancelRequested=!1,D.busy=!1,D.activeExportStartedAt=null,D.statusTone=e.cancelled?"idle":"error",D.statusMessage=It(D.locale,e.message),e.cancelled?D.exportCancelNoticeShown||(D.exportCancelNoticeShown=!0,Bt("info",L("\uB0B4\uBCF4\uB0B4\uAE30 \uCDE8\uC18C"),D.statusMessage)):Bt("error",L("\uB0B4\uBCF4\uB0B4\uAE30 \uC2E4\uD328"),D.statusMessage),Le()'
+$uiExportErrorCancelPreviousReplace = 'case"export-error":wu(e.cancelled?"success":"error"),Xi(!0),D.exportCancelRequested=!1,D.busy=!1,D.activeExportStartedAt=null,D.statusTone=e.cancelled?"idle":"error",D.statusMessage=It(D.locale,e.message),e.cancelled?D.exportCancelNoticeShown||(D.exportCancelNoticeShown=!0,Bt("info",L("\uB0B4\uBCF4\uB0B4\uAE30 \uCDE8\uC18C"),D.statusMessage)):Bt("error",L("\uB0B4\uBCF4\uB0B4\uAE30 \uC2E4\uD328"),D.statusMessage),Le()'
+$uiExportErrorCancelReplace = 'case"export-error":if(D.exportAssemblyFailed){D.exportAssemblyFailed=!1;return}wu(e.cancelled?"success":"error"),Xi(!0),D.exportCancelRequested=!1,D.busy=!1,D.activeExportStartedAt=null,D.statusTone=e.cancelled?"idle":"error",D.statusMessage=It(D.locale,e.message),e.cancelled?D.exportCancelNoticeShown||(D.exportCancelNoticeShown=!0,Bt("info",L("\uB0B4\uBCF4\uB0B4\uAE30 \uCDE8\uC18C"),D.statusMessage)):Bt("error",L("\uB0B4\uBCF4\uB0B4\uAE30 \uC2E4\uD328"),D.statusMessage),Le()'
 if ($uiBundle.Contains($uiExportErrorCancelFind)) {
   $uiBundle = Replace-Exact `
     -Text $uiBundle `
@@ -1082,6 +1231,13 @@ if ($uiBundle.Contains($uiExportErrorCancelFind)) {
     -Replace $uiExportErrorCancelReplace `
     -ExpectedCount 1 `
     -Label 'ui PSD cancel error result'
+} elseif ($uiBundle.Contains($uiExportErrorCancelPreviousReplace)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiExportErrorCancelPreviousReplace `
+    -Replace $uiExportErrorCancelReplace `
+    -ExpectedCount 1 `
+    -Label 'ui PSD stale assembly export-error guard'
 } elseif ($uiBundle.Contains($uiExportErrorCancelReplace)) {
   # Already patched in this UI bundle variant.
 } else {
@@ -1307,6 +1463,22 @@ $importOpacityUnitFind = 'function xS(e){let t=typeof e.name=="string"?e.name.tr
 $importOpacityUnitReplace = 'function xS(e){let t=typeof e.name=="string"?e.name.trim():"";return t.length>0?t:"Layer"}function dr(e){let t=null;if(Number.isFinite(e))t=Number(e);else if(e&&Number.isFinite(e.value)){t=Number(e.value);let r=typeof e.units=="string"?e.units.toLowerCase():"";r.includes("percent")&&(t=t/100)}return t===null?1:Math.min(1,Math.max(0,t>1?(t<=100?t/100:t/255):t))}function mo(e,t,n)'
 $bitmapLayerNativeEffectsFind = 'let T={name:v.name,left:v.x,top:v.y,opacity:v.opacity,hidden:!v.visible,blendMode:wr(v.blendMode)};if(!(t&&v.kind==="text"))'
 $bitmapLayerNativeEffectsReplace = 'let T={name:v.name,left:v.x,top:v.y,opacity:v.opacity,hidden:!v.visible,blendMode:wr(v.blendMode)};Wn(T,v.effects,v.strokeEffect);if(!(t&&v.kind==="text"))'
+$uiMaskedSmartObjectLayerHelperMarker = 'async function pigmaApplyContainerClipToBackground('
+$uiMaskedSmartObjectLayerHelper = @'
+async function pigmaBuildLayeredSmartObjectFile(e,t,n,r=[]){let i=e&&e.smartObjectDocument;if(!i||!Array.isArray(i.children)||i.children.length===0)return null;let a=Math.max(1,Math.round(Number(i.width)||t.width||1)),o=Math.max(1,Math.round(Number(i.height)||t.height||1)),s=await vm(i.children,n,r.concat(e.name||"Smart Object"),a,o,!1,null);if(s.children.length===0)return null;let u={width:a,height:o,children:s.children};s.linkedFiles.length>0&&(u.linkedFiles=s.linkedFiles);let l=(0,Lh.writePsdUint8Array)(u,{invalidateTextLayers:!1,noBackground:!0,generateThumbnail:!0});return{bytes:l,warnings:s.warnings}}
+function pigmaBuildSmartObjectPreviewCanvas(e,t){let n=e&&e.smartObjectDocument;if(!n)return{canvas:t,offsetX:0,offsetY:0,width:t.width,height:t.height};let r=Math.max(1,Math.round(Number(n.width)||t.width||1)),i=Math.max(1,Math.round(Number(n.height)||t.height||1)),a=Math.max(0,Math.round(Number(n.offsetX)||0)),o=Math.max(0,Math.round(Number(n.offsetY)||0));if(r===t.width&&i===t.height&&a===0&&o===0)return{canvas:t,offsetX:0,offsetY:0,width:t.width,height:t.height};let s=it(r,i,"smart object preview"),u=s.getContext("2d");if(!u)throw new Error("Unable to create a 2D canvas for a Smart Object preview.");return u.drawImage(t,a,o),{canvas:s,offsetX:a,offsetY:o,width:r,height:i}}
+async function pigmaBuildRasterSmartObjectLayer(e,t,n,r=[]){let i=tn(),a=tn(),o=pigmaBuildSmartObjectPreviewCanvas(e,t),s=await l1(o.canvas),u=await pigmaBuildLayeredSmartObjectFile(e,t,n,r),l=u?Du(i,"".concat(qo(e.name||"masked-smart-object"),".psd"),u.bytes):Du(i,"".concat(qo(e.name||"masked-smart-object"),".png"),s);u&&(l.type="8BPS",l.creator="8BIM");let c=e.x-o.offsetX,f=e.y-o.offsetY,d=o.width,p=o.height,h={name:e.name,left:c,top:f,right:c+d,bottom:f+p,opacity:e.opacity,hidden:!e.visible,blendMode:wr(e.blendMode),canvas:o.canvas,placedLayer:{id:i,placed:a,type:"raster",comp:qi,compInfo:Zo(),transform:[c,f,c+d,f,c+d,f+p,c,f+p],width:d,height:p,resolution:{value:72,units:"Density"}}};return Wn(h,e.effects,e.strokeEffect),{layer:h,linkedFiles:[l],warnings:u?u.warnings:[]}}
+'@
+$uiMaskedSmartObjectLayerHelperLegacy = @'
+async function pigmaBuildRasterSmartObjectLayer(e,t){let n=tn(),r=tn(),i=await l1(t),a=e.x,o=e.y,s=e.width,u=e.height,l={name:e.name,left:a,top:o,right:a+s,bottom:o+u,opacity:e.opacity,hidden:!e.visible,blendMode:wr(e.blendMode),canvas:t,placedLayer:{id:n,placed:r,type:"raster",comp:qi,compInfo:Zo(),transform:[a,o,a+s,o,a+s,o+u,a,o+u],width:t.width,height:t.height,resolution:{value:72,units:"Density"}}};return Wn(l,e.effects,e.strokeEffect),{layer:l,linkedFiles:[Du(n,"".concat(qo(e.name||"masked-smart-object"),".png"),i)],warnings:[]}}
+'@
+$uiMaskedSmartObjectLayerHelperPreviousLayered = @'
+async function pigmaBuildLayeredSmartObjectFile(e,t,n,r=[]){let i=e&&e.smartObjectDocument;if(!i||!Array.isArray(i.children)||i.children.length===0)return null;let a=Math.max(1,Math.round(Number(i.width)||t.width||1)),o=Math.max(1,Math.round(Number(i.height)||t.height||1)),s=await vm(i.children,n,r.concat(e.name||"Smart Object"),a,o,!1,null);if(s.children.length===0)return null;let u={width:a,height:o,children:s.children};s.linkedFiles.length>0&&(u.linkedFiles=s.linkedFiles);let l=(0,Lh.writePsdUint8Array)(u,{invalidateTextLayers:!1,noBackground:!0,generateThumbnail:!0});return{bytes:l,warnings:s.warnings}}
+async function pigmaBuildRasterSmartObjectLayer(e,t,n,r=[]){let i=tn(),a=tn(),o=await l1(t),s=await pigmaBuildLayeredSmartObjectFile(e,t,n,r),u=s?Du(i,"".concat(qo(e.name||"masked-smart-object"),".psd"),s.bytes):Du(i,"".concat(qo(e.name||"masked-smart-object"),".png"),o);s&&(u.type="8BPS",u.creator="8BIM");let l=e.x,c=e.y,f=e.width,d=e.height,p={name:e.name,left:l,top:c,right:l+f,bottom:c+d,opacity:e.opacity,hidden:!e.visible,blendMode:wr(e.blendMode),canvas:t,placedLayer:{id:i,placed:a,type:"raster",comp:qi,compInfo:Zo(),transform:[l,c,l+f,c,l+f,c+d,l,c+d],width:t.width,height:t.height,resolution:{value:72,units:"Density"}}};return Wn(p,e.effects,e.strokeEffect),{layer:p,linkedFiles:[u],warnings:s?s.warnings:[]}}
+'@
+$uiMaskedSmartObjectBitmapFind = 'let b=cu(Ki(v.effects),d),P=Sh(v,d),y=t&&v.kind==="text",F=!t||v.kind!=="text"||y||!!b||P?await Xn(v.pngBytes):null,k=F&&v.kind==="text"?x1(v,F):F;if(du(b)){'
+$uiMaskedSmartObjectBitmapReplace = 'let b=cu(Ki(v.effects),d),P=Sh(v,d),y=t&&v.kind==="text",F=!t||v.kind!=="text"||y||!!b||P?await Xn(v.pngBytes):null,k=F&&v.kind==="text"?x1(v,F):F;if(v.smartObject===!0){if(!k)throw new Error("Raster smart object export requires a decoded preview canvas.");let M=await pigmaBuildRasterSmartObjectLayer(v,k,t,n);s.push(M.layer),u.push(...M.linkedFiles),c.push(...M.warnings),m();continue}if(du(b)){'
+$uiMaskedSmartObjectBitmapLegacyReplace = 'let b=cu(Ki(v.effects),d),P=Sh(v,d),y=t&&v.kind==="text",F=!t||v.kind!=="text"||y||!!b||P?await Xn(v.pngBytes):null,k=F&&v.kind==="text"?x1(v,F):F;if(v.smartObject===!0){if(!k)throw new Error("Raster smart object export requires a decoded preview canvas.");let M=await pigmaBuildRasterSmartObjectLayer(v,k);s.push(M.layer),u.push(...M.linkedFiles),c.push(...M.warnings),m();continue}if(du(b)){'
 $preserveMultiShadowFind = 'function V1(e,t){let n={scale:100},r=!1,i=e?$1(e):Tm(),a=H1(t),o=i.dropShadow.map(c=>Ph(c)).filter(Boolean),s=i.innerShadow.map(c=>Ph(c)).filter(Boolean),u=i.outerGlow.map(c=>tw(c)).filter(Boolean),l=i.innerGlow.map(c=>nw(c)).filter(Boolean);return o.length>0&&(n.dropShadow=o,r=!0),s.length>0&&(n.innerShadow=s,r=!0),u.length>0&&(n.outerGlow=u[0],r=!0),l.length>0&&(n.innerGlow=l[0],r=!0),a&&(n.stroke=[a],r=!0),r?n:null}'
 $preserveMultiShadowReplace = 'function V1(e,t){let n={scale:100},r=!1,i=e?$1(e):Tm(),a=H1(t),o=pigmaNativeShadowStack(i.dropShadow),s=pigmaNativeShadowStack(i.innerShadow),u=i.outerGlow.map(c=>tw(c)).filter(Boolean),l=i.innerGlow.map(c=>nw(c)).filter(Boolean);return o.length>0&&(n.dropShadow=o,r=!0),s.length>0&&(n.innerShadow=s,r=!0),u.length>0&&(n.outerGlow=u[0],r=!0),l.length>0&&(n.innerGlow=l[0],r=!0),a&&(n.stroke=[a],r=!0),r?n:null}'
 $shadowMergeAntiCancelFind = 'function pigmaMergeNativeShadowStack(e){let t=0,n=0,r=0,i=0,a=0,o=0,s=0,u=0,l=0,c=e[0];for(let f of e){let d=ae(typeof f.opacity=="number"?f.opacity:1,0,1),p=pigmaEffectUnitValue(f.size,0),h=pigmaEffectUnitValue(f.distance,0),g=Math.max(.001,d*(1+p+h)),v=pigmaNativeShadowOffset(f),m=f.color||{r:0,g:0,b:0};t+=v.x*g,n+=v.y*g,r+=g,i=Math.max(i,p),a=Math.max(a,pigmaEffectUnitValue(f.choke,0)),o+=d,s+=m.r*d,u+=m.g*d,l+=m.b*d}let d=ae(o,0,1),p=o>0?{r:jn(s/o),g:jn(u/o),b:jn(l/o)}:c.color,h=r>0?t/r:0,g=r>0?n/r:0,v=Math.hypot(h,g);return Object.assign({},c,{color:p,opacity:d,angle:rw(h,g),distance:wn(v),size:wn(i),choke:wn(a),useGlobalLight:!1})}'
@@ -1816,6 +1988,11 @@ $uiNativeShapeBeforeBitmapFind = 'async function aw(e,t,n,r,i,a=null){if(i.force
 $uiNativeShapeBeforeBitmapReplace = 'async function aw(e,t,n,r,i,a=null){let pigmaNativeShapeCandidate=e.strategy==="shape"&&e.fill&&gw(e.svgString,e.width,e.height);if(i.forceBitmapVectorPreview&&!pigmaNativeShapeCandidate){let f=await Xn(e.pngBytes);return{layer:ku(e,f,e.x+e.previewOffsetX,e.y+e.previewOffsetY,null),linkedFiles:[],warnings:[]}}let o=await ow(e),s=o.canvas,u=pigmaNativeShapeCandidate,l=cu(Ki(e.effects),i),c=e.previewOffsetX!==0||e.previewOffsetY!==0||o.visibleWidth!==e.width||o.visibleHeight!==e.height;if(du(l)){'
 $uiNativeShapeSizeGuardFind = 'function gw(e,t,n){if(t>512||n>512||t*n>18e4)return!1;'
 $uiNativeShapeSizeGuardReplace = 'function gw(e,t,n){if(t<=0||n<=0)return!1;'
+$uiNativeShapeTransformGuardFind = 'function gw(e,t,n){if(t<=0||n<=0)return!1;let i=new DOMParser().parseFromString(e,"image/svg+xml");if(i.querySelector("parsererror"))return!1;let a=i.documentElement;if(a.tagName.toLowerCase()!=="svg")return!1;let o=Array.from(a.querySelectorAll("*")).filter(u=>{let l=u.tagName.toLowerCase();return l!=="defs"&&l!=="title"&&l!=="desc"});if(o.length===0||o.length>6)return!1;let s=0;for(let u of o){let l=u.tagName.toLowerCase();if(l!=="path"&&l!=="rect"&&l!=="ellipse"&&l!=="circle"||u.hasAttribute("transform"))return!1;if(l==="path"){let c=u.getAttribute("d")||"";if(!c||/[Aa]/.test(c))return!1;let f=c.match(/[MmLlHhVvCcSsQqTtZz]/g)||[];if(s+=f.length,f.length>40)return!1}else if(l==="ellipse"||l==="circle")try{Zm(u)}catch(c){return!1}}return s<=60}'
+$uiNativeShapeTransformGuardPreviousReplace = 'function pigmaSvgTransformIsNativeShapeSafe(e){if(!e||e.trim().length===0)return!0;let t=e.trim(),n=/([a-zA-Z]+)\(([^)]*)\)/g,r,i=0,a=!1;for(;(r=n.exec(t));){if(t.slice(i,r.index).trim().length>0)return!1;let o=r[1].toLowerCase(),s=qm(r[2]);if(o==="matrix"){if(s.length!==6)return!1}else if(o==="translate"||o==="scale"){if(s.length<1||s.length>2)return!1}else return!1;i=n.lastIndex,a=!0}return a&&t.slice(i).trim().length===0}function gw(e,t,n){if(t<=0||n<=0)return!1;let i=new DOMParser().parseFromString(e,"image/svg+xml");if(i.querySelector("parsererror"))return!1;let a=i.documentElement;if(a.tagName.toLowerCase()!=="svg")return!1;let o=Array.from(a.querySelectorAll("*")).filter(u=>{let l=u.tagName.toLowerCase();return l!=="defs"&&l!=="title"&&l!=="desc"});if(o.length===0||o.length>6)return!1;let s=0;for(let u of o){let l=u.tagName.toLowerCase();if(l!=="path"&&l!=="rect"&&l!=="ellipse"&&l!=="circle")return!1;if(!pigmaSvgTransformIsNativeShapeSafe(u.getAttribute("transform")))return!1;if(l==="path"){let c=u.getAttribute("d")||"";if(!c||/[Aa]/.test(c))return!1;let f=c.match(/[MmLlHhVvCcSsQqTtZz]/g)||[];if(s+=f.length,f.length>40)return!1}else if(l==="ellipse"||l==="circle")try{Zm(u)}catch(c){return!1}}return s<=60}'
+$uiNativeShapeTransformGuardReplace = 'function pigmaSvgTransformIsNativeShapeSafe(e){if(!e||e.trim().length===0)return!0;let t=e.trim(),n=/([a-zA-Z]+)\(([^)]*)\)/g,r,i=0,a=!1;for(;(r=n.exec(t));){if(t.slice(i,r.index).trim().length>0)return!1;let o=r[1].toLowerCase(),s=qm(r[2]);if(o==="matrix"){if(s.length!==6)return!1}else if(o==="translate"||o==="scale"){if(s.length<1||s.length>2)return!1}else if(o==="rotate"){if(s.length!==1&&s.length!==3)return!1}else return!1;i=n.lastIndex,a=!0}return a&&t.slice(i).trim().length===0}function pigmaSvgElementIsNativeShapeSafe(e,t){let n=e.tagName.toLowerCase();if(n==="defs"||n==="title"||n==="desc"||n==="metadata"||n==="style")return!0;if(!pigmaSvgTransformIsNativeShapeSafe(e.getAttribute("transform")))return!1;if(n==="svg"||n==="g"){for(let r of Array.from(e.children))if(!pigmaSvgElementIsNativeShapeSafe(r,t))return!1;return!0}if(n!=="path"&&n!=="rect"&&n!=="ellipse"&&n!=="circle")return!1;if(t.count+=1,t.count>6)return!1;if(n==="path"){let r=e.getAttribute("d")||"";if(!r||/[Aa]/.test(r))return!1;let i=r.match(/[MmLlHhVvCcSsQqTtZz]/g)||[];return t.commands+=i.length,!(i.length>40||t.commands>60)}else if(n==="ellipse"||n==="circle")try{Zm(e)}catch(r){return!1}return!0}function gw(e,t,n){if(t<=0||n<=0)return!1;let r=new DOMParser().parseFromString(e,"image/svg+xml");if(r.querySelector("parsererror"))return!1;let i=r.documentElement;if(i.tagName.toLowerCase()!=="svg")return!1;let a={count:0,commands:0};return pigmaSvgElementIsNativeShapeSafe(i,a)&&a.count>0&&a.count<=6&&a.commands<=60}'
+$uiNativeShapeTransformParserFind = 'function ww(e,t){var n,r,i,a,o;switch(e){case"matrix":if(t.length!==6)throw new Error("Invalid SVG matrix() transform.");return{a:t[0],b:t[1],c:t[2],d:t[3],e:t[4],f:t[5]};case"translate":return{a:1,b:0,c:0,d:1,e:(n=t[0])!=null?n:0,f:(r=t[1])!=null?r:0};case"scale":return{a:(i=t[0])!=null?i:1,b:0,c:0,d:(o=(a=t[1])!=null?a:t[0])!=null?o:1,e:0,f:0};default:throw new Error("Unsupported SVG transform: ".concat(e,"()."))}}'
+$uiNativeShapeTransformParserReplace = 'function pigmaSvgTransformTranslate(e,t){return{a:1,b:0,c:0,d:1,e:e,f:t}}function pigmaSvgTransformRotate(e,t,n){let r=e*Math.PI/180,i=Math.cos(r),a=Math.sin(r),o={a:i,b:a,c:-a,d:i,e:0,f:0};return Number.isFinite(t)&&Number.isFinite(n)?Mu(Mu(pigmaSvgTransformTranslate(t,n),o),pigmaSvgTransformTranslate(-t,-n)):o}function ww(e,t){var n,r,i,a,o;switch(e){case"matrix":if(t.length!==6)throw new Error("Invalid SVG matrix() transform.");return{a:t[0],b:t[1],c:t[2],d:t[3],e:t[4],f:t[5]};case"translate":return{a:1,b:0,c:0,d:1,e:(n=t[0])!=null?n:0,f:(r=t[1])!=null?r:0};case"scale":return{a:(i=t[0])!=null?i:1,b:0,c:0,d:(o=(a=t[1])!=null?a:t[0])!=null?o:1,e:0,f:0};case"rotate":if(t.length!==1&&t.length!==3)throw new Error("Invalid SVG rotate() transform.");return pigmaSvgTransformRotate(t[0],t[1],t[2]);default:throw new Error("Unsupported SVG transform: ".concat(e,"()."))}}'
 $uiNativeShapePreviewAlignmentFind = 'if(e.strategy==="shape"&&!l&&e.fill&&!c&&u)try{let f=Sh(e,i),d=sw(e,f?s:null,t,n),p=f?await bt(e,d,s,i,a):{layer:d,linkedFiles:[],warnings:[]};return{layer:p.layer,linkedFiles:p.linkedFiles,warnings:p.warnings}}catch(f){}'
 $uiNativeShapePreviewAlignmentReplace = 'if(e.strategy==="shape"&&!l&&e.fill&&u)try{let f=Sh(e,i),d=sw(e,f?s:null,t,n),p=f?await bt(e,d,s,i,a):{layer:d,linkedFiles:[],warnings:[]};return{layer:p.layer,linkedFiles:p.linkedFiles,warnings:p.warnings}}catch(f){}'
 if ($uiBundle.Contains($uiColorDodgeShapeOpacityFind)) {
@@ -1921,6 +2098,39 @@ if ($uiBundle.Contains($uiNativeShapeSizeGuardFind)) {
   # Already patched in this UI bundle variant.
 } else {
   throw 'Could not patch UI native Photoshop shape size guard.'
+}
+
+if ($uiBundle.Contains($uiNativeShapeTransformGuardFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiNativeShapeTransformGuardFind `
+    -Replace $uiNativeShapeTransformGuardReplace `
+    -ExpectedCount 1 `
+    -Label 'ui native Photoshop shape SVG transform guard'
+} elseif ($uiBundle.Contains($uiNativeShapeTransformGuardPreviousReplace)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiNativeShapeTransformGuardPreviousReplace `
+    -Replace $uiNativeShapeTransformGuardReplace `
+    -ExpectedCount 1 `
+    -Label 'ui native Photoshop shape SVG group transform guard'
+} elseif ($uiBundle.Contains($uiNativeShapeTransformGuardReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI native Photoshop shape SVG transform guard.'
+}
+
+if ($uiBundle.Contains($uiNativeShapeTransformParserFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiNativeShapeTransformParserFind `
+    -Replace $uiNativeShapeTransformParserReplace `
+    -ExpectedCount 1 `
+    -Label 'ui native Photoshop shape SVG rotate transform parser'
+} elseif ($uiBundle.Contains($uiNativeShapeTransformParserReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI native Photoshop shape SVG transform parser.'
 }
 
 if ($uiBundle.Contains($uiNativeShapePreviewAlignmentFind)) {
@@ -2712,6 +2922,55 @@ if ($uiBundle.Contains($uiBackgroundClipHelperFind)) {
   throw 'Could not patch UI PSD background clipping helper.'
 }
 
+if ($uiBundle.Contains($uiMaskedSmartObjectLayerHelperLegacy)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiMaskedSmartObjectLayerHelperLegacy `
+    -Replace $uiMaskedSmartObjectLayerHelper `
+    -ExpectedCount 1 `
+    -Label 'ui PSD masked smart object layered helper'
+} elseif ($uiBundle.Contains($uiMaskedSmartObjectLayerHelperPreviousLayered)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiMaskedSmartObjectLayerHelperPreviousLayered `
+    -Replace $uiMaskedSmartObjectLayerHelper `
+    -ExpectedCount 1 `
+    -Label 'ui PSD masked smart object padded preview helper'
+} elseif ($uiBundle.Contains('async function pigmaBuildLayeredSmartObjectFile(')) {
+  # Already patched in this UI bundle variant.
+} elseif (-not $uiBundle.Contains('async function pigmaBuildRasterSmartObjectLayer(')) {
+  if ($uiBundle.Contains($uiMaskedSmartObjectLayerHelperMarker)) {
+    $uiBundle = Replace-Exact `
+      -Text $uiBundle `
+      -Find $uiMaskedSmartObjectLayerHelperMarker `
+      -Replace ($uiMaskedSmartObjectLayerHelper + "`n" + $uiMaskedSmartObjectLayerHelperMarker) `
+      -ExpectedCount 1 `
+      -Label 'ui PSD masked smart object layer helper'
+  } else {
+    throw 'Could not patch UI PSD masked smart object layer helper.'
+  }
+}
+
+if ($uiBundle.Contains($uiMaskedSmartObjectBitmapFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiMaskedSmartObjectBitmapFind `
+    -Replace $uiMaskedSmartObjectBitmapReplace `
+    -ExpectedCount 1 `
+    -Label 'ui PSD masked bitmap smart object path'
+} elseif ($uiBundle.Contains($uiMaskedSmartObjectBitmapLegacyReplace)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiMaskedSmartObjectBitmapLegacyReplace `
+    -Replace $uiMaskedSmartObjectBitmapReplace `
+    -ExpectedCount 1 `
+    -Label 'ui PSD masked bitmap layered smart object path'
+} elseif ($uiBundle.Contains($uiMaskedSmartObjectBitmapReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI PSD masked bitmap smart object path.'
+}
+
 $uiBackgroundClipSmartObjectBaseFind = 'async function pigmaApplyContainerClipToBackground(e,t=0,n=0){let r={applied:!1,linkedFiles:[],warnings:[]};if(!Array.isArray(e)||e.length<2)return r;let i=pigmaFindContainerClipBaseIndex(e);if(i<0)return r;let a=e[i];if(pigmaIsLayerGroup(a)){let o=await pigmaBuildClipBaseSmartObject(a,t,n);if(!o){r.warnings.push("\"".concat(Su(a&&a.name?a.name:"clip base"),"\" stayed as a group, so Pigma skipped automatic clipping masks for this container to avoid hiding clipped layers in Photoshop."));return r}e[i]=o.layer,r.linkedFiles.push(...o.linkedFiles),r.warnings.push(...o.warnings)}for(let o=i+1;o<e.length;o+=1){let s=e[o];if(s&&typeof s=="object"){s.clipping=!0,r.applied=!0}}return r}'
 $uiBackgroundClipSmartObjectBaseReplace = 'async function pigmaApplyContainerClipToBackground(e,t=0,n=0){let r={applied:!1,linkedFiles:[],warnings:[]};if(!Array.isArray(e)||e.length<2)return r;let i=pigmaFindContainerClipBaseIndex(e);if(i<0)return r;let a=e[i];if(pigmaIsLayerGroup(a)){let l=await pigmaBuildClipBaseSmartObject(a,t,n);if(!l){r.warnings.push("\"".concat(Su(a&&a.name?a.name:"clip base"),"\" stayed as a group, so Pigma skipped automatic clipping masks for this container to avoid hiding clipped layers in Photoshop."));return r}e[i]=l.layer,r.linkedFiles.push(...l.linkedFiles),r.warnings.push(...l.warnings)}let o=e.findIndex(pigmaIsBackgroundClipBaseLayer),s=o>=0&&o<i?o:i;for(let l=s+1;l<e.length;l+=1){let u=e[l];if(u&&typeof u=="object"){u.clipping=!0,r.applied=!0}}return r}'
 if ($uiBundle.Contains($uiBackgroundClipSmartObjectBaseFind)) {
@@ -2952,6 +3211,8 @@ $bundle = Replace-Exact `
 
 $shapeNativeSizeGuardFind = 'function gw(e,t,n){if(t>512||n>512||t*n>18e4)return!1;'
 $shapeNativeSizeGuardReplace = 'function gw(e,t,n){if(t<=0||n<=0)return!1;'
+$shapeNativeTransformGuardFind = $uiNativeShapeTransformGuardFind
+$shapeNativeTransformGuardReplace = $uiNativeShapeTransformGuardReplace
 if ($bundle.Contains($shapeNativeSizeGuardFind)) {
   $bundle = Replace-Exact `
     -Text $bundle `
@@ -2963,6 +3224,39 @@ if ($bundle.Contains($shapeNativeSizeGuardFind)) {
   # Already patched in this bundle variant.
 } else {
   # Native shape size gate is owned by the externalized UI in this bundle variant.
+}
+
+if ($bundle.Contains($shapeNativeTransformGuardFind)) {
+  $bundle = Replace-Exact `
+    -Text $bundle `
+    -Find $shapeNativeTransformGuardFind `
+    -Replace $shapeNativeTransformGuardReplace `
+    -ExpectedCount 1 `
+    -Label 'native Photoshop shape SVG transform guard'
+} elseif ($bundle.Contains($uiNativeShapeTransformGuardPreviousReplace)) {
+  $bundle = Replace-Exact `
+    -Text $bundle `
+    -Find $uiNativeShapeTransformGuardPreviousReplace `
+    -Replace $shapeNativeTransformGuardReplace `
+    -ExpectedCount 1 `
+    -Label 'native Photoshop shape SVG group transform guard'
+} elseif ($bundle.Contains($shapeNativeTransformGuardReplace)) {
+  # Already patched in this bundle variant.
+} else {
+  # Native shape transform gate is owned by the externalized UI in this bundle variant.
+}
+
+if ($bundle.Contains($uiNativeShapeTransformParserFind)) {
+  $bundle = Replace-Exact `
+    -Text $bundle `
+    -Find $uiNativeShapeTransformParserFind `
+    -Replace $uiNativeShapeTransformParserReplace `
+    -ExpectedCount 1 `
+    -Label 'native Photoshop shape SVG rotate transform parser'
+} elseif ($bundle.Contains($uiNativeShapeTransformParserReplace)) {
+  # Already patched in this bundle variant.
+} else {
+  # Native shape transform parser is owned by the externalized UI in this bundle variant.
 }
 
 $shapeVectorPreviewFind = 'if(e.strategy==="shape"&&!l&&e.fill&&!c&&u)try{let f=sw(e,s,t,n),d=await bt(e,f,s,i,a);return{layer:d.layer,linkedFiles:d.linkedFiles,warnings:d.warnings}}catch(f){}'
@@ -3141,7 +3435,7 @@ $bundle = Replace-Section `
   -Text $bundle `
   -StartMarker 'async function ct(' `
   -EndMarker 'async function Cn(' `
-  -Replacement 'async function ct(e,t,r=null){var i,a,s;if(t.hiddenLayerMode==="ignore-hidden"&&!q(e))return null;if(pigmaShouldFlattenTransformedClipContainer(e)){t.warnings.add("\"".concat(f(e),"\" was flattened because PSD cannot preserve a transformed clipping container as editable child layers."));return await qn(e,t,r)}let o=e.type==="TEXT"?await Hn(e):null;if(o&&!o.ok)return t.warnings.add(o.reason),await Cn(e,t);let n=Fe(e);if(n==="group"){let l=e,u=await gr(l,t,(i=Ut(l))!=null?i:r);if(u.length>0)return t.preservedGroupCount+=1,{kind:"group",id:e.id,name:f(e),sourceType:e.type,opacity:j(e),visible:e.visible,blendMode:K(e),effects:null,strokeEffect:null,mask:containerMask(l,t.documentBounds,t.root),children:u}}if(n==="split"){let l=await kn(e,t,(a=Ut(e))!=null?a:r);if(l)return t.preservedGroupCount+=1,l;let u=await gr(e,t,r);if(u.length>0)return t.warnings.add("\"".concat(f(e),"\" could not separate its background cleanly, so it preserved the child layers without a synthetic background.")),t.preservedGroupCount+=1,{kind:"group",id:e.id,name:f(e),sourceType:e.type,opacity:j(e),visible:e.visible,blendMode:K(e),effects:null,strokeEffect:null,mask:containerMask(e,t.documentBounds,t.root),children:u};t.warnings.add("\"".concat(f(e),"\" could not separate its background cleanly, so it was flattened."))}if(progressiveBlurShouldRasterize(L(e,t.root)))return await qn(e,t,r);if(e.type==="TEXT"&&t.settings.textExportMode!=="rasterize-text"){let l=await Gn(e,t,r);if(l)return _(l.effects)||(t.editableTextCount+=1),l}if(Re(e)){let l=(s=ft(e))!=null?s:v(e),u=!t.longFrameMode?await pigmaExportMultiFillGroup(e,t,r,l):null;if(u)return t.preservedGroupCount+=1,u;if(t.longFrameMode&&!!l&&Ne(d(l.width),d(l.height),!1))t.warnings.add(jo(f(e)));else{let c=await Jn(e,t);if(c)return c;t.warnings.add("\"".concat(f(e),"\" could not keep its SVG/vector data, so it fell back to a bitmap layer."))}}if(V(e)&&e.children.length>0){let l=L(e);_(l)?t.warnings.add(Mr(e,"past")):ze(e)?t.warnings.add(Ir(e,"past")):$e(l)?t.warnings.add(Rr(e,"past")):Pt(l)?t.warnings.add(Ar(e,"past")):t.warnings.add(Br(e,"past"))}return await qn(e,t,r)}' `
+  -Replacement 'async function ct(e,t,r=null){var i,a,s;if(t.hiddenLayerMode==="ignore-hidden"&&!q(e))return null;if(pigmaShouldFlattenTransformedClipContainer(e)){t.warnings.add("\"".concat(f(e),"\" was wrapped as a layered smart object because PSD cannot preserve transformed clipping containers directly."));return await pigmaBuildTransformedClipSmartObject(e,t,r)}let o=e.type==="TEXT"?await Hn(e):null;if(o&&!o.ok)return t.warnings.add(o.reason),await Cn(e,t);let n=Fe(e);if(n==="group"){let l=e,u=await gr(l,t,(i=Ut(l))!=null?i:r);if(u.length>0)return t.preservedGroupCount+=1,{kind:"group",id:e.id,name:f(e),sourceType:e.type,opacity:j(e),visible:e.visible,blendMode:K(e),effects:null,strokeEffect:null,mask:containerMask(l,t.documentBounds,t.root),children:u}}if(n==="split"){let l=await kn(e,t,(a=Ut(e))!=null?a:r);if(l)return t.preservedGroupCount+=1,l;let u=await gr(e,t,r);if(u.length>0)return t.warnings.add("\"".concat(f(e),"\" could not separate its background cleanly, so it preserved the child layers without a synthetic background.")),t.preservedGroupCount+=1,{kind:"group",id:e.id,name:f(e),sourceType:e.type,opacity:j(e),visible:e.visible,blendMode:K(e),effects:null,strokeEffect:null,mask:containerMask(e,t.documentBounds,t.root),children:u};t.warnings.add("\"".concat(f(e),"\" could not separate its background cleanly, so it was flattened."))}if(progressiveBlurShouldRasterize(L(e,t.root)))return await qn(e,t,r);if(e.type==="TEXT"&&t.settings.textExportMode!=="rasterize-text"){let l=await Gn(e,t,r);if(l)return _(l.effects)||(t.editableTextCount+=1),l}if(Re(e)){let l=(s=ft(e))!=null?s:v(e),u=!t.longFrameMode?await pigmaExportMultiFillGroup(e,t,r,l):null;if(u)return t.preservedGroupCount+=1,u;if(t.longFrameMode&&!!l&&Ne(d(l.width),d(l.height),!1))t.warnings.add(jo(f(e)));else{let c=await Jn(e,t);if(c)return c;t.warnings.add("\"".concat(f(e),"\" could not keep its SVG/vector data, so it fell back to a bitmap layer."))}}if(V(e)&&e.children.length>0){let l=L(e);_(l)?t.warnings.add(Mr(e,"past")):ze(e)?t.warnings.add(Ir(e,"past")):$e(l)?t.warnings.add(Rr(e,"past")):Pt(l)?t.warnings.add(Ar(e,"past")):t.warnings.add(Br(e,"past"))}return await qn(e,t,r)}' `
   -Label 'multi-fill group preempts vector export'
 
 $importPatch = [System.IO.File]::ReadAllText($patch, [System.Text.Encoding]::UTF8)
