@@ -348,6 +348,10 @@ node -c code.patched.js
   - Scope: moved translate, translate fallback, and typo-clear refresh callbacks to `window.__PIGMA_AI_CORRECTION_TAB_WATCHER__`. Mirrored the typo audit/fix source blocks in `ui-ai-correction.js` so the source notes do not drift further.
   - Verification: `ui.html` inline script parse, `node -c ui-ai-correction.js`, `build-patched-main.ps1`, `verify-figma-runtime-syntax.js`, `verify-externalized-ui.js code.patched.js`, and `node -c code.patched.js` passed.
   - Follow-up: remaining `data-ai-correction-tab` observer text should be either inactive/commented legacy code or local fallback branches guarded by the shared watcher.
+- 2026-06-11 follow-up: guarded active AI correction tab observers with verifier coverage.
+  - Reason: the retired/hidden Design Assist UI still created its own active `data-ai-correction-tab` observer.
+  - Scope: moved Design Assist refresh onto `window.__PIGMA_AI_CORRECTION_TAB_WATCHER__` with the same local fallback pattern, and tightened `verify-ui-source-boundary.js` so active tab observers must be either the shared watcher definition or a guarded fallback.
+  - Verification: `verify-ui-source-boundary.js` now reports the active shared watcher/fallback counts.
 - 2026-05-19 step 5: added cooperative yielding to the read-only design-read tree scan.
   - Reason: `ai-design-read.js` scans every selected descendant synchronously before optional AI enrichment.
   - Scope: made `analyzeCurrentSelection()` async, yielded every 80 scanned nodes, and posted scan progress every 240 nodes without changing the analysis result schema.

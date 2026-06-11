@@ -16,6 +16,11 @@ const failures = [];
 const uiSource = readRequired(uiFile);
 const mirrorSource = readRequired(mirrorFile);
 const manifest = readJsonRequired(manifestFile);
+const tabObserverStats = {
+  uiShared: 0,
+  uiFallback: 0,
+  mirrorFallback: 0,
+};
 
 if (manifest.ui !== uiFile) {
   fail(`manifest.json must keep "${uiFile}" as the live UI source, found "${manifest.ui || ""}".`);
@@ -51,7 +56,7 @@ for (const tag of scriptTags) {
 }
 
 verifyClassicScript(mirrorSource, mirrorFile);
-verifyTabWatcherBoundary();
+verifyTabWatcherBoundary(scriptTags);
 
 if (failures.length) {
   console.error("UI source boundary verification failed:");
@@ -62,7 +67,7 @@ if (failures.length) {
 }
 
 console.log(
-  `Verified UI source boundary: ${inlineScriptCount} inline scripts, ${externalScriptCount} external UI scripts, ${mirrorFile} kept as mirror.`
+  `Verified UI source boundary: ${inlineScriptCount} inline scripts, ${externalScriptCount} external UI scripts, ${tabObserverStats.uiShared} shared tab watcher, ${tabObserverStats.uiFallback} UI tab fallback observers, ${tabObserverStats.mirrorFallback} mirror tab fallback observers.`
 );
 
 function readRequired(file) {
@@ -182,7 +187,7 @@ function verifyMirrorBoundary() {
   }
 }
 
-function verifyTabWatcherBoundary() {
+function verifyTabWatcherBoundary(scriptTags) {
   const assignmentMatches = uiSource.match(/window\.__PIGMA_AI_CORRECTION_TAB_WATCHER__\s*=\s*\{/g) || [];
   if (assignmentMatches.length !== 1) {
     fail(`${uiFile} should define window.__PIGMA_AI_CORRECTION_TAB_WATCHER__ exactly once; found ${assignmentMatches.length}.`);
@@ -191,6 +196,166 @@ function verifyTabWatcherBoundary() {
   if (uiSource.indexOf("subscribe: (callback)") < 0) {
     fail(`${uiFile} shared AI correction tab watcher must expose subscribe(callback).`);
   }
+
+  const uiStats = verifyTabAttributeObservers(
+    uiFile,
+    scriptTags
+      .filter((tag) => !getAttribute(tag.attrs || "", "src") && isJavaScriptType(getScriptType(tag.attrs || "")))
+      .map((tag) => ({ body: tag.body, startLine: tag.startLine })),
+    true
+  );
+  const mirrorStats = verifyTabAttributeObservers(
+    mirrorFile,
+    [{ body: mirrorSource, startLine: 1 }],
+    false
+  );
+
+  tabObserverStats.uiShared = uiStats.shared;
+  tabObserverStats.uiFallback = uiStats.fallback;
+  tabObserverStats.mirrorFallback = mirrorStats.fallback;
+
+  if (uiStats.shared !== 1) {
+    fail(`${uiFile} should have exactly one active shared data-ai-correction-tab observer; found ${uiStats.shared}.`);
+  }
+}
+
+function verifyTabAttributeObservers(file, scripts, allowSharedDefinition) {
+  const stats = {
+    shared: 0,
+    fallback: 0,
+  };
+  const filterRegex = /attributeFilter\s*:\s*\[\s*["']data-ai-correction-tab["']\s*\]/g;
+
+  for (const script of scripts) {
+    const activeSource = stripJavaScriptComments(script.body || "");
+    let match;
+    while ((match = filterRegex.exec(activeSource))) {
+      if (isInsideDeadUiBlock(script.body || "", match.index)) {
+        continue;
+      }
+
+      const line = script.startLine + lineNumberAt(activeSource, match.index) - 1;
+      const before = activeSource.slice(Math.max(0, match.index - 1000), match.index);
+      const after = activeSource.slice(match.index, Math.min(activeSource.length, match.index + 800));
+      const scriptHasSharedDefinition =
+        allowSharedDefinition &&
+        activeSource.indexOf("const callbacks = new Set()") >= 0 &&
+        activeSource.indexOf("window.__PIGMA_AI_CORRECTION_TAB_WATCHER__ = {") >= 0;
+      const isFallbackObserver =
+        before.indexOf("window.__PIGMA_AI_CORRECTION_TAB_WATCHER__") >= 0 &&
+        before.indexOf(".subscribe") >= 0 &&
+        before.indexOf("} else {") >= 0;
+
+      if (scriptHasSharedDefinition) {
+        stats.shared += 1;
+        continue;
+      }
+
+      if (isFallbackObserver) {
+        stats.fallback += 1;
+        continue;
+      }
+
+      fail(
+        `${file}:${line} observes data-ai-correction-tab outside the shared watcher/fallback path. Route active refreshes through window.__PIGMA_AI_CORRECTION_TAB_WATCHER__.subscribe(...).`
+      );
+
+      if (after.indexOf("rootObserver.observe") < 0 && before.indexOf("rootObserver.observe") < 0) {
+        fail(`${file}:${line} has a data-ai-correction-tab attributeFilter without a nearby observer.observe call.`);
+      }
+    }
+  }
+
+  return stats;
+}
+
+function isInsideDeadUiBlock(source, index) {
+  const marker = source.lastIndexOf("PIGMA_DEAD_UI_BLOCK", index);
+  if (marker < 0) {
+    return false;
+  }
+
+  const commentStart = source.lastIndexOf("/*", marker);
+  if (commentStart < 0 || commentStart > index) {
+    return false;
+  }
+
+  const commentEnd = source.indexOf("*/", commentStart + 2);
+  return commentEnd < 0 || commentEnd > index;
+}
+
+function stripJavaScriptComments(source) {
+  let result = "";
+  let quote = "";
+  let escaped = false;
+  let lineComment = false;
+  let blockComment = false;
+
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+    const next = source[index + 1] || "";
+
+    if (lineComment) {
+      if (char === "\n") {
+        lineComment = false;
+        result += char;
+      } else {
+        result += " ";
+      }
+      continue;
+    }
+
+    if (blockComment) {
+      if (char === "*" && next === "/") {
+        result += "  ";
+        index += 1;
+        blockComment = false;
+      } else {
+        result += char === "\n" ? "\n" : " ";
+      }
+      continue;
+    }
+
+    if (quote) {
+      result += char;
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (char === quote) {
+        quote = "";
+      }
+      continue;
+    }
+
+    if (char === "\"" || char === "'" || char === "`") {
+      quote = char;
+      result += char;
+      continue;
+    }
+
+    if (char === "/" && next === "/") {
+      result += "  ";
+      index += 1;
+      lineComment = true;
+      continue;
+    }
+
+    if (char === "/" && next === "*") {
+      result += "  ";
+      index += 1;
+      blockComment = true;
+      continue;
+    }
+
+    result += char;
+  }
+
+  return result;
 }
 
 function lineNumberAt(source, index) {

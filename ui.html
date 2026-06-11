@@ -19796,16 +19796,27 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
           }
         });
 
-        const rootObserver = new MutationObserver(() => {
-          if (rootElement.dataset.aiCorrectionTab === "active") {
-            requestCachedAssist();
-          }
-        });
+        if (
+          window.__PIGMA_AI_CORRECTION_TAB_WATCHER__ &&
+          typeof window.__PIGMA_AI_CORRECTION_TAB_WATCHER__.subscribe === "function"
+        ) {
+          window.__PIGMA_AI_CORRECTION_TAB_WATCHER__.subscribe((active) => {
+            if (active) {
+              requestCachedAssist();
+            }
+          });
+        } else {
+          const rootObserver = new MutationObserver(() => {
+            if (rootElement.dataset.aiCorrectionTab === "active") {
+              requestCachedAssist();
+            }
+          });
 
-        rootObserver.observe(rootElement, {
-          attributes: true,
-          attributeFilter: ["data-ai-correction-tab"],
-        });
+          rootObserver.observe(rootElement, {
+            attributes: true,
+            attributeFilter: ["data-ai-correction-tab"],
+          });
+        }
 
         window.addEventListener("message", (event) => {
           const message = event.data?.pluginMessage;
