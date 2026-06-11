@@ -57,7 +57,7 @@ for (const tag of scriptTags) {
 
 verifyClassicScript(mirrorSource, mirrorFile);
 verifyTabWatcherBoundary(scriptTags);
-verifyRetiredImageUpscaleBoundary();
+verifyRemovedImageUpscaleBoundary();
 
 if (failures.length) {
   console.error("UI source boundary verification failed:");
@@ -220,53 +220,31 @@ function verifyTabWatcherBoundary(scriptTags) {
   }
 }
 
-function verifyRetiredImageUpscaleBoundary() {
-  const requiredFlags = [
-    "window.__PIGMA_AI_IMAGE_UPSCALE_RETIRED__ = true;",
-    "window.__PIGMA_AI_CORRECTION_IMAGE_UPSCALE__ = true;",
-    "window.__PIGMA_AI_CORRECTION_IMAGE_UPSCALE_OBJECT__ = true;",
-    "window.__PIGMA_AI_IMAGE_UPSCALE_PERSON_V2__ = true;",
-    "window.__PIGMA_AI_IMAGE_UPSCALE_OBJECT_V2__ = true;",
-  ];
-
-  for (const flag of requiredFlags) {
-    if (uiSource.indexOf(flag) < 0) {
-      fail(`${uiFile} is missing retired image-upscale guard: ${flag}`);
-    }
-  }
-
+function verifyRemovedImageUpscaleBoundary() {
   if (uiSource.indexOf("window.__PIGMA_AI_IMAGE_UPSCALE_SHARED__ = {") < 0) {
-    fail(`${uiFile} must keep the shared image bridge while direct upscale UI is retired.`);
+    fail(`${uiFile} must keep the shared image bridge after direct image-upscale UI removal.`);
   }
 
-  verifyRetiredButtonMarkup("aiImageUpscaleButton");
-  verifyRetiredButtonMarkup("aiImageUpscaleObjectButton");
-
-  const retiredGateEntries = [
-    '["aiImageUpscaleButton", "any"]',
-    '["aiImageUpscaleObjectButton", "any"]',
-    '["image-upscale", "any"]',
-    '["image-upscale-object", "any"]',
+  const removedUiMarkers = [
+    "aiImageUpscaleButton",
+    "aiImageUpscaleObjectButton",
+    'data-ai-action="image-upscale"',
+    'data-ai-action="image-upscale-object"',
+    '"image-upscale":',
+    '"image-upscale-object":',
+    '["image-upscale",',
+    '["image-upscale-object",',
+    "__PIGMA_AI_IMAGE_UPSCALE_RETIRED__",
+    "__PIGMA_AI_CORRECTION_IMAGE_UPSCALE__",
+    "__PIGMA_AI_CORRECTION_IMAGE_UPSCALE_OBJECT__",
+    "__PIGMA_AI_IMAGE_UPSCALE_PERSON_V2__",
+    "__PIGMA_AI_IMAGE_UPSCALE_OBJECT_V2__",
   ];
 
-  for (const entry of retiredGateEntries) {
-    if (uiSource.indexOf(entry) >= 0) {
-      fail(`${uiFile} must not include retired image-upscale action in AI API gating maps: ${entry}`);
+  for (const marker of removedUiMarkers) {
+    if (uiSource.indexOf(marker) >= 0) {
+      fail(`${uiFile} still contains removed direct image-upscale UI marker: ${marker}`);
     }
-  }
-}
-
-function verifyRetiredButtonMarkup(buttonId) {
-  const marker = `id="${buttonId}"`;
-  const index = uiSource.indexOf(marker);
-  if (index < 0) {
-    fail(`${uiFile} is missing retired image-upscale button marker: ${buttonId}`);
-    return;
-  }
-
-  const snippet = uiSource.slice(Math.max(0, index - 300), Math.min(uiSource.length, index + 500));
-  if (snippet.indexOf("hidden") < 0 || snippet.indexOf('data-ai-retired="true"') < 0) {
-    fail(`${uiFile} retired image-upscale button must stay hidden and marked data-ai-retired: ${buttonId}`);
   }
 }
 
