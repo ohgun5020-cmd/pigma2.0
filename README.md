@@ -261,7 +261,7 @@ Current stabilization target: keep the plugin alive while reducing the hidden co
 - `ai-design-chat.js` is appended after the main patch array, so it becomes the top-level message wrapper. Its pass-through behavior is especially sensitive.
 - `ui.html` is the live UI source. `ui-ai-correction.js` still contains similar AI correction logic and should be treated as a mirror/cleanup target until the source-of-truth boundary is simplified.
 - Multiple UI modules observe `data-ai-correction-tab`; tab changes can fan out into several cache requests and state refreshes.
-- Direct scan currently finds no UI-to-plugin message type without a matching plugin-side handler.
+- Automated message checks now cover handler pass-through and direct UI-to-runtime message type coverage via `verify-message-handler-pass-through.js` and `verify-ui-runtime-message-types.js`.
 - Design Assist is retired for now. Keep the disabled UI stub only where other UI modules still call `window.__PIGMA_AI_DESIGN_ASSIST__`; do not reintroduce plugin runtime messages unless the feature is deliberately revived with a real handler.
 - The visible UI does not expose design-read/accessibility as a normal user action. `aiReadDesignButton` is hidden/debug-only; `ai-accessibility-diagnosis.js` remains bundled for compatibility, while `ai-design-read.js` is inactive legacy source.
 - Use the active menu map below before choosing manual tests. A source file is not a manual-test target unless a visible button or active runtime path reaches it.
