@@ -316,6 +316,7 @@ Manual testing rule: test the visible action changed in the current step first. 
 .\build-patched-main.ps1
 node verify-figma-runtime-syntax.js
 node verify-message-handler-pass-through.js
+node verify-ui-runtime-message-types.js
 node verify-externalized-ui.js code.patched.js
 node -c code.patched.js
 ```
@@ -521,6 +522,7 @@ When `ui.html` changes, also run a browser-script parse check with `new Function
    - `node verify-psd-export-boundary.js`
    - `node verify-figma-runtime-syntax.js`
    - `node verify-message-handler-pass-through.js`
+   - `node verify-ui-runtime-message-types.js`
    - `node -c code.patched.js`
    - Run a `ui.html` script parse check as well whenever AI correction UI scripts changed.
 5. Load `manifest.json` as the local plugin entry in Figma.
