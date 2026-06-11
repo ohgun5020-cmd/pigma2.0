@@ -14,6 +14,8 @@
     "getTextHighlightParagraphSpacing",
     "getTextHighlightParagraphSpacingValue",
     "shouldPreserveTextHighlightMeasuredRowCenter",
+    "getSafeEstimatedTextHighlightSelectionBounds",
+    "buildTextHighlightSoftWrappedSelectionRowsFromPrefixDiff",
     "findTextHighlightSourceRangeInNode",
     "findClosestTextHighlightSourceTextIndex",
     "buildTextHighlightNormalizedIndexMap",
@@ -26,6 +28,7 @@
     "getTextHighlightMinimumSelectionWidthRatio",
     "getEstimatedTextHighlightSoftLineOffsetBefore",
     "getEstimatedTextHighlightSoftLineIndexForSelection",
+    "isTextHighlightMeasuredSelectionCoveredByLineRows",
     "isPlausibleSoftWrappedTextHighlightSelectionRows",
     "tightenTextHighlightBoxBoundsToVisualRows",
     "buildTextHighlightBoxVisualRowHeight",
@@ -103,6 +106,11 @@
     "return calibrateEstimatedTextHighlightLayoutWidth(",
     "const previousSoftLineOffsetY = getEstimatedTextHighlightSoftLineOffsetBefore(",
     "getTextHighlightParagraphSpacing(node)",
+    "for (let softLineIndex = 0; softLineIndex < softLines.length; softLineIndex += 1)",
+    "selectedEndInLine <= selectedStartInLine",
+    "return getSafeEstimatedTextHighlightSelectionBounds(node, estimatedRows, selectionText, size, resolvedLineHeight);",
+    "const softWrappedRows = buildTextHighlightSoftWrappedSelectionRowsFromPrefixDiff(",
+    "rows.length > 1",
     "const wrapTolerance = Math.max(0.75, getTextHighlightMetricFontSize(fontSize) * 0.1);",
     "nextLineWidth > widthLimit + wrapTolerance",
     "nextTrimmedLineWidth > widthLimit + wrapTolerance",
@@ -112,11 +120,15 @@
     "const ratio = getTextHighlightMinimumSelectionWidthRatio(compactSelectedText, size, alignment);",
     "let usedEstimatedSelectionFallback = false;",
     "const estimatedSelectionBoundsList = buildEstimatedAlignmentSensitiveTextHighlightSelectionBounds(",
+    "const safeLeftSelectedRows = getSafeEstimatedTextHighlightSelectionBounds(",
+    "for (const selectedRow of safeLeftSelectedRows)",
+    "const safeRows = getSafeEstimatedTextHighlightSelectionBounds(",
+    "const safeEstimatedRows = getSafeEstimatedTextHighlightSelectionBounds(",
     "usedEstimatedSelectionFallback = true;",
     "if (!usedAlignmentSensitiveFallback && !usedEstimatedSelectionFallback)",
     "hasUnderwideTextHighlightSelectionRows(\n        boundsList,",
     "if (!safeEstimatedSelectionBoundsList.length)",
-    "return safeRows.length ? safeRows : estimatedRows;",
+    "return safeRows.length ? safeRows : safeEstimatedRows;",
     "const tokenTrimmedWidth = estimateTextHighlightLayoutInlineWidth(token.text.replace(/\\s+$/g, \"\"), fontSize);",
     "const extraTargetHeight = Math.max(0, localHeight - naturalLocalHeight);",
     "return character === \"\\n\" || character === \"\\r\" || character === \"\\u2028\" || character === \"\\u2029\";"
@@ -142,6 +154,7 @@
   ],
   "forbiddenUiSnippets": [
     "Math.max(12, Number(currentSource && currentSource.fontSize) || 16)",
+    "Math.max(8, Number(payload && payload.fontSize) || 16)",
     "Math.max(12, Number(fontSize) || 16)"
   ],
   "requiredOrderedSnippets": [
@@ -205,8 +218,15 @@
     ],
     [
       "const estimatedRows = buildEstimatedAlignmentSensitiveTextHighlightSelectionBounds(",
+      "const safeLeftSelectedRows = getSafeEstimatedTextHighlightSelectionBounds(",
+      "for (const selectedRow of safeLeftSelectedRows)",
+      "const safeEstimatedRows = getSafeEstimatedTextHighlightSelectionBounds(",
+      "return safeRows.length ? safeRows : safeEstimatedRows;"
+    ],
+    [
+      "const estimatedRows = buildEstimatedAlignmentSensitiveTextHighlightSelectionBounds(",
       "return estimatedRows;",
-      "return safeRows.length ? safeRows : estimatedRows;"
+      "const safeLeftSelectedRows = getSafeEstimatedTextHighlightSelectionBounds("
     ],
     [
       "async function runTextHighlightLine(message)",

@@ -8,7 +8,7 @@
   const AI_DESIGN_READ_CACHE_KEY = "pigma:ai-design-read-cache:v1";
   const AI_PIXEL_PERFECT_CACHE_KEY = "pigma:ai-pixel-perfect-cache:v1";
   const AI_PIXEL_PERFECT_CLEAR_CACHE_KEY = "pigma:ai-pixel-perfect-clear-cache:v1";
-  const PATCH_VERSION = 5;
+  const PATCH_VERSION = 7;
   const RESULT_PREVIEW_LIMIT = 80;
   const VALUE_EPSILON = 0.0001;
   const PIXEL_SCAN_YIELD_INTERVAL = 60;
@@ -234,14 +234,14 @@
     await waitForNextTick();
     const designReadResult = await readDesignReadCache();
     const context = buildRunContext(selection, designReadResult);
-    postStatus("running", "선택한 레이어에서 소수 좌표/크기 후보를 찾는 중입니다.");
+    postStatus("running", "선택한 레이어에서 소수 좌표/크기/텍스트 크기/오토레이아웃 후보를 찾는 중입니다.");
     await waitForNextTick();
     const collection = await collectPixelCandidates(selection, (scannedNodeCount, candidateCount) => {
-      postStatus("running", `레이어 ${scannedNodeCount}개 스캔 중... 좌표/크기 후보 ${candidateCount}건`);
+      postStatus("running", `레이어 ${scannedNodeCount}개 스캔 중... 좌표/크기/텍스트 크기/오토레이아웃 후보 ${candidateCount}건`);
     });
 
     if (!collection.candidates.length) {
-      postStatus("running", `레이어 ${collection.scannedNodeCount || 0}개 확인 완료. 교정할 소수 좌표/크기 후보가 없습니다.`);
+      postStatus("running", `레이어 ${collection.scannedNodeCount || 0}개 확인 완료. 교정할 소수 좌표/크기/텍스트 크기/오토레이아웃 후보가 없습니다.`);
       await waitForNextTick();
       return buildPixelPerfectResult({
         selection,
@@ -267,7 +267,7 @@
 
     postStatus(
       "running",
-      `레이어 ${collection.scannedNodeCount || 0}개에서 좌표/크기 후보 ${collection.candidates.length}건을 찾았습니다.`
+      `레이어 ${collection.scannedNodeCount || 0}개에서 좌표/크기/텍스트 크기/오토레이아웃 후보 ${collection.candidates.length}건을 찾았습니다.`
     );
     await waitForNextTick();
     const aiDecisionSummary = await requestAiDecisions(collection.candidates, context);
@@ -278,7 +278,7 @@
     let processedPlanCount = 0;
     const shouldReportApplyProgress = plans.length > 40;
 
-    postStatus("running", `정수 좌표/크기 ${plans.length}건을 적용 중입니다.`);
+    postStatus("running", `정수 좌표/크기/텍스트 크기/오토레이아웃 ${plans.length}건을 적용 중입니다.`);
 
     for (const plan of plans) {
       try {
@@ -296,7 +296,7 @@
         processedPlanCount % PIXEL_APPLY_YIELD_INTERVAL === 0 ||
         (shouldReportApplyProgress && processedPlanCount === plans.length)
       ) {
-        postStatus("running", `정수 좌표/크기 적용 중... ${processedPlanCount}/${plans.length}`);
+        postStatus("running", `정수 좌표/크기/텍스트 크기/오토레이아웃 적용 중... ${processedPlanCount}/${plans.length}`);
         await waitForNextTick();
       }
     }
@@ -409,7 +409,7 @@
         aiStatusLabel: aiSummary.aiStatusLabel || "로컬 규칙",
         aiProviderLabel: aiSummary.aiProviderLabel || "",
         aiModelLabel: aiSummary.aiModelLabel || "",
-        reviewStrategy: aiSummary.reviewStrategy || "소수 좌표/크기만 최근접 정수로 스냅",
+        reviewStrategy: aiSummary.reviewStrategy || "소수 좌표/크기/텍스트 크기/오토레이아웃 간격·패딩만 최근접 정수로 스냅",
         modeLabel: annotationSummary.modeLabel || "Result only",
         categoryLabel: annotationSummary.categoryLabel || "",
       },
@@ -582,6 +582,11 @@
         category: "size",
       });
     }
+
+    collectTextCandidates(node, nodeName, nodeType, candidates, excluded, {
+      includeTextSpacing: false,
+    });
+    collectAutoLayoutCandidates(node, nodeName, nodeType, candidates, excluded);
   }
 
   function collectAutoLayoutCandidates(node, nodeName, nodeType, candidates, excluded) {
@@ -769,7 +774,7 @@
     }
   }
 
-  function collectTextCandidates(node, nodeName, nodeType, candidates, excluded) {
+  function collectTextCandidates(node, nodeName, nodeType, candidates, excluded, options) {
     if (!node || node.type !== "TEXT") {
       return;
     }
@@ -789,6 +794,10 @@
         textField: "fontSize",
       },
     });
+
+    if (!options || options.includeTextSpacing !== true) {
+      return;
+    }
 
     const lineHeight = getTextMetricDescriptor(node.lineHeight);
     maybeAddCandidate({
@@ -948,7 +957,10 @@
       aiModelLabel: "",
       aiDecisionCount: 0,
       fallbackDecisionCount: candidateCount,
-      reviewStrategy: candidateCount > 0 ? "소수 좌표/크기만 최근접 정수로 스냅" : "좌표/크기 보정 대상 없음",
+      reviewStrategy:
+        candidateCount > 0
+          ? "소수 좌표/크기/텍스트 크기/오토레이아웃 간격·패딩만 최근접 정수로 스냅"
+          : "좌표/크기/텍스트 크기/오토레이아웃 보정 대상 없음",
       decisionMap: new Map(),
     };
   }
@@ -1654,7 +1666,7 @@
   async function readCachedResult() {
     try {
       const value = await figma.clientStorage.getAsync(AI_PIXEL_PERFECT_CACHE_KEY);
-      return value && typeof value === "object" ? value : null;
+      return isCurrentPixelPerfectCache(value) ? value : null;
     } catch (error) {
       return null;
     }
@@ -1663,10 +1675,14 @@
   async function readCachedClearResult() {
     try {
       const value = await figma.clientStorage.getAsync(AI_PIXEL_PERFECT_CLEAR_CACHE_KEY);
-      return value && typeof value === "object" ? value : null;
+      return isCurrentPixelPerfectCache(value) ? value : null;
     } catch (error) {
       return null;
     }
+  }
+
+  function isCurrentPixelPerfectCache(value) {
+    return !!value && typeof value === "object" && value.version === PATCH_VERSION;
   }
 
   async function writeCachedResult(result) {

@@ -266,7 +266,7 @@ Current stabilization target: keep the plugin alive while reducing the hidden co
 - The visible UI does not expose design-read/accessibility as a normal user action. `aiReadDesignButton` is hidden/debug-only; `ai-accessibility-diagnosis.js` remains bundled for compatibility, while `ai-design-read.js` is inactive legacy source.
 - Use the active menu map below before choosing manual tests. A source file is not a manual-test target unless a visible button or active runtime path reaches it.
 - Long-running risk is highest around repeated `exportAsync` calls in `ai-image-upscale.js`, then full-tree scans in bundled AI correction features such as accessibility compatibility, design consistency, typo, and pixel-perfect features.
-- Pixel-perfect default correction scope should remain `x`, `y`, `width`, and `height` only. Broader style snapping belongs in a separate feature.
+- Pixel-perfect default correction scope is `x`, `y`, `width`, `height`, `fontSize`, and auto-layout spacing/padding only. Broader style snapping belongs in a separate feature.
 
 #### Active menu map
 

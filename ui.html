@@ -23345,7 +23345,8 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
           const probeY = Number(payload && payload.probeY) || 0;
           const scaleX = probeWidth / bitmap.width;
           const scaleY = probeHeight / bitmap.height;
-          const fontSize = Math.max(8, Number(payload && payload.fontSize) || 16);
+          const rawFontSize = Number(payload && payload.fontSize);
+          const fontSize = Number.isFinite(rawFontSize) && rawFontSize > 0 ? rawFontSize : 16;
           const lineHeight = Math.max(fontSize, Number(payload && payload.lineHeight) || fontSize * 1.2);
           const maxRowSolidPixelCount = rowSolidPixelCounts.reduce(
             (currentMax, value) => Math.max(currentMax, Number(value) || 0),

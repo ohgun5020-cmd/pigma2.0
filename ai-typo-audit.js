@@ -6965,11 +6965,12 @@
         lineHeight,
         selectedText
       );
-      const alignment = getTextHighlightHorizontalAlignment(node);
-      const safeEstimatedSelectionBoundsList = sortTextHighlightBoundsList(estimatedSelectionBoundsList).filter(
-        (row) =>
-          !hasOverwideTextHighlightSelectionRows([row], selectedText, fontSize, lineHeight) &&
-          !hasUnderwideTextHighlightSelectionRows([row], selectedText, fontSize, alignment)
+      const safeEstimatedSelectionBoundsList = getSafeEstimatedTextHighlightSelectionBounds(
+        node,
+        estimatedSelectionBoundsList,
+        selectedText,
+        fontSize,
+        lineHeight
       );
       if (safeEstimatedSelectionBoundsList.length) {
         boundsList = safeEstimatedSelectionBoundsList;
@@ -7065,11 +7066,12 @@
         lineHeight,
         selectedText
       );
-      const alignment = getTextHighlightHorizontalAlignment(node);
-      const safeEstimatedSelectionBoundsList = sortTextHighlightBoundsList(estimatedSelectionBoundsList).filter(
-        (row) =>
-          !hasOverwideTextHighlightSelectionRows([row], selectedText, fontSize, lineHeight) &&
-          !hasUnderwideTextHighlightSelectionRows([row], selectedText, fontSize, alignment)
+      const safeEstimatedSelectionBoundsList = getSafeEstimatedTextHighlightSelectionBounds(
+        node,
+        estimatedSelectionBoundsList,
+        selectedText,
+        fontSize,
+        lineHeight
       );
       if (!safeEstimatedSelectionBoundsList.length) {
         throw new Error("Could not safely measure the selected text highlight range.");
@@ -8128,46 +8130,9 @@
       return [];
     }
 
-    const selectionMidpoint = (localSelectionStart + localSelectionEnd) / 2;
-    let softLineIndex = softLines.findIndex(
-      (line) => selectionMidpoint >= line.start && selectionMidpoint <= Math.max(line.start, line.end)
-    );
-    if (softLineIndex < 0) {
-      softLineIndex = softLines.findIndex(
-        (line) => localSelectionStart >= line.start && localSelectionStart <= Math.max(line.start, line.end)
-      );
-    }
-    if (softLineIndex < 0) {
-      return [];
-    }
-
-    const softLine = softLines[softLineIndex];
-    const selectedStartInLine = Math.max(softLine.start, Math.min(softLine.end, localSelectionStart));
-    const selectedEndInLine = Math.max(selectedStartInLine, Math.min(softLine.end, localSelectionEnd));
-    const selectedLineText = hardLineText.slice(selectedStartInLine, selectedEndInLine) || selectionText;
-    if (!compactText(selectedLineText)) {
-      return [];
-    }
-
     const size = getTextHighlightMetricFontSize(fontSize);
     const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
     const metrics = buildTextHighlightBoxGlyphMetrics(size, resolvedLineHeight);
-    const lineWidth = Math.max(
-      getTextHighlightMinimumWidth(size),
-      Math.min(layoutLocalBounds.width, softLine.width)
-    );
-    const prefixWidth = Math.max(
-      0,
-      Math.min(lineWidth, estimateTextHighlightLayoutInlineWidth(hardLineText.slice(softLine.start, selectedStartInLine), size))
-    );
-    const selectedWidth = Math.max(
-      getTextHighlightMinimumWidth(size),
-      Math.min(layoutLocalBounds.width - prefixWidth, estimateTextHighlightLayoutInlineWidth(selectedLineText, size))
-    );
-    if (!(selectedWidth > 0)) {
-      return [];
-    }
-
     const previousSoftLineOffsetY = getEstimatedTextHighlightSoftLineOffsetBefore(
       characters,
       hardLineRange.start,
@@ -8176,38 +8141,94 @@
       resolvedLineHeight,
       getTextHighlightParagraphSpacing(node)
     );
-    const lineLocalX =
-      alignment === "RIGHT"
-        ? layoutLocalBounds.x + Math.max(0, layoutLocalBounds.width - lineWidth)
-        : alignment === "CENTER"
-          ? layoutLocalBounds.x + Math.max(0, (layoutLocalBounds.width - lineWidth) / 2)
-          : layoutLocalBounds.x;
-    const localBounds = {
-      x: roundTextHighlightMetric(lineLocalX + prefixWidth),
-      y: roundTextHighlightMetric(
-        layoutLocalBounds.y +
-          previousSoftLineOffsetY +
-          softLineIndex * resolvedLineHeight +
-          Math.max(0, (resolvedLineHeight - metrics.height) / 2)
-      ),
-      width: roundTextHighlightMetric(selectedWidth),
-      height: metrics.height,
-    };
-    const worldBounds = normalizeTextHighlightWorldBounds(
-      getTextHighlightWorldBoundsFromLocalBounds(node, localBounds)
+    const estimatedRows = [];
+
+    for (let softLineIndex = 0; softLineIndex < softLines.length; softLineIndex += 1) {
+      const softLine = softLines[softLineIndex];
+      const selectedStartInLine = Math.max(softLine.start, Math.min(softLine.end, localSelectionStart));
+      const selectedEndInLine = Math.max(selectedStartInLine, Math.min(softLine.end, localSelectionEnd));
+      if (selectedEndInLine <= selectedStartInLine) {
+        continue;
+      }
+
+      const selectedLineText = hardLineText.slice(selectedStartInLine, selectedEndInLine);
+      if (!compactText(selectedLineText)) {
+        continue;
+      }
+
+      const lineWidth = Math.max(
+        getTextHighlightMinimumWidth(size),
+        Math.min(layoutLocalBounds.width, softLine.width)
+      );
+      const prefixWidth = Math.max(
+        0,
+        Math.min(
+          lineWidth,
+          estimateTextHighlightLayoutInlineWidth(hardLineText.slice(softLine.start, selectedStartInLine), size)
+        )
+      );
+      const selectedWidth = Math.max(
+        getTextHighlightMinimumWidth(size),
+        Math.min(layoutLocalBounds.width - prefixWidth, estimateTextHighlightLayoutInlineWidth(selectedLineText, size))
+      );
+      if (!(selectedWidth > 0)) {
+        continue;
+      }
+
+      const lineLocalX =
+        alignment === "RIGHT"
+          ? layoutLocalBounds.x + Math.max(0, layoutLocalBounds.width - lineWidth)
+          : alignment === "CENTER"
+            ? layoutLocalBounds.x + Math.max(0, (layoutLocalBounds.width - lineWidth) / 2)
+            : layoutLocalBounds.x;
+      const localBounds = {
+        x: roundTextHighlightMetric(lineLocalX + prefixWidth),
+        y: roundTextHighlightMetric(
+          layoutLocalBounds.y +
+            previousSoftLineOffsetY +
+            softLineIndex * resolvedLineHeight +
+            Math.max(0, (resolvedLineHeight - metrics.height) / 2)
+        ),
+        width: roundTextHighlightMetric(selectedWidth),
+        height: metrics.height,
+      };
+      const worldBounds = normalizeTextHighlightWorldBounds(
+        getTextHighlightWorldBoundsFromLocalBounds(node, localBounds)
+      );
+      if (!worldBounds) {
+        continue;
+      }
+
+      if (
+        hasOverwideTextHighlightSelectionRows([worldBounds], selectedLineText, size, resolvedLineHeight) ||
+        hasUnderwideTextHighlightSelectionRows([worldBounds], selectedLineText, size, alignment)
+      ) {
+        continue;
+      }
+
+      estimatedRows.push(worldBounds);
+    }
+
+    return getSafeEstimatedTextHighlightSelectionBounds(node, estimatedRows, selectionText, size, resolvedLineHeight);
+  }
+
+  function getSafeEstimatedTextHighlightSelectionBounds(node, boundsList, selectedText, fontSize, lineHeight) {
+    const rows = sortTextHighlightBoundsList(boundsList);
+    if (!rows.length) {
+      return [];
+    }
+    if (rows.length > 1) {
+      return isPlausibleSoftWrappedTextHighlightSelectionRows(node, rows, selectedText, fontSize, lineHeight)
+        ? rows
+        : [];
+    }
+
+    const alignment = getTextHighlightHorizontalAlignment(node);
+    return rows.filter(
+      (row) =>
+        !hasOverwideTextHighlightSelectionRows([row], selectedText, fontSize, lineHeight) &&
+        !hasUnderwideTextHighlightSelectionRows([row], selectedText, fontSize, alignment)
     );
-    if (!worldBounds) {
-      return [];
-    }
-
-    if (
-      hasOverwideTextHighlightSelectionRows([worldBounds], selectedLineText, size, resolvedLineHeight) ||
-      hasUnderwideTextHighlightSelectionRows([worldBounds], selectedLineText, size, alignment)
-    ) {
-      return [];
-    }
-
-    return [worldBounds];
   }
 
   function buildEstimatedTextHighlightSoftLines(text, maximumWidth, fontSize) {
@@ -8390,11 +8411,14 @@
         lineHeight,
         selectedText
       );
-      if (
-        !leftSelectedRows.length ||
-        hasOverwideTextHighlightSelectionRows(leftSelectedRows, selectedText, fontSize, lineHeight) ||
-        hasUnderwideTextHighlightSelectionRows(leftSelectedRows, selectedText, fontSize, "LEFT")
-      ) {
+      const safeLeftSelectedRows = getSafeEstimatedTextHighlightSelectionBounds(
+        leftClone,
+        leftSelectedRows,
+        selectedText,
+        fontSize,
+        lineHeight
+      );
+      if (!safeLeftSelectedRows.length) {
         return estimatedRows;
       }
 
@@ -8405,7 +8429,15 @@
         lineHeight,
         { preferGlyphBounds: true }
       );
-      if (!leftLineRows.length) {
+      if (
+        !leftLineRows.length ||
+        !isTextHighlightMeasuredSelectionCoveredByLineRows(
+          safeLeftSelectedRows,
+          leftLineRows,
+          fontSize,
+          lineHeight
+        )
+      ) {
         return estimatedRows;
       }
       const nodeTransform = getAbsoluteTransformMatrix(node);
@@ -8432,7 +8464,7 @@
         fontSize
       );
       const translatedRows = [];
-      for (const selectedRow of leftSelectedRows) {
+      for (const selectedRow of safeLeftSelectedRows) {
         const measuredLineIndex = findTextHighlightSoftLineIndexForRow(
           selectedRow,
           leftLineRows,
@@ -8509,12 +8541,21 @@
         estimatedRows,
         fontSize
       );
-      const safeRows = sortTextHighlightBoundsList(reconciledRows).filter(
-        (row) =>
-          !hasOverwideTextHighlightSelectionRows([row], selectedText, fontSize, lineHeight) &&
-          !hasUnderwideTextHighlightSelectionRows([row], selectedText, fontSize, alignment)
+      const safeRows = getSafeEstimatedTextHighlightSelectionBounds(
+        node,
+        reconciledRows,
+        selectedText,
+        fontSize,
+        lineHeight
       );
-      return safeRows.length ? safeRows : estimatedRows;
+      const safeEstimatedRows = getSafeEstimatedTextHighlightSelectionBounds(
+        node,
+        estimatedRows,
+        selectedText,
+        fontSize,
+        lineHeight
+      );
+      return safeRows.length ? safeRows : safeEstimatedRows;
     } catch (error) {
       return estimatedRows;
     } finally {
@@ -8730,6 +8771,18 @@
     }
 
     return bestIndex;
+  }
+
+  function isTextHighlightMeasuredSelectionCoveredByLineRows(selectionRows, lineRows, fontSize, lineHeight) {
+    const selectedRows = sortTextHighlightBoundsList(selectionRows);
+    const rows = sortTextHighlightBoundsList(lineRows);
+    if (!selectedRows.length || !rows.length) {
+      return false;
+    }
+
+    return selectedRows.every(
+      (row) => findTextHighlightSoftLineIndexForRow(row, rows, fontSize, lineHeight) >= 0
+    );
   }
 
   async function measureAlignmentSensitiveTextHighlightRangeRows(node, start, end, textColorHex, fontSize, lineHeight) {
@@ -8999,6 +9052,19 @@
     }
 
     const startRows = sortTextHighlightBoundsList(startBoundsList);
+    const softWrappedRows = buildTextHighlightSoftWrappedSelectionRowsFromPrefixDiff(
+      node,
+      start,
+      fontSize,
+      lineHeight,
+      endRows,
+      startRows,
+      selectedText
+    );
+    if (softWrappedRows.length > 1) {
+      return softWrappedRows;
+    }
+
     const targetRowIndex = endRows.length - 1;
     const targetRow = endRows[targetRowIndex];
     if (!targetRow) {
@@ -9098,6 +9164,78 @@
     }
 
     return [row];
+  }
+
+  function buildTextHighlightSoftWrappedSelectionRowsFromPrefixDiff(
+    node,
+    start,
+    fontSize,
+    lineHeight,
+    endRows,
+    startRows,
+    selectedText
+  ) {
+    const normalizedEndRows = sortTextHighlightBoundsList(endRows);
+    const normalizedStartRows = sortTextHighlightBoundsList(startRows);
+    if (normalizedEndRows.length <= 1 || normalizedEndRows.length <= normalizedStartRows.length) {
+      return [];
+    }
+
+    const rowTolerance = getTextHighlightRowTolerance(fontSize, lineHeight);
+    const minimumWidth = getTextHighlightMinimumWidth(fontSize);
+    const whitespaceAdvance = getTextHighlightWhitespaceAdvanceBeforeSelection(node, start, fontSize);
+    const rows = [];
+    let foundSelectionRow = false;
+    let appliedWhitespaceAdvance = false;
+
+    for (let index = 0; index < normalizedEndRows.length; index += 1) {
+      const endRow = normalizedEndRows[index];
+      const endRight = endRow.x + endRow.width;
+      let startRight = findTextHighlightMatchedStartRight(
+        endRow,
+        normalizedStartRows,
+        rowTolerance,
+        fontSize,
+        lineHeight
+      );
+      if (!Number.isFinite(startRight)) {
+        startRight = findTextHighlightIndexMatchedStartRight(
+          endRow,
+          normalizedStartRows,
+          index,
+          fontSize,
+          lineHeight
+        );
+      }
+
+      let nextX = endRow.x;
+      if (Number.isFinite(startRight)) {
+        if (!appliedWhitespaceAdvance && startRight < endRight - minimumWidth) {
+          startRight += whitespaceAdvance;
+          appliedWhitespaceAdvance = true;
+        }
+        nextX = Math.max(endRow.x, Math.min(endRight, startRight));
+      } else if (!foundSelectionRow && index < normalizedStartRows.length) {
+        continue;
+      }
+
+      const nextWidth = endRight - nextX;
+      if (nextWidth < minimumWidth) {
+        continue;
+      }
+
+      foundSelectionRow = true;
+      rows.push({
+        x: roundTextHighlightMetric(nextX),
+        y: endRow.y,
+        width: roundTextHighlightMetric(nextWidth),
+        height: endRow.height,
+      });
+    }
+
+    return rows.length > 1
+      ? getSafeEstimatedTextHighlightSelectionBounds(node, rows, selectedText, fontSize, lineHeight)
+      : [];
   }
 
   function getTextHighlightWhitespaceAdvanceBeforeSelection(node, start, fontSize) {
