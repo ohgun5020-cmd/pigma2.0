@@ -267,7 +267,7 @@ Current stabilization target: keep the plugin alive while reducing the hidden co
 - Design Assist is retired for now. Keep the disabled UI stub only where other UI modules still call `window.__PIGMA_AI_DESIGN_ASSIST__`; do not reintroduce plugin runtime messages unless the feature is deliberately revived with a real handler.
 - The visible UI does not expose design-read/accessibility as a normal user action. `aiReadDesignButton` is hidden/debug-only; `ai-accessibility-diagnosis.js` remains bundled for compatibility, while `ai-design-read.js` is inactive legacy source.
 - Use the active menu map below before choosing manual tests. A source file is not a manual-test target unless a visible button or active runtime path reaches it.
-- Long-running risk is highest around repeated `exportAsync` calls in `ai-image-upscale.js`, then full-tree scans in bundled AI correction features such as accessibility compatibility, design consistency, typo, and pixel-perfect features.
+- Long-running risk is highest around the shared image source/apply bridge in `ai-image-upscale.js`, then full-tree scans in bundled AI correction features such as accessibility compatibility, design consistency, typo, and pixel-perfect features. The direct image-upscale buttons are retired for now, but this file still backs visible image tools such as image extend, prompt edit/generation, reference search, image merge, and image text extraction.
 - Pixel-perfect default correction scope is `x`, `y`, `width`, `height`, `fontSize`, and auto-layout spacing/padding only. Broader style snapping belongs in a separate feature.
 
 #### Active menu map
@@ -283,8 +283,8 @@ Use this map for stability work and manual tests. "Visible" means the user can n
 - Visible 정렬/교정 actions: `정수 픽셀 정렬 교정`, `버튼 사이즈 자동 맞춤`, `기울기 보정`, `모서리 둥글기 조정`, `픽셀 교정 주석 삭제`.
 - Visible 텍스트 actions: `오타 직접 수정`, `텍스트 번역`, `텍스트 하이라이트`, `텍스트 행간 조정`, `오타 주석 삭제`.
 - Visible 이미지 보정 actions: `이미지 보이는 영역 맞춤`, `원본 크기 맞춤`, `원본 이미지 저장`, `선명도 보정`, `색감 자동 보정`, `색상 추출`, `참고 이미지 검색`, `이미지 합치기`.
-- Hidden 이미지 보정 action: `이미지 업스케일 (사물)`.
-- Visible 이미지 생성/확장 actions: `프롬프트 편집/생성`, `이미지 영역 확장`, `해상도 높이기`, `이미지 텍스트 추출`.
+- Retired 이미지 보정 actions: `해상도 높이기`, `이미지 업스케일 (사물)`.
+- Visible 이미지 생성/확장 actions: `프롬프트 편집/생성`, `이미지 영역 확장`, `이미지 텍스트 추출`.
 - Visible 공유/기타 actions: `프로토타입 링크 복사`.
 - Visible 영상 actions: `AI 영상 생성`, `영상 GIF 변환`, `영상 APNG 변환`.
 
@@ -509,6 +509,11 @@ node -c code.patched.js
   - Reason: `해상도 높이기` already had a 30s source export/read boundary, but the later auto-classification and provider upscale requests could still wait without a feature-level watchdog. That can leave the button/toast spinning after the image source is ready.
   - Scope: added a 45s timeout around OpenAI/Gemini subject classification fetches, added a 5-minute controller watchdog to the visible `해상도 높이기` button, and passed a 3-minute OpenAI image upscale timeout through the shared request path. Source export, output-size choices, prompts, provider picker behavior, fill replacement, and local sharpening behavior are unchanged.
   - Manual test: reload the plugin, select one simple image layer, run `해상도 높이기`, choose `OpenAI`, and pick `1K` or `원본 유지` if offered. Confirm it moves through classification/upscale/apply, replaces the image fill, and the button returns to normal. If OpenAI is slow, it should stop around 3 minutes or the whole run should stop by 5 minutes instead of spinning indefinitely.
+
+- 2026-06-11 follow-up: retired the direct image-upscale UI controllers.
+  - Reason: the current direct upscale UI is hidden/retired and will be redesigned later.
+  - Scope: hid/disabled `해상도 높이기` and `이미지 업스케일 (사물)`, removed those actions from AI API gating maps, and set the existing upscale controller flags so both active and legacy UI controllers do not attach. Kept `ai-image-upscale.js` bundled because it still provides the shared source/apply bridge used by other visible image tools.
+  - Manual test: no direct upscale test. Regression-check one visible shared-image action such as `이미지 영역 확장` or `프롬프트 편집/생성` after reload.
 
 1. Edit `ui.html` for UI-only changes.
    - Keep `편집하기` screen markup and styles in `ui.html`.

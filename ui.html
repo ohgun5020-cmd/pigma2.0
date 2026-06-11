@@ -6809,6 +6809,7 @@
                   id="aiImageUpscaleObjectButton"
                   type="button"
                   data-ai-action="image-upscale-object"
+                  data-ai-retired="true"
 
 
                   title="&#xC774;&#xBBF8;&#xC9C0; &#xC5C5;&#xC2A4;&#xCF00;&#xC77C; (&#xC0AC;&#xBB3C;)"
@@ -6909,6 +6910,8 @@
                   id="aiImageUpscaleButton"
                   type="button"
                   data-ai-action="image-upscale"
+                  data-ai-retired="true"
+                  hidden
 
 
                   title="해상도 높이기"
@@ -16534,14 +16537,12 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
             ["aiTypoFixButton", "any"],
             ["aiTranslateButton", "any"],
             ["aiTranslateModalConfirm", "any"],
-            ["aiImageUpscaleObjectButton", "any"],
             ["aiImageReferenceSearchButton", "any"],
             ["aiImageReferenceModalConfirm", "any"],
             ["aiImagePromptEditButton", "any"],
             ["aiImagePromptModalConfirm", "any"],
             ["aiImageExtendButton", "any"],
             ["aiImageExtendModalConfirm", "any"],
-            ["aiImageUpscaleButton", "any"],
             ["aiImageTextFeasibilityButton", "any"],
             ["aiImageCompositeButton", "gemini"],
             ["aiOriginalVideoExtractButton", "openai"],
@@ -16554,11 +16555,9 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
             ["design-consistency", "any"],
             ["typo-fix", "any"],
             ["translate", "any"],
-            ["image-upscale-object", "any"],
             ["image-reference-search", "any"],
             ["image-prompt-edit", "any"],
             ["image-extend", "any"],
-            ["image-upscale", "any"],
             ["image-text-feasibility", "any"],
             ["ai-video-generate", "openai"],
           ].map(([action, provider]) => [action, { provider }])
@@ -42542,6 +42541,29 @@ ${buildReferencePromptOutputRules()}
             return activeFeatureKey;
           },
         };
+      })();
+    </script>
+    <script>
+      (() => {
+        window.__PIGMA_AI_IMAGE_UPSCALE_RETIRED__ = true;
+        window.__PIGMA_AI_CORRECTION_IMAGE_UPSCALE__ = true;
+        window.__PIGMA_AI_CORRECTION_IMAGE_UPSCALE_OBJECT__ = true;
+        window.__PIGMA_AI_IMAGE_UPSCALE_PERSON_V2__ = true;
+        window.__PIGMA_AI_IMAGE_UPSCALE_OBJECT_V2__ = true;
+
+        const retiredButtonIds = ["aiImageUpscaleButton", "aiImageUpscaleObjectButton"];
+        retiredButtonIds.forEach((buttonId) => {
+          const button = document.getElementById(buttonId);
+          if (!(button instanceof HTMLButtonElement)) {
+            return;
+          }
+          button.hidden = true;
+          button.disabled = true;
+          button.tabIndex = -1;
+          button.dataset.aiRetired = "true";
+          button.setAttribute("aria-hidden", "true");
+          button.setAttribute("aria-disabled", "true");
+        });
       })();
     </script>
     <script>
