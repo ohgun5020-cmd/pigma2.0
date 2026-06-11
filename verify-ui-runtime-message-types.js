@@ -24,6 +24,7 @@ const runtimeFiles = [
   "corner-radius-adjust.js",
   "button-text-auto-size.js",
   "select-all-text.js",
+  "select-color-matches.js",
   "text-line-height-adjust.js",
   "unlock-locked-layers.js",
   "detach-linked-components.js",

@@ -1084,7 +1084,8 @@
         gap: 10px;
       }
 
-      .ai-correction-action {
+      .ai-correction-action,
+      .ai-correction-shortcut-action {
         align-items: center;
         justify-content: flex-start;
         gap: 0;
@@ -1167,13 +1168,16 @@
         min-width: 0;
       }
 
-      .ai-correction-action-shell > .ai-correction-action {
+      .ai-correction-action-shell > .ai-correction-action,
+      .ai-correction-action-shell > .ai-correction-shortcut-action {
+        position: relative;
+        z-index: 1;
         padding-right: 44px;
       }
 
       .ai-correction-action-pin {
         position: absolute;
-        z-index: 2;
+        z-index: 3;
         top: 50%;
         right: 9px;
         display: inline-flex;
@@ -1190,6 +1194,7 @@
         background: transparent;
         box-shadow: none;
         opacity: 0.42;
+        pointer-events: auto;
         transform: translateY(-50%);
       }
 
@@ -1218,12 +1223,14 @@
         fill: currentColor;
       }
 
-      .ai-correction-shortcut-shell > .ai-correction-action {
+      .ai-correction-shortcut-shell > .ai-correction-action,
+      .ai-correction-shortcut-shell > .ai-correction-shortcut-action {
         min-height: 40px;
         background: var(--surface-muted);
       }
 
-      .ai-correction-shortcut-shell > .ai-correction-action:hover {
+      .ai-correction-shortcut-shell > .ai-correction-action:hover,
+      .ai-correction-shortcut-shell > .ai-correction-shortcut-action:hover {
         border-color: var(--button-secondary-hover-border);
         background: var(--button-secondary-hover-bg);
       }
@@ -1232,14 +1239,16 @@
         opacity: 0.92;
       }
 
-      .ai-correction-action[data-plan-locked="true"] {
+      .ai-correction-action[data-plan-locked="true"],
+      .ai-correction-shortcut-action[data-shortcut-plan-locked="true"] {
         position: relative;
         opacity: 0.58;
         cursor: not-allowed;
       }
 
-      .ai-correction-action[data-plan-locked="true"]::after {
-        content: attr(data-plan-lock-label);
+      .ai-correction-action[data-plan-locked="true"]::after,
+      .ai-correction-shortcut-action[data-shortcut-plan-locked="true"]::after {
+        content: attr(data-shortcut-plan-lock-label);
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -1257,7 +1266,17 @@
         white-space: nowrap;
       }
 
+      .ai-correction-action[data-plan-locked="true"]::after {
+        content: attr(data-plan-lock-label);
+      }
+
       .ai-correction-action[data-plan-required-tier="2"][data-plan-locked="true"]::after {
+        border-color: rgba(95, 234, 158, 0.3);
+        color: #75f0a9;
+        background: rgba(95, 234, 158, 0.09);
+      }
+
+      .ai-correction-shortcut-action[data-shortcut-plan-required-tier="2"][data-shortcut-plan-locked="true"]::after {
         border-color: rgba(95, 234, 158, 0.3);
         color: #75f0a9;
         background: rgba(95, 234, 158, 0.09);
@@ -6840,6 +6859,34 @@
                   </button>
                 </div>
               </details>
+              <details class="ai-correction-group" role="group" aria-label="&#xC0C9;&#xC0C1; &#xC120;&#xD0DD; &#xAE30;&#xB2A5;">
+                <summary class="ai-correction-group-heading">
+                  <p class="ai-correction-group-title">&#xC0C9;&#xC0C1;</p>
+                  <span class="ai-correction-group-line"></span>
+                </summary>
+                <div class="ai-correction-group-actions">
+                  <button
+                    class="button-secondary ai-correction-action"
+                    id="aiSelectSameColorButton"
+                    type="button"
+                    data-ai-action="select-same-color"
+                    title="&#xC120;&#xD0DD;&#xD55C; &#xAE30;&#xC900; &#xB808;&#xC774;&#xC5B4;&#xC758; &#xC0C9;&#xACFC; &#xAC19;&#xC740; &#xC0C9;&#xC744; &#xD604;&#xC7AC; &#xD398;&#xC774;&#xC9C0;&#xC5D0;&#xC11C; &#xBAA8;&#xB450; &#xC120;&#xD0DD;&#xD569;&#xB2C8;&#xB2E4;. &#xD504;&#xB808;&#xC784;&#xC744; &#xD568;&#xAED8; &#xC120;&#xD0DD;&#xD558;&#xBA74; &#xD574;&#xB2F9; &#xD504;&#xB808;&#xC784; &#xC548;&#xC73C;&#xB85C; &#xC81C;&#xD55C;&#xD569;&#xB2C8;&#xB2E4;."
+                    aria-label="&#xAC19;&#xC740; &#xC0C9; &#xC120;&#xD0DD;. &#xC120;&#xD0DD;&#xD55C; &#xAE30;&#xC900; &#xB808;&#xC774;&#xC5B4;&#xC758; &#xC0C9;&#xACFC; &#xAC19;&#xC740; &#xC0C9;&#xC744; &#xD604;&#xC7AC; &#xD398;&#xC774;&#xC9C0;&#xC5D0;&#xC11C; &#xBAA8;&#xB450; &#xC120;&#xD0DD;&#xD569;&#xB2C8;&#xB2E4;. &#xD504;&#xB808;&#xC784;&#xC744; &#xD568;&#xAED8; &#xC120;&#xD0DD;&#xD558;&#xBA74; &#xD574;&#xB2F9; &#xD504;&#xB808;&#xC784; &#xC548;&#xC73C;&#xB85C; &#xC81C;&#xD55C;&#xD569;&#xB2C8;&#xB2E4;."
+                  >
+                    &#xAC19;&#xC740; &#xC0C9; &#xC120;&#xD0DD;
+                  </button>
+                  <button
+                    class="button-secondary ai-correction-action"
+                    id="aiSelectSimilarColorButton"
+                    type="button"
+                    data-ai-action="select-similar-color"
+                    title="&#xC120;&#xD0DD;&#xD55C; &#xAE30;&#xC900; &#xB808;&#xC774;&#xC5B4;&#xC758; &#xC0C9;&#xACFC; &#xBE44;&#xC2B7;&#xD55C; &#xC0C9;&#xC744; &#xD604;&#xC7AC; &#xD398;&#xC774;&#xC9C0;&#xC5D0;&#xC11C; &#xBAA8;&#xB450; &#xC120;&#xD0DD;&#xD569;&#xB2C8;&#xB2E4;. &#xD504;&#xB808;&#xC784;&#xC744; &#xD568;&#xAED8; &#xC120;&#xD0DD;&#xD558;&#xBA74; &#xD574;&#xB2F9; &#xD504;&#xB808;&#xC784; &#xC548;&#xC73C;&#xB85C; &#xC81C;&#xD55C;&#xD569;&#xB2C8;&#xB2E4;."
+                    aria-label="&#xBE44;&#xC2B7;&#xD55C; &#xC0C9; &#xC120;&#xD0DD;. &#xC120;&#xD0DD;&#xD55C; &#xAE30;&#xC900; &#xB808;&#xC774;&#xC5B4;&#xC758; &#xC0C9;&#xACFC; &#xBE44;&#xC2B7;&#xD55C; &#xC0C9;&#xC744; &#xD604;&#xC7AC; &#xD398;&#xC774;&#xC9C0;&#xC5D0;&#xC11C; &#xBAA8;&#xB450; &#xC120;&#xD0DD;&#xD569;&#xB2C8;&#xB2E4;. &#xD504;&#xB808;&#xC784;&#xC744; &#xD568;&#xAED8; &#xC120;&#xD0DD;&#xD558;&#xBA74; &#xD574;&#xB2F9; &#xD504;&#xB808;&#xC784; &#xC548;&#xC73C;&#xB85C; &#xC81C;&#xD55C;&#xD569;&#xB2C8;&#xB2E4;."
+                  >
+                    &#xBE44;&#xC2B7;&#xD55C; &#xC0C9; &#xC120;&#xD0DD;
+                  </button>
+                </div>
+              </details>
               <details class="ai-correction-group" role="group" aria-label="&#xC774;&#xBBF8;&#xC9C0; &#xBCF4;&#xC815; &#xAE30;&#xB2A5;">
                 <summary class="ai-correction-group-heading">
                   <p class="ai-correction-group-title">&#xC774;&#xBBF8;&#xC9C0; &#xBCF4;&#xC815;</p>
@@ -7219,6 +7266,8 @@
                   "pixel-perfect-clear": "format_clear",
                   "read-design": "accessibility_new",
                   "select-all-text": "select_all",
+                  "select-same-color": "palette",
+                  "select-similar-color": "palette",
                   "skew-transform": "straighten",
                   "split-long-frame": "vertical_split",
                   "text-highlight": "format_color_text",
@@ -7534,6 +7583,18 @@
                     tooltip: "선택 범위 안의 모든 텍스트 레이어를 선택합니다.",
                     ariaLabel: "모든 텍스트 선택. 선택한 프레임 또는 레이어 안의 모든 텍스트 레이어를 선택합니다.",
                   },
+                  aiSelectSameColorButton: {
+                    tooltip:
+                      "\uC120\uD0DD\uD55C \uAE30\uC900 \uB808\uC774\uC5B4\uC758 fill, stroke, \uD14D\uC2A4\uD2B8 \uC0C9\uACFC \uAC19\uC740 \uC0C9\uC744 \uD604\uC7AC \uD398\uC774\uC9C0\uC5D0\uC11C \uBAA8\uB450 \uC120\uD0DD\uD569\uB2C8\uB2E4. \uD504\uB808\uC784\uC744 \uD568\uAED8 \uC120\uD0DD\uD558\uBA74 \uD574\uB2F9 \uD504\uB808\uC784 \uC548\uC73C\uB85C \uC81C\uD55C\uD569\uB2C8\uB2E4.",
+                    ariaLabel:
+                      "\uAC19\uC740 \uC0C9 \uC120\uD0DD. \uC120\uD0DD\uD55C \uAE30\uC900 \uB808\uC774\uC5B4\uC758 fill, stroke, \uD14D\uC2A4\uD2B8 \uC0C9\uACFC \uAC19\uC740 \uC0C9\uC744 \uD604\uC7AC \uD398\uC774\uC9C0\uC5D0\uC11C \uBAA8\uB450 \uC120\uD0DD\uD569\uB2C8\uB2E4. \uD504\uB808\uC784\uC744 \uD568\uAED8 \uC120\uD0DD\uD558\uBA74 \uD574\uB2F9 \uD504\uB808\uC784 \uC548\uC73C\uB85C \uC81C\uD55C\uD569\uB2C8\uB2E4.",
+                  },
+                  aiSelectSimilarColorButton: {
+                    tooltip:
+                      "\uC120\uD0DD\uD55C \uAE30\uC900 \uB808\uC774\uC5B4\uC758 fill, stroke, \uD14D\uC2A4\uD2B8 \uC0C9\uACFC \uBE44\uC2B7\uD55C \uC0C9\uC744 \uD604\uC7AC \uD398\uC774\uC9C0\uC5D0\uC11C \uBAA8\uB450 \uC120\uD0DD\uD569\uB2C8\uB2E4. \uD504\uB808\uC784\uC744 \uD568\uAED8 \uC120\uD0DD\uD558\uBA74 \uD574\uB2F9 \uD504\uB808\uC784 \uC548\uC73C\uB85C \uC81C\uD55C\uD569\uB2C8\uB2E4.",
+                    ariaLabel:
+                      "\uBE44\uC2B7\uD55C \uC0C9 \uC120\uD0DD. \uC120\uD0DD\uD55C \uAE30\uC900 \uB808\uC774\uC5B4\uC758 fill, stroke, \uD14D\uC2A4\uD2B8 \uC0C9\uACFC \uBE44\uC2B7\uD55C \uC0C9\uC744 \uD604\uC7AC \uD398\uC774\uC9C0\uC5D0\uC11C \uBAA8\uB450 \uC120\uD0DD\uD569\uB2C8\uB2E4. \uD504\uB808\uC784\uC744 \uD568\uAED8 \uC120\uD0DD\uD558\uBA74 \uD574\uB2F9 \uD504\uB808\uC784 \uC548\uC73C\uB85C \uC81C\uD55C\uD569\uB2C8\uB2E4.",
+                  },
                   aiTranslateButton: {
                     tooltip: "선택한 텍스트를 지정한 언어로 번역해 같은 위치에 적용합니다.",
                     ariaLabel: "텍스트 번역. 선택한 텍스트를 지정한 언어로 번역해 같은 위치에 적용합니다.",
@@ -7806,6 +7867,811 @@
                 applyAllTooltips();
               })();
 
+            </script>
+
+            <script>
+              (() => {
+                if (window.__PIGMA_AI_CORRECTION_ACTION_SHORTCUTS__) {
+                  return;
+                }
+                window.__PIGMA_AI_CORRECTION_ACTION_SHORTCUTS__ = true;
+
+                const storageKey = "pigma:ai-correction-action-shortcuts:v1";
+                const shortcutsId = "aiCorrectionActionShortcuts";
+                const shortcutsTitle = "\uBC14\uB85C\uAC00\uAE30";
+                const pinLabel = "\uBC14\uB85C\uAC00\uAE30\uC5D0 \uACE0\uC815";
+                const unpinLabel = "\uBC14\uB85C\uAC00\uAE30\uC5D0\uC11C \uD574\uC81C";
+                const layerCleanupTitle = "\uB808\uC774\uC5B4 \uC815\uB9AC";
+                const svgNamespace = "http://www.w3.org/2000/svg";
+                const pushPinPath =
+                  "M16 9V4l1-1V2H7v1l1 1v5l-2 2v2h5v7h2v-7h5v-2l-2-2z";
+
+                let pinnedIds = [];
+                let renderFrame = 0;
+                let isRendering = false;
+                let isWrapping = false;
+                let shortcutActionDelegateInstalled = false;
+
+                const normalizePinnedIds = (ids) => {
+                  const seen = new Set();
+                  return (Array.isArray(ids) ? ids : [])
+                    .map((id) => String(id || "").trim())
+                    .filter((id) => {
+                      if (!id || seen.has(id)) {
+                        return false;
+                      }
+                      seen.add(id);
+                      return true;
+                    });
+                };
+
+                const readPinnedIds = () => {
+                  try {
+                    const storage = window.localStorage;
+                    if (!storage) {
+                      return [];
+                    }
+                    return normalizePinnedIds(JSON.parse(storage.getItem(storageKey) || "[]"));
+                  } catch (error) {
+                    return [];
+                  }
+                };
+
+                const writePinnedIds = () => {
+                  try {
+                    const storage = window.localStorage;
+                    if (!storage) {
+                      postPluginMessage({
+                        type: "update-ai-correction-shortcuts",
+                        pinnedIds,
+                      });
+                      return;
+                    }
+                    if (pinnedIds.length) {
+                      storage.setItem(storageKey, JSON.stringify(pinnedIds));
+                    } else {
+                      storage.removeItem(storageKey);
+                    }
+                  } catch (error) {}
+
+                  postPluginMessage({
+                    type: "update-ai-correction-shortcuts",
+                    pinnedIds,
+                  });
+                };
+
+                const postPluginMessage = (message) => {
+                  parent.postMessage({ pluginMessage: message }, "*");
+                };
+
+                const requestPinnedIds = () => {
+                  postPluginMessage({ type: "request-ai-correction-shortcuts" });
+                };
+
+                const getContainer = () => document.querySelector("#viewAi .ai-correction-actions");
+
+                const getLayerCleanupGroup = () => {
+                  const anchorButton = document.getElementById("aiUnlockLockedLayersButton");
+                  if (anchorButton instanceof HTMLElement) {
+                    const group = anchorButton.closest(".ai-correction-group");
+                    if (group instanceof HTMLElement) {
+                      return group;
+                    }
+                  }
+
+                  const container = getContainer();
+                  if (!(container instanceof HTMLElement)) {
+                    return null;
+                  }
+
+                  return (
+                    Array.from(container.children).find((element) => {
+                      if (!(element instanceof HTMLDetailsElement) || !element.classList.contains("ai-correction-group")) {
+                        return false;
+                      }
+                      const title = element.querySelector(".ai-correction-group-title");
+                      const label = String(title && title.textContent ? title.textContent : "")
+                        .replace(/\s+/g, " ")
+                        .trim();
+                      return label === layerCleanupTitle;
+                    }) || null
+                  );
+                };
+
+                const ensureShortcutPanel = () => {
+                  const container = getContainer();
+                  if (!(container instanceof HTMLElement)) {
+                    return null;
+                  }
+
+                  let panel = document.getElementById(shortcutsId);
+                  if (!(panel instanceof HTMLElement)) {
+                    panel = document.createElement("div");
+                    panel.id = shortcutsId;
+                    panel.className = "ai-correction-shortcuts";
+                    panel.hidden = true;
+                    panel.setAttribute("aria-label", shortcutsTitle);
+
+                    const heading = document.createElement("div");
+                    heading.className = "ai-correction-shortcuts-heading";
+                    const title = document.createElement("p");
+                    title.className = "ai-correction-shortcuts-title";
+                    title.textContent = shortcutsTitle;
+                    const line = document.createElement("span");
+                    line.className = "ai-correction-shortcuts-line";
+                    line.setAttribute("aria-hidden", "true");
+                    heading.appendChild(title);
+                    heading.appendChild(line);
+
+                    const actions = document.createElement("div");
+                    actions.className = "ai-correction-shortcuts-actions";
+                    actions.setAttribute("role", "group");
+                    actions.setAttribute("aria-label", shortcutsTitle);
+
+                    panel.appendChild(heading);
+                    panel.appendChild(actions);
+                  }
+
+                  const layerGroup = getLayerCleanupGroup();
+                  if (layerGroup instanceof HTMLElement) {
+                    if (panel.parentElement !== container || panel.nextElementSibling !== layerGroup) {
+                      container.insertBefore(panel, layerGroup);
+                    }
+                  } else if (panel.parentElement !== container) {
+                    container.insertBefore(panel, container.firstChild);
+                  }
+
+                  return panel;
+                };
+
+                const isActionHidden = (button) => {
+                  if (!(button instanceof HTMLButtonElement)) {
+                    return true;
+                  }
+                  const hiddenAncestor = button.closest("[hidden], [aria-hidden='true']");
+                  return hiddenAncestor instanceof HTMLElement && hiddenAncestor.id !== shortcutsId;
+                };
+
+                const getActionId = (button) => (button instanceof HTMLButtonElement ? String(button.id || "").trim() : "");
+
+                const getCandidateButtons = () => {
+                  const container = getContainer();
+                  if (!(container instanceof HTMLElement)) {
+                    return [];
+                  }
+                  return Array.from(container.querySelectorAll(".ai-correction-group button.ai-correction-action")).filter(
+                    (button) => button instanceof HTMLButtonElement && getActionId(button) && !isActionHidden(button)
+                  );
+                };
+
+                const getOriginalButton = (id) => {
+                  const button = document.getElementById(String(id || ""));
+                  return button instanceof HTMLButtonElement ? button : null;
+                };
+
+                const snapshotGroupOpenStates = () => {
+                  const container = getContainer();
+                  if (!(container instanceof HTMLElement)) {
+                    return [];
+                  }
+                  return Array.from(container.querySelectorAll(".ai-correction-group")).map((group) => ({
+                    group,
+                    open: group instanceof HTMLDetailsElement ? group.open : false,
+                  }));
+                };
+
+                const restoreGroupOpenStates = (states) => {
+                  if (!Array.isArray(states)) {
+                    return;
+                  }
+                  states.forEach((state) => {
+                    if (state && state.group instanceof HTMLDetailsElement) {
+                      state.group.open = state.open === true;
+                    }
+                  });
+                };
+
+                const openAncestorDetails = (element) => {
+                  const opened = [];
+                  let current = element instanceof HTMLElement ? element.parentElement : null;
+                  while (current) {
+                    if (current instanceof HTMLDetailsElement && !current.open) {
+                      current.open = true;
+                      opened.push(current);
+                    }
+                    current = current.parentElement;
+                  }
+                  return opened;
+                };
+
+                const triggerOriginalButton = (button) => {
+                  if (!(button instanceof HTMLButtonElement) || button.dataset.planLocked === "true") {
+                    return false;
+                  }
+
+                  const groupStates = snapshotGroupOpenStates();
+                  openAncestorDetails(button);
+                  button.dispatchEvent(
+                    new MouseEvent("click", {
+                      bubbles: true,
+                      cancelable: true,
+                      view: window,
+                    })
+                  );
+                  window.setTimeout(() => restoreGroupOpenStates(groupStates), 0);
+                  return true;
+                };
+
+                const directShortcutMessages = {
+                  aiAutoLayoutOffButton: { type: "run-auto-layout-off" },
+                  aiButtonTextAutoSizeButton: { type: "run-button-text-auto-size" },
+                  aiClearFrameGuidesButton: { type: "run-clear-frame-guides" },
+                  aiDetachLinkedComponentsButton: { type: "run-detach-linked-components" },
+                  aiOriginalImageDownloadButton: { type: "run-original-image-download" },
+                  aiPixelPerfectButton: { type: "run-ai-pixel-perfect" },
+                  aiPixelPerfectClearButton: { type: "run-ai-pixel-perfect-clear" },
+                  aiSelectAllTextButton: { type: "run-select-all-text" },
+                  aiSelectSameColorButton: { type: "run-select-same-color" },
+                  aiSelectSimilarColorButton: { type: "run-select-similar-color" },
+                  aiTextLineHeightButton: { type: "run-text-line-height-adjust" },
+                  aiUnlockLockedLayersButton: { type: "run-unlock-locked-layers" },
+                };
+
+                const runDirectShortcutMessage = (id) => {
+                  const message = directShortcutMessages[String(id || "").trim()];
+                  if (!message) {
+                    return false;
+                  }
+                  postPluginMessage({ ...message });
+                  return true;
+                };
+
+                const runShortcutAction = (id) => {
+                  const normalizedId = String(id || "").trim();
+                  if (triggerOriginalButton(getOriginalButton(normalizedId))) {
+                    return true;
+                  }
+
+                  const runners = window.__PIGMA_AI_CORRECTION_SHORTCUT_RUNNERS__;
+                  const runner =
+                    runners && typeof runners === "object" && typeof runners[normalizedId] === "function"
+                      ? runners[normalizedId]
+                      : null;
+                  if (runner) {
+                    try {
+                      const result = runner();
+                      if (result && typeof result.catch === "function") {
+                        result.catch(() => {});
+                      }
+                      return result !== false;
+                    } catch (error) {
+                      return runDirectShortcutMessage(normalizedId) || triggerOriginalButton(getOriginalButton(normalizedId));
+                    }
+                  }
+
+                  return runDirectShortcutMessage(normalizedId);
+                };
+
+                const hasShortcutRunner = (id) => {
+                  const normalizedId = String(id || "").trim();
+                  const runners = window.__PIGMA_AI_CORRECTION_SHORTCUT_RUNNERS__;
+                  return !!(
+                    normalizedId &&
+                    runners &&
+                    typeof runners === "object" &&
+                    typeof runners[normalizedId] === "function"
+                  );
+                };
+
+                const getButtonLabel = (button) => {
+                  if (!(button instanceof HTMLButtonElement)) {
+                    return "";
+                  }
+                  const title = Array.from(button.children).find(
+                    (child) => child instanceof HTMLElement && child.classList.contains("ai-correction-action-title")
+                  );
+                  const label = title instanceof HTMLElement ? title.textContent : button.textContent;
+                  return String(label || "").replace(/\s+/g, " ").trim();
+                };
+
+                const createPinIcon = () => {
+                  const svg = document.createElementNS(svgNamespace, "svg");
+                  svg.setAttribute("viewBox", "0 0 24 24");
+                  svg.setAttribute("focusable", "false");
+                  svg.setAttribute("aria-hidden", "true");
+                  const path = document.createElementNS(svgNamespace, "path");
+                  path.setAttribute("d", pushPinPath);
+                  svg.appendChild(path);
+                  return svg;
+                };
+
+                const getPinAriaLabel = (id) => {
+                  const source = getOriginalButton(id);
+                  const actionLabel = getButtonLabel(source);
+                  const verb = pinnedIds.indexOf(id) >= 0 ? unpinLabel : pinLabel;
+                  return actionLabel ? actionLabel + " " + verb : verb;
+                };
+
+                const updatePinButton = (pinButton) => {
+                  if (!(pinButton instanceof HTMLButtonElement)) {
+                    return;
+                  }
+                  const id = String(pinButton.dataset.pinActionId || "").trim();
+                  const pinned = pinnedIds.indexOf(id) >= 0;
+                  const label = getPinAriaLabel(id);
+                  pinButton.setAttribute("aria-pressed", pinned ? "true" : "false");
+                  pinButton.setAttribute("aria-label", label);
+                  pinButton.dataset.aiCorrectionTooltip = "true";
+                  pinButton.dataset.tooltip = label;
+                };
+
+                const updatePinButtons = () => {
+                  document.querySelectorAll(".ai-correction-action-pin").forEach((pinButton) => {
+                    updatePinButton(pinButton);
+                  });
+                };
+
+                const applyPinnedIdsChange = () => {
+                  pinnedIds = normalizePinnedIds(pinnedIds);
+                  writePinnedIds();
+                  updatePinButtons();
+                  renderShortcuts();
+                };
+
+                const removePinnedId = (id) => {
+                  const normalizedId = String(id || "").trim();
+                  if (!normalizedId) {
+                    return;
+                  }
+                  const index = pinnedIds.indexOf(normalizedId);
+                  if (index < 0) {
+                    return;
+                  }
+                  pinnedIds.splice(index, 1);
+                  applyPinnedIdsChange();
+                };
+
+                const createPinButton = (id, options = {}) => {
+                  const removeOnly = options && options.removeOnly === true;
+                  const button = document.createElement("button");
+                  button.type = "button";
+                  button.className = "ai-correction-action-pin";
+                  button.dataset.pinActionId = id;
+                  button.appendChild(createPinIcon());
+                  button.addEventListener(
+                    "pointerdown",
+                    (event) => {
+                      event.stopPropagation();
+                    },
+                    true
+                  );
+                  button.addEventListener(
+                    "click",
+                    (event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      if (typeof event.stopImmediatePropagation === "function") {
+                        event.stopImmediatePropagation();
+                      }
+                      if (removeOnly) {
+                        removePinnedId(id);
+                      } else {
+                        togglePinnedId(id);
+                      }
+                    },
+                    true
+                  );
+                  button.addEventListener("click", (event) => {
+                    if (event.defaultPrevented) {
+                      return;
+                    }
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (removeOnly) {
+                      removePinnedId(id);
+                    } else {
+                      togglePinnedId(id);
+                    }
+                  });
+                  updatePinButton(button);
+                  return button;
+                };
+
+                const hasDirectPin = (shell) =>
+                  Array.from(shell.children).some(
+                    (child) => child instanceof HTMLElement && child.classList.contains("ai-correction-action-pin")
+                  );
+
+                const ensureActionPins = () => {
+                  const buttons = getCandidateButtons();
+                  isWrapping = true;
+                  try {
+                    buttons.forEach((button) => {
+                      const id = getActionId(button);
+                      let shell =
+                        button.parentElement instanceof HTMLElement &&
+                        button.parentElement.classList.contains("ai-correction-action-shell")
+                          ? button.parentElement
+                          : null;
+
+                      if (!(shell instanceof HTMLElement)) {
+                        const parent = button.parentNode;
+                        if (!parent) {
+                          return;
+                        }
+                        shell = document.createElement("div");
+                        shell.className = "ai-correction-action-shell";
+                        parent.insertBefore(shell, button);
+                        shell.appendChild(button);
+                      }
+
+                      if (!hasDirectPin(shell)) {
+                        shell.appendChild(createPinButton(id));
+                      }
+                    });
+                  } finally {
+                    isWrapping = false;
+                  }
+                  updatePinButtons();
+                };
+
+                const createShortcutButton = (source, id) => {
+                  const clone = document.createElement("button");
+                  const sourcePlanLocked = source.dataset.planLocked === "true";
+                  const actionLabel = getButtonLabel(source);
+                  clone.type = "button";
+                  clone.className = "button-secondary ai-correction-shortcut-action";
+                  clone.dataset.aiCorrectionShortcut = "true";
+                  clone.dataset.shortcutFor = id;
+                  clone.title = source.title || actionLabel || shortcutsTitle;
+                  Array.from(source.childNodes).forEach((node) => {
+                    clone.appendChild(node.cloneNode(true));
+                  });
+                  if (sourcePlanLocked) {
+                    clone.dataset.shortcutPlanLocked = "true";
+                    clone.dataset.shortcutPlanLockLabel = source.dataset.planLockLabel || "";
+                    clone.dataset.shortcutPlanRequiredTier = source.dataset.planRequiredTier || "";
+                  } else {
+                    delete clone.dataset.shortcutPlanLocked;
+                    delete clone.dataset.shortcutPlanLockLabel;
+                    delete clone.dataset.shortcutPlanRequiredTier;
+                  }
+                  const shortcutUnavailable = sourcePlanLocked;
+                  clone.disabled = false;
+                  if (shortcutUnavailable) {
+                    clone.dataset.shortcutDisabled = "true";
+                    clone.setAttribute("aria-disabled", "true");
+                  } else {
+                    delete clone.dataset.shortcutDisabled;
+                    clone.removeAttribute("aria-disabled");
+                  }
+                  clone.setAttribute("aria-label", actionLabel ? shortcutsTitle + ": " + actionLabel : shortcutsTitle);
+                  clone.addEventListener("click", (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (typeof event.stopImmediatePropagation === "function") {
+                      event.stopImmediatePropagation();
+                    }
+                  });
+                  return clone;
+                };
+
+                const getShortcutActionTarget = (event) => {
+                  const target = event && event.target instanceof Element ? event.target : null;
+                  if (!target) {
+                    return null;
+                  }
+                  const button = target.closest("#" + shortcutsId + " .ai-correction-shortcut-action");
+                  return button instanceof HTMLButtonElement ? button : null;
+                };
+
+                const runShortcutButtonEvent = (event, button) => {
+                  const id = String(button?.dataset?.shortcutFor || "").trim();
+                  if (!id) {
+                    return;
+                  }
+                  if (event && event.type === "pointerup" && typeof event.button === "number" && event.button !== 0) {
+                    return;
+                  }
+                  event.preventDefault();
+                  event.stopPropagation();
+                  if (typeof event.stopImmediatePropagation === "function") {
+                    event.stopImmediatePropagation();
+                  }
+                  if (button.dataset.shortcutDisabled === "true" || button.dataset.shortcutPlanLocked === "true") {
+                    return;
+                  }
+                  if (runShortcutAction(id)) {
+                    scheduleRefresh();
+                  }
+                };
+
+                const installShortcutActionDelegate = () => {
+                  if (shortcutActionDelegateInstalled) {
+                    return;
+                  }
+                  shortcutActionDelegateInstalled = true;
+                  const runFromEvent = (event) => {
+                    const button = getShortcutActionTarget(event);
+                    if (!(button instanceof HTMLButtonElement)) {
+                      return;
+                    }
+                    runShortcutButtonEvent(event, button);
+                  };
+                  document.addEventListener("pointerup", runFromEvent, true);
+                  document.addEventListener(
+                    "keydown",
+                    (event) => {
+                      const key = String(event.key || "");
+                      if (key !== "Enter" && key !== " ") {
+                        return;
+                      }
+                      runFromEvent(event);
+                    },
+                    true
+                  );
+                  document.addEventListener(
+                    "click",
+                    (event) => {
+                      const button = getShortcutActionTarget(event);
+                      if (!(button instanceof HTMLButtonElement)) {
+                        return;
+                      }
+                      event.preventDefault();
+                      event.stopPropagation();
+                      if (typeof event.stopImmediatePropagation === "function") {
+                        event.stopImmediatePropagation();
+                      }
+                    },
+                    true
+                  );
+                };
+
+                installShortcutActionDelegate();
+
+                const stopShortcutPinEvent = (event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  if (typeof event.stopImmediatePropagation === "function") {
+                    event.stopImmediatePropagation();
+                  }
+                };
+
+                const isShortcutPinIntent = (event, shell) => {
+                  const target = event.target instanceof Element ? event.target : null;
+                  if (target && target.closest(".ai-correction-action-pin")) {
+                    return true;
+                  }
+                  if (!(shell instanceof HTMLElement) || typeof event.clientX !== "number" || typeof event.clientY !== "number") {
+                    return false;
+                  }
+                  const pin = shell.querySelector(".ai-correction-action-pin");
+                  if (!(pin instanceof HTMLElement)) {
+                    return false;
+                  }
+                  const rect = pin.getBoundingClientRect();
+                  return (
+                    event.clientX >= rect.left &&
+                    event.clientX <= rect.right &&
+                    event.clientY >= rect.top &&
+                    event.clientY <= rect.bottom
+                  );
+                };
+
+                const getShortcutPinTarget = (event) => {
+                  const target = event.target instanceof Element ? event.target : null;
+                  if (!target) {
+                    return null;
+                  }
+
+                  const panel = target.closest("#" + shortcutsId);
+                  if (!(panel instanceof HTMLElement)) {
+                    return null;
+                  }
+
+                  const pin = target.closest(".ai-correction-action-pin");
+                  const shell = target.closest(".ai-correction-shortcut-shell");
+                  if (!(shell instanceof HTMLElement)) {
+                    return null;
+                  }
+
+                  if (!(pin instanceof HTMLElement) && !isShortcutPinIntent(event, shell)) {
+                    return null;
+                  }
+
+                  const id =
+                    (pin instanceof HTMLElement ? String(pin.dataset.pinActionId || "").trim() : "") ||
+                    String(
+                      (shell.querySelector(".ai-correction-shortcut-action") || shell.querySelector(".ai-correction-action-pin"))
+                        ?.dataset?.shortcutFor ||
+                        (shell.querySelector(".ai-correction-action-pin") || {}).dataset?.pinActionId ||
+                        ""
+                    ).trim();
+
+                  return id ? { id, shell } : null;
+                };
+
+                const installShortcutPinDelegates = () => {
+                  const removeFromShortcut = (event) => {
+                    const target = getShortcutPinTarget(event);
+                    if (!target) {
+                      return;
+                    }
+                    stopShortcutPinEvent(event);
+                    removePinnedId(target.id);
+                  };
+
+                  document.addEventListener("pointerdown", removeFromShortcut, true);
+                  document.addEventListener("mousedown", removeFromShortcut, true);
+                  document.addEventListener("click", removeFromShortcut, true);
+                };
+
+                const installStorageListener = () => {
+                  window.addEventListener("message", (event) => {
+                    const message = event && event.data ? event.data.pluginMessage : null;
+                    if (!message || typeof message !== "object" || message.type !== "ai-correction-shortcuts-state") {
+                      return;
+                    }
+
+                    const storedIds = normalizePinnedIds(message.pinnedIds);
+                    if (storedIds.length || !pinnedIds.length) {
+                      pinnedIds = storedIds;
+                      try {
+                        const storage = window.localStorage;
+                        if (storage) {
+                          if (pinnedIds.length) {
+                            storage.setItem(storageKey, JSON.stringify(pinnedIds));
+                          } else {
+                            storage.removeItem(storageKey);
+                          }
+                        }
+                      } catch (error) {}
+                      updatePinButtons();
+                      renderShortcuts();
+                      return;
+                    }
+
+                    writePinnedIds();
+                  });
+                };
+
+                const wireShortcutShell = (shell, id) => {
+                  if (!(shell instanceof HTMLElement)) {
+                    return;
+                  }
+                  shell.addEventListener(
+                    "pointerdown",
+                    (event) => {
+                      if (isShortcutPinIntent(event, shell)) {
+                        stopShortcutPinEvent(event);
+                      }
+                    },
+                    true
+                  );
+                  shell.addEventListener(
+                    "click",
+                    (event) => {
+                      if (!isShortcutPinIntent(event, shell)) {
+                        return;
+                      }
+                      stopShortcutPinEvent(event);
+                      removePinnedId(id);
+                    },
+                    true
+                  );
+                };
+
+                const renderShortcuts = () => {
+                  const panel = ensureShortcutPanel();
+                  if (!(panel instanceof HTMLElement)) {
+                    return;
+                  }
+                  const actions = panel.querySelector(".ai-correction-shortcuts-actions");
+                  if (!(actions instanceof HTMLElement)) {
+                    return;
+                  }
+
+                  isRendering = true;
+                  try {
+                    actions.textContent = "";
+                    const visibleIds = pinnedIds.filter((id) => {
+                      const source = getOriginalButton(id);
+                      return source instanceof HTMLButtonElement && !isActionHidden(source);
+                    });
+
+                    visibleIds.forEach((id) => {
+                      const source = getOriginalButton(id);
+                      if (!(source instanceof HTMLButtonElement)) {
+                        return;
+                      }
+                      const shell = document.createElement("div");
+                      shell.className = "ai-correction-action-shell ai-correction-shortcut-shell";
+                      wireShortcutShell(shell, id);
+                      shell.appendChild(createShortcutButton(source, id));
+                      shell.appendChild(createPinButton(id, { removeOnly: true }));
+                      actions.appendChild(shell);
+                    });
+
+                    panel.hidden = visibleIds.length === 0;
+                  } finally {
+                    isRendering = false;
+                  }
+                  updatePinButtons();
+                };
+
+                function togglePinnedId(id) {
+                  const normalizedId = String(id || "").trim();
+                  if (!normalizedId) {
+                    return;
+                  }
+                  const index = pinnedIds.indexOf(normalizedId);
+                  if (index >= 0) {
+                    pinnedIds.splice(index, 1);
+                  } else {
+                    pinnedIds.push(normalizedId);
+                  }
+                  applyPinnedIdsChange();
+                }
+
+                function scheduleRefresh() {
+                  if (renderFrame) {
+                    return;
+                  }
+                  renderFrame = requestAnimationFrame(() => {
+                    renderFrame = 0;
+                    ensureActionPins();
+                    renderShortcuts();
+                  });
+                }
+
+                const installObserver = () => {
+                  const root = document.getElementById("viewAi") || document.body;
+                  if (!(root instanceof HTMLElement) || typeof MutationObserver !== "function") {
+                    return;
+                  }
+                  const observer = new MutationObserver(() => {
+                    if (isRendering || isWrapping) {
+                      return;
+                    }
+                    scheduleRefresh();
+                  });
+                  observer.observe(root, {
+                    attributes: true,
+                    attributeFilter: [
+                      "aria-busy",
+                      "aria-disabled",
+                      "aria-hidden",
+                      "class",
+                      "data-plan-lock-label",
+                      "data-plan-locked",
+                      "data-plan-required-tier",
+                      "disabled",
+                      "hidden",
+                    ],
+                    childList: true,
+                    characterData: true,
+                    subtree: true,
+                  });
+                };
+
+                const start = () => {
+                  pinnedIds = readPinnedIds();
+                  ensureShortcutPanel();
+                  ensureActionPins();
+                  renderShortcuts();
+                  installStorageListener();
+                  installObserver();
+                  installShortcutPinDelegates();
+                  requestPinnedIds();
+                  window.__PIGMA_AI_CORRECTION_REFRESH_SHORTCUTS__ = scheduleRefresh;
+                };
+
+                if (document.readyState === "loading") {
+                  window.addEventListener("DOMContentLoaded", start, { once: true });
+                } else {
+                  start();
+                }
+              })();
             </script>
 
             <script>
@@ -25132,9 +25998,29 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
           });
         }
 
+        const runPixelPerfectShortcut = () => {
+          if (isApplying) {
+            return false;
+          }
+
+          setButtonBusy(true);
+          setStatus("running", "running");
+          elements.panelTitle.textContent = "Pixel perfect running";
+          elements.panelCopy.textContent = pixelRunningCopy;
+          postPluginMessage({ type: "run-ai-pixel-perfect" });
+          return true;
+        };
+
         window.__PIGMA_AI_CORRECTION_PIXEL_PERFECT__ = {
           requestCachedResult,
+          run: runPixelPerfectShortcut,
         };
+        window.__PIGMA_AI_CORRECTION_SHORTCUT_RUNNERS__ =
+          window.__PIGMA_AI_CORRECTION_SHORTCUT_RUNNERS__ || {};
+        window.__PIGMA_AI_CORRECTION_SHORTCUT_RUNNERS__.aiPixelPerfectButton = runPixelPerfectShortcut;
+        if (typeof window.__PIGMA_AI_CORRECTION_REFRESH_SHORTCUTS__ === "function") {
+          window.__PIGMA_AI_CORRECTION_REFRESH_SHORTCUTS__();
+        }
       })();
     </script>
     <script>
@@ -25465,9 +26351,29 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
           });
         }
 
+        const runPixelPerfectClearShortcut = () => {
+          if (isApplying) {
+            return false;
+          }
+
+          setButtonBusy(true);
+          setStatus("running", "running");
+          elements.panelTitle.textContent = "Pixel perfect annotations clearing";
+          elements.panelCopy.textContent = "Clearing pixel perfect annotations in the current selection.";
+          postPluginMessage({ type: "run-ai-pixel-perfect-clear" });
+          return true;
+        };
+
         window.__PIGMA_AI_CORRECTION_PIXEL_PERFECT_CLEAR__ = {
           requestCachedResult,
+          run: runPixelPerfectClearShortcut,
         };
+        window.__PIGMA_AI_CORRECTION_SHORTCUT_RUNNERS__ =
+          window.__PIGMA_AI_CORRECTION_SHORTCUT_RUNNERS__ || {};
+        window.__PIGMA_AI_CORRECTION_SHORTCUT_RUNNERS__.aiPixelPerfectClearButton = runPixelPerfectClearShortcut;
+        if (typeof window.__PIGMA_AI_CORRECTION_REFRESH_SHORTCUTS__ === "function") {
+          window.__PIGMA_AI_CORRECTION_REFRESH_SHORTCUTS__();
+        }
       })();
     </script>
     <script>
@@ -48528,6 +49434,22 @@ ${buildReferencePromptOutputRules()}
             visualBusy: false,
           },
           {
+            buttonId: "aiSelectSameColorButton",
+            defaultLabel: "\uAC19\uC740 \uC0C9 \uC120\uD0DD",
+            runningLabel: "\uAC19\uC740 \uC0C9 \uC120\uD0DD \uC911...",
+            runMessage: { type: "run-select-same-color" },
+            statusType: "select-same-color-status",
+            finishTypes: ["select-same-color-result", "select-same-color-error"],
+          },
+          {
+            buttonId: "aiSelectSimilarColorButton",
+            defaultLabel: "\uBE44\uC2B7\uD55C \uC0C9 \uC120\uD0DD",
+            runningLabel: "\uBE44\uC2B7\uD55C \uC0C9 \uC120\uD0DD \uC911...",
+            runMessage: { type: "run-select-similar-color" },
+            statusType: "select-similar-color-status",
+            finishTypes: ["select-similar-color-result", "select-similar-color-error"],
+          },
+          {
             buttonId: "aiUnlockLockedLayersButton",
             defaultLabel: "\uC7A0\uAE34 \uB808\uC774\uC5B4 \uD574\uC81C",
             runningLabel: "\uC7A0\uAE08 \uD574\uC81C \uC911...",
@@ -48686,6 +49608,36 @@ ${buildReferencePromptOutputRules()}
           return window.confirm(translateUiMessage(buildDeleteConfirmMessage(result)));
         };
 
+        const runLayerCleanupAction = async (config) => {
+          if (!config) {
+            return false;
+          }
+
+          const state = states.get(config.buttonId);
+          if (!state || state.isRunning || state.isChoosing) {
+            return false;
+          }
+
+          if (config.modePicker === "split-long-frame") {
+            state.isChoosing = true;
+            const splitMode = await openSplitModeModal();
+            state.isChoosing = false;
+            if (!splitMode) {
+              return false;
+            }
+            setButtonBusy(config, true);
+            postPluginMessage({
+              ...config.runMessage,
+              splitMode,
+            });
+            return true;
+          }
+
+          setButtonBusy(config, true);
+          postPluginMessage(config.previewMessage || config.runMessage);
+          return true;
+        };
+
         configs.forEach((config) => {
           const button = document.getElementById(config.buttonId);
           if (!(button instanceof HTMLButtonElement)) {
@@ -48701,31 +49653,21 @@ ${buildReferencePromptOutputRules()}
             isChoosing: false,
           });
 
-          button.addEventListener("click", async () => {
-            const state = states.get(config.buttonId);
-            if (!state || state.isRunning || state.isChoosing) {
-              return;
-            }
-
-            if (config.modePicker === "split-long-frame") {
-              state.isChoosing = true;
-              const splitMode = await openSplitModeModal();
-              state.isChoosing = false;
-              if (!splitMode) {
-                return;
-              }
-              setButtonBusy(config, true);
-              postPluginMessage({
-                ...config.runMessage,
-                splitMode,
-              });
-              return;
-            }
-
-            setButtonBusy(config, true);
-            postPluginMessage(config.previewMessage || config.runMessage);
+          button.addEventListener("click", () => {
+            runLayerCleanupAction(config);
           });
         });
+
+        window.__PIGMA_AI_CORRECTION_SHORTCUT_RUNNERS__ =
+          window.__PIGMA_AI_CORRECTION_SHORTCUT_RUNNERS__ || {};
+        configs.forEach((config) => {
+          if (config && config.buttonId) {
+            window.__PIGMA_AI_CORRECTION_SHORTCUT_RUNNERS__[config.buttonId] = () => runLayerCleanupAction(config);
+          }
+        });
+        if (typeof window.__PIGMA_AI_CORRECTION_REFRESH_SHORTCUTS__ === "function") {
+          window.__PIGMA_AI_CORRECTION_REFRESH_SHORTCUTS__();
+        }
 
         refreshStableAiCorrectionActionLocalization();
         document.getElementById("uiLanguageSelect")?.addEventListener("change", () => {
@@ -66338,6 +67280,8 @@ UPNG.encode.alphaMul = function(img, roundA) {
           "split-long-frame",
           "pixel-perfect",
           "select-all-text",
+          "select-same-color",
+          "select-similar-color",
           "button-text-auto-size",
           "skew-transform",
           "corner-radius-adjust",

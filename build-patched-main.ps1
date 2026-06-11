@@ -17,6 +17,7 @@ $skewTransformPatch = Join-Path $root "skew-transform.js"
 $cornerRadiusAdjustPatch = Join-Path $root "corner-radius-adjust.js"
 $buttonTextAutoSizePatch = Join-Path $root "button-text-auto-size.js"
 $selectAllTextPatch = Join-Path $root "select-all-text.js"
+$selectColorMatchesPatch = Join-Path $root "select-color-matches.js"
 $textLineHeightAdjustPatch = Join-Path $root "text-line-height-adjust.js"
 $unlockLockedLayersPatch = Join-Path $root "unlock-locked-layers.js"
 $detachLinkedComponentsPatch = Join-Path $root "detach-linked-components.js"
@@ -124,6 +125,10 @@ if (-not (Test-Path $buttonTextAutoSizePatch)) {
 
 if (-not (Test-Path $selectAllTextPatch)) {
   throw "Missing select all text patch: $selectAllTextPatch"
+}
+
+if (-not (Test-Path $selectColorMatchesPatch)) {
+  throw "Missing select color matches patch: $selectColorMatchesPatch"
 }
 
 if (-not (Test-Path $textLineHeightAdjustPatch)) {
@@ -314,6 +319,7 @@ $runtimeSyntaxSourceFiles = @(
   $cornerRadiusAdjustPatch,
   $buttonTextAutoSizePatch,
   $selectAllTextPatch,
+  $selectColorMatchesPatch,
   $textLineHeightAdjustPatch,
   $unlockLockedLayersPatch,
   $detachLinkedComponentsPatch,
@@ -3485,6 +3491,7 @@ $skewTransformPatchContent = [System.IO.File]::ReadAllText($skewTransformPatch, 
 $cornerRadiusAdjustPatchContent = [System.IO.File]::ReadAllText($cornerRadiusAdjustPatch, [System.Text.Encoding]::UTF8)
 $buttonTextAutoSizePatchContent = [System.IO.File]::ReadAllText($buttonTextAutoSizePatch, [System.Text.Encoding]::UTF8)
 $selectAllTextPatchContent = [System.IO.File]::ReadAllText($selectAllTextPatch, [System.Text.Encoding]::UTF8)
+$selectColorMatchesPatchContent = [System.IO.File]::ReadAllText($selectColorMatchesPatch, [System.Text.Encoding]::UTF8)
 $textLineHeightAdjustPatchContent = [System.IO.File]::ReadAllText($textLineHeightAdjustPatch, [System.Text.Encoding]::UTF8)
 $unlockLockedLayersPatchContent = [System.IO.File]::ReadAllText($unlockLockedLayersPatch, [System.Text.Encoding]::UTF8)
 $detachLinkedComponentsPatchContent = [System.IO.File]::ReadAllText($detachLinkedComponentsPatch, [System.Text.Encoding]::UTF8)
@@ -3517,6 +3524,7 @@ $patchedRuntimeParts = @(
   $cornerRadiusAdjustPatchContent,
   $buttonTextAutoSizePatchContent,
   $selectAllTextPatchContent,
+  $selectColorMatchesPatchContent,
   $textLineHeightAdjustPatchContent,
   $unlockLockedLayersPatchContent,
   $detachLinkedComponentsPatchContent,

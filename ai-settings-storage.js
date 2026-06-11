@@ -4,6 +4,7 @@
   // panel reloads and full Figma app restarts.
   const originalOnMessage = figma.ui.onmessage;
   const AI_SETTINGS_KEY = "pigma:ai-settings:v1";
+  const AI_CORRECTION_SHORTCUTS_KEY = "pigma:ai-correction-action-shortcuts:v1";
   const DEFAULT_AI_SETTINGS = Object.freeze({
     enabled: false,
     provider: "openai",
@@ -27,6 +28,17 @@
   }
 
   figma.ui.onmessage = async message => {
+    if (isAiCorrectionShortcutsMessage(message)) {
+      if (message.type === "request-ai-correction-shortcuts") {
+        await postAiCorrectionShortcuts();
+        return;
+      }
+
+      await writeAiCorrectionShortcuts(message.pinnedIds);
+      await postAiCorrectionShortcuts();
+      return;
+    }
+
     if (isAiSettingsMessage(message)) {
       if (message.type === "request-ai-settings") {
         await postAiSettings();
@@ -43,6 +55,37 @@
 
   function isAiSettingsMessage(message) {
     return !!message && (message.type === "request-ai-settings" || message.type === "update-ai-settings");
+  }
+
+  function isAiCorrectionShortcutsMessage(message) {
+    return (
+      !!message &&
+      (message.type === "request-ai-correction-shortcuts" ||
+        message.type === "update-ai-correction-shortcuts")
+    );
+  }
+
+  async function postAiCorrectionShortcuts() {
+    figma.ui.postMessage({
+      type: "ai-correction-shortcuts-state",
+      pinnedIds: await readAiCorrectionShortcuts()
+    });
+  }
+
+  async function readAiCorrectionShortcuts() {
+    try {
+      return normalizeShortcutIds(await figma.clientStorage.getAsync(AI_CORRECTION_SHORTCUTS_KEY));
+    } catch (error) {
+      return [];
+    }
+  }
+
+  async function writeAiCorrectionShortcuts(pinnedIds) {
+    const next = normalizeShortcutIds(pinnedIds);
+    try {
+      await figma.clientStorage.setAsync(AI_CORRECTION_SHORTCUTS_KEY, next);
+    } catch (error) {}
+    return next;
   }
 
   async function postAiSettings() {
@@ -211,5 +254,24 @@
     }
 
     return normalized.slice(0, 200);
+  }
+
+  function normalizeShortcutIds(value) {
+    const source = Array.isArray(value) ? value : [];
+    const normalized = [];
+    const seen = new Set();
+
+    for (const item of source) {
+      const id = String(item || "")
+        .replace(/[\u0000-\u001F\u007F-\u009F]/g, "")
+        .trim();
+      if (!id || seen.has(id)) {
+        continue;
+      }
+      seen.add(id);
+      normalized.push(id);
+    }
+
+    return normalized.slice(0, 80);
   }
 })();

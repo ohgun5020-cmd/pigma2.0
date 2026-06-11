@@ -23,6 +23,7 @@ const defaultFiles = [
   { file: "corner-radius-adjust.js" },
   { file: "button-text-auto-size.js" },
   { file: "select-all-text.js" },
+  { file: "select-color-matches.js" },
   { file: "text-line-height-adjust.js" },
   { file: "unlock-locked-layers.js" },
   { file: "detach-linked-components.js" },
