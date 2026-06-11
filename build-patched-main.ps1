@@ -50,6 +50,7 @@ $shapeLayerExportVerifier = Join-Path $root "verify-psd-shape-layer-export.js"
 $figmaRuntimeSyntaxVerifier = Join-Path $root "verify-figma-runtime-syntax.js"
 $messageHandlerVerifier = Join-Path $root "verify-message-handler-pass-through.js"
 $uiRuntimeMessageVerifier = Join-Path $root "verify-ui-runtime-message-types.js"
+$uiSourceBoundaryVerifier = Join-Path $root "verify-ui-source-boundary.js"
 $fontPostScriptMapBuilder = Join-Path $root "build-font-postscript-map.js"
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
@@ -256,6 +257,10 @@ if (-not (Test-Path $uiRuntimeMessageVerifier)) {
   throw "Missing UI/runtime message verifier: $uiRuntimeMessageVerifier"
 }
 
+if (-not (Test-Path $uiSourceBoundaryVerifier)) {
+  throw "Missing UI source boundary verifier: $uiSourceBoundaryVerifier"
+}
+
 & node $pdfJsInlineAssetCleanup
 if ($LASTEXITCODE -ne 0) {
   throw "Failed to remove inline PDF.js assets from ui.html"
@@ -338,6 +343,11 @@ if ($LASTEXITCODE -ne 0) {
 & node $uiRuntimeMessageVerifier
 if ($LASTEXITCODE -ne 0) {
   throw "UI/runtime message type verification failed."
+}
+
+& node $uiSourceBoundaryVerifier
+if ($LASTEXITCODE -ne 0) {
+  throw "UI source boundary verification failed."
 }
 
 function Replace-Exact {

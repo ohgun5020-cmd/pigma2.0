@@ -173,13 +173,15 @@ Recommended notice JSON shape:
   - Source of truth for the original-image download button's plugin-side image-hash collection and byte export pipeline.
   - In the externalized UI, 1-2 images download individually and 3 or more are packaged into a ZIP automatically.
 - `ui-ai-correction.js`
-  - Source of truth for `편집하기` feature logic and AI-only behavior. The `편집하기` UI itself lives in `ui.html`.
+  - Reference mirror for older AI correction UI logic. Runtime source of truth currently lives in `ui.html`; do not wire this file into `ui.html` unless the source boundary is deliberately redesigned.
 - `externalize-embedded-ui.js`
   - Replaces embedded `figma.showUI(...)` HTML with `__html__`.
 - `sync-pdfjs-inline-assets.js`
   - Removes any stale inline PDF.js asset block from `ui.html`; PDF.js is loaded from the hosted web-assets directory at runtime.
 - `verify-externalized-ui.js`
   - Fails if a bundle stops using `figma.showUI(__html__, ...)`.
+- `verify-ui-source-boundary.js`
+  - Parses live UI scripts and keeps `ui-ai-correction.js` as a reference mirror instead of a second live controller.
 - `text-import-guard.contract.json`
   - Contract for the import text guard.
 - `verify-text-import-guard.js`
@@ -317,11 +319,12 @@ Manual testing rule: test the visible action changed in the current step first. 
 node verify-figma-runtime-syntax.js
 node verify-message-handler-pass-through.js
 node verify-ui-runtime-message-types.js
+node verify-ui-source-boundary.js
 node verify-externalized-ui.js code.patched.js
 node -c code.patched.js
 ```
 
-When `ui.html` changes, also run a browser-script parse check with `new Function(...)` over every inline script block. When source patch files change, run `node -c` for every edited patch file before rebuilding.
+`verify-ui-source-boundary.js` includes the browser-script parse check for `ui.html` inline scripts and the allowed external UI scripts. When source patch files change, run `node -c` for every edited patch file before rebuilding.
 
 #### Step log
 
@@ -523,8 +526,8 @@ When `ui.html` changes, also run a browser-script parse check with `new Function
    - `node verify-figma-runtime-syntax.js`
    - `node verify-message-handler-pass-through.js`
    - `node verify-ui-runtime-message-types.js`
+   - `node verify-ui-source-boundary.js`
    - `node -c code.patched.js`
-   - Run a `ui.html` script parse check as well whenever AI correction UI scripts changed.
 5. Load `manifest.json` as the local plugin entry in Figma.
 
 ## Important Rules
