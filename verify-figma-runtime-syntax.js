@@ -24,7 +24,7 @@ const defaultFiles = [
   "clear-frame-guides.js",
   "split-long-frame.js",
   "original-image-download.js",
-  "ai-image-upscale.js",
+  "ai-image-shared-bridge.js",
 ];
 
 const inputFiles = process.argv.slice(2);

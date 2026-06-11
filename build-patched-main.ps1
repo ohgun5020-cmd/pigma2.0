@@ -27,7 +27,7 @@ $splitLongFramePatch = Join-Path $root "split-long-frame.js"
 $copyPrototypeLinkPatch = Join-Path $root "copy-prototype-link.js"
 $aiColorExtractPatch = Join-Path $root "ai-color-extract.js"
 $originalImageDownloadPatch = Join-Path $root "original-image-download.js"
-$aiImageUpscalePatch = Join-Path $root "ai-image-upscale.js"
+$aiImageSharedBridgePatch = Join-Path $root "ai-image-shared-bridge.js"
 $destination = Join-Path $root "code.patched.js"
 $uiSource = Join-Path $root "ui.html"
 $pdfJsInlineAssetCleanup = Join-Path $root "sync-pdfjs-inline-assets.js"
@@ -163,8 +163,8 @@ if (-not (Test-Path $aiColorExtractPatch)) {
 }
 
 $hasOriginalImageDownloadPatch = Test-Path $originalImageDownloadPatch
-if (-not (Test-Path $aiImageUpscalePatch)) {
-  throw "Missing AI image upscale patch: $aiImageUpscalePatch"
+if (-not (Test-Path $aiImageSharedBridgePatch)) {
+  throw "Missing AI image shared bridge patch: $aiImageSharedBridgePatch"
 }
 
 if (-not (Test-Path $uiSource)) {
@@ -323,7 +323,7 @@ $runtimeSyntaxSourceFiles = @(
   $splitLongFramePatch,
   $copyPrototypeLinkPatch,
   $aiColorExtractPatch,
-  $aiImageUpscalePatch
+  $aiImageSharedBridgePatch
 )
 
 if ($hasOriginalImageDownloadPatch) {
@@ -3494,7 +3494,7 @@ $clearFrameGuidesPatchContent = [System.IO.File]::ReadAllText($clearFrameGuidesP
 $splitLongFramePatchContent = [System.IO.File]::ReadAllText($splitLongFramePatch, [System.Text.Encoding]::UTF8)
 $copyPrototypeLinkPatchContent = [System.IO.File]::ReadAllText($copyPrototypeLinkPatch, [System.Text.Encoding]::UTF8)
 $aiColorExtractPatchContent = [System.IO.File]::ReadAllText($aiColorExtractPatch, [System.Text.Encoding]::UTF8)
-$aiImageUpscalePatchContent = [System.IO.File]::ReadAllText($aiImageUpscalePatch, [System.Text.Encoding]::UTF8)
+$aiImageSharedBridgePatchContent = [System.IO.File]::ReadAllText($aiImageSharedBridgePatch, [System.Text.Encoding]::UTF8)
 $originalImageDownloadPatchContent = ""
 if ($hasOriginalImageDownloadPatch) {
   $originalImageDownloadPatchContent = [System.IO.File]::ReadAllText($originalImageDownloadPatch, [System.Text.Encoding]::UTF8)
@@ -3526,7 +3526,7 @@ $patchedRuntimeParts = @(
   $splitLongFramePatchContent,
   $copyPrototypeLinkPatchContent,
   $aiColorExtractPatchContent,
-  $aiImageUpscalePatchContent
+  $aiImageSharedBridgePatchContent
 )
 
 if ($hasOriginalImageDownloadPatch -and $originalImageDownloadPatchContent.Trim().Length -gt 0) {

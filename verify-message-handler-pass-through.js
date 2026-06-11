@@ -32,7 +32,7 @@ const defaultFiles = [
   { file: "split-long-frame.js" },
   { file: "copy-prototype-link.js" },
   { file: "ai-color-extract.js" },
-  { file: "ai-image-upscale.js" },
+  { file: "ai-image-shared-bridge.js" },
   { file: "original-image-download.js", optional: true },
   { file: "ai-design-chat.js" },
 ];

@@ -33,7 +33,7 @@ const runtimeFiles = [
   "split-long-frame.js",
   "copy-prototype-link.js",
   "ai-color-extract.js",
-  "ai-image-upscale.js",
+  "ai-image-shared-bridge.js",
   "original-image-download.js",
   "ai-design-chat.js",
 ];

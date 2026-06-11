@@ -39903,7 +39903,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
 ;(() => {
   const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
-  if (globalScope.__PIGMA_AI_IMAGE_UPSCALE_PATCH__) {
+  if (globalScope.__PIGMA_AI_IMAGE_SHARED_BRIDGE_PATCH__) {
     return;
   }
 
@@ -40006,7 +40006,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   }
 
   figma.ui.onmessage = async (message) => {
-    if (isAiImageUpscaleMessage(message)) {
+    if (isAiImageSharedBridgeMessage(message)) {
       if (message.type === "request-ai-image-upscale-source") {
         await prepareUpscaleSource(message);
         return;
@@ -40125,9 +40125,9 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     return originalOnMessage(message);
   };
 
-  globalScope.__PIGMA_AI_IMAGE_UPSCALE_PATCH__ = true;
+  globalScope.__PIGMA_AI_IMAGE_SHARED_BRIDGE_PATCH__ = true;
 
-  function isAiImageUpscaleMessage(message) {
+  function isAiImageSharedBridgeMessage(message) {
     return (
       !!message &&
       (message.type === "request-ai-image-upscale-source" ||

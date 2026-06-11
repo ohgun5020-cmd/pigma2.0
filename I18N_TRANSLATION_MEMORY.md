@@ -52,7 +52,7 @@ Updated: 2026-05-08
 | `original-image-download.js` | Original image search/save status, empty-selection toasts, read/prepare errors, download result labels |
 | `ai-color-extract.js` | Prepare/apply status, one-target validation, palette name, empty result toast, success toast, browser-analysis failure |
 | `ai-color-extract-ui.js` | Init failure, busy labels, processing toast labels, peer-busy error, UI error bridge |
-| `ai-image-upscale.js` | Large image task constants, original size fit, bounds-fit, reference search, prompt draft, extend, composite, text overlay, selected fill errors |
+| `ai-image-shared-bridge.js` | Large image task constants, original size fit, bounds-fit, reference search, prompt draft, extend, composite, text overlay, selected fill errors |
 | `code.patched.js` | Generated bundle mirrors the source patches above; do not edit only this file unless doing an emergency bundle patch |
 
 ## English UI Areas Already Listed In The Map

@@ -267,7 +267,7 @@ Current stabilization target: keep the plugin alive while reducing the hidden co
 - Design Assist is retired for now. Keep the disabled UI stub only where other UI modules still call `window.__PIGMA_AI_DESIGN_ASSIST__`; do not reintroduce plugin runtime messages unless the feature is deliberately revived with a real handler.
 - The visible UI does not expose design-read/accessibility as a normal user action. `aiReadDesignButton` is hidden/debug-only; `ai-accessibility-diagnosis.js` remains bundled for compatibility, while `ai-design-read.js` is inactive legacy source.
 - Use the active menu map below before choosing manual tests. A source file is not a manual-test target unless a visible button or active runtime path reaches it.
-- Long-running risk is highest around the shared image source/apply bridge in `ai-image-upscale.js`, then full-tree scans in bundled AI correction features such as accessibility compatibility, design consistency, typo, and pixel-perfect features. The direct image-upscale UI has been removed for now, but this file still backs visible image tools such as image extend, prompt edit/generation, reference search, image merge, and image text extraction.
+- Long-running risk is highest around the shared image source/apply bridge in `ai-image-shared-bridge.js`, then full-tree scans in bundled AI correction features such as accessibility compatibility, design consistency, typo, and pixel-perfect features. The direct image-upscale UI has been removed for now, but this file still backs visible image tools such as image extend, prompt edit/generation, reference search, image merge, and image text extraction.
 - Pixel-perfect default correction scope is `x`, `y`, `width`, `height`, `fontSize`, and auto-layout spacing/padding only. Broader style snapping belongs in a separate feature.
 
 #### Active menu map
@@ -368,7 +368,7 @@ node -c code.patched.js
   - Scope: made `analyzeCurrentSelection()` async, yielded every 80 scanned nodes, and posted scan progress every 240 nodes while preserving the result schema, annotation flow, and fix plans.
   - Verification: `node -c ai-accessibility-diagnosis.js`, `verify-figma-runtime-syntax.js ai-accessibility-diagnosis.js`, `build-patched-main.ps1`, `verify-figma-runtime-syntax.js`, `verify-externalized-ui.js code.patched.js`, `node -c code.patched.js`, and `git diff --check` passed. `git diff --check` only reported existing CRLF conversion warnings.
   - Later audit: the visible UI hides `aiReadDesignButton`; this compatibility path should not be part of the normal manual smoke test.
-  - Follow-up: after visible Figma smoke testing, inspect the remaining high-risk long operation in `ai-image-upscale.js` because repeated `exportAsync` calls can still hold the runtime for large selections.
+  - Follow-up: after visible Figma smoke testing, inspect the remaining high-risk long operation in `ai-image-shared-bridge.js` because repeated `exportAsync` calls can still hold the runtime for large selections.
 - 2026-05-20 step 8: removed the inactive `ai-design-read.js` build dependency.
   - Reason: the visible UI no longer exposes design read, and the build did not append `ai-design-read.js` to `code.patched.js`, but the script still required and syntax-verified the file.
   - Scope: removed the unused path variable, missing-file guard, and runtime syntax verifier entry from `build-patched-main.ps1`. Runtime behavior and the generated bundle source list are otherwise unchanged.
@@ -512,8 +512,11 @@ node -c code.patched.js
 
 - 2026-06-11 follow-up: removed the direct image-upscale UI controllers.
   - Reason: the current direct upscale UI is removed and will be redesigned later.
-  - Scope: deleted `해상도 높이기` and `이미지 업스케일 (사물)` UI entries, removed those actions from AI API gating maps, and deleted the active plus legacy upscale UI controller scripts. Kept `ai-image-upscale.js` bundled because it still provides the shared source/apply bridge used by other visible image tools.
+  - Scope: deleted `해상도 높이기` and `이미지 업스케일 (사물)` UI entries, removed those actions from AI API gating maps, and deleted the active plus legacy upscale UI controller scripts. Kept the shared source/apply bridge bundled because it still provides behavior used by other visible image tools.
   - Manual test: no direct upscale test. Regression-check one visible shared-image action such as `이미지 영역 확장` or `프롬프트 편집/생성` after reload.
+- 2026-06-11 follow-up: renamed the shared image bridge source.
+  - Reason: `ai-image-upscale.js` looked like a removed direct-upscale feature file even though it is still a shared source/apply bridge.
+  - Scope: renamed the source to `ai-image-shared-bridge.js` and updated build plus verifier file lists. Existing `ai-image-upscale-*` message names remain for runtime compatibility.
 
 1. Edit `ui.html` for UI-only changes.
    - Keep `편집하기` screen markup and styles in `ui.html`.
