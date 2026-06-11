@@ -10,6 +10,8 @@
   const VIEWPORT_FOCUS_LIMIT = 80;
   const BASE_SELECTION_SYNC_SUPPRESS_MS = 2500;
   const BASE_SELECTION_SYNC_REFRESH_DELAY_MS = 2600;
+  const GROUP_DELTA_E_THRESHOLD = 4.5;
+  const GROUP_ALPHA_THRESHOLD = 0.04;
   const SIMILAR_DELTA_E_THRESHOLD = 18;
   const SIMILAR_ALPHA_THRESHOLD = 0.28;
   const MAX_TEXT_RANGE_SCAN = 8000;
@@ -20,6 +22,16 @@
   }
 
   figma.ui.onmessage = async (message) => {
+    if (isGroupSimilarColorsMessage(message)) {
+      if (isRunning) {
+        postGroupStatus("running", "\uBE44\uC2B7\uD55C \uC0C9\uC744 \uC815\uB9AC\uD558\uACE0 \uC788\uC2B5\uB2C8\uB2E4.");
+        return;
+      }
+
+      await runGroupSimilarColors();
+      return;
+    }
+
     if (isSelectColorMessage(message)) {
       const mode = resolveMode(message);
       if (isRunning) {
@@ -36,6 +48,10 @@
 
   globalScope.__PIGMA_SELECT_COLOR_MATCHES_PATCH__ = true;
 
+  function isGroupSimilarColorsMessage(message) {
+    return !!message && message.type === "run-group-similar-colors";
+  }
+
   function isSelectColorMessage(message) {
     return (
       !!message &&
@@ -49,6 +65,29 @@
 
   function eventPrefix(mode) {
     return mode === "similar" ? "select-similar-color" : "select-same-color";
+  }
+
+  async function runGroupSimilarColors() {
+    isRunning = true;
+    postGroupStatus("running", "\uC120\uD0DD \uBC94\uC704\uC758 fill, stroke, \uD14D\uC2A4\uD2B8 \uC0C9\uC744 \uC2A4\uCE94\uD558\uACE0 \uC788\uC2B5\uB2C8\uB2E4.");
+
+    try {
+      const result = await groupSimilarColors();
+      figma.ui.postMessage({
+        type: "group-similar-colors-result",
+        result,
+      });
+      notifyGroupResult(result);
+    } catch (error) {
+      const message = normalizeErrorMessage(error, "\uBE44\uC2B7\uD55C \uC0C9\uC744 \uBB36\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.");
+      figma.ui.postMessage({
+        type: "group-similar-colors-error",
+        message,
+      });
+      figma.notify(message, { error: true, timeout: 3000 });
+    } finally {
+      isRunning = false;
+    }
   }
 
   async function runSelectColorMatches(mode) {
@@ -72,6 +111,33 @@
     } finally {
       isRunning = false;
     }
+  }
+
+  async function groupSimilarColors() {
+    const selection = Array.from(figma.currentPage.selection || []).filter(Boolean);
+    if (!selection.length) {
+      throw new Error("\uBE44\uC2B7\uD55C \uC0C9\uC744 \uBB36\uC744 \uD504\uB808\uC784\uC774\uB098 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694.");
+    }
+
+    const context = buildGroupingContext(selection);
+    const collection = await collectColorOccurrences(context.scopes);
+    if (!collection.occurrences.length) {
+      throw new Error("\uC120\uD0DD \uBC94\uC704\uC5D0\uC11C \uC815\uB9AC\uD560 SOLID fill, stroke, \uD14D\uC2A4\uD2B8 \uC0C9\uC744 \uCC3E\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.");
+    }
+
+    const clusters = buildSimilarColorClusters(collection.occurrences);
+    const applied = applySimilarColorClusters(clusters);
+    selectChangedNodes(applied.changed);
+
+    return buildGroupResult({
+      selection,
+      scopes: context.scopes,
+      scannedNodeCount: collection.scannedNodeCount,
+      occurrenceCount: collection.occurrences.length,
+      exactColorCount: collection.exactColorCount,
+      clusters,
+      applied,
+    });
   }
 
   async function selectColorMatches(mode) {
@@ -151,6 +217,26 @@
       sampleNodes,
       referenceColors: collectReferenceColors(sampleNodes),
     };
+  }
+
+  function buildGroupingContext(selection) {
+    const scopes = [];
+    const scopeIds = {};
+
+    for (let index = 0; index < selection.length; index += 1) {
+      const node = selection[index];
+      if (isFrameLikeScopeNode(node)) {
+        addUniqueNode(scopes, scopeIds, node);
+      }
+    }
+
+    if (!scopes.length) {
+      for (let index = 0; index < selection.length; index += 1) {
+        addUniqueNode(scopes, scopeIds, selection[index]);
+      }
+    }
+
+    return { scopes };
   }
 
   function addUniqueNode(list, seen, node) {
@@ -288,6 +374,378 @@
     );
   }
 
+  async function collectColorOccurrences(scopes) {
+    const occurrences = [];
+    const seenNodes = {};
+    const exactColors = {};
+    const stack = [];
+
+    for (let index = scopes.length - 1; index >= 0; index -= 1) {
+      const scope = scopes[index];
+      if (scope && !scope.removed) {
+        stack.push({ node: scope, path: safeName(scope) });
+      }
+    }
+
+    let scannedNodeCount = 0;
+    while (stack.length > 0) {
+      await yieldColorMatchTurn(scannedNodeCount, NODE_SCAN_YIELD_INTERVAL);
+      scannedNodeCount += 1;
+
+      const current = stack.pop();
+      const node = current && current.node;
+      if (!node || node.removed) {
+        continue;
+      }
+
+      const nodeId = safeNodeId(node);
+      if (nodeId && seenNodes[nodeId]) {
+        continue;
+      }
+      if (nodeId) {
+        seenNodes[nodeId] = true;
+      }
+
+      if (node.visible !== false) {
+        const nodeOccurrences = collectNodeColorOccurrences(node, current.path);
+        for (let index = 0; index < nodeOccurrences.length; index += 1) {
+          const occurrence = nodeOccurrences[index];
+          occurrences.push(occurrence);
+          exactColors[colorValueKey(occurrence.color)] = true;
+        }
+      }
+
+      const children = getChildren(node);
+      for (let childIndex = children.length - 1; childIndex >= 0; childIndex -= 1) {
+        const child = children[childIndex];
+        stack.push({
+          node: child,
+          path: current.path + " / " + safeName(child),
+        });
+      }
+    }
+
+    return {
+      occurrences,
+      scannedNodeCount,
+      exactColorCount: Object.keys(exactColors).length,
+    };
+  }
+
+  function collectNodeColorOccurrences(node, path) {
+    const occurrences = [];
+    if (!node || node.removed) {
+      return occurrences;
+    }
+
+    if (node.type === "TEXT" && typeof node.getRangeFills === "function" && typeof node.setRangeFills === "function") {
+      addTextRangeColorOccurrences(occurrences, node, path);
+    } else {
+      addPaintColorOccurrences(occurrences, node, path, node.fills, "fills", "fill");
+    }
+
+    addPaintColorOccurrences(occurrences, node, path, node.strokes, "strokes", "stroke");
+    addPaintColorOccurrences(occurrences, node, path, node.backgrounds, "backgrounds", "background");
+    addEffectColorOccurrences(occurrences, node, path, node.effects);
+    return occurrences;
+  }
+
+  function addPaintColorOccurrences(occurrences, node, path, paints, propertyName, role) {
+    if (!Array.isArray(paints)) {
+      return;
+    }
+
+    for (let index = 0; index < paints.length; index += 1) {
+      const paint = paints[index];
+      if (!isEditableSolidPaint(paint)) {
+        continue;
+      }
+      occurrences.push(createOccurrence(node, path, role, {
+        propertyName,
+        paintIndex: index,
+        color: paintToColor(paint, role),
+      }));
+    }
+  }
+
+  function addEffectColorOccurrences(occurrences, node, path, effects) {
+    if (!Array.isArray(effects)) {
+      return;
+    }
+
+    for (let index = 0; index < effects.length; index += 1) {
+      const effect = effects[index];
+      if (!effect || effect.visible === false || !effect.color || isVariableBoundColor(effect)) {
+        continue;
+      }
+      occurrences.push(createOccurrence(node, path, "effect", {
+        propertyName: "effects",
+        effectIndex: index,
+        color: {
+          r: clampUnit(effect.color.r),
+          g: clampUnit(effect.color.g),
+          b: clampUnit(effect.color.b),
+          a: normalizeAlpha(effect.color.a),
+          role: "effect",
+        },
+      }));
+    }
+  }
+
+  function addTextRangeColorOccurrences(occurrences, node, path) {
+    const characters = String(node.characters || "");
+    const limit = Math.min(characters.length, MAX_TEXT_RANGE_SCAN);
+    let active = null;
+
+    for (let index = 0; index < limit; index += 1) {
+      let paints = null;
+      try {
+        paints = node.getRangeFills(index, index + 1);
+      } catch (error) {
+        paints = null;
+      }
+
+      const match = getFirstEditableSolidPaint(paints);
+      const key = match ? colorValueKey(paintToColor(match.paint, "text")) : "";
+      if (active && active.key === key && match) {
+        active.end = index + 1;
+        continue;
+      }
+
+      if (active) {
+        occurrences.push(createOccurrence(node, path, "text", active));
+        active = null;
+      }
+
+      if (match) {
+        active = {
+          propertyName: "textRange",
+          start: index,
+          end: index + 1,
+          paintIndex: match.index,
+          color: paintToColor(match.paint, "text"),
+          key,
+        };
+      }
+    }
+
+    if (active) {
+      occurrences.push(createOccurrence(node, path, "text", active));
+    }
+  }
+
+  function createOccurrence(node, path, role, options) {
+    return {
+      node,
+      nodeId: safeNodeId(node),
+      nodeName: safeName(node),
+      nodeType: String(node && node.type ? node.type : "UNKNOWN"),
+      path,
+      role,
+      propertyName: options.propertyName,
+      paintIndex: typeof options.paintIndex === "number" ? options.paintIndex : -1,
+      effectIndex: typeof options.effectIndex === "number" ? options.effectIndex : -1,
+      start: typeof options.start === "number" ? options.start : -1,
+      end: typeof options.end === "number" ? options.end : -1,
+      color: options.color,
+    };
+  }
+
+  function buildSimilarColorClusters(occurrences) {
+    const statsByColor = {};
+    const stats = [];
+    for (let index = 0; index < occurrences.length; index += 1) {
+      const occurrence = occurrences[index];
+      const key = colorValueKey(occurrence.color);
+      let stat = statsByColor[key];
+      if (!stat) {
+        stat = {
+          key,
+          color: occurrence.color,
+          occurrences: [],
+          firstIndex: index,
+        };
+        statsByColor[key] = stat;
+        stats.push(stat);
+      }
+      stat.occurrences.push(occurrence);
+    }
+
+    stats.sort((first, second) => {
+      if (second.occurrences.length !== first.occurrences.length) {
+        return second.occurrences.length - first.occurrences.length;
+      }
+      return first.firstIndex - second.firstIndex;
+    });
+
+    const used = {};
+    const clusters = [];
+    for (let index = 0; index < stats.length; index += 1) {
+      const representative = stats[index];
+      if (!representative || used[representative.key]) {
+        continue;
+      }
+      used[representative.key] = true;
+      const members = [representative];
+
+      for (let nextIndex = index + 1; nextIndex < stats.length; nextIndex += 1) {
+        const candidate = stats[nextIndex];
+        if (!candidate || used[candidate.key]) {
+          continue;
+        }
+        const delta = colorDistance(representative.color, candidate.color);
+        const alphaDelta = Math.abs(normalizeAlpha(representative.color.a) - normalizeAlpha(candidate.color.a));
+        if (delta <= GROUP_DELTA_E_THRESHOLD && alphaDelta <= GROUP_ALPHA_THRESHOLD) {
+          used[candidate.key] = true;
+          candidate.delta = delta;
+          members.push(candidate);
+        }
+      }
+
+      if (members.length > 1) {
+        clusters.push({ representative, members });
+      }
+    }
+
+    return clusters;
+  }
+
+  function applySimilarColorClusters(clusters) {
+    const changed = [];
+    const skipped = [];
+    const changedNodeIds = {};
+    let changedOccurrenceCount = 0;
+    let mergedColorCount = 0;
+
+    for (let clusterIndex = 0; clusterIndex < clusters.length; clusterIndex += 1) {
+      const cluster = clusters[clusterIndex];
+      const representativeColor = cluster.representative.color;
+      for (let memberIndex = 1; memberIndex < cluster.members.length; memberIndex += 1) {
+        const member = cluster.members[memberIndex];
+        mergedColorCount += 1;
+        for (let occurrenceIndex = 0; occurrenceIndex < member.occurrences.length; occurrenceIndex += 1) {
+          const occurrence = member.occurrences[occurrenceIndex];
+          try {
+            if (setOccurrenceColor(occurrence, representativeColor)) {
+              changedOccurrenceCount += 1;
+              if (!changedNodeIds[occurrence.nodeId]) {
+                changedNodeIds[occurrence.nodeId] = true;
+                changed.push(occurrence);
+              }
+            }
+          } catch (error) {
+            skipped.push({
+              nodeId: occurrence.nodeId,
+              nodeName: occurrence.nodeName,
+              nodeType: occurrence.nodeType,
+              path: occurrence.path,
+              reason: normalizeErrorMessage(error, "\uC774 \uC0C9\uC744 \uB300\uD45C\uC0C9\uC73C\uB85C \uBC14\uAFB8\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4."),
+            });
+          }
+        }
+      }
+    }
+
+    return {
+      changed,
+      skipped,
+      changedOccurrenceCount,
+      changedNodeCount: changed.length,
+      mergedColorCount,
+    };
+  }
+
+  function setOccurrenceColor(occurrence, color) {
+    if (!occurrence || !occurrence.node || occurrence.node.removed) {
+      return false;
+    }
+
+    if (occurrence.propertyName === "textRange") {
+      return setTextRangeColor(occurrence, color);
+    }
+    if (occurrence.propertyName === "effects") {
+      return setEffectColor(occurrence, color);
+    }
+    return setPaintPropertyColor(occurrence, color);
+  }
+
+  function setPaintPropertyColor(occurrence, color) {
+    const node = occurrence.node;
+    const propertyName = occurrence.propertyName;
+    const source = node[propertyName];
+    if (!Array.isArray(source)) {
+      return false;
+    }
+    const paints = cloneArray(source);
+    const paint = paints[occurrence.paintIndex];
+    if (!isEditableSolidPaint(paint)) {
+      return false;
+    }
+    applyColorToSolidPaint(paint, color);
+    node[propertyName] = paints;
+    return true;
+  }
+
+  function setEffectColor(occurrence, color) {
+    const node = occurrence.node;
+    if (!Array.isArray(node.effects)) {
+      return false;
+    }
+    const effects = cloneArray(node.effects);
+    const effect = effects[occurrence.effectIndex];
+    if (!effect || !effect.color || isVariableBoundColor(effect)) {
+      return false;
+    }
+    effect.color = {
+      r: clampUnit(color.r),
+      g: clampUnit(color.g),
+      b: clampUnit(color.b),
+      a: normalizeAlpha(color.a),
+    };
+    node.effects = effects;
+    return true;
+  }
+
+  function setTextRangeColor(occurrence, color) {
+    const node = occurrence.node;
+    if (typeof node.getRangeFills !== "function" || typeof node.setRangeFills !== "function") {
+      return false;
+    }
+    const start = Math.max(0, occurrence.start);
+    const end = Math.max(start + 1, occurrence.end);
+    const source = node.getRangeFills(start, end);
+    if (!Array.isArray(source)) {
+      return false;
+    }
+    const paints = cloneArray(source);
+    const fallback = getFirstEditableSolidPaint(paints);
+    const paint = paints[occurrence.paintIndex] || (fallback ? fallback.paint : null);
+    if (!isEditableSolidPaint(paint)) {
+      return false;
+    }
+    applyColorToSolidPaint(paint, color);
+    node.setRangeFills(start, end, paints);
+    return true;
+  }
+
+  function selectChangedNodes(entries) {
+    const aliveEntries = entries.filter((entry) => entry && entry.node && !entry.node.removed);
+    if (!aliveEntries.length) {
+      return;
+    }
+
+    try {
+      suppressBaseSelectionSync();
+      figma.currentPage.selection = aliveEntries.map((entry) => entry.node);
+      if (aliveEntries.length <= VIEWPORT_FOCUS_LIMIT) {
+        figma.viewport.scrollAndZoomIntoView(aliveEntries.map((entry) => entry.node));
+      }
+    } catch (error) {
+      // Selection feedback is best-effort; the color changes are the main operation.
+    }
+    scheduleBaseSelectionSyncRefresh();
+  }
+
   function collectNodeColors(node, scanTextRanges) {
     const colors = [];
     const seen = {};
@@ -305,6 +763,50 @@
     }
 
     return colors;
+  }
+
+  function getFirstEditableSolidPaint(paints) {
+    if (!Array.isArray(paints)) {
+      return null;
+    }
+    for (let index = 0; index < paints.length; index += 1) {
+      const paint = paints[index];
+      if (isEditableSolidPaint(paint)) {
+        return { paint, index };
+      }
+    }
+    return null;
+  }
+
+  function isEditableSolidPaint(paint) {
+    return !!paint && paint.visible !== false && paint.type === "SOLID" && !!paint.color && !isVariableBoundColor(paint);
+  }
+
+  function isVariableBoundColor(value) {
+    return !!(value && value.boundVariables && value.boundVariables.color);
+  }
+
+  function paintToColor(paint, role) {
+    return {
+      r: clampUnit(paint.color.r),
+      g: clampUnit(paint.color.g),
+      b: clampUnit(paint.color.b),
+      a: normalizeAlpha(paint.opacity),
+      role,
+    };
+  }
+
+  function applyColorToSolidPaint(paint, color) {
+    paint.color = {
+      r: clampUnit(color.r),
+      g: clampUnit(color.g),
+      b: clampUnit(color.b),
+    };
+    paint.opacity = normalizeAlpha(color.a);
+  }
+
+  function cloneArray(value) {
+    return JSON.parse(JSON.stringify(value));
   }
 
   function addPaintColors(colors, seen, paints, role) {
@@ -387,6 +889,15 @@
       Math.round(clampUnit(color.b) * 255),
       Math.round(normalizeAlpha(color.a) * 1000),
       color.role || "",
+    ].join(":");
+  }
+
+  function colorValueKey(color) {
+    return [
+      Math.round(clampUnit(color.r) * 255),
+      Math.round(clampUnit(color.g) * 255),
+      Math.round(clampUnit(color.b) * 255),
+      Math.round(normalizeAlpha(color.a) * 1000),
     ].join(":");
   }
 
@@ -515,6 +1026,47 @@
     selectEntryGroup(aliveEntries.slice(midpoint), selected, skipped);
   }
 
+  function buildGroupResult(options) {
+    const selection = Array.isArray(options.selection) ? options.selection : [];
+    const scopes = Array.isArray(options.scopes) ? options.scopes : [];
+    const clusters = Array.isArray(options.clusters) ? options.clusters : [];
+    const applied = options.applied || {};
+
+    return {
+      processedAt: new Date().toISOString(),
+      mode: "group-similar",
+      summary: {
+        selectionLabel: formatSelectionLabel(selection),
+        scopeCount: scopes.length,
+        scannedNodeCount: Number(options.scannedNodeCount) || 0,
+        occurrenceCount: Number(options.occurrenceCount) || 0,
+        exactColorCount: Number(options.exactColorCount) || 0,
+        clusterCount: clusters.length,
+        mergedColorCount: Number(applied.mergedColorCount) || 0,
+        changedOccurrenceCount: Number(applied.changedOccurrenceCount) || 0,
+        changedNodeCount: Number(applied.changedNodeCount) || 0,
+        skippedCount: Array.isArray(applied.skipped) ? applied.skipped.length : 0,
+      },
+      clusters: clusters.map(stripCluster).slice(0, RESULT_PREVIEW_LIMIT),
+      changed: (Array.isArray(applied.changed) ? applied.changed : []).map(stripEntry).slice(0, RESULT_PREVIEW_LIMIT),
+      skipped: (Array.isArray(applied.skipped) ? applied.skipped : []).slice(0, RESULT_PREVIEW_LIMIT),
+    };
+  }
+
+  function stripCluster(cluster) {
+    const representative = cluster && cluster.representative ? cluster.representative : {};
+    const members = Array.isArray(cluster && cluster.members) ? cluster.members : [];
+    const occurrenceCount = members.reduce(
+      (sum, member) => sum + (Array.isArray(member.occurrences) ? member.occurrences.length : 0),
+      0
+    );
+    return {
+      representativeColor: colorToHex(representative.color || {}),
+      mergedColors: members.slice(1).map((member) => colorToHex(member.color)).slice(0, 8),
+      occurrenceCount,
+    };
+  }
+
   function buildResult(options) {
     const selection = Array.isArray(options.selection) ? options.selection : [];
     const scopes = Array.isArray(options.scopes) ? options.scopes : [];
@@ -567,6 +1119,36 @@
       return;
     }
     figma.notify(label + " \uB808\uC774\uC5B4\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.", { timeout: 2200 });
+  }
+
+  function notifyGroupResult(result) {
+    const summary = result && result.summary ? result.summary : {};
+    const clusterCount = Number(summary.clusterCount) || 0;
+    const changedOccurrenceCount = Number(summary.changedOccurrenceCount) || 0;
+    if (changedOccurrenceCount > 0) {
+      figma.notify(
+        "\uBE44\uC2B7\uD55C \uC0C9 " +
+          clusterCount +
+          "\uADF8\uB8F9, \uC0C9\uC0C1 \uAC12 " +
+          changedOccurrenceCount +
+          "\uAC1C\uB97C \uB300\uD45C\uC0C9\uC73C\uB85C \uBB36\uC5C8\uC2B5\uB2C8\uB2E4.",
+        { timeout: 2600 }
+      );
+      return;
+    }
+    if (clusterCount > 0) {
+      figma.notify("\uBE44\uC2B7\uD55C \uC0C9 \uADF8\uB8F9\uC740 \uCC3E\uC558\uC9C0\uB9CC \uBCC0\uACBD\uD560 \uC218 \uC5C6\uC5C8\uC2B5\uB2C8\uB2E4.", { timeout: 2600 });
+      return;
+    }
+    figma.notify("\uBB36\uC744 \uB9CC\uD07C \uBE44\uC2B7\uD55C \uC0C9 \uADF8\uB8F9\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.", { timeout: 2200 });
+  }
+
+  function postGroupStatus(status, message) {
+    figma.ui.postMessage({
+      type: "group-similar-colors-status",
+      status,
+      message,
+    });
   }
 
   function postStatus(mode, status, message) {
