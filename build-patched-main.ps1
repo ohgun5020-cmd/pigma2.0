@@ -48,6 +48,7 @@ $exportBoundaryVerifier = Join-Path $root "verify-psd-export-boundary.js"
 $shapeLayerExportContract = Join-Path $root "psd-shape-layer-export.contract.json"
 $shapeLayerExportVerifier = Join-Path $root "verify-psd-shape-layer-export.js"
 $figmaRuntimeSyntaxVerifier = Join-Path $root "verify-figma-runtime-syntax.js"
+$messageHandlerVerifier = Join-Path $root "verify-message-handler-pass-through.js"
 $fontPostScriptMapBuilder = Join-Path $root "build-font-postscript-map.js"
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
@@ -246,6 +247,10 @@ if (-not (Test-Path $figmaRuntimeSyntaxVerifier)) {
   throw "Missing Figma runtime syntax verifier: $figmaRuntimeSyntaxVerifier"
 }
 
+if (-not (Test-Path $messageHandlerVerifier)) {
+  throw "Missing message handler verifier: $messageHandlerVerifier"
+}
+
 & node $pdfJsInlineAssetCleanup
 if ($LASTEXITCODE -ne 0) {
   throw "Failed to remove inline PDF.js assets from ui.html"
@@ -318,6 +323,11 @@ if ($hasOriginalImageDownloadPatch) {
 & node $figmaRuntimeSyntaxVerifier @runtimeSyntaxSourceFiles
 if ($LASTEXITCODE -ne 0) {
   throw "Figma runtime syntax verification failed for source patches."
+}
+
+& node $messageHandlerVerifier
+if ($LASTEXITCODE -ne 0) {
+  throw "Message handler pass-through verification failed."
 }
 
 function Replace-Exact {
