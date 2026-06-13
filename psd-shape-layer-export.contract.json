@@ -61,7 +61,7 @@
   "uiFile": "ui.html",
   "requiredUiSnippets": [
     "forceBitmapVectorPreview:t.forceBitmapVectorPreview===!0",
-    "pigmaNativeShapeCandidate=e.strategy===\"shape\"&&e.fill&&gw(",
+    "pigmaGradientShapeSvg=e.fill&&e.fill.kind===\"gradient\"",
     "if(i.forceBitmapVectorPreview&&!pigmaNativeShapeCandidate)",
     "function gw(e,t,n){if(t<=0||n<=0)return!1;",
     "if(e.strategy===\"shape\"&&!l&&e.fill&&u)"
