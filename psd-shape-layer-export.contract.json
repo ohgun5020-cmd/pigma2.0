@@ -50,12 +50,18 @@
     "pigmaShouldFlattenTransformedClipContainer(e)",
     "pigmaBuildTransformedClipSmartObject(e,t,r)",
     "TRANSFORMED_CLIP_SMART_OBJECT",
+    "function pigmaStrokeOnlyVectorRequiresSvg(e,t)",
+    "pigmaStrokeOnlyVectorRequiresSvg(e,t)?{strategy:\"smart-object\",fill:null,forceSvgSmartObject:!0}",
     "was wrapped as a layered smart object because PSD cannot preserve transformed clipping containers directly."
+  ],
+  "forbiddenBundleSnippets": [
+    "u=(e.type===\"LINE\"||e.type===\"VECTOR\")&&!!i&&!l"
   ],
   "requiredBuildSnippets": [
     "transformed clipping container flatten helper",
     "pigmaShouldFlattenTransformedClipContainer(e)",
     "pigmaBuildTransformedClipSmartObject(e,t,r)",
+    "stroke-only vector SVG smart object preservation",
     "was wrapped as a layered smart object because PSD cannot preserve transformed clipping containers directly."
   ],
   "uiFile": "ui.html",

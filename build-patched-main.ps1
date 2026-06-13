@@ -3251,7 +3251,7 @@ if ($multiFillHelpersMatchCount -eq 1) {
 $bundle = Replace-Exact `
   -Text $bundle `
   -Find 'function Nr(e){if(re(e)||te(e)||X(e,"strokes")||fe(e))return{strategy:"smart-object",fill:null};let t=Ti(e);return t?{strategy:"shape",fill:t}:{strategy:"smart-object",fill:null}}' `
-  -Replace 'function pigmaShapeFillRequiresSvg(e){return e&&e.kind==="gradient"}function pigmaVectorRequiresSvgSmartObject(e,t){return pigmaShapeFillRequiresSvg(t)||pigmaStrokeRequiresSvg(e)}function Nr(e){if(re(e)||te(e)||fe(e))return{strategy:"smart-object",fill:null};let t=Ti(e);return t?pigmaVectorRequiresSvgSmartObject(e,t)?{strategy:"smart-object",fill:t,forceSvgSmartObject:!0}:{strategy:"shape",fill:t,forceSvgSmartObject:!1}:pigmaStrokeRequiresSvg(e)?{strategy:"smart-object",fill:null,forceSvgSmartObject:!0}:{strategy:"smart-object",fill:null}}' `
+  -Replace 'function pigmaShapeFillRequiresSvg(e){return e&&e.kind==="gradient"}function pigmaHasVisibleFill(e){return"fills"in e&&Array.isArray(e.fills)&&e.fills.some(W)}function pigmaStrokeOnlyVectorRequiresSvg(e,t){return Re(e)&&!!me(e)&&!t&&!pigmaHasVisibleFill(e)}function pigmaVectorRequiresSvgSmartObject(e,t){return pigmaShapeFillRequiresSvg(t)||pigmaStrokeRequiresSvg(e)||pigmaStrokeOnlyVectorRequiresSvg(e,t)}function Nr(e){if(re(e)||te(e)||fe(e))return{strategy:"smart-object",fill:null};let t=Ti(e);return t?pigmaVectorRequiresSvgSmartObject(e,t)?{strategy:"smart-object",fill:t,forceSvgSmartObject:!0}:{strategy:"shape",fill:t,forceSvgSmartObject:!1}:pigmaStrokeRequiresSvg(e)||pigmaStrokeOnlyVectorRequiresSvg(e,t)?{strategy:"smart-object",fill:null,forceSvgSmartObject:!0}:{strategy:"smart-object",fill:null}}' `
   -ExpectedCount 1 `
   -Label 'gradient-filled shape strategy uses SVG smart object'
 
@@ -3361,16 +3361,16 @@ $bundle = Replace-Exact `
   -ExpectedCount 1 `
   -Label 'stroke-only vector render bounds'
 
-# Keep stroke-only vectors visible in Photoshop by preserving their stroke pixels
-# in the preview PNG. Removing supported strokes works for filled shapes, but it
-# can leave LINE/stroke-only vectors effectively transparent when PSD cannot
-# reconstruct them natively.
+# Keep stroke-only vectors visible while routing them through SVG smart objects.
+# Removing supported strokes works for filled shapes, but it can leave
+# LINE/stroke-only vectors effectively transparent when PSD cannot reconstruct
+# them natively.
 $bundle = Replace-Exact `
   -Text $bundle `
   -Find 'async function Jn(e,t){if(O.forceBitmapVectorPreview)return null;let r=ft(e);if(!r)return null;let o=L(e,t.root),n=_(o),i=me(e),a=await Me(e,t,o||i||n?r:void 0,o||i||n?{removeSupportedEffects:!0,removeSupportedStroke:!!i}:void 0);if(!a)return null;let s=x(r.x-t.documentBounds.x),l=x(r.y-t.documentBounds.y),u=d(r.width),c=d(r.height),p=x(a.x-s),g=x(a.y-l),y="";try{y=await e.exportAsync({format:"SVG_STRING",useAbsoluteBounds:r.useAbsoluteBounds,svgOutlineText:!0,svgIdAttribute:!0,svgSimplifyStroke:!1})}catch(T){return null}if(!y||y.trim().length===0)return null;let m=Nr(e);return{kind:"vector",id:e.id,name:f(e),sourceType:e.type,opacity:j(e),visible:e.visible,blendMode:ro(e),effects:o,strokeEffect:i,x:s,y:l,width:u,height:c,nodeTransform:de(e,t.documentBounds,s,l),pngBytes:a.pngBytes,strategy:m.strategy,svgString:y,fill:m.fill,previewOffsetX:p,previewOffsetY:g}}' `
-  -Replace 'async function Jn(e,t){if(O.forceBitmapVectorPreview)return null;let r=ft(e);if(!r)return null;let o=L(e,t.root),n=_(o),i=me(e),a=Nr(e),s=oa(e),l="fills"in e&&Array.isArray(e.fills)?e.fills.some(W):!1,u=(e.type==="LINE"||e.type==="VECTOR")&&!!i&&!l;if(u)return null;let c=!!i&&!(a!=null&&a.fill)&&!I(e)?Math.max(3,Math.ceil(i.width/2)+2):0,p=c?{x:r.x-c,y:r.y-c,width:r.width+c*2,height:r.height+c*2,useAbsoluteBounds:!1}:r,g=await Me(e,t,o||i||n||s?p:void 0,o||i||n||s?{normalizePaintOpacity:(s==null?void 0:s.normalizePaintOpacity)===!0,normalizePaintBlendMode:(s==null?void 0:s.normalizePaintBlendMode)===!0,removeSupportedEffects:!0,removeSupportedStroke:!!i&&a.strategy==="shape"&&!!a.fill}:void 0);if(!g)return null;let y=x(r.x-t.documentBounds.x),m=x(r.y-t.documentBounds.y),T=d(r.width),C=d(r.height),E=x(g.x-y),R=x(g.y-m),N="";try{N=await e.exportAsync({format:"SVG_STRING",useAbsoluteBounds:r.useAbsoluteBounds,svgOutlineText:!0,svgIdAttribute:!0,svgSimplifyStroke:!1})}catch(F){return null}if(!N||N.trim().length===0)return null;return{kind:"vector",id:e.id,name:f(e),sourceType:e.type,opacity:s?s.effectiveOpacity:j(e),visible:e.visible,blendMode:at(s?s.effectiveBlendMode:K(e)),effects:o,strokeEffect:a.strategy==="shape"&&a.fill?i:null,x:y,y:m,width:T,height:C,nodeTransform:de(e,t.documentBounds,y,m),pngBytes:g.pngBytes,strategy:a.strategy,forceSvgSmartObject:a.forceSvgSmartObject===!0,svgString:N,fill:a.fill,previewOffsetX:E,previewOffsetY:R}}' `
+  -Replace 'async function Jn(e,t){if(O.forceBitmapVectorPreview)return null;let r=ft(e);if(!r)return null;let o=L(e,t.root),n=_(o),i=me(e),a=Nr(e),s=oa(e),l=!!i&&!(a!=null&&a.fill)&&!I(e)?Math.max(3,Math.ceil(i.width/2)+2):0,u=l?{x:r.x-l,y:r.y-l,width:r.width+l*2,height:r.height+l*2,useAbsoluteBounds:!1}:r,c=await Me(e,t,o||i||n||s?u:void 0,o||i||n||s?{normalizePaintOpacity:(s==null?void 0:s.normalizePaintOpacity)===!0,normalizePaintBlendMode:(s==null?void 0:s.normalizePaintBlendMode)===!0,removeSupportedEffects:!0,removeSupportedStroke:!!i&&a.strategy==="shape"&&!!a.fill}:void 0);if(!c)return null;let p=x(r.x-t.documentBounds.x),g=x(r.y-t.documentBounds.y),y=d(r.width),m=d(r.height),T=x(c.x-p),C=x(c.y-g),E="";try{E=await e.exportAsync({format:"SVG_STRING",useAbsoluteBounds:r.useAbsoluteBounds,svgOutlineText:!0,svgIdAttribute:!0,svgSimplifyStroke:!1})}catch(R){return null}if(!E||E.trim().length===0)return null;return{kind:"vector",id:e.id,name:f(e),sourceType:e.type,opacity:s?s.effectiveOpacity:j(e),visible:e.visible,blendMode:at(s?s.effectiveBlendMode:K(e)),effects:o,strokeEffect:a.strategy==="shape"&&a.fill?i:null,x:p,y:g,width:y,height:m,nodeTransform:de(e,t.documentBounds,p,g),pngBytes:c.pngBytes,strategy:a.strategy,forceSvgSmartObject:a.forceSvgSmartObject===!0,svgString:E,fill:a.fill,previewOffsetX:T,previewOffsetY:C}}' `
   -ExpectedCount 1 `
-  -Label 'stroke-only vector preview preservation'
+  -Label 'stroke-only vector SVG smart object preservation'
 
 $bundle = Replace-Exact `
   -Text $bundle `
