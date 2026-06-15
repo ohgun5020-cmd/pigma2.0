@@ -61,8 +61,12 @@
     "TRANSFORMED_CLIP_SMART_OBJECT",
     "was wrapped as a layered smart object because PSD cannot preserve transformed clipping containers directly.",
     "function pigmaSvgHasOpenStrokeSubpath(e)",
+    "function pigmaHasVisibleGradientFill(e)",
+    "function pigmaHasVisibleGradientStroke(e)",
     "pigmaOpenStrokeSvgFallback",
-    "forceSvgSmartObject:pigmaEndpointSvgFallback||pigmaOpenStrokeSvgFallback"
+    "pigmaGradientFillSvgFallback",
+    "pigmaGradientStrokeSvgFallback",
+    "forceSvgSmartObject:pigmaEndpointSvgFallback||pigmaOpenStrokeSvgFallback||pigmaGradientFillSvgFallback||pigmaGradientStrokeSvgFallback"
   ],
   "requiredBuildSnippets": [
     "transformed clipping container flatten helper",
@@ -70,8 +74,12 @@
     "pigmaBuildTransformedClipSmartObject(e,t,r)",
     "was wrapped as a layered smart object because PSD cannot preserve transformed clipping containers directly.",
     "function pigmaSvgHasOpenStrokeSubpath(e)",
+    "function pigmaHasVisibleGradientFill(e)",
+    "function pigmaHasVisibleGradientStroke(e)",
     "pigmaOpenStrokeSvgFallback",
-    "forceSvgSmartObject:pigmaEndpointSvgFallback||pigmaOpenStrokeSvgFallback"
+    "pigmaGradientFillSvgFallback",
+    "pigmaGradientStrokeSvgFallback",
+    "forceSvgSmartObject:pigmaEndpointSvgFallback||pigmaOpenStrokeSvgFallback||pigmaGradientFillSvgFallback||pigmaGradientStrokeSvgFallback"
   ],
   "uiFile": "ui.html",
   "requiredUiSnippets": [
