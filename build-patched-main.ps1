@@ -19,6 +19,7 @@ $buttonTextAutoSizePatch = Join-Path $root "button-text-auto-size.js"
 $selectAllTextPatch = Join-Path $root "select-all-text.js"
 $selectColorMatchesPatch = Join-Path $root "select-color-matches.js"
 $textLineHeightAdjustPatch = Join-Path $root "text-line-height-adjust.js"
+$textStyleNormalizePatch = Join-Path $root "text-style-normalize.js"
 $unlockLockedLayersPatch = Join-Path $root "unlock-locked-layers.js"
 $detachLinkedComponentsPatch = Join-Path $root "detach-linked-components.js"
 $autoLayoutOffPatch = Join-Path $root "auto-layout-off.js"
@@ -28,6 +29,7 @@ $splitLongFramePatch = Join-Path $root "split-long-frame.js"
 $copyPrototypeLinkPatch = Join-Path $root "copy-prototype-link.js"
 $aiColorExtractPatch = Join-Path $root "ai-color-extract.js"
 $originalImageDownloadPatch = Join-Path $root "original-image-download.js"
+$psdOriginalImageSmartObjectPatch = Join-Path $root "psd-original-image-smart-object.js"
 $aiImageSharedBridgePatch = Join-Path $root "ai-image-shared-bridge.js"
 $destination = Join-Path $root "code.patched.js"
 $uiSource = Join-Path $root "ui.html"
@@ -135,6 +137,10 @@ if (-not (Test-Path $textLineHeightAdjustPatch)) {
   throw "Missing text line height adjust patch: $textLineHeightAdjustPatch"
 }
 
+if (-not (Test-Path $textStyleNormalizePatch)) {
+  throw "Missing text style normalize patch: $textStyleNormalizePatch"
+}
+
 if (-not (Test-Path $unlockLockedLayersPatch)) {
   throw "Missing locked layer unlock patch: $unlockLockedLayersPatch"
 }
@@ -168,6 +174,9 @@ if (-not (Test-Path $aiColorExtractPatch)) {
 }
 
 $hasOriginalImageDownloadPatch = Test-Path $originalImageDownloadPatch
+if (-not (Test-Path $psdOriginalImageSmartObjectPatch)) {
+  throw "Missing PSD original image smart object patch: $psdOriginalImageSmartObjectPatch"
+}
 if (-not (Test-Path $aiImageSharedBridgePatch)) {
   throw "Missing AI image shared bridge patch: $aiImageSharedBridgePatch"
 }
@@ -321,6 +330,7 @@ $runtimeSyntaxSourceFiles = @(
   $selectAllTextPatch,
   $selectColorMatchesPatch,
   $textLineHeightAdjustPatch,
+  $textStyleNormalizePatch,
   $unlockLockedLayersPatch,
   $detachLinkedComponentsPatch,
   $autoLayoutOffPatch,
@@ -430,8 +440,29 @@ $bundle = [System.IO.File]::ReadAllText($source, [System.Text.Encoding]::UTF8)
 
 $bundle = Replace-Exact `
   -Text $bundle `
-  -Find 'exportPackageMode:t.exportPackageMode==="bundle-with-rasters"||t.exportPackageMode==="psd-only"?t.exportPackageMode:A.exportPackageMode' `
-  -Replace 'exportPackageMode:t.exportPackageMode==="bundle-with-rasters"||t.exportPackageMode==="psd-with-png"?"psd-with-png":t.exportPackageMode==="psd-with-jpg"||t.exportPackageMode==="psd-only"?t.exportPackageMode:A.exportPackageMode' `
+  -Find 'ne={locale:Mt,localeMode:"auto",exportSettings:A}' `
+  -Replace 'ne={locale:Mt,localeMode:"auto",exportSettings:$}' `
+  -ExpectedCount 1 `
+  -Label 'main default image export uses smart objects'
+
+$bundle = Replace-Exact `
+  -Text $bundle `
+  -Find 'function At(e){if(!e)return{};let t=typeof e.fileNamePattern=="string"&&e.fileNamePattern.trim().length>0?e.fileNamePattern.trim():$.fileNamePattern,r=e.psdVersion==="max-compatibility"?e.psdVersion:$.psdVersion,o=e.textExportMode==="editable-text"||e.textExportMode==="rasterize-text"?e.textExportMode:$.textExportMode,n=e.imageExportMode==="smart-object-if-possible"||e.imageExportMode==="bitmap-only"?e.imageExportMode:$.imageExportMode;return r!==$.psdVersion||o!==$.textExportMode||n!==$.imageExportMode||t!==$.fileNamePattern?e:B(b({},e),{imageExportMode:A.imageExportMode})}' `
+  -Replace 'function At(e){if(!e)return{};let t=typeof e.fileNamePattern=="string"&&e.fileNamePattern.trim().length>0?e.fileNamePattern.trim():$.fileNamePattern,r=e.psdVersion==="max-compatibility"?e.psdVersion:$.psdVersion,o=e.textExportMode==="editable-text"||e.textExportMode==="rasterize-text"?e.textExportMode:$.textExportMode,n=e.imageExportMode==="smart-object-if-possible"||e.imageExportMode==="bitmap-only"?e.imageExportMode:$.imageExportMode;return r===$.psdVersion&&o===$.textExportMode&&t===$.fileNamePattern&&n===A.imageExportMode?B(b({},e),{imageExportMode:$.imageExportMode}):e}' `
+  -ExpectedCount 1 `
+  -Label 'main unexplicit bitmap default migrates to smart object'
+
+$bundle = Replace-Exact `
+  -Text $bundle `
+  -Find 'function Ft(e){let t=e!=null?e:{};return{psdVersion:t.psdVersion==="max-compatibility"?t.psdVersion:A.psdVersion,textExportMode:t.textExportMode==="editable-text"||t.textExportMode==="rasterize-text"?t.textExportMode:A.textExportMode,imageExportMode:t.imageExportMode==="smart-object-if-possible"||t.imageExportMode==="bitmap-only"?t.imageExportMode:A.imageExportMode,hiddenLayerMode:t.hiddenLayerMode==="preserve-hidden"||t.hiddenLayerMode==="ignore-hidden"?t.hiddenLayerMode:A.hiddenLayerMode,exportPackageMode:t.exportPackageMode==="bundle-with-rasters"||t.exportPackageMode==="psd-only"?t.exportPackageMode:A.exportPackageMode,fileNamePattern:typeof t.fileNamePattern=="string"&&t.fileNamePattern.trim().length>0?t.fileNamePattern.trim():A.fileNamePattern}}' `
+  -Replace 'function Ft(e){let t=e!=null?e:{};return{psdVersion:t.psdVersion==="max-compatibility"?t.psdVersion:$.psdVersion,textExportMode:t.textExportMode==="editable-text"||t.textExportMode==="rasterize-text"?t.textExportMode:$.textExportMode,imageExportMode:t.imageExportMode==="smart-object-if-possible"||t.imageExportMode==="bitmap-only"?t.imageExportMode:$.imageExportMode,hiddenLayerMode:t.hiddenLayerMode==="preserve-hidden"||t.hiddenLayerMode==="ignore-hidden"?t.hiddenLayerMode:$.hiddenLayerMode,exportPackageMode:t.exportPackageMode==="bundle-with-rasters"||t.exportPackageMode==="psd-only"?t.exportPackageMode:$.exportPackageMode,fileNamePattern:typeof t.fileNamePattern=="string"&&t.fileNamePattern.trim().length>0?t.fileNamePattern.trim():$.fileNamePattern}}' `
+  -ExpectedCount 1 `
+  -Label 'main sanitized default image export uses smart objects'
+
+$bundle = Replace-Exact `
+  -Text $bundle `
+  -Find 'exportPackageMode:t.exportPackageMode==="bundle-with-rasters"||t.exportPackageMode==="psd-only"?t.exportPackageMode:$.exportPackageMode' `
+  -Replace 'exportPackageMode:t.exportPackageMode==="bundle-with-rasters"||t.exportPackageMode==="psd-with-png"?"psd-with-png":t.exportPackageMode==="psd-with-jpg"||t.exportPackageMode==="psd-only"?t.exportPackageMode:$.exportPackageMode' `
   -ExpectedCount 1 `
   -Label 'PSD export package mode variants'
 
@@ -676,7 +707,7 @@ $bundle = Replace-Exact `
 $bundle = Replace-Exact `
   -Text $bundle `
   -Find 'function An(e,t,r){if(fe(e)||!pigmaIsShapeBackgroundTransformSafe(e))return null;let o=Di(e);if(!o)return null;let n=Fr(e,t);return!n||!o.fill&&!o.stroke?null:{kind:"shape",id:"".concat(e.id,":background-shape"),name:"Background",sourceType:"".concat(e.type,"_BACKGROUND_SHAPE"),opacity:1,visible:!0,blendMode:"normal",effects:null,strokeEffect:null,x:n.x,y:n.y,width:n.width,height:n.height,nodeTransform:null,shape:n,fill:o.fill,stroke:o.stroke}}' `
-  -Replace 'function An(e,t,r){if(fe(e)||!pigmaIsShapeBackgroundTransformSafe(e)||pigmaStrokeRequiresSvg(e))return null;let o=Di(e),n=oa(e),i=n&&((n.normalizePaintOpacity===!0)||(n.normalizePaintBlendMode===!0))?n:null;if(!o)return null;let a=Fr(e,t);return!a||!o.fill&&!o.stroke?null:{kind:"shape",id:"".concat(e.id,":background-shape"),name:"Background",sourceType:"".concat(e.type,"_BACKGROUND_SHAPE"),opacity:i?i.effectiveOpacity:1,visible:!0,blendMode:at(i?i.effectiveBlendMode:"normal"),effects:null,strokeEffect:null,x:a.x,y:a.y,width:a.width,height:a.height,nodeTransform:null,shape:a,fill:o.fill,stroke:o.stroke}}' `
+  -Replace 'function An(e,t,r){if(fe(e)||!pigmaIsShapeBackgroundTransformSafe(e))return null;let o=Di(e),n=oa(e),i=n&&((n.normalizePaintOpacity===!0)||(n.normalizePaintBlendMode===!0))?n:null;if(!o)return null;let a=Fr(e,t);return!a||!o.fill&&!o.stroke?null:{kind:"shape",id:"".concat(e.id,":background-shape"),name:"Background",sourceType:"".concat(e.type,"_BACKGROUND_SHAPE"),opacity:i?i.effectiveOpacity:1,visible:!0,blendMode:at(i?i.effectiveBlendMode:"normal"),effects:null,strokeEffect:null,x:a.x,y:a.y,width:a.width,height:a.height,nodeTransform:null,shape:a,fill:o.fill,stroke:o.stroke}}' `
   -ExpectedCount 1 `
   -Label 'background shape fill blend promotion'
 
@@ -687,32 +718,29 @@ $bundle = Replace-Exact `
   -ExpectedCount 1 `
   -Label 'transformed clipping container flatten helper'
 
-# Preserve Figma gradient handle geometry in the shape fill payload. The UI-side
-# PSD writer turns these normalized handle positions into Photoshop angle,
-# offset, and scale values so shortened or shifted gradients keep their spacing.
-$bundle = Replace-Exact `
-  -Text $bundle `
-  -Find 'function Ci(e){return e.type==="GRADIENT_LINEAR"||e.type==="GRADIENT_RADIAL"||e.type==="GRADIENT_ANGULAR"||e.type==="GRADIENT_DIAMOND"}function ki(e){var n;if(!Array.isArray(e.gradientStops)||e.gradientStops.length<2)return null;let t=Mi(e.gradientTransform);if(!t)return null;let r=h((n=e.opacity)!=null?n:1,0,1),o=e.gradientStops.slice().sort((i,a)=>i.position-a.position);return{kind:"gradient",gradientType:Bi(e.type),transform:t,colorStops:o.map(i=>({position:h(i.position,0,1),color:ee({r:i.color.r,g:i.color.g,b:i.color.b,a:1})})),opacityStops:o.map(i=>({position:h(i.position,0,1),opacity:h(i.color.a*r,0,1)}))}}function Bi(e){switch(e){case"GRADIENT_LINEAR":return"linear";case"GRADIENT_RADIAL":return"radial";case"GRADIENT_ANGULAR":return"angular";case"GRADIENT_DIAMOND":return"diamond";default:return"linear"}}function Mi(e){if(!Array.isArray(e)||e.length!==2||!Array.isArray(e[0])||!Array.isArray(e[1])||e[0].length!==3||e[1].length!==3)return null;let t=[D(e[0][0]),D(e[1][0]),D(e[0][1]),D(e[1][1]),D(e[0][2]),D(e[1][2])];return t.every(r=>Number.isFinite(r))?t:null}' `
-  -Replace 'function Ci(e){return e.type==="GRADIENT_LINEAR"||e.type==="GRADIENT_RADIAL"||e.type==="GRADIENT_ANGULAR"||e.type==="GRADIENT_DIAMOND"}function ki(e){var n;if(!Array.isArray(e.gradientStops)||e.gradientStops.length<2)return null;let t=Mi(e.gradientTransform);if(!t)return null;let r=h((n=e.opacity)!=null?n:1,0,1),o=e.gradientStops.slice().sort((i,a)=>i.position-a.position),s=pigmaGradientHandlePositions(t);return{kind:"gradient",gradientType:Bi(e.type),transform:t,handlePositions:s,colorStops:o.map(i=>({position:h(i.position,0,1),color:ee({r:i.color.r,g:i.color.g,b:i.color.b,a:1})})),opacityStops:o.map(i=>({position:h(i.position,0,1),opacity:h(i.color.a*r,0,1)}))}}function pigmaInvertGradientTransform(e){let[t,n,r,i,a,o]=e,s=t*i-n*r;return Math.abs(s)<1e-6?null:[i/s,-n/s,-r/s,t/s,(r*o-i*a)/s,(n*a-t*o)/s]}function pigmaTransformGradientPoint(e,t,n){let[r,i,a,o,s,l]=e;return{x:D(r*t+a*n+s),y:D(i*t+o*n+l)}}function pigmaGradientHandlePositions(e){let t=pigmaInvertGradientTransform(e);return t?[pigmaTransformGradientPoint(t,0,.5),pigmaTransformGradientPoint(t,1,.5),pigmaTransformGradientPoint(t,0,1)]:null}function Bi(e){switch(e){case"GRADIENT_LINEAR":return"linear";case"GRADIENT_RADIAL":return"radial";case"GRADIENT_ANGULAR":return"angular";case"GRADIENT_DIAMOND":return"diamond";default:return"linear"}}function Mi(e){if(!Array.isArray(e)||e.length!==2||!Array.isArray(e[0])||!Array.isArray(e[1])||e[0].length!==3||e[1].length!==3)return null;let t=[D(e[0][0]),D(e[1][0]),D(e[0][1]),D(e[1][1]),D(e[0][2]),D(e[1][2])];return t.every(r=>Number.isFinite(r))?t:null}' `
-  -ExpectedCount 1 `
-  -Label 'main gradient handle geometry metadata'
-
-# Keep Figma dashed strokes attached to PSD shape metadata and fallback shape
-# previews. Leaf vector/stroke-only layers are bitmap-preserved, but simple
-# background shapes can still travel through vectorStroke.
+# Keep Figma dashed strokes attached to PSD shape metadata and native Photoshop
+# vectorStroke payloads. Stroke-only vector-like layers use a transparent
+# vectorFill carrier so Photoshop keeps them as editable path layers.
 $bundle = Replace-Exact `
   -Text $bundle `
   -Find 'function Di(e){if(te(e))return null;let t="fills"in e&&Array.isArray(e.fills)?wi(e.fills):null,r="strokes"in e&&Array.isArray(e.strokes)?Gr(e.strokes):null,o=null;if(r){let n=Jr(e);if(n===null)return null;o={kind:"solid",color:Ge(r),width:n,position:Or(e)}}return!t&&!o?null:{fill:t,stroke:o}}' `
-  -Replace 'function pigmaDashPattern(e){if(!e||!Array.isArray(e.dashPattern))return null;let t=e.dashPattern.map(r=>Number(r)).filter(r=>Number.isFinite(r)&&r>0);return t.length>0?t:null}function pigmaStrokeCapRequiresSvg(e){if(!e||!("strokeCap"in e))return!1;let t=String(e.strokeCap||"NONE").toUpperCase();return t!=="NONE"&&t!=="BUTT"}function pigmaStrokeJoinRequiresSvg(e){if(!e||!("strokeJoin"in e))return!1;let t=String(e.strokeJoin||"MITER").toUpperCase();return t!=="MITER"}function pigmaStrokeRequiresSvg(e){let t="strokes"in e&&Array.isArray(e.strokes)?Gr(e.strokes):null;return!!t&&(!!pigmaDashPattern(e)||pigmaStrokeCapRequiresSvg(e)||pigmaStrokeJoinRequiresSvg(e))}function Di(e){if(te(e))return null;let t="fills"in e&&Array.isArray(e.fills)?wi(e.fills):null,r="strokes"in e&&Array.isArray(e.strokes)?Gr(e.strokes):null,o=null;if(r){let n=Jr(e);if(n===null)return null;o={kind:"solid",color:Ge(r),width:n,position:Or(e),dashPattern:pigmaDashPattern(e)}}return!t&&!o?null:{fill:t,stroke:o}}' `
+  -Replace 'function pigmaDashPattern(e){if(!e||!Array.isArray(e.dashPattern))return null;let t=e.dashPattern.map(r=>Number(r)).filter(r=>Number.isFinite(r)&&r>0);return t.length>0?t:null}function pigmaPsdStrokeCap(e){let t="strokeCap"in e?e.strokeCap:"NONE";switch(t){case"ROUND":return"round";case"SQUARE":return"square";case"NONE":case void 0:return"butt";default:return null}}function pigmaPsdStrokeJoin(e){let t="strokeJoin"in e?e.strokeJoin:"MITER";switch(t){case"ROUND":return"round";case"BEVEL":return"bevel";case"MITER":case void 0:return"miter";default:return"miter"}}function pigmaPsdStrokeMiterLimit(e){let t=Number(e&&e.strokeMiterLimit);return Number.isFinite(t)&&t>0?M(t):4}function pigmaSimpleStrokePayload(e,t){let r=Jr(e);if(r===null)return null;let o=pigmaPsdStrokeCap(e);return o?{kind:"solid",blendMode:oe(t.blendMode),color:Ge(t),width:r,position:Or(e),cap:o,join:pigmaPsdStrokeJoin(e),miterLimit:pigmaPsdStrokeMiterLimit(e),dashPattern:pigmaDashPattern(e)}:null}function Di(e){if(te(e))return null;let t="fills"in e&&Array.isArray(e.fills)?wi(e.fills):null,r="strokes"in e&&Array.isArray(e.strokes)?Gr(e.strokes):null,o=r?pigmaSimpleStrokePayload(e,r):null;return!t&&!o?null:{fill:t,stroke:o}}' `
   -ExpectedCount 1 `
   -Label 'main dashed shape stroke metadata'
 
 $bundle = Replace-Exact `
   -Text $bundle `
   -Find 'function me(e){if(!("strokes"in e)||!Array.isArray(e.strokes))return null;let t=Gr(e.strokes);if(!t)return null;let r=Jr(e);return r===null?null:{blendMode:oe(t.blendMode),color:Ge(t),width:r,position:Or(e)}}' `
-  -Replace 'function me(e){if(!("strokes"in e)||!Array.isArray(e.strokes))return null;let t=Gr(e.strokes);if(!t)return null;let r=Jr(e);return r===null?null:{blendMode:oe(t.blendMode),color:Ge(t),width:r,position:Or(e),dashPattern:pigmaDashPattern(e)}}' `
+  -Replace 'function me(e){if(!("strokes"in e)||!Array.isArray(e.strokes))return null;let t=Gr(e.strokes);return t?pigmaSimpleStrokePayload(e,t):null}' `
   -ExpectedCount 1 `
   -Label 'main dashed stroke effect metadata'
+
+$bundle = Replace-Exact `
+  -Text $bundle `
+  -Find 'function Nr(e){if(re(e)||te(e)||X(e,"strokes")||fe(e))return{strategy:"smart-object",fill:null};let t=Ti(e);return t?{strategy:"shape",fill:t}:{strategy:"smart-object",fill:null}}' `
+  -Replace 'function Nr(e){if(re(e)||te(e)||fe(e))return{strategy:"smart-object",fill:null,stroke:null};let t="fills"in e&&Array.isArray(e.fills)?vi(e.fills):null,r=me(e);return t||r?{strategy:"shape",fill:t,stroke:r}:{strategy:"smart-object",fill:null,stroke:null}}' `
+  -ExpectedCount 1 `
+  -Label 'native vector stroke shape strategy'
 
 # Reuse the export-session analysis we already computed for the current selection
 # instead of recomputing bounds and layer counts again for each root.
@@ -1042,6 +1070,130 @@ if ($bundle.Contains('invalidateTextLayers:t&&e.hasEditableText')) {
 
 $uiBundle = [System.IO.File]::ReadAllText($uiSource, [System.Text.Encoding]::UTF8)
 $originalUiBundle = $uiBundle
+
+$uiDefaultSmartSanitizerFind = 'function Qp(e){let t=e!=null?e:{};return{psdVersion:t.psdVersion==="max-compatibility"?t.psdVersion:st.psdVersion,textExportMode:t.textExportMode==="editable-text"||t.textExportMode==="rasterize-text"?t.textExportMode:st.textExportMode,imageExportMode:t.imageExportMode==="smart-object-if-possible"||t.imageExportMode==="bitmap-only"?t.imageExportMode:st.imageExportMode,hiddenLayerMode:t.hiddenLayerMode==="preserve-hidden"||t.hiddenLayerMode==="ignore-hidden"?t.hiddenLayerMode:st.hiddenLayerMode,exportPackageMode:t.exportPackageMode==="bundle-with-rasters"||t.exportPackageMode==="psd-with-png"?"psd-with-png":t.exportPackageMode==="psd-with-jpg"||t.exportPackageMode==="psd-only"?t.exportPackageMode:st.exportPackageMode,fileNamePattern:typeof t.fileNamePattern=="string"&&t.fileNamePattern.trim().length>0?t.fileNamePattern.trim():st.fileNamePattern}}'
+$uiDefaultSmartSanitizerReplace = 'function Qp(e){let t=e!=null?e:{};return{psdVersion:t.psdVersion==="max-compatibility"?t.psdVersion:Gn.psdVersion,textExportMode:t.textExportMode==="editable-text"||t.textExportMode==="rasterize-text"?t.textExportMode:Gn.textExportMode,imageExportMode:t.imageExportMode==="smart-object-if-possible"||t.imageExportMode==="bitmap-only"?t.imageExportMode:Gn.imageExportMode,hiddenLayerMode:t.hiddenLayerMode==="preserve-hidden"||t.hiddenLayerMode==="ignore-hidden"?t.hiddenLayerMode:Gn.hiddenLayerMode,exportPackageMode:t.exportPackageMode==="bundle-with-rasters"||t.exportPackageMode==="psd-with-png"?"psd-with-png":t.exportPackageMode==="psd-with-jpg"||t.exportPackageMode==="psd-only"?t.exportPackageMode:Gn.exportPackageMode,fileNamePattern:typeof t.fileNamePattern=="string"&&t.fileNamePattern.trim().length>0?t.fileNamePattern.trim():Gn.fileNamePattern}}'
+if ($uiBundle.Contains($uiDefaultSmartSanitizerFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiDefaultSmartSanitizerFind `
+    -Replace $uiDefaultSmartSanitizerReplace `
+    -ExpectedCount 1 `
+    -Label 'ui default image export uses smart objects'
+} elseif ($uiBundle.Contains($uiDefaultSmartSanitizerReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw "Could not patch UI smart object default sanitizer."
+}
+
+$uiDefaultSmartMigrationFind = 'function Kl(e){if(!e)return{};let t=typeof e.fileNamePattern=="string"&&e.fileNamePattern.trim().length>0?e.fileNamePattern.trim():Gn.fileNamePattern,n=e.psdVersion==="max-compatibility"?e.psdVersion:Gn.psdVersion,r=e.textExportMode==="editable-text"||e.textExportMode==="rasterize-text"?e.textExportMode:Gn.textExportMode,i=e.imageExportMode==="smart-object-if-possible"||e.imageExportMode==="bitmap-only"?e.imageExportMode:Gn.imageExportMode;return n!==Gn.psdVersion||r!==Gn.textExportMode||i!==Gn.imageExportMode||t!==Gn.fileNamePattern?e:Re(le({},e),{imageExportMode:st.imageExportMode})}'
+$uiDefaultSmartMigrationReplace = 'function Kl(e){if(!e)return{};let t=typeof e.fileNamePattern=="string"&&e.fileNamePattern.trim().length>0?e.fileNamePattern.trim():Gn.fileNamePattern,n=e.psdVersion==="max-compatibility"?e.psdVersion:Gn.psdVersion,r=e.textExportMode==="editable-text"||e.textExportMode==="rasterize-text"?e.textExportMode:Gn.textExportMode,i=e.imageExportMode==="smart-object-if-possible"||e.imageExportMode==="bitmap-only"?e.imageExportMode:Gn.imageExportMode;return n===Gn.psdVersion&&r===Gn.textExportMode&&t===Gn.fileNamePattern&&i===st.imageExportMode?Re(le({},e),{imageExportMode:Gn.imageExportMode}):e}'
+if ($uiBundle.Contains($uiDefaultSmartMigrationFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiDefaultSmartMigrationFind `
+    -Replace $uiDefaultSmartMigrationReplace `
+    -ExpectedCount 1 `
+    -Label 'ui unexplicit bitmap default migrates to smart object'
+} elseif ($uiBundle.Contains($uiDefaultSmartMigrationReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw "Could not patch UI smart object default migration."
+}
+
+if ($uiBundle.Contains('return le({},st)')) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find 'return le({},st)' `
+    -Replace 'return le({},Gn)' `
+    -ExpectedCount 2 `
+    -Label 'ui preference fallback defaults to smart objects'
+}
+
+$uiNativeShapeCandidateFind = 'let pigmaNativeShapeCandidate=e.strategy==="shape"&&e.fill&&gw(e.svgString,e.width,e.height);'
+$uiNativeShapeCandidatePreviousReplace = 'let pigmaNativeShapeCandidate=e.strategy==="shape"&&(e.fill||e.stroke)&&gw(e.svgString,e.width,e.height);'
+$uiNativeShapeCandidateReplace = 'let pigmaNativeShapeCandidate=!e.forceSvgSmartObject&&e.strategy==="shape"&&(e.fill||e.stroke)&&gw(e.svgString,e.width,e.height);'
+if ($uiBundle.Contains($uiNativeShapeCandidateFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiNativeShapeCandidateFind `
+    -Replace $uiNativeShapeCandidateReplace `
+    -ExpectedCount 1 `
+    -Label 'UI native vector stroke candidate gate'
+} elseif ($uiBundle.Contains($uiNativeShapeCandidatePreviousReplace)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiNativeShapeCandidatePreviousReplace `
+    -Replace $uiNativeShapeCandidateReplace `
+    -ExpectedCount 1 `
+    -Label 'UI arrow SVG vector candidate gate'
+} elseif ($uiBundle.Contains($uiNativeShapeCandidateReplace)) {
+  # Already patched in this UI variant.
+} else {
+  throw "Could not find UI native vector stroke candidate gate."
+}
+
+$uiShapeVectorPreviewFind = 'if(e.strategy==="shape"&&!l&&e.fill&&u)try{let f=Sh(e,i),d=sw(e,f?s:null,t,n),p=f?await bt(e,d,s,i,a):{layer:d,linkedFiles:[],warnings:[]};return{layer:p.layer,linkedFiles:p.linkedFiles,warnings:p.warnings}}catch(f){}'
+$uiShapeVectorPreviewReplace = 'if(e.strategy==="shape"&&!l&&(e.fill||e.stroke)&&u)try{let f=Sh(e,i),d=sw(e,f?s:null,t,n),p=f?await bt(e,d,s,i,a):{layer:d,linkedFiles:[],warnings:[]};return{layer:p.layer,linkedFiles:p.linkedFiles,warnings:p.warnings}}catch(f){}'
+if ($uiBundle.Contains($uiShapeVectorPreviewFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiShapeVectorPreviewFind `
+    -Replace $uiShapeVectorPreviewReplace `
+    -ExpectedCount 1 `
+    -Label 'UI native vector stroke export gate'
+} elseif ($uiBundle.Contains($uiShapeVectorPreviewReplace)) {
+  # Already patched in this UI variant.
+} else {
+  throw "Could not find UI native vector stroke export gate."
+}
+
+$uiPsdVectorStrokeBuilderFind = 'function pigmaPsdLineDashSet(e){return e&&Array.isArray(e.dashPattern)&&e.dashPattern.length>0?e.dashPattern.map(t=>({value:t,units:"Pixels"})):void 0}function pigmaApplyPsdLineDash(e,t){let n=pigmaPsdLineDashSet(t);return n&&(e.lineDashSet=n,e.lineDashOffset={value:0,units:"Pixels"}),e}function B1(e,t,n,r=null){var a,o;let i={name:e.name,left:e.x,top:e.y,right:e.x+e.width,bottom:e.y+e.height,opacity:pigmaShapeLayerOpacity(e),hidden:!e.visible,blendMode:wr(e.blendMode),vectorOrigination:iw(e),vectorMask:{fillStartsWithAllPixels:!1,paths:[Lw(e,t,n)]}};return r&&(i.canvas=r),e.fill&&(i.fillOpacity=pigmaShapeLayerFillOpacity(e),i.vectorFill=Dm(e.fill,e.width,e.height,e.nodeTransform)),i.vectorStroke=pigmaApplyPsdLineDash({fillEnabled:!!e.fill,strokeEnabled:!!e.stroke,lineWidth:{value:e.stroke?e.stroke.width:1,units:"Pixels"},lineAlignment:e.stroke?e.stroke.position:"center",opacity:e.stroke?e.stroke.color.a/255:1,content:{type:"color",color:Sr(_1(e.fill,(o=(a=e.stroke)==null?void 0:a.color)!=null?o:null))},resolution:72},e.stroke),Wn(i,e.effects,e.strokeEffect),i}'
+$uiPsdVectorStrokeBuilderPreviousReplace = 'function pigmaPsdLineDashSet(e){return e&&Array.isArray(e.dashPattern)&&e.dashPattern.length>0?e.dashPattern.map(t=>({value:t,units:"Pixels"})):void 0}function pigmaApplyPsdLineDash(e,t){let n=pigmaPsdLineDashSet(t);return n&&(e.lineDashSet=n,e.lineDashOffset={value:0,units:"Pixels"}),e}function pigmaTransparentVectorFill(){return{type:"color",color:{r:255,g:255,b:255}}}function pigmaBuildPsdVectorStroke(e,t){return pigmaApplyPsdLineDash({fillEnabled:!!e||!!t,strokeEnabled:!!t,lineWidth:{value:t?t.width:1,units:"Pixels"},lineAlignment:t?t.position:"center",lineCapType:t&&t.cap?t.cap:"butt",lineJoinType:t&&t.join?t.join:"miter",miterLimit:t&&t.miterLimit?t.miterLimit:4,opacity:t?t.color.a/255:1,blendMode:t&&t.blendMode?wr(t.blendMode):"normal",content:{type:"color",color:Sr(_1(e,t&&t.color?t.color:null))},resolution:72},t)}function B1(e,t,n,r=null){let i={name:e.name,left:e.x,top:e.y,right:e.x+e.width,bottom:e.y+e.height,opacity:pigmaShapeLayerOpacity(e),hidden:!e.visible,blendMode:wr(e.blendMode),vectorOrigination:iw(e),vectorMask:{fillStartsWithAllPixels:!1,paths:[Lw(e,t,n)]}};return r&&(i.canvas=r),e.fill?(i.fillOpacity=pigmaShapeLayerFillOpacity(e),i.vectorFill=Dm(e.fill,e.width,e.height,e.nodeTransform)):e.stroke&&(i.fillOpacity=0,i.vectorFill=pigmaTransparentVectorFill()),i.vectorStroke=pigmaBuildPsdVectorStroke(e.fill,e.stroke),Wn(i,e.effects,e.strokeEffect),i}'
+$uiPsdVectorStrokeBuilderNoDotReplace = 'function pigmaPsdLineDashSet(e){return e&&Array.isArray(e.dashPattern)&&e.dashPattern.length>0?e.dashPattern.map(t=>({value:t,units:"Pixels"})):void 0}function pigmaApplyPsdLineDash(e,t){let n=pigmaPsdLineDashSet(t);return n&&(e.lineDashSet=n,e.lineDashOffset={value:0,units:"Pixels"}),e}function pigmaTransparentVectorFill(){return{type:"color",color:{r:255,g:255,b:255}}}function pigmaBuildPsdVectorStroke(e,t){return pigmaApplyPsdLineDash({fillEnabled:!!e||!!t,strokeEnabled:!!t,lineWidth:{value:t?t.width:1,units:"Pixels"},lineAlignment:t?t.position:"center",lineCapType:t&&t.cap?t.cap:"butt",lineJoinType:t&&t.join?t.join:"miter",miterLimit:t&&t.miterLimit?t.miterLimit:4,opacity:t?t.color.a/255:1,blendMode:t&&t.blendMode?wr(t.blendMode):"normal",content:{type:"color",color:Sr(_1(e,t&&t.color?t.color:null))},resolution:72},t)}function B1(e,t,n,r=null){let i={name:e.name,left:e.x,top:e.y,right:e.x+e.width,bottom:e.y+e.height,opacity:pigmaShapeLayerOpacity(e),hidden:!e.visible,blendMode:wr(e.blendMode),vectorOrigination:iw(e),vectorMask:{fillStartsWithAllPixels:!1,paths:[Lw(e,t,n)]}};return r&&(i.canvas=r),e.fill&&(i.fillOpacity=pigmaShapeLayerFillOpacity(e),i.vectorFill=Dm(e.fill,e.width,e.height,e.nodeTransform)),!e.fill&&e.stroke&&(i.fillOpacity=0,i.vectorFill=pigmaTransparentVectorFill()),i.vectorStroke=pigmaBuildPsdVectorStroke(e.fill,e.stroke),Wn(i,e.effects,e.strokeEffect),i}'
+$uiPsdVectorStrokeBuilderDotDashReplace = 'function pigmaPsdDashPattern(e){if(!e||!Array.isArray(e.dashPattern)||e.dashPattern.length===0)return null;let t=e.dashPattern.map(n=>Number(n)).filter(n=>Number.isFinite(n)&&n>=0);return t.length>0?t:null}function pigmaPsdLineDashSet(e){let t=pigmaPsdDashPattern(e);return t?(e&&e.cap==="round"&&t.length>=2&&t[0]<=1&&(t[0]=0),t.map(n=>({value:n,units:"Pixels"}))):void 0}function pigmaApplyPsdLineDash(e,t){let n=pigmaPsdLineDashSet(t);return n&&(e.lineDashSet=n,e.lineDashOffset={value:0,units:"Pixels"}),e}'
+$uiPsdVectorStrokeBuilderReplace = $uiPsdVectorStrokeBuilderDotDashReplace + 'function pigmaTransparentVectorFill(){return{type:"color",color:{r:255,g:255,b:255}}}function pigmaBuildPsdVectorStroke(e,t){return pigmaApplyPsdLineDash({fillEnabled:!!e||!!t,strokeEnabled:!!t,lineWidth:{value:t?t.width:1,units:"Pixels"},lineAlignment:t?t.position:"center",lineCapType:t&&t.cap?t.cap:"butt",lineJoinType:t&&t.join?t.join:"miter",miterLimit:t&&t.miterLimit?t.miterLimit:4,opacity:t?t.color.a/255:1,blendMode:t&&t.blendMode?wr(t.blendMode):"normal",content:{type:"color",color:Sr(_1(e,t&&t.color?t.color:null))},resolution:72},t)}function B1(e,t,n,r=null){let i={name:e.name,left:e.x,top:e.y,right:e.x+e.width,bottom:e.y+e.height,opacity:pigmaShapeLayerOpacity(e),hidden:!e.visible,blendMode:wr(e.blendMode),vectorOrigination:iw(e),vectorMask:{fillStartsWithAllPixels:!1,paths:[Lw(e,t,n)]}};return r&&(i.canvas=r),e.fill&&(i.fillOpacity=pigmaShapeLayerFillOpacity(e),i.vectorFill=Dm(e.fill,e.width,e.height,e.nodeTransform)),!e.fill&&e.stroke&&(i.fillOpacity=0,i.vectorFill=pigmaTransparentVectorFill()),i.vectorStroke=pigmaBuildPsdVectorStroke(e.fill,e.stroke),Wn(i,e.effects,e.strokeEffect),i}'
+if ($uiBundle.Contains($uiPsdVectorStrokeBuilderFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiPsdVectorStrokeBuilderFind `
+    -Replace $uiPsdVectorStrokeBuilderReplace `
+    -ExpectedCount 1 `
+    -Label 'UI PSD vectorStroke carrier builder'
+} elseif ($uiBundle.Contains($uiPsdVectorStrokeBuilderPreviousReplace)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiPsdVectorStrokeBuilderPreviousReplace `
+    -Replace $uiPsdVectorStrokeBuilderReplace `
+    -ExpectedCount 1 `
+    -Label 'UI PSD vectorStroke carrier builder normalization'
+} elseif ($uiBundle.Contains($uiPsdVectorStrokeBuilderNoDotReplace)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiPsdVectorStrokeBuilderNoDotReplace `
+    -Replace $uiPsdVectorStrokeBuilderReplace `
+    -ExpectedCount 1 `
+    -Label 'UI PSD round dot dash normalization'
+} elseif ($uiBundle.Contains($uiPsdVectorStrokeBuilderReplace)) {
+  # Already patched in this UI variant.
+} else {
+  throw "Could not find UI PSD vectorStroke carrier builder."
+}
+
+$uiSvgShapeLayerBuilderFind = 'function sw(e,t,n,r){if(!e.fill)throw new Error("Shape vector export requires a supported fill.");let i=Aw(bw(e.svgString,e.width,e.height),e.x,e.y,n,r);if(i.length===0)throw new Error("The SVG did not contain any shape paths.");let a={name:e.name,left:e.x,top:e.y,right:e.x+e.width,bottom:e.y+e.height,opacity:e.opacity,hidden:!e.visible,blendMode:wr(e.blendMode),fillOpacity:Em(e.fill),vectorFill:Dm(e.fill,e.width,e.height,e.nodeTransform),vectorMask:{paths:i}};return t&&(a.canvas=t),Wn(a,e.effects,e.strokeEffect),a}'
+$uiSvgShapeLayerBuilderReplace = 'function sw(e,t,n,r){if(!e.fill&&!e.stroke)throw new Error("Shape vector export requires a supported fill or stroke.");let i=Aw(bw(e.svgString,e.width,e.height),e.x,e.y,n,r);if(i.length===0)throw new Error("The SVG did not contain any shape paths.");let a={name:e.name,left:e.x,top:e.y,right:e.x+e.width,bottom:e.y+e.height,opacity:pigmaShapeLayerOpacity(e),hidden:!e.visible,blendMode:wr(e.blendMode),vectorMask:{paths:i}};return t&&(a.canvas=t),e.fill?(a.fillOpacity=pigmaShapeLayerFillOpacity(e),a.vectorFill=Dm(e.fill,e.width,e.height,e.nodeTransform)):e.stroke&&(a.fillOpacity=0,a.vectorFill=pigmaTransparentVectorFill()),e.stroke&&(a.vectorStroke=pigmaBuildPsdVectorStroke(e.fill,e.stroke)),Wn(a,e.effects,null),a}'
+if ($uiBundle.Contains($uiSvgShapeLayerBuilderFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiSvgShapeLayerBuilderFind `
+    -Replace $uiSvgShapeLayerBuilderReplace `
+    -ExpectedCount 1 `
+    -Label 'UI SVG native vectorStroke shape builder'
+} elseif ($uiBundle.Contains($uiSvgShapeLayerBuilderReplace)) {
+  # Already patched in this UI variant.
+} else {
+  throw "Could not find UI SVG native vectorStroke shape builder."
+}
 
 # Release large PSD/ZIP buffers before the prepared download click. The Figma
 # plugin iframe can otherwise hold root PSD bytes, ZIP stream chunks, and the
@@ -1511,6 +1663,15 @@ $bitmapLayerNativeEffectsFind = 'let T={name:v.name,left:v.x,top:v.y,opacity:v.o
 $bitmapLayerNativeEffectsReplace = 'let T={name:v.name,left:v.x,top:v.y,opacity:v.opacity,hidden:!v.visible,blendMode:wr(v.blendMode)};Wn(T,v.effects,v.strokeEffect);if(!(t&&v.kind==="text"))'
 $uiMaskedSmartObjectLayerHelperMarker = 'async function pigmaApplyContainerClipToBackground('
 $uiMaskedSmartObjectLayerHelper = @'
+async function pigmaBuildLayeredSmartObjectFile(e,t,n,r=[]){let i=e&&e.smartObjectDocument;if(!i||!Array.isArray(i.children)||i.children.length===0)return null;let a=Math.max(1,Math.round(Number(i.width)||t.width||1)),o=Math.max(1,Math.round(Number(i.height)||t.height||1)),s=await vm(i.children,n,r.concat(e.name||"Smart Object"),a,o,!1,null);if(s.children.length===0)return null;let u={width:a,height:o,children:s.children};s.linkedFiles.length>0&&(u.linkedFiles=s.linkedFiles);let l=(0,Lh.writePsdUint8Array)(u,{invalidateTextLayers:!1,noBackground:!0,generateThumbnail:!0});return{bytes:l,warnings:s.warnings}}
+function pigmaBuildSmartObjectPreviewCanvas(e,t){let n=e&&e.smartObjectDocument;if(!n)return{canvas:t,offsetX:0,offsetY:0,width:t.width,height:t.height};let r=Math.max(1,Math.round(Number(n.width)||t.width||1)),i=Math.max(1,Math.round(Number(n.height)||t.height||1)),a=Math.max(0,Math.round(Number(n.offsetX)||0)),o=Math.max(0,Math.round(Number(n.offsetY)||0));if(r===t.width&&i===t.height&&a===0&&o===0)return{canvas:t,offsetX:0,offsetY:0,width:t.width,height:t.height};let s=it(r,i,"smart object preview"),u=s.getContext("2d");if(!u)throw new Error("Unable to create a 2D canvas for a Smart Object preview.");return u.drawImage(t,a,o),{canvas:s,offsetX:a,offsetY:o,width:r,height:i}}
+function pigmaSmartObjectSourceBytes(e){let t=e&&e.smartObjectSourceBytes;if(!t)return null;if(t instanceof Uint8Array)return t;if(t instanceof ArrayBuffer)return new Uint8Array(t);if(typeof ArrayBuffer!="undefined"&&typeof ArrayBuffer.isView=="function"&&ArrayBuffer.isView(t))return new Uint8Array(t.buffer,t.byteOffset||0,t.byteLength);return Array.isArray(t)?new Uint8Array(t):null}
+function pigmaSmartObjectSourceDimension(e,t,n){let r=Math.round(Number(e&&e[t]));return Number.isFinite(r)&&r>0?r:n}
+function pigmaSmartObjectSourceFileName(e){let t=e&&typeof e.smartObjectSourceFileName=="string"?e.smartObjectSourceFileName.trim():"",n=t?t.replace(/\.[^./\\]+$/,""):e&&e.name?e.name:"smart-object";return"".concat(qo(n),".png")}
+async function pigmaDecodeSmartObjectSourcePng(e){let t=pigmaSmartObjectSourceBytes(e);if(!t)return null;let n=typeof e.smartObjectSourceMimeType=="string"&&e.smartObjectSourceMimeType.trim()?e.smartObjectSourceMimeType.trim():"image/png",r=await createImageBitmap(new Blob([t],{type:n})),i=it(Math.max(1,r.width),Math.max(1,r.height),"smart object original source"),a=i.getContext("2d");if(!a)throw new Error("Unable to create a 2D canvas for a Smart Object source.");try{return a.drawImage(r,0,0),{bytes:await l1(i),width:i.width,height:i.height}}finally{r.close&&r.close(),Qt(i)}}
+async function pigmaBuildRasterSmartObjectLayer(e,t,n,r=[]){let i=tn(),a=tn(),o=pigmaBuildSmartObjectPreviewCanvas(e,t),s=await pigmaDecodeSmartObjectSourcePng(e),u=s?null:await pigmaBuildLayeredSmartObjectFile(e,t,n,r),l=s?Du(i,pigmaSmartObjectSourceFileName(e),s.bytes):u?Du(i,"".concat(qo(e.name||"masked-smart-object"),".psd"),u.bytes):Du(i,"".concat(qo(e.name||"masked-smart-object"),".png"),await l1(o.canvas));u&&(l.type="8BPS",l.creator="8BIM");let c=e.x-o.offsetX,f=e.y-o.offsetY,d=o.width,p=o.height,h=s?s.width:pigmaSmartObjectSourceDimension(e,"smartObjectSourceWidth",d),g=s?s.height:pigmaSmartObjectSourceDimension(e,"smartObjectSourceHeight",p),v={name:e.name,left:c,top:f,right:c+d,bottom:f+p,opacity:e.opacity,hidden:!e.visible,blendMode:wr(e.blendMode),canvas:o.canvas,placedLayer:{id:i,placed:a,type:"raster",comp:qi,compInfo:Zo(),transform:[c,f,c+d,f,c+d,f+p,c,f+p],width:h,height:g,resolution:{value:72,units:"Density"}}};return Wn(v,e.effects,e.strokeEffect),{layer:v,linkedFiles:[l],warnings:u?u.warnings:[]}}
+'@
+$uiMaskedSmartObjectLayerHelperBeforeOriginalSource = @'
 async function pigmaBuildLayeredSmartObjectFile(e,t,n,r=[]){let i=e&&e.smartObjectDocument;if(!i||!Array.isArray(i.children)||i.children.length===0)return null;let a=Math.max(1,Math.round(Number(i.width)||t.width||1)),o=Math.max(1,Math.round(Number(i.height)||t.height||1)),s=await vm(i.children,n,r.concat(e.name||"Smart Object"),a,o,!1,null);if(s.children.length===0)return null;let u={width:a,height:o,children:s.children};s.linkedFiles.length>0&&(u.linkedFiles=s.linkedFiles);let l=(0,Lh.writePsdUint8Array)(u,{invalidateTextLayers:!1,noBackground:!0,generateThumbnail:!0});return{bytes:l,warnings:s.warnings}}
 function pigmaBuildSmartObjectPreviewCanvas(e,t){let n=e&&e.smartObjectDocument;if(!n)return{canvas:t,offsetX:0,offsetY:0,width:t.width,height:t.height};let r=Math.max(1,Math.round(Number(n.width)||t.width||1)),i=Math.max(1,Math.round(Number(n.height)||t.height||1)),a=Math.max(0,Math.round(Number(n.offsetX)||0)),o=Math.max(0,Math.round(Number(n.offsetY)||0));if(r===t.width&&i===t.height&&a===0&&o===0)return{canvas:t,offsetX:0,offsetY:0,width:t.width,height:t.height};let s=it(r,i,"smart object preview"),u=s.getContext("2d");if(!u)throw new Error("Unable to create a 2D canvas for a Smart Object preview.");return u.drawImage(t,a,o),{canvas:s,offsetX:a,offsetY:o,width:r,height:i}}
 async function pigmaBuildRasterSmartObjectLayer(e,t,n,r=[]){let i=tn(),a=tn(),o=pigmaBuildSmartObjectPreviewCanvas(e,t),s=await l1(o.canvas),u=await pigmaBuildLayeredSmartObjectFile(e,t,n,r),l=u?Du(i,"".concat(qo(e.name||"masked-smart-object"),".psd"),u.bytes):Du(i,"".concat(qo(e.name||"masked-smart-object"),".png"),s);u&&(l.type="8BPS",l.creator="8BIM");let c=e.x-o.offsetX,f=e.y-o.offsetY,d=o.width,p=o.height,h={name:e.name,left:c,top:f,right:c+d,bottom:f+p,opacity:e.opacity,hidden:!e.visible,blendMode:wr(e.blendMode),canvas:o.canvas,placedLayer:{id:i,placed:a,type:"raster",comp:qi,compInfo:Zo(),transform:[c,f,c+d,f,c+d,f+p,c,f+p],width:d,height:p,resolution:{value:72,units:"Density"}}};return Wn(h,e.effects,e.strokeEffect),{layer:h,linkedFiles:[l],warnings:u?u.warnings:[]}}
@@ -2031,7 +2192,9 @@ $uiShapePreviewVectorMetadataReplace = 'let V=N?ku(v,N,v.x,v.y):B1(v,r,i,null);i
 $uiVectorPreviewMetadataReplace = 'function Qo(e){let t=e!=null?e:{};return{disableShapePreviewCanvas:t.disableShapePreviewCanvas===!0,forceBitmapVectorPreview:t.forceBitmapVectorPreview===!0,disableEditableTextPreview:!1,disableLayerBlur:t.disableLayerBlur===!0,disableProgressiveLayerBlur:t.disableProgressiveLayerBlur===!0,disableBackgroundBlur:t.disableBackgroundBlur===!0,disableNoise:t.disableNoise===!0,disableTexture:t.disableTexture===!0}}'
 $uiVectorPreviewMetadataLegacyReplace = 'function Qo(e){let t=e!=null?e:{};return{disableShapePreviewCanvas:t.disableShapePreviewCanvas===!0,forceBitmapVectorPreview:!0,disableEditableTextPreview:!1,disableLayerBlur:t.disableLayerBlur===!0,disableProgressiveLayerBlur:t.disableProgressiveLayerBlur===!0,disableBackgroundBlur:t.disableBackgroundBlur===!0,disableNoise:t.disableNoise===!0,disableTexture:t.disableTexture===!0}}'
 $uiNativeShapeBeforeBitmapFind = 'async function aw(e,t,n,r,i,a=null){if(i.forceBitmapVectorPreview){let f=await Xn(e.pngBytes);return{layer:ku(e,f,e.x+e.previewOffsetX,e.y+e.previewOffsetY,null),linkedFiles:[],warnings:[]}}let o=await ow(e),s=o.canvas,u=gw(e.svgString,e.width,e.height),l=cu(Ki(e.effects),i),c=e.previewOffsetX!==0||e.previewOffsetY!==0||o.visibleWidth!==e.width||o.visibleHeight!==e.height;if(du(l)){'
-$uiNativeShapeBeforeBitmapReplace = 'async function aw(e,t,n,r,i,a=null){let pigmaGradientShapeSvg=e.fill&&e.fill.kind==="gradient",pigmaForceSvgSmartObject=e.forceSvgSmartObject===!0||pigmaGradientShapeSvg,pigmaNativeShapeCandidate=e.strategy==="shape"&&e.fill&&!pigmaForceSvgSmartObject&&gw(e.svgString,e.width,e.height);if(i.forceBitmapVectorPreview&&!pigmaNativeShapeCandidate){let f=await Xn(e.pngBytes);return{layer:ku(e,f,e.x+e.previewOffsetX,e.y+e.previewOffsetY,null),linkedFiles:[],warnings:[]}}let o=await ow(e),s=o.canvas,u=pigmaNativeShapeCandidate,l=cu(Ki(e.effects),i),c=e.previewOffsetX!==0||e.previewOffsetY!==0||o.visibleWidth!==e.width||o.visibleHeight!==e.height;if(du(l)){'
+$uiNativeShapeBeforeBitmapPreviousReplace = 'async function aw(e,t,n,r,i,a=null){let pigmaNativeShapeCandidate=e.strategy==="shape"&&(e.fill||e.stroke)&&gw(e.svgString,e.width,e.height);if(i.forceBitmapVectorPreview&&!pigmaNativeShapeCandidate){let f=await Xn(e.pngBytes);return{layer:ku(e,f,e.x+e.previewOffsetX,e.y+e.previewOffsetY,null),linkedFiles:[],warnings:[]}}let o=await ow(e),s=o.canvas,u=pigmaNativeShapeCandidate,l=cu(Ki(e.effects),i),c=e.previewOffsetX!==0||e.previewOffsetY!==0||o.visibleWidth!==e.width||o.visibleHeight!==e.height;if(du(l)){'
+$uiNativeShapeBeforeBitmapCandidateOnlyReplace = 'async function aw(e,t,n,r,i,a=null){let pigmaNativeShapeCandidate=!e.forceSvgSmartObject&&e.strategy==="shape"&&(e.fill||e.stroke)&&gw(e.svgString,e.width,e.height);if(i.forceBitmapVectorPreview&&!pigmaNativeShapeCandidate){let f=await Xn(e.pngBytes);return{layer:ku(e,f,e.x+e.previewOffsetX,e.y+e.previewOffsetY,null),linkedFiles:[],warnings:[]}}let o=await ow(e),s=o.canvas,u=pigmaNativeShapeCandidate,l=cu(Ki(e.effects),i),c=e.previewOffsetX!==0||e.previewOffsetY!==0||o.visibleWidth!==e.width||o.visibleHeight!==e.height;if(du(l)){'
+$uiNativeShapeBeforeBitmapReplace = 'async function aw(e,t,n,r,i,a=null){let pigmaNativeShapeCandidate=!e.forceSvgSmartObject&&e.strategy==="shape"&&(e.fill||e.stroke)&&gw(e.svgString,e.width,e.height);if(i.forceBitmapVectorPreview&&!pigmaNativeShapeCandidate&&!e.forceSvgSmartObject){let f=await Xn(e.pngBytes);return{layer:ku(e,f,e.x+e.previewOffsetX,e.y+e.previewOffsetY,null),linkedFiles:[],warnings:[]}}let o=await ow(e),s=o.canvas,u=pigmaNativeShapeCandidate,l=cu(Ki(e.effects),i),c=e.previewOffsetX!==0||e.previewOffsetY!==0||o.visibleWidth!==e.width||o.visibleHeight!==e.height;if(du(l)){'
 $uiNativeShapeSizeGuardFind = 'function gw(e,t,n){if(t>512||n>512||t*n>18e4)return!1;'
 $uiNativeShapeSizeGuardReplace = 'function gw(e,t,n){if(t<=0||n<=0)return!1;'
 $uiNativeShapeTransformGuardFind = 'function gw(e,t,n){if(t<=0||n<=0)return!1;let i=new DOMParser().parseFromString(e,"image/svg+xml");if(i.querySelector("parsererror"))return!1;let a=i.documentElement;if(a.tagName.toLowerCase()!=="svg")return!1;let o=Array.from(a.querySelectorAll("*")).filter(u=>{let l=u.tagName.toLowerCase();return l!=="defs"&&l!=="title"&&l!=="desc"});if(o.length===0||o.length>6)return!1;let s=0;for(let u of o){let l=u.tagName.toLowerCase();if(l!=="path"&&l!=="rect"&&l!=="ellipse"&&l!=="circle"||u.hasAttribute("transform"))return!1;if(l==="path"){let c=u.getAttribute("d")||"";if(!c||/[Aa]/.test(c))return!1;let f=c.match(/[MmLlHhVvCcSsQqTtZz]/g)||[];if(s+=f.length,f.length>40)return!1}else if(l==="ellipse"||l==="circle")try{Zm(u)}catch(c){return!1}}return s<=60}'
@@ -2040,7 +2203,9 @@ $uiNativeShapeTransformGuardReplace = 'function pigmaSvgTransformIsNativeShapeSa
 $uiNativeShapeTransformParserFind = 'function ww(e,t){var n,r,i,a,o;switch(e){case"matrix":if(t.length!==6)throw new Error("Invalid SVG matrix() transform.");return{a:t[0],b:t[1],c:t[2],d:t[3],e:t[4],f:t[5]};case"translate":return{a:1,b:0,c:0,d:1,e:(n=t[0])!=null?n:0,f:(r=t[1])!=null?r:0};case"scale":return{a:(i=t[0])!=null?i:1,b:0,c:0,d:(o=(a=t[1])!=null?a:t[0])!=null?o:1,e:0,f:0};default:throw new Error("Unsupported SVG transform: ".concat(e,"()."))}}'
 $uiNativeShapeTransformParserReplace = 'function pigmaSvgTransformTranslate(e,t){return{a:1,b:0,c:0,d:1,e:e,f:t}}function pigmaSvgTransformRotate(e,t,n){let r=e*Math.PI/180,i=Math.cos(r),a=Math.sin(r),o={a:i,b:a,c:-a,d:i,e:0,f:0};return Number.isFinite(t)&&Number.isFinite(n)?Mu(Mu(pigmaSvgTransformTranslate(t,n),o),pigmaSvgTransformTranslate(-t,-n)):o}function ww(e,t){var n,r,i,a,o;switch(e){case"matrix":if(t.length!==6)throw new Error("Invalid SVG matrix() transform.");return{a:t[0],b:t[1],c:t[2],d:t[3],e:t[4],f:t[5]};case"translate":return{a:1,b:0,c:0,d:1,e:(n=t[0])!=null?n:0,f:(r=t[1])!=null?r:0};case"scale":return{a:(i=t[0])!=null?i:1,b:0,c:0,d:(o=(a=t[1])!=null?a:t[0])!=null?o:1,e:0,f:0};case"rotate":if(t.length!==1&&t.length!==3)throw new Error("Invalid SVG rotate() transform.");return pigmaSvgTransformRotate(t[0],t[1],t[2]);default:throw new Error("Unsupported SVG transform: ".concat(e,"()."))}}'
 $uiNativeShapePreviewAlignmentFind = 'if(e.strategy==="shape"&&!l&&e.fill&&!c&&u)try{let f=Sh(e,i),d=sw(e,f?s:null,t,n),p=f?await bt(e,d,s,i,a):{layer:d,linkedFiles:[],warnings:[]};return{layer:p.layer,linkedFiles:p.linkedFiles,warnings:p.warnings}}catch(f){}'
-$uiNativeShapePreviewAlignmentReplace = 'if(e.strategy==="shape"&&!l&&e.fill&&u)try{let f=Sh(e,i),d=sw(e,f?s:null,t,n),p=f?await bt(e,d,s,i,a):{layer:d,linkedFiles:[],warnings:[]};return{layer:p.layer,linkedFiles:p.linkedFiles,warnings:p.warnings}}catch(f){}if(pigmaForceSvgSmartObject&&!l)try{let f=lw(e,s,o.visibleWidth,o.visibleHeight),d=await bt(e,f.layer,s,i,a);return{layer:d.layer,linkedFiles:f.linkedFiles.concat(d.linkedFiles),warnings:f.warnings.concat(d.warnings)}}catch(f){}'
+$uiNativeShapePreviewAlignmentReplace = 'if(e.strategy==="shape"&&!l&&(e.fill||e.stroke)&&u)try{let f=Sh(e,i),d=sw(e,f?s:null,t,n),p=f?await bt(e,d,s,i,a):{layer:d,linkedFiles:[],warnings:[]};return{layer:p.layer,linkedFiles:p.linkedFiles,warnings:p.warnings}}catch(f){}'
+$uiArrowSvgSmartObjectFind = 'if(e.strategy==="shape"&&!l&&(e.fill||e.stroke)&&u)try{let f=Sh(e,i),d=sw(e,f?s:null,t,n),p=f?await bt(e,d,s,i,a):{layer:d,linkedFiles:[],warnings:[]};return{layer:p.layer,linkedFiles:p.linkedFiles,warnings:p.warnings}}catch(f){}if(l&&r==="smart-object-if-possible"){'
+$uiArrowSvgSmartObjectReplace = 'if(e.strategy==="shape"&&!l&&(e.fill||e.stroke)&&u)try{let f=Sh(e,i),d=sw(e,f?s:null,t,n),p=f?await bt(e,d,s,i,a):{layer:d,linkedFiles:[],warnings:[]};return{layer:p.layer,linkedFiles:p.linkedFiles,warnings:p.warnings}}catch(f){}if(e.forceSvgSmartObject)try{let f=lw(e,s,o.visibleWidth,o.visibleHeight),d=await bt(e,f.layer,s,i,a);return{layer:d.layer,linkedFiles:f.linkedFiles.concat(d.linkedFiles),warnings:f.warnings.concat(d.warnings)}}catch(f){}if(l&&r==="smart-object-if-possible"){'
 if ($uiBundle.Contains($uiColorDodgeShapeOpacityFind)) {
   $uiBundle = Replace-Exact `
     -Text $uiBundle `
@@ -2088,7 +2253,7 @@ if ($uiBundle.Contains($uiShapeVectorStrokeDashFind)) {
     -Replace $uiShapeVectorStrokeDashReplace `
     -ExpectedCount 1 `
     -Label 'ui dashed PSD vector stroke metadata'
-} elseif ($uiBundle.Contains($uiShapeVectorStrokeDashReplace)) {
+} elseif ($uiBundle.Contains($uiShapeVectorStrokeDashReplace) -or $uiBundle.Contains($uiPsdVectorStrokeBuilderReplace)) {
   # Already patched in this UI bundle variant.
 } else {
   throw 'Could not patch UI dashed PSD vector stroke metadata.'
@@ -2127,10 +2292,37 @@ if ($uiBundle.Contains($uiNativeShapeBeforeBitmapFind)) {
     -Replace $uiNativeShapeBeforeBitmapReplace `
     -ExpectedCount 1 `
     -Label 'ui vector export native Photoshop shape before bitmap mode'
+} elseif ($uiBundle.Contains($uiNativeShapeBeforeBitmapPreviousReplace)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiNativeShapeBeforeBitmapPreviousReplace `
+    -Replace $uiNativeShapeBeforeBitmapReplace `
+    -ExpectedCount 1 `
+    -Label 'ui arrow SVG vector before bitmap mode'
+} elseif ($uiBundle.Contains($uiNativeShapeBeforeBitmapCandidateOnlyReplace)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiNativeShapeBeforeBitmapCandidateOnlyReplace `
+    -Replace $uiNativeShapeBeforeBitmapReplace `
+    -ExpectedCount 1 `
+    -Label 'ui arrow SVG vector bitmap bypass gate'
 } elseif ($uiBundle.Contains($uiNativeShapeBeforeBitmapReplace)) {
   # Already patched in this UI bundle variant.
 } else {
   throw 'Could not patch UI native Photoshop shape vector export.'
+}
+
+if ($uiBundle.Contains($uiArrowSvgSmartObjectFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiArrowSvgSmartObjectFind `
+    -Replace $uiArrowSvgSmartObjectReplace `
+    -ExpectedCount 1 `
+    -Label 'ui arrow SVG smart object fallback'
+} elseif ($uiBundle.Contains($uiArrowSvgSmartObjectReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI arrow SVG smart object fallback.'
 }
 
 if ($uiBundle.Contains($uiNativeShapeSizeGuardFind)) {
@@ -2162,8 +2354,44 @@ if ($uiBundle.Contains($uiNativeShapeTransformGuardFind)) {
     -Label 'ui native Photoshop shape SVG group transform guard'
 } elseif ($uiBundle.Contains($uiNativeShapeTransformGuardReplace)) {
   # Already patched in this UI bundle variant.
+} elseif (
+  $uiBundle.Contains('&&n!=="line"&&n!=="polyline"&&n!=="polygon")return!1') -and
+  $uiBundle.Contains('else if(n==="line"){let r=ut(e.getAttribute("x1"))') -and
+  $uiBundle.Contains('else if(n==="polyline"||n==="polygon"){let r=pigmaSvgPointPairs(e.getAttribute("points"))')
+) {
+  # Already patched in this UI bundle variant with line/polyline/polygon support.
 } else {
   throw 'Could not patch UI native Photoshop shape SVG transform guard.'
+}
+
+$uiNativeShapeSvgElementAllowFind = 'if(n!=="path"&&n!=="rect"&&n!=="ellipse"&&n!=="circle")return!1;if(t.count+=1,t.count>6)return!1;'
+$uiNativeShapeSvgElementAllowReplace = 'if(n!=="path"&&n!=="rect"&&n!=="ellipse"&&n!=="circle"&&n!=="line"&&n!=="polyline"&&n!=="polygon")return!1;if(t.count+=1,t.count>6)return!1;'
+if ($uiBundle.Contains($uiNativeShapeSvgElementAllowFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiNativeShapeSvgElementAllowFind `
+    -Replace $uiNativeShapeSvgElementAllowReplace `
+    -ExpectedCount 1 `
+    -Label 'ui native Photoshop shape SVG line/polyline/polygon gate'
+} elseif ($uiBundle.Contains($uiNativeShapeSvgElementAllowReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI native Photoshop shape SVG element allow-list.'
+}
+
+$uiNativeShapeSvgElementValidateFind = 'else if(n==="ellipse"||n==="circle")try{Zm(e)}catch(r){return!1}return!0'
+$uiNativeShapeSvgElementValidateReplace = 'else if(n==="ellipse"||n==="circle")try{Zm(e)}catch(r){return!1}else if(n==="line"){let r=ut(e.getAttribute("x1")),i=ut(e.getAttribute("y1")),a=ut(e.getAttribute("x2")),o=ut(e.getAttribute("y2"));if(r===null||i===null||a===null||o===null)return!1;t.commands+=2}else if(n==="polyline"||n==="polygon"){let r=pigmaSvgPointPairs(e.getAttribute("points"));if(r.length<2)return!1;t.commands+=r.length+1;if(t.commands>60)return!1}return!0'
+if ($uiBundle.Contains($uiNativeShapeSvgElementValidateFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiNativeShapeSvgElementValidateFind `
+    -Replace $uiNativeShapeSvgElementValidateReplace `
+    -ExpectedCount 1 `
+    -Label 'ui native Photoshop shape SVG line/polyline/polygon validation'
+} elseif ($uiBundle.Contains($uiNativeShapeSvgElementValidateReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI native Photoshop shape SVG element validation.'
 }
 
 if ($uiBundle.Contains($uiNativeShapeTransformParserFind)) {
@@ -2177,6 +2405,36 @@ if ($uiBundle.Contains($uiNativeShapeTransformParserFind)) {
   # Already patched in this UI bundle variant.
 } else {
   throw 'Could not patch UI native Photoshop shape SVG transform parser.'
+}
+
+$uiNativeShapeSvgElementParserFind = 'else if(i==="rect")u=lu(Mw(e),s);else if(i==="ellipse"||i==="circle")u=lu(Zm(e),s);else throw new Error("Unsupported SVG element for native shape export: <".concat(i,">."));'
+$uiNativeShapeSvgElementParserReplace = 'else if(i==="rect")u=lu(Mw(e),s);else if(i==="ellipse"||i==="circle")u=lu(Zm(e),s);else if(i==="line")u=lu(pigmaSvgLinePath(e),s);else if(i==="polyline")u=lu(pigmaSvgPolyPath(e,!1),s);else if(i==="polygon")u=lu(pigmaSvgPolyPath(e,!0),s);else throw new Error("Unsupported SVG element for native shape export: <".concat(i,">."));'
+if ($uiBundle.Contains($uiNativeShapeSvgElementParserFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiNativeShapeSvgElementParserFind `
+    -Replace $uiNativeShapeSvgElementParserReplace `
+    -ExpectedCount 1 `
+    -Label 'ui native Photoshop shape SVG line/polyline/polygon parser'
+} elseif ($uiBundle.Contains($uiNativeShapeSvgElementParserReplace)) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI native Photoshop shape SVG element parser.'
+}
+
+$uiNativeShapeSvgElementHelpersFind = 'for(let c of u)r.push(Pw(c,o))}function yw(e,t,n){var i,a;'
+$uiNativeShapeSvgElementHelpersReplace = 'for(let c of u)r.push(Pw(c,o))}function pigmaSvgLinePath(e){let t=ut(e.getAttribute("x1")),n=ut(e.getAttribute("y1")),r=ut(e.getAttribute("x2")),i=ut(e.getAttribute("y2"));if(t===null||n===null||r===null||i===null)throw new Error("Invalid SVG line dimensions.");return"M ".concat(t," ").concat(n," L ").concat(r," ").concat(i)}function pigmaSvgPointPairs(e){let t=qm(e||"");if(t.length<4||t.length%2!==0)throw new Error("Invalid SVG points attribute.");let n=[];for(let r=0;r<t.length;r+=2)n.push({x:t[r],y:t[r+1]});return n}function pigmaSvgPolyPath(e,t){let n=pigmaSvgPointPairs(e.getAttribute("points"));if(n.length<2)throw new Error("Invalid SVG poly points.");let r="M ".concat(n[0].x," ").concat(n[0].y);for(let i=1;i<n.length;i+=1)r+=" L ".concat(n[i].x," ").concat(n[i].y);return t?r+" Z":r}function yw(e,t,n){var i,a;'
+if ($uiBundle.Contains($uiNativeShapeSvgElementHelpersFind)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiNativeShapeSvgElementHelpersFind `
+    -Replace $uiNativeShapeSvgElementHelpersReplace `
+    -ExpectedCount 1 `
+    -Label 'ui native Photoshop shape SVG line/polyline/polygon helpers'
+} elseif ($uiBundle.Contains('function pigmaSvgLinePath(') -and $uiBundle.Contains('function pigmaSvgPolyPath(')) {
+  # Already patched in this UI bundle variant.
+} else {
+  throw 'Could not patch UI native Photoshop shape SVG helper insertion.'
 }
 
 if ($uiBundle.Contains($uiNativeShapePreviewAlignmentFind)) {
@@ -2968,7 +3226,14 @@ if ($uiBundle.Contains($uiBackgroundClipHelperFind)) {
   throw 'Could not patch UI PSD background clipping helper.'
 }
 
-if ($uiBundle.Contains($uiMaskedSmartObjectLayerHelperLegacy)) {
+if ($uiBundle.Contains($uiMaskedSmartObjectLayerHelperBeforeOriginalSource)) {
+  $uiBundle = Replace-Exact `
+    -Text $uiBundle `
+    -Find $uiMaskedSmartObjectLayerHelperBeforeOriginalSource `
+    -Replace $uiMaskedSmartObjectLayerHelper `
+    -ExpectedCount 1 `
+    -Label 'ui PSD original image smart object source helper'
+} elseif ($uiBundle.Contains($uiMaskedSmartObjectLayerHelperLegacy)) {
   $uiBundle = Replace-Exact `
     -Text $uiBundle `
     -Find $uiMaskedSmartObjectLayerHelperLegacy `
@@ -2983,7 +3248,12 @@ if ($uiBundle.Contains($uiMaskedSmartObjectLayerHelperLegacy)) {
     -ExpectedCount 1 `
     -Label 'ui PSD masked smart object padded preview helper'
 } elseif ($uiBundle.Contains('async function pigmaBuildLayeredSmartObjectFile(')) {
-  # Already patched in this UI bundle variant.
+  $uiBundle = Replace-Section `
+    -Text $uiBundle `
+    -StartMarker 'async function pigmaBuildLayeredSmartObjectFile(' `
+    -EndMarker 'async function pigmaApplyContainerClipToBackground(' `
+    -Replacement ($uiMaskedSmartObjectLayerHelper + "`n") `
+    -Label 'ui PSD original image smart object source helper refresh'
 } elseif (-not $uiBundle.Contains('async function pigmaBuildRasterSmartObjectLayer(')) {
   if ($uiBundle.Contains($uiMaskedSmartObjectLayerHelperMarker)) {
     $uiBundle = Replace-Exact `
@@ -3217,6 +3487,21 @@ $bundle = Replace-Exact `
 
 $multiFillHelpersPatched = @'
 function pigmaVisibleFillEntries(e){return!("fills"in e)||!Array.isArray(e.fills)?[]:e.fills.map((t,r)=>({paint:t,index:r})).filter(t=>W(t.paint))}
+function pigmaVisibleImageFillEntries(e){return pigmaVisibleFillEntries(e).filter(t=>t.paint&&t.paint.type==="IMAGE"&&!!t.paint.imageHash)}
+function pigmaHasVisibleImageFill(e){return pigmaVisibleImageFillEntries(e).length>0}
+function pigmaHasEndpointStrokeCap(e){let t="strokeCap"in e?String(e.strokeCap||"NONE"):"NONE";return t!=="NONE"&&t!=="ROUND"&&t!=="SQUARE"}
+function pigmaVisibleStrokeEntries(e){return!("strokes"in e)||!Array.isArray(e.strokes)?[]:e.strokes.map((t,r)=>({paint:t,index:r})).filter(t=>W(t.paint))}
+function pigmaIsGradientPaint(e){return!!e&&(e.type==="GRADIENT_LINEAR"||e.type==="GRADIENT_RADIAL"||e.type==="GRADIENT_ANGULAR"||e.type==="GRADIENT_DIAMOND")}
+function pigmaHasVisibleGradientFill(e){return pigmaVisibleFillEntries(e).some(t=>pigmaIsGradientPaint(t.paint))}
+function pigmaHasVisibleGradientStroke(e){return pigmaVisibleStrokeEntries(e).some(t=>pigmaIsGradientPaint(t.paint))}
+function pigmaSvgAttr(e,t){let r=new RegExp("\\s"+t+"\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)')","i").exec(e);return r?r[1]!=null?r[1]:r[2]:null}
+function pigmaSvgDecodeAttr(e){return String(e||"").replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&amp;/g,"&")}
+function pigmaSvgPathNeedsSmartObject(e){let t=pigmaSvgDecodeAttr(e);if(!t||/[Zz]/.test(t))return!1;let r=t.match(/[LlHhVvCcSsQqTt]/g)||[];return r.length>1||r.length===1&&/[CcSsQqTt]/.test(r[0])}
+function pigmaSvgPointCount(e){let t=pigmaSvgDecodeAttr(e).trim().match(/[-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?/g);return t?Math.floor(t.length/2):0}
+function pigmaSvgHasOpenStrokeSubpath(e){if(!e||typeof e!="string")return!1;let t=/<path\b[^>]*>/gi,r;for(;(r=t.exec(e));){let o=pigmaSvgAttr(r[0],"d");if(o&&pigmaSvgPathNeedsSmartObject(o))return!0}let n=/<polyline\b[^>]*>/gi,i;for(;(i=n.exec(e));){let o=pigmaSvgAttr(i[0],"points");if(o&&pigmaSvgPointCount(o)>2)return!0}return!1}
+function pigmaGuessImageBytesMimeType(e){return e&&e.length>=8&&e[0]===137&&e[1]===80&&e[2]===78&&e[3]===71?"image/png":e&&e.length>=3&&e[0]===255&&e[1]===216&&e[2]===255?"image/jpeg":e&&e.length>=6&&e[0]===71&&e[1]===73&&e[2]===70?"image/gif":e&&e.length>=12&&e[0]===82&&e[1]===73&&e[2]===70&&e[3]===70&&e[8]===87&&e[9]===69&&e[10]===66&&e[11]===80?"image/webp":"image/png"}
+async function pigmaResolveSingleImageFillSource(e){let t=pigmaVisibleImageFillEntries(e);if(t.length!==1)return null;let r=t[0].paint.imageHash;try{let o=figma.getImageByHash(r);if(!o)return null;let n=await o.getBytesAsync();return n&&n.length>0?{hash:r,bytes:n,mimeType:pigmaGuessImageBytesMimeType(n)}:null}catch(o){return null}}
+async function pigmaExportImageFillSmartObjectBitmap(e,t,r=null){let o=await qn(e,t,r);if(o&&o.kind==="bitmap"){o.smartObject=!0,o.smartObjectSourceKind="image-fill-preview";let n=await pigmaResolveSingleImageFillSource(e);n&&(o.smartObjectSourceKind="original-image-fill",o.smartObjectSourceHash=n.hash,o.smartObjectSourceBytes=n.bytes,o.smartObjectSourceMimeType=n.mimeType)}return o}
 function pigmaPsdFillStackEntries(e){return e.slice().reverse()}
 function pigmaColorBurnOpacityScale(e){return e&&e.blendMode==="COLOR_BURN"?.875:1}
 function pigmaFillOpacity(e){var t;return h(((t=e.opacity)!=null?t:1)*pigmaColorBurnOpacityScale(e),0,1)}
@@ -3251,9 +3536,9 @@ if ($multiFillHelpersMatchCount -eq 1) {
 $bundle = Replace-Exact `
   -Text $bundle `
   -Find 'function Nr(e){if(re(e)||te(e)||X(e,"strokes")||fe(e))return{strategy:"smart-object",fill:null};let t=Ti(e);return t?{strategy:"shape",fill:t}:{strategy:"smart-object",fill:null}}' `
-  -Replace 'function pigmaShapeFillRequiresSvg(e){return e&&e.kind==="gradient"}function pigmaHasVisibleFill(e){return"fills"in e&&Array.isArray(e.fills)&&e.fills.some(W)}function pigmaStrokeOnlyVectorRequiresSvg(e,t){return Re(e)&&!!me(e)&&!t&&!pigmaHasVisibleFill(e)}function pigmaVectorRequiresSvgSmartObject(e,t){return pigmaShapeFillRequiresSvg(t)||pigmaStrokeRequiresSvg(e)||pigmaStrokeOnlyVectorRequiresSvg(e,t)}function Nr(e){if(re(e)||te(e)||fe(e))return{strategy:"smart-object",fill:null};let t=Ti(e);return t?pigmaVectorRequiresSvgSmartObject(e,t)?{strategy:"smart-object",fill:t,forceSvgSmartObject:!0}:{strategy:"shape",fill:t,forceSvgSmartObject:!1}:pigmaStrokeRequiresSvg(e)||pigmaStrokeOnlyVectorRequiresSvg(e,t)?{strategy:"smart-object",fill:null,forceSvgSmartObject:!0}:{strategy:"smart-object",fill:null}}' `
-  -ExpectedCount 1 `
-  -Label 'gradient-filled shape strategy uses SVG smart object'
+  -Replace 'function Nr(e){if(re(e)||te(e)||fe(e))return{strategy:"smart-object",fill:null};let t=Ti(e);return t?{strategy:"shape",fill:t}:{strategy:"smart-object",fill:null}}' `
+  -ExpectedCount 0 `
+  -Label 'filled shape strategy keeps supported strokes'
 
 $shapeNativeSizeGuardFind = 'function gw(e,t,n){if(t>512||n>512||t*n>18e4)return!1;'
 $shapeNativeSizeGuardReplace = 'function gw(e,t,n){if(t<=0||n<=0)return!1;'
@@ -3307,7 +3592,7 @@ if ($bundle.Contains($uiNativeShapeTransformParserFind)) {
 
 $shapeVectorPreviewFind = 'if(e.strategy==="shape"&&!l&&e.fill&&!c&&u)try{let f=sw(e,s,t,n),d=await bt(e,f,s,i,a);return{layer:d.layer,linkedFiles:d.linkedFiles,warnings:d.warnings}}catch(f){}'
 $shapeVectorPreviewLegacyReplace = 'if(e.strategy==="shape"&&!l&&e.fill&&!c&&u)try{let f=Sh(e,i),d=sw(e,f?s:null,t,n),p=f?await bt(e,d,s,i,a):{layer:d,linkedFiles:[],warnings:[]};return{layer:p.layer,linkedFiles:p.linkedFiles,warnings:p.warnings}}catch(f){}'
-$shapeVectorPreviewReplace = 'if(e.strategy==="shape"&&!l&&e.fill&&u)try{let f=Sh(e,i),d=sw(e,f?s:null,t,n),p=f?await bt(e,d,s,i,a):{layer:d,linkedFiles:[],warnings:[]};return{layer:p.layer,linkedFiles:p.linkedFiles,warnings:p.warnings}}catch(f){}if(pigmaForceSvgSmartObject&&!l)try{let f=lw(e,s,o.visibleWidth,o.visibleHeight),d=await bt(e,f.layer,s,i,a);return{layer:d.layer,linkedFiles:f.linkedFiles.concat(d.linkedFiles),warnings:f.warnings.concat(d.warnings)}}catch(f){}'
+$shapeVectorPreviewReplace = 'if(e.strategy==="shape"&&!l&&(e.fill||e.stroke)&&u)try{let f=Sh(e,i),d=sw(e,f?s:null,t,n),p=f?await bt(e,d,s,i,a):{layer:d,linkedFiles:[],warnings:[]};return{layer:p.layer,linkedFiles:p.linkedFiles,warnings:p.warnings}}catch(f){}'
 if ($bundle.Contains($shapeVectorPreviewFind)) {
   $bundle = Replace-Exact `
     -Text $bundle `
@@ -3330,7 +3615,7 @@ if ($bundle.Contains($shapeVectorPreviewFind)) {
 
 $conditionalShapePreviewFind = 'function sw(e,t,n,r){if(!e.fill)throw new Error("Shape vector export requires a supported fill.");let i=Aw(bw(e.svgString,e.width,e.height),e.x,e.y,n,r);if(i.length===0)throw new Error("The SVG did not contain any shape paths.");let a={name:e.name,left:e.x,top:e.y,right:e.x+e.width,bottom:e.y+e.height,opacity:e.opacity,hidden:!e.visible,blendMode:wr(e.blendMode),fillOpacity:Em(e.fill),canvas:t,vectorFill:Dm(e.fill,e.width,e.height,e.nodeTransform),vectorMask:{paths:i}};return Wn(a,e.effects,e.strokeEffect),a}'
 $conditionalShapePreviewLegacyReplace = 'function sw(e,t,n,r){if(!e.fill)throw new Error("Shape vector export requires a supported fill.");let i=Aw(bw(e.svgString,e.width,e.height),e.x,e.y,n,r);if(i.length===0)throw new Error("The SVG did not contain any shape paths.");let a={name:e.name,left:e.x,top:e.y,right:e.x+e.width,bottom:e.y+e.height,opacity:e.opacity,hidden:!e.visible,blendMode:wr(e.blendMode),fillOpacity:Em(e.fill),vectorFill:Dm(e.fill,e.width,e.height,e.nodeTransform),vectorMask:{paths:i}};return t&&(a.canvas=t),Wn(a,e.effects,e.strokeEffect),a}'
-$conditionalShapePreviewReplace = 'function pigmaShapeUsesLayerOpacityForFill(e){return e&&String(e.blendMode||"").toLowerCase()==="color dodge"}function pigmaShapeFillOpacity(e){return Em(e&&e.fill)}function pigmaShapeLayerOpacity(e){let t=typeof e.opacity=="number"?e.opacity:1,n=pigmaShapeFillOpacity(e);return pigmaShapeUsesLayerOpacityForFill(e)?ae(t*n,0,1):t}function pigmaShapeLayerFillOpacity(e){return pigmaShapeUsesLayerOpacityForFill(e)?1:pigmaShapeFillOpacity(e)}function sw(e,t,n,r){if(!e.fill)throw new Error("Shape vector export requires a supported fill.");let i=Aw(bw(e.svgString,e.width,e.height),e.x,e.y,n,r);if(i.length===0)throw new Error("The SVG did not contain any shape paths.");let a={name:e.name,left:e.x,top:e.y,right:e.x+e.width,bottom:e.y+e.height,opacity:pigmaShapeLayerOpacity(e),hidden:!e.visible,blendMode:wr(e.blendMode),fillOpacity:pigmaShapeLayerFillOpacity(e),vectorFill:Dm(e.fill,e.width,e.height,e.nodeTransform),vectorMask:{paths:i}};return t&&(a.canvas=t),Wn(a,e.effects,e.strokeEffect),a}'
+$conditionalShapePreviewReplace = 'function pigmaShapeUsesLayerOpacityForFill(e){return e&&String(e.blendMode||"").toLowerCase()==="color dodge"}function pigmaShapeFillOpacity(e){return Em(e&&e.fill)}function pigmaShapeLayerOpacity(e){let t=typeof e.opacity=="number"?e.opacity:1,n=pigmaShapeFillOpacity(e);return pigmaShapeUsesLayerOpacityForFill(e)?ae(t*n,0,1):t}function pigmaShapeLayerFillOpacity(e){return pigmaShapeUsesLayerOpacityForFill(e)?1:pigmaShapeFillOpacity(e)}function pigmaTransparentVectorFill(){return{type:"color",color:{r:255,g:255,b:255}}}function pigmaBuildPsdVectorStroke(e,t){return pigmaApplyPsdLineDash({fillEnabled:!!e||!!t,strokeEnabled:!!t,lineWidth:{value:t?t.width:1,units:"Pixels"},lineAlignment:t?t.position:"center",lineCapType:t&&t.cap?t.cap:"butt",lineJoinType:t&&t.join?t.join:"miter",miterLimit:t&&t.miterLimit?t.miterLimit:4,opacity:t?t.color.a/255:1,blendMode:t&&t.blendMode?wr(t.blendMode):"normal",content:{type:"color",color:Sr(_1(e,t&&t.color?t.color:null))},resolution:72},t)}function sw(e,t,n,r){if(!e.fill&&!e.stroke)throw new Error("Shape vector export requires a supported fill or stroke.");let i=Aw(bw(e.svgString,e.width,e.height),e.x,e.y,n,r);if(i.length===0)throw new Error("The SVG did not contain any shape paths.");let a={name:e.name,left:e.x,top:e.y,right:e.x+e.width,bottom:e.y+e.height,opacity:pigmaShapeLayerOpacity(e),hidden:!e.visible,blendMode:wr(e.blendMode),vectorMask:{paths:i}};return t&&(a.canvas=t),e.fill?(a.fillOpacity=pigmaShapeLayerFillOpacity(e),a.vectorFill=Dm(e.fill,e.width,e.height,e.nodeTransform)):e.stroke&&(a.fillOpacity=0,a.vectorFill=pigmaTransparentVectorFill()),e.stroke&&(a.vectorStroke=pigmaBuildPsdVectorStroke(e.fill,e.stroke)),Wn(a,e.effects,null),a}'
 if ($bundle.Contains($conditionalShapePreviewFind)) {
   $bundle = Replace-Exact `
     -Text $bundle `
@@ -3357,20 +3642,27 @@ if ($bundle.Contains($conditionalShapePreviewFind)) {
 $bundle = Replace-Exact `
   -Text $bundle `
   -Find 'function ft(e){let t=ce(e);return t||v(e)}' `
-  -Replace 'function ft(e){let t=me(e),r=Re(e)?Nr(e):null,o=Re(e)&&!!t&&!(r!=null&&r.fill),n=o?I(e):null;if(n&&n.width>0&&n.height>0)return{x:n.x,y:n.y,width:n.width,height:n.height,useAbsoluteBounds:!1};let i=ce(e);if(!i)return v(e);if(!o)return{x:i.x,y:i.y,width:i.width,height:i.height,useAbsoluteBounds:!0};let a=Math.max(3,Math.ceil(t.width/2)+2);return{x:i.x-a,y:i.y-a,width:i.width+a*2,height:i.height+a*2,useAbsoluteBounds:!1}}' `
+  -Replace 'function ft(e){if(pigmaHasEndpointStrokeCap(e)){let t=I(e);if(t&&t.width>0&&t.height>0)return{x:t.x,y:t.y,width:t.width,height:t.height,useAbsoluteBounds:!1}}let t=me(e),r=Re(e)?Nr(e):null,o=Re(e)&&!!t&&!(r!=null&&r.fill),n=o?I(e):null;if(n&&n.width>0&&n.height>0)return{x:n.x,y:n.y,width:n.width,height:n.height,useAbsoluteBounds:!1};let i=ce(e);if(!i)return v(e);if(!o)return{x:i.x,y:i.y,width:i.width,height:i.height,useAbsoluteBounds:!0};let a=Math.max(3,Math.ceil(t.width/2)+2);return{x:i.x-a,y:i.y-a,width:i.width+a*2,height:i.height+a*2,useAbsoluteBounds:!1}}' `
   -ExpectedCount 1 `
   -Label 'stroke-only vector render bounds'
 
-# Keep stroke-only vectors visible while routing them through SVG smart objects.
-# Removing supported strokes works for filled shapes, but it can leave
-# LINE/stroke-only vectors effectively transparent when PSD cannot reconstruct
-# them natively.
+# Keep stroke-only vectors visible in Photoshop by preserving their stroke pixels
+# in the preview PNG. Removing supported strokes works for filled shapes, but it
+# can leave LINE/stroke-only vectors effectively transparent when PSD cannot
+# reconstruct them natively.
 $bundle = Replace-Exact `
   -Text $bundle `
   -Find 'async function Jn(e,t){if(O.forceBitmapVectorPreview)return null;let r=ft(e);if(!r)return null;let o=L(e,t.root),n=_(o),i=me(e),a=await Me(e,t,o||i||n?r:void 0,o||i||n?{removeSupportedEffects:!0,removeSupportedStroke:!!i}:void 0);if(!a)return null;let s=x(r.x-t.documentBounds.x),l=x(r.y-t.documentBounds.y),u=d(r.width),c=d(r.height),p=x(a.x-s),g=x(a.y-l),y="";try{y=await e.exportAsync({format:"SVG_STRING",useAbsoluteBounds:r.useAbsoluteBounds,svgOutlineText:!0,svgIdAttribute:!0,svgSimplifyStroke:!1})}catch(T){return null}if(!y||y.trim().length===0)return null;let m=Nr(e);return{kind:"vector",id:e.id,name:f(e),sourceType:e.type,opacity:j(e),visible:e.visible,blendMode:ro(e),effects:o,strokeEffect:i,x:s,y:l,width:u,height:c,nodeTransform:de(e,t.documentBounds,s,l),pngBytes:a.pngBytes,strategy:m.strategy,svgString:y,fill:m.fill,previewOffsetX:p,previewOffsetY:g}}' `
-  -Replace 'async function Jn(e,t){if(O.forceBitmapVectorPreview)return null;let r=ft(e);if(!r)return null;let o=L(e,t.root),n=_(o),i=me(e),a=Nr(e),s=oa(e),l=!!i&&!(a!=null&&a.fill)&&!I(e)?Math.max(3,Math.ceil(i.width/2)+2):0,u=l?{x:r.x-l,y:r.y-l,width:r.width+l*2,height:r.height+l*2,useAbsoluteBounds:!1}:r,c=await Me(e,t,o||i||n||s?u:void 0,o||i||n||s?{normalizePaintOpacity:(s==null?void 0:s.normalizePaintOpacity)===!0,normalizePaintBlendMode:(s==null?void 0:s.normalizePaintBlendMode)===!0,removeSupportedEffects:!0,removeSupportedStroke:!!i&&a.strategy==="shape"&&!!a.fill}:void 0);if(!c)return null;let p=x(r.x-t.documentBounds.x),g=x(r.y-t.documentBounds.y),y=d(r.width),m=d(r.height),T=x(c.x-p),C=x(c.y-g),E="";try{E=await e.exportAsync({format:"SVG_STRING",useAbsoluteBounds:r.useAbsoluteBounds,svgOutlineText:!0,svgIdAttribute:!0,svgSimplifyStroke:!1})}catch(R){return null}if(!E||E.trim().length===0)return null;return{kind:"vector",id:e.id,name:f(e),sourceType:e.type,opacity:s?s.effectiveOpacity:j(e),visible:e.visible,blendMode:at(s?s.effectiveBlendMode:K(e)),effects:o,strokeEffect:a.strategy==="shape"&&a.fill?i:null,x:p,y:g,width:y,height:m,nodeTransform:de(e,t.documentBounds,p,g),pngBytes:c.pngBytes,strategy:a.strategy,forceSvgSmartObject:a.forceSvgSmartObject===!0,svgString:E,fill:a.fill,previewOffsetX:T,previewOffsetY:C}}' `
+  -Replace 'async function Jn(e,t){let pigmaEndpointSvgFallback=pigmaHasEndpointStrokeCap(e),pigmaGradientFillSvgFallback=pigmaHasVisibleGradientFill(e),pigmaGradientStrokeSvgFallback=pigmaHasVisibleGradientStroke(e);if(O.forceBitmapVectorPreview&&!pigmaEndpointSvgFallback&&!pigmaGradientFillSvgFallback&&!pigmaGradientStrokeSvgFallback)return null;let r=ft(e);if(!r)return null;let o=L(e,t.root),n=_(o),i=me(e),a=Nr(e),s=oa(e),l=!!i&&!(a!=null&&a.fill)&&!I(e)?Math.max(3,Math.ceil(i.width/2)+2):0,u=l?{x:r.x-l,y:r.y-l,width:r.width+l*2,height:r.height+l*2,useAbsoluteBounds:!1}:r,c=await Me(e,t,o||i||n||s?u:void 0,o||i||n||s?{normalizePaintOpacity:(s==null?void 0:s.normalizePaintOpacity)===!0,normalizePaintBlendMode:(s==null?void 0:s.normalizePaintBlendMode)===!0,removeSupportedEffects:!0,removeSupportedStroke:!!i&&!!a.fill}:void 0);if(!c)return null;let p=x(r.x-t.documentBounds.x),g=x(r.y-t.documentBounds.y),y=d(r.width),m=d(r.height),T=x(c.x-p),C=x(c.y-g),E="";try{E=await e.exportAsync({format:"SVG_STRING",useAbsoluteBounds:r.useAbsoluteBounds,svgOutlineText:!0,svgIdAttribute:!0,svgSimplifyStroke:!1})}catch(R){return null}if(!E||E.trim().length===0)return null;let pigmaOpenStrokeSvgFallback=!!(a.stroke&&!a.fill&&pigmaSvgHasOpenStrokeSubpath(E));return{kind:"vector",id:e.id,name:f(e),sourceType:e.type,opacity:s?s.effectiveOpacity:j(e),visible:e.visible,blendMode:at(s?s.effectiveBlendMode:K(e)),effects:o,strokeEffect:a.fill?i:null,x:p,y:g,width:y,height:m,nodeTransform:de(e,t.documentBounds,p,g),pngBytes:c.pngBytes,strategy:a.strategy,svgString:E,fill:a.fill,stroke:a.stroke,forceSvgSmartObject:pigmaEndpointSvgFallback||pigmaOpenStrokeSvgFallback||pigmaGradientFillSvgFallback||pigmaGradientStrokeSvgFallback,previewOffsetX:T,previewOffsetY:C}}' `
   -ExpectedCount 1 `
-  -Label 'stroke-only vector SVG smart object preservation'
+  -Label 'stroke-only vector preview preservation'
+
+$bundle = Replace-Exact `
+  -Text $bundle `
+  -Find 'async function Jn(e,t){let pigmaEndpointSvgFallback=pigmaHasEndpointStrokeCap(e),pigmaGradientFillSvgFallback=pigmaHasVisibleGradientFill(e),pigmaGradientStrokeSvgFallback=pigmaHasVisibleGradientStroke(e);if(O.forceBitmapVectorPreview&&!pigmaEndpointSvgFallback&&!pigmaGradientFillSvgFallback&&!pigmaGradientStrokeSvgFallback)return null;let r=ft(e);' `
+  -Replace 'async function Jn(e,t){let pigmaEndpointSvgFallback=pigmaHasEndpointStrokeCap(e),pigmaGradientFillSvgFallback=pigmaHasVisibleGradientFill(e),pigmaGradientStrokeSvgFallback=pigmaHasVisibleGradientStroke(e);if(O.forceBitmapVectorPreview&&!pigmaEndpointSvgFallback&&!pigmaGradientFillSvgFallback&&!pigmaGradientStrokeSvgFallback)return null;if(pigmaHasVisibleImageFill(e))return null;let r=ft(e);' `
+  -ExpectedCount 1 `
+  -Label 'image fills bypass SVG vector export'
 
 $bundle = Replace-Exact `
   -Text $bundle `
@@ -3484,6 +3776,13 @@ $bundle = Replace-Section `
   -Replacement 'async function ct(e,t,r=null){var i,a,s;if(t.hiddenLayerMode==="ignore-hidden"&&!q(e))return null;if(pigmaShouldFlattenTransformedClipContainer(e)){t.warnings.add("\"".concat(f(e),"\" was wrapped as a layered smart object because PSD cannot preserve transformed clipping containers directly."));return await pigmaBuildTransformedClipSmartObject(e,t,r)}let o=e.type==="TEXT"?await Hn(e):null;if(o&&!o.ok)return t.warnings.add(o.reason),await Cn(e,t);let n=Fe(e);if(n==="group"){let l=e,u=await gr(l,t,(i=Ut(l))!=null?i:r);if(u.length>0)return t.preservedGroupCount+=1,{kind:"group",id:e.id,name:f(e),sourceType:e.type,opacity:j(e),visible:e.visible,blendMode:K(e),effects:null,strokeEffect:null,mask:containerMask(l,t.documentBounds,t.root),children:u}}if(n==="split"){let l=await kn(e,t,(a=Ut(e))!=null?a:r);if(l)return t.preservedGroupCount+=1,l;let u=await gr(e,t,r);if(u.length>0)return t.warnings.add("\"".concat(f(e),"\" could not separate its background cleanly, so it preserved the child layers without a synthetic background.")),t.preservedGroupCount+=1,{kind:"group",id:e.id,name:f(e),sourceType:e.type,opacity:j(e),visible:e.visible,blendMode:K(e),effects:null,strokeEffect:null,mask:containerMask(e,t.documentBounds,t.root),children:u};t.warnings.add("\"".concat(f(e),"\" could not separate its background cleanly, so it was flattened."))}if(progressiveBlurShouldRasterize(L(e,t.root)))return await qn(e,t,r);if(e.type==="TEXT"&&t.settings.textExportMode!=="rasterize-text"){let l=await Gn(e,t,r);if(l)return _(l.effects)||(t.editableTextCount+=1),l}if(Re(e)){let l=(s=ft(e))!=null?s:v(e),u=!t.longFrameMode?await pigmaExportMultiFillGroup(e,t,r,l):null;if(u)return t.preservedGroupCount+=1,u;if(t.longFrameMode&&!!l&&Ne(d(l.width),d(l.height),!1))t.warnings.add(jo(f(e)));else{let c=await Jn(e,t);if(c)return c;t.warnings.add("\"".concat(f(e),"\" could not keep its SVG/vector data, so it fell back to a bitmap layer."))}}if(V(e)&&e.children.length>0){let l=L(e);_(l)?t.warnings.add(Mr(e,"past")):ze(e)?t.warnings.add(Ir(e,"past")):$e(l)?t.warnings.add(Rr(e,"past")):Pt(l)?t.warnings.add(Ar(e,"past")):t.warnings.add(Br(e,"past"))}return await qn(e,t,r)}' `
   -Label 'multi-fill group preempts vector export'
 
+$bundle = Replace-Exact `
+  -Text $bundle `
+  -Find 'else{let c=await Jn(e,t);if(c)return c;t.warnings.add(' `
+  -Replace 'else{if(pigmaHasVisibleImageFill(e)&&t.settings.imageExportMode==="smart-object-if-possible"){let c=await pigmaExportImageFillSmartObjectBitmap(e,t,r);if(c)return c}let c=await Jn(e,t);if(c)return c;t.warnings.add(' `
+  -ExpectedCount 1 `
+  -Label 'image fill smart object preempts vector export'
+
 $importPatch = [System.IO.File]::ReadAllText($patch, [System.Text.Encoding]::UTF8)
 $exportPatchContent = [System.IO.File]::ReadAllText($exportPatch, [System.Text.Encoding]::UTF8)
 $shapeLayerExportPatchContent = [System.IO.File]::ReadAllText($shapeLayerExportPatch, [System.Text.Encoding]::UTF8)
@@ -3503,6 +3802,7 @@ $buttonTextAutoSizePatchContent = [System.IO.File]::ReadAllText($buttonTextAutoS
 $selectAllTextPatchContent = [System.IO.File]::ReadAllText($selectAllTextPatch, [System.Text.Encoding]::UTF8)
 $selectColorMatchesPatchContent = [System.IO.File]::ReadAllText($selectColorMatchesPatch, [System.Text.Encoding]::UTF8)
 $textLineHeightAdjustPatchContent = [System.IO.File]::ReadAllText($textLineHeightAdjustPatch, [System.Text.Encoding]::UTF8)
+$textStyleNormalizePatchContent = [System.IO.File]::ReadAllText($textStyleNormalizePatch, [System.Text.Encoding]::UTF8)
 $unlockLockedLayersPatchContent = [System.IO.File]::ReadAllText($unlockLockedLayersPatch, [System.Text.Encoding]::UTF8)
 $detachLinkedComponentsPatchContent = [System.IO.File]::ReadAllText($detachLinkedComponentsPatch, [System.Text.Encoding]::UTF8)
 $autoLayoutOffPatchContent = [System.IO.File]::ReadAllText($autoLayoutOffPatch, [System.Text.Encoding]::UTF8)
@@ -3512,6 +3812,7 @@ $splitLongFramePatchContent = [System.IO.File]::ReadAllText($splitLongFramePatch
 $copyPrototypeLinkPatchContent = [System.IO.File]::ReadAllText($copyPrototypeLinkPatch, [System.Text.Encoding]::UTF8)
 $aiColorExtractPatchContent = [System.IO.File]::ReadAllText($aiColorExtractPatch, [System.Text.Encoding]::UTF8)
 $aiImageSharedBridgePatchContent = [System.IO.File]::ReadAllText($aiImageSharedBridgePatch, [System.Text.Encoding]::UTF8)
+$psdOriginalImageSmartObjectPatchContent = [System.IO.File]::ReadAllText($psdOriginalImageSmartObjectPatch, [System.Text.Encoding]::UTF8)
 $originalImageDownloadPatchContent = ""
 if ($hasOriginalImageDownloadPatch) {
   $originalImageDownloadPatchContent = [System.IO.File]::ReadAllText($originalImageDownloadPatch, [System.Text.Encoding]::UTF8)
@@ -3536,6 +3837,7 @@ $patchedRuntimeParts = @(
   $selectAllTextPatchContent,
   $selectColorMatchesPatchContent,
   $textLineHeightAdjustPatchContent,
+  $textStyleNormalizePatchContent,
   $unlockLockedLayersPatchContent,
   $detachLinkedComponentsPatchContent,
   $autoLayoutOffPatchContent,
@@ -3551,6 +3853,7 @@ if ($hasOriginalImageDownloadPatch -and $originalImageDownloadPatchContent.Trim(
   $patchedRuntimeParts += $originalImageDownloadPatchContent
 }
 
+$patchedRuntimeParts += $psdOriginalImageSmartObjectPatchContent
 $patchedRuntimeParts += $aiDesignChatPatchContent
 
 [System.IO.File]::WriteAllText($destination, [string]::Join("`r`n", $patchedRuntimeParts), $utf8NoBom)

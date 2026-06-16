@@ -19,6 +19,10 @@
     "isSimplePhotoshopShapeCandidate",
     "isPhotoshopShapeTransformSafe",
     "isFiniteAffineTransform",
+    "hasExactlyOneSupportedVisibleStroke",
+    "hasUniformPositiveStrokeWeight",
+    "hasSupportedStrokeCap",
+    "hasEndpointStrokeCap",
     "buildFigmaToPhotoshopShapeKindMap",
     "getPhotoshopShapeKindForFigmaType"
   ],
@@ -31,8 +35,13 @@
     "ELLIPSE",
     "POLYGON",
     "STAR",
+    "LINE",
     "BOOLEAN_OPERATION",
     "SOLID",
+    "strokeWeight",
+    "strokeCap",
+    "ROUND",
+    "SQUARE",
     "TRANSFORM_DETERMINANT_EPSILON",
     "xx * yy - xy * yx",
     "foundUnsupported",
@@ -50,27 +59,38 @@
     "pigmaShouldFlattenTransformedClipContainer(e)",
     "pigmaBuildTransformedClipSmartObject(e,t,r)",
     "TRANSFORMED_CLIP_SMART_OBJECT",
-    "function pigmaStrokeOnlyVectorRequiresSvg(e,t)",
-    "pigmaStrokeOnlyVectorRequiresSvg(e,t)?{strategy:\"smart-object\",fill:null,forceSvgSmartObject:!0}",
-    "was wrapped as a layered smart object because PSD cannot preserve transformed clipping containers directly."
-  ],
-  "forbiddenBundleSnippets": [
-    "u=(e.type===\"LINE\"||e.type===\"VECTOR\")&&!!i&&!l"
+    "was wrapped as a layered smart object because PSD cannot preserve transformed clipping containers directly.",
+    "function pigmaSvgHasOpenStrokeSubpath(e)",
+    "function pigmaHasVisibleGradientFill(e)",
+    "function pigmaHasVisibleGradientStroke(e)",
+    "pigmaOpenStrokeSvgFallback",
+    "pigmaGradientFillSvgFallback",
+    "pigmaGradientStrokeSvgFallback",
+    "forceSvgSmartObject:pigmaEndpointSvgFallback||pigmaOpenStrokeSvgFallback||pigmaGradientFillSvgFallback||pigmaGradientStrokeSvgFallback"
   ],
   "requiredBuildSnippets": [
     "transformed clipping container flatten helper",
     "pigmaShouldFlattenTransformedClipContainer(e)",
     "pigmaBuildTransformedClipSmartObject(e,t,r)",
-    "stroke-only vector SVG smart object preservation",
-    "was wrapped as a layered smart object because PSD cannot preserve transformed clipping containers directly."
+    "was wrapped as a layered smart object because PSD cannot preserve transformed clipping containers directly.",
+    "function pigmaSvgHasOpenStrokeSubpath(e)",
+    "function pigmaHasVisibleGradientFill(e)",
+    "function pigmaHasVisibleGradientStroke(e)",
+    "pigmaOpenStrokeSvgFallback",
+    "pigmaGradientFillSvgFallback",
+    "pigmaGradientStrokeSvgFallback",
+    "forceSvgSmartObject:pigmaEndpointSvgFallback||pigmaOpenStrokeSvgFallback||pigmaGradientFillSvgFallback||pigmaGradientStrokeSvgFallback"
   ],
   "uiFile": "ui.html",
   "requiredUiSnippets": [
     "forceBitmapVectorPreview:t.forceBitmapVectorPreview===!0",
-    "pigmaForceSvgSmartObject=e.forceSvgSmartObject===!0||pigmaGradientShapeSvg",
-    "if(i.forceBitmapVectorPreview&&!pigmaNativeShapeCandidate)",
+    "pigmaNativeShapeCandidate=!e.forceSvgSmartObject&&e.strategy===\"shape\"&&(e.fill||e.stroke)&&gw(",
+    "if(i.forceBitmapVectorPreview&&!pigmaNativeShapeCandidate&&!e.forceSvgSmartObject)",
+    "if(e.forceSvgSmartObject)try{let f=lw(",
     "function gw(e,t,n){if(t<=0||n<=0)return!1;",
-    "if(e.strategy===\"shape\"&&!l&&e.fill&&u)"
+    "function pigmaSvgLinePath(",
+    "function pigmaSvgPolyPath(",
+    "if(e.strategy===\"shape\"&&!l&&(e.fill||e.stroke)&&u)"
   ],
   "forbiddenUiSnippets": [
     "t>512||n>512||t*n>18e4",

@@ -15,7 +15,7 @@
     ellipse: Object.freeze(["ELLIPSE"]),
     polygon: Object.freeze(["POLYGON"]),
     star: Object.freeze(["STAR"]),
-    customPath: Object.freeze(["VECTOR", "BOOLEAN_OPERATION"])
+    customPath: Object.freeze(["VECTOR", "BOOLEAN_OPERATION", "LINE"])
   });
   const FIGMA_TO_PHOTOSHOP_SHAPE_KIND = buildFigmaToPhotoshopShapeKindMap(
     PHOTOSHOP_SHAPE_KIND_TO_FIGMA_TYPES
@@ -163,15 +163,11 @@
       return false;
     }
 
-    if (hasVisiblePaints(node.strokes)) {
-      return false;
-    }
-
     if (hasVisibleEffects(node.effects)) {
       return false;
     }
 
-    return hasExactlyOneVisibleSolidFill(node.fills);
+    return hasExactlyOneVisibleSolidFill(node.fills) || hasExactlyOneSupportedVisibleStroke(node);
   }
 
   function isPhotoshopShapeTransformSafe(node) {
@@ -213,6 +209,52 @@
 
     const visibleFills = fills.filter(isVisiblePaint);
     return visibleFills.length === 1 && visibleFills[0].type === "SOLID";
+  }
+
+  function hasExactlyOneSupportedVisibleStroke(node) {
+    if (!node || !Array.isArray(node.strokes)) {
+      return false;
+    }
+
+    const visibleStrokes = node.strokes.filter(isVisiblePaint);
+    if (visibleStrokes.length !== 1 || visibleStrokes[0].type !== "SOLID") {
+      return false;
+    }
+
+    return hasUniformPositiveStrokeWeight(node) && hasSupportedStrokeCap(node);
+  }
+
+  function hasUniformPositiveStrokeWeight(node) {
+    if (!node || typeof node.strokeWeight !== "number" || node.strokeWeight <= 0) {
+      return false;
+    }
+
+    const sideWeights = [
+      node.strokeTopWeight,
+      node.strokeRightWeight,
+      node.strokeBottomWeight,
+      node.strokeLeftWeight
+    ];
+
+    if (sideWeights.some(value => typeof value !== "number" || !Number.isFinite(value) || value <= 0)) {
+      return true;
+    }
+
+    return sideWeights.every(value => Math.abs(value - node.strokeWeight) <= 0.01);
+  }
+
+  function hasSupportedStrokeCap(node) {
+    if (hasEndpointStrokeCap(node)) {
+      return false;
+    }
+
+    const cap = "strokeCap" in node ? node.strokeCap : "NONE";
+    return cap === "NONE" || cap === "ROUND" || cap === "SQUARE";
+  }
+
+  function hasEndpointStrokeCap(node) {
+    const cap = "strokeCap" in node ? String(node.strokeCap || "NONE") : "NONE";
+    return cap !== "NONE" && cap !== "ROUND" && cap !== "SQUARE";
   }
 
   function hasVisiblePaints(paints) {

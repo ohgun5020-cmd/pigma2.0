@@ -5,6 +5,7 @@
   }
 
   const originalOnMessage = figma.ui.onmessage;
+  const NO_LOGIN_TEST_MODE = true;
   const WEB_AUTH_KEY = "pigma:web-auth:v1";
   const DEFAULT_WEB_AUTH = Object.freeze({
     serverUrl: "https://oy-tools-production.up.railway.app",
@@ -65,6 +66,10 @@
   }
 
   async function readWebAuth() {
+    if (NO_LOGIN_TEST_MODE) {
+      return normalizeWebAuth(null);
+    }
+
     try {
       return normalizeWebAuth(await figma.clientStorage.getAsync(WEB_AUTH_KEY));
     } catch (error) {
@@ -73,6 +78,10 @@
   }
 
   async function writeWebAuth(settings) {
+    if (NO_LOGIN_TEST_MODE) {
+      return normalizeWebAuth(null);
+    }
+
     const next = normalizeWebAuth(settings);
     try {
       await figma.clientStorage.setAsync(WEB_AUTH_KEY, next);

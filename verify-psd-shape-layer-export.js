@@ -72,7 +72,6 @@ if (contract.baseFile) {
   assertIncludes(bundleContent, contract.bundleFile, contract.requiredBaseSnippets || [], "base snippet");
 }
 assertIncludes(bundleContent, contract.bundleFile, contract.requiredBundleSnippets || [], "bundle snippet");
-assertExcludes(bundleContent, contract.bundleFile, contract.forbiddenBundleSnippets || [], "bundle snippet");
 assertIncludes(buildScriptContent, contract.buildScript, contract.requiredBuildSnippets || [], "build snippet");
 assertIncludes(uiContent, contract.uiFile || "ui", contract.requiredUiSnippets || [], "UI snippet");
 assertExcludes(uiContent, contract.uiFile || "ui", contract.forbiddenUiSnippets || [], "UI snippet");

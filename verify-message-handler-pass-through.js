@@ -25,6 +25,7 @@ const defaultFiles = [
   { file: "select-all-text.js" },
   { file: "select-color-matches.js" },
   { file: "text-line-height-adjust.js" },
+  { file: "text-style-normalize.js" },
   { file: "unlock-locked-layers.js" },
   { file: "detach-linked-components.js" },
   { file: "auto-layout-off.js" },

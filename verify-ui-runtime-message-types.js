@@ -26,6 +26,7 @@ const runtimeFiles = [
   "select-all-text.js",
   "select-color-matches.js",
   "text-line-height-adjust.js",
+  "text-style-normalize.js",
   "unlock-locked-layers.js",
   "detach-linked-components.js",
   "auto-layout-off.js",
