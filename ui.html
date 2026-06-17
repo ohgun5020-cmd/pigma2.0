@@ -67841,6 +67841,29 @@ UPNG.encode.alphaMul = function(img, roundA) {
         window.__PIGMA_STABLE_AI_CORRECTION_FINALIZER__ = true;
 
         const directLabels = {
+          ko: {
+            aiDetachLinkedComponentsButton: {
+              label: "연결된 컴포넌트 해제",
+              aria: "연결된 컴포넌트 해제. 선택 범위 안의 인스턴스와 메인 컴포넌트를 일반 프레임으로 해제합니다.",
+            },
+            aiAutoLayoutOffButton: {
+              label: "오토레이아웃 전체 해제",
+              aria: "오토레이아웃 전체 해제. 선택한 프레임 또는 레이어와 그 하위 컨테이너의 오토레이아웃을 모두 끕니다.",
+            },
+            aiClearFrameGuidesButton: {
+              label: "프레임 가이드 전체 지우기",
+              aria: "프레임 가이드 전체 지우기. 선택한 프레임 안의 눈금자 가이드를 모두 삭제합니다.",
+            },
+            aiGroupSimilarColorsButton: {
+              label: "비슷한 색 묶기",
+              aria: "비슷한 색 묶기. 선택 범위 안의 fill, stroke, 텍스트 색 중 아주 비슷한 색을 대표색으로 통일합니다.",
+            },
+            aiTextStyleNormalizeButton: {
+              label: "텍스트 스타일 정리",
+              aria:
+                "텍스트 스타일 정리. 선택 범위 안의 소수점처럼 아주 미세하게 어긋난 텍스트 크기, 행간, 색만 대표 스타일로 정리합니다.",
+            },
+          },
           en: {
             aiDetachLinkedComponentsButton: {
               label: "Detach Linked Components",
@@ -67970,6 +67993,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
           const select = document.getElementById("uiLanguageSelect");
           if (select instanceof HTMLSelectElement) {
             const value = String(select.value || "").toLowerCase();
+            if (value === "ko" || value.startsWith("ko-")) return "ko";
             if (value === "en" || value.startsWith("en-")) return "en";
             if (value === "es" || value.startsWith("es-")) return "es";
             if (value === "ja" || value.startsWith("ja-")) return "ja";
@@ -67982,6 +68006,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
           if (hiddenLabel.includes("\u975E\u8868\u793A\u30EC\u30A4\u30E4\u30FC")) return "ja";
           if (hiddenLabel.includes("Eliminar capas")) return "es";
           if (hiddenLabel.includes("Delete Hidden Layers")) return "en";
+          if (hiddenLabel.includes("숨겨진 레이어")) return "ko";
           return "";
         };
 
