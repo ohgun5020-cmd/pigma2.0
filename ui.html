@@ -9885,7 +9885,7 @@
                   <strong id="pigmaWebPlanState">미확인</strong>
                 </div>
                 <div class="setting-row pigma-web-stat-row" id="pigmaWebTrialRow" hidden aria-hidden="true">
-                  <span class="setting-label">무료 체험</span>
+                  <span class="setting-label">무료 사용량</span>
                   <strong id="pigmaWebTrialState">-</strong>
                 </div>
                 <div class="setting-row pigma-web-stat-row">
@@ -11861,6 +11861,8 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
             "계정": "Account",
             "연결 대기": "Waiting to connect",
             "관리자": "Admin",
+            "무료 회원": "Free member",
+            "계정 전체 남음": "Left across account",
             "요금제": "Plan",
             "미확인": "Unchecked",
             "무료 체험": "Free Trial",
@@ -66739,7 +66741,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
         let loginFirstModalDismissed = false;
         let loginFirstModalLastFocused = null;
         const PSD_USAGE_POLICY_NOTE =
-          "플랜별 기간 한도에서 PSD 파일 개수만큼 차감됩니다. 무료 체험 사용분은 유료 한도에 포함되지 않습니다. 리셋은 한국 시간 기준입니다.";
+          "무료 계정은 계정당 총 5회까지 PSD를 만들 수 있습니다. 유료 월간은 월 단위, 유료 연간은 연 단위로 PSD 파일 개수만큼 차감됩니다.";
 
         const postPluginMessage = (message) => {
           parent.postMessage({ pluginMessage: message }, "*");
@@ -67007,9 +67009,6 @@ UPNG.encode.alphaMul = function(img, roundA) {
           return 0;
         };
 
-        const BASIC_TRIAL_DAYS = 7;
-        const MINUTE_MS = 60 * 1000;
-
         const clampPlanTier = (value) => {
           const numberValue = Number(value);
           if (numberValue >= 3) {
@@ -67022,64 +67021,6 @@ UPNG.encode.alphaMul = function(img, roundA) {
             return 1;
           }
           return 0;
-        };
-
-        const getFallbackBasicTrial = (user, planTier) => {
-          if (!user || planTier !== 0) {
-            return { active: false, endsAt: null, days: BASIC_TRIAL_DAYS };
-          }
-
-          const createdAt = new Date(user.createdAt || "");
-          if (Number.isNaN(createdAt.getTime())) {
-            return { active: false, endsAt: null, days: BASIC_TRIAL_DAYS };
-          }
-
-          const endsAt = new Date(createdAt.getTime() + BASIC_TRIAL_DAYS * 24 * 60 * 60 * 1000);
-          return {
-            active: endsAt.getTime() > Date.now(),
-            endsAt: endsAt.toISOString(),
-            days: BASIC_TRIAL_DAYS,
-          };
-        };
-
-        const getBasicTrialRemainingMs = (entitlement, fallbackTrial) => {
-          const explicitRemaining = entitlement ? Number(entitlement.basicTrialRemainingMs) : NaN;
-          if (Number.isFinite(explicitRemaining) && explicitRemaining >= 0) {
-            return explicitRemaining;
-          }
-
-          const endsAt =
-            entitlement && typeof entitlement.basicTrialEndsAt === "string" ? entitlement.basicTrialEndsAt : fallbackTrial.endsAt;
-          if (!endsAt) {
-            return 0;
-          }
-
-          const endsAtDate = new Date(endsAt);
-          if (Number.isNaN(endsAtDate.getTime())) {
-            return 0;
-          }
-
-          return Math.max(0, endsAtDate.getTime() - Date.now());
-        };
-
-        const formatTrialRemaining = (remainingMs) => {
-          const safeMs = Math.max(0, Number(remainingMs) || 0);
-          if (safeMs <= 0) {
-            return "무료 체험 종료";
-          }
-
-          const totalMinutes = Math.max(1, Math.ceil(safeMs / MINUTE_MS));
-          const days = Math.floor(totalMinutes / (24 * 60));
-          const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
-          const minutes = totalMinutes % 60;
-
-          if (days > 0) {
-            return hours > 0 ? `${days}일 ${hours}시간 남음` : `${days}일 남음`;
-          }
-          if (hours > 0) {
-            return minutes > 0 ? `${hours}시간 ${minutes}분 남음` : `${hours}시간 남음`;
-          }
-          return `${minutes}분 남음`;
         };
 
         const setTrialState = (visible, message, tone = "active") => {
@@ -67155,22 +67096,13 @@ UPNG.encode.alphaMul = function(img, roundA) {
           const plan = user && user.plan ? String(user.plan).toLowerCase() : "free";
           const tier = user ? getPlanTier(plan) : 0;
           const entitlement = user && user.entitlement && typeof user.entitlement === "object" ? user.entitlement : null;
-          const fallbackTrial = getFallbackBasicTrial(user, tier);
           const effectiveTier = user
-            ? clampPlanTier(entitlement && entitlement.effectiveTier !== undefined ? entitlement.effectiveTier : fallbackTrial.active ? 1 : tier)
+            ? clampPlanTier(tier === 0 ? tier : entitlement && entitlement.effectiveTier !== undefined ? entitlement.effectiveTier : tier)
             : 0;
-          const basicTrialActive = Boolean(
-            user && (entitlement && entitlement.basicTrialActive !== undefined ? entitlement.basicTrialActive : fallbackTrial.active)
-          );
-          const basicTrialEndsAt =
-            user && entitlement && typeof entitlement.basicTrialEndsAt === "string"
-              ? entitlement.basicTrialEndsAt
-              : fallbackTrial.endsAt;
-          const basicTrialDays =
-            user && entitlement && Number(entitlement.basicTrialDays) > 0
-              ? Number(entitlement.basicTrialDays)
-              : fallbackTrial.days;
-          const basicTrialRemainingMs = user ? getBasicTrialRemainingMs(entitlement, fallbackTrial) : 0;
+          const basicTrialActive = false;
+          const basicTrialEndsAt = null;
+          const basicTrialDays = 0;
+          const basicTrialRemainingMs = 0;
           const isAdmin = isAdminAccount(user);
           const adminPlanActive = isAdminPlan(user, entitlement);
           const serverAiEnabled = Boolean(
@@ -67253,27 +67185,18 @@ UPNG.encode.alphaMul = function(img, roundA) {
           const statusLabel = getStatusLabel(user.planStatus || user.plan);
           const tier = getPlanTier(user.plan);
           const entitlement = user.entitlement && typeof user.entitlement === "object" ? user.entitlement : null;
-          const fallbackTrial = getFallbackBasicTrial(user, tier);
           const effectiveTier = clampPlanTier(
-            entitlement && entitlement.effectiveTier !== undefined ? entitlement.effectiveTier : fallbackTrial.active ? 1 : tier
+            tier === 0 ? tier : entitlement && entitlement.effectiveTier !== undefined ? entitlement.effectiveTier : tier
           );
-          const basicTrialActive = Boolean(
-            entitlement && entitlement.basicTrialActive !== undefined ? entitlement.basicTrialActive : fallbackTrial.active
-          );
-          const basicTrialRemainingMs = getBasicTrialRemainingMs(entitlement, fallbackTrial);
-          const trialRemainingText = formatTrialRemaining(basicTrialRemainingMs);
-          const shouldShowTrialState = tier === 0 && Boolean(
-            (entitlement && typeof entitlement.basicTrialEndsAt === "string" && entitlement.basicTrialEndsAt) || fallbackTrial.endsAt
-          );
+          const basicTrialActive = false;
+          const shouldShowTrialState = false;
           const isAdmin = isAdminAccount(user);
           const adminPlanActive = isAdminPlan(user, entitlement);
           const planStatusValue = String(user.planStatus || "").toLowerCase();
           const planStatusIsPlanName = ["free", "basic", "basic_yearly", "pro", "pro_yearly", "admin"].includes(planStatusValue);
           const planText = adminPlanActive
             ? "관리자"
-            : basicTrialActive
-              ? `${planLabel} · Basic 체험`
-              : planStatusValue && !planStatusIsPlanName
+            : planStatusValue && !planStatusIsPlanName
                 ? `${planLabel} · ${statusLabel}`
                 : planLabel;
           const psdUsage = user.psdUsage && typeof user.psdUsage === "object" ? user.psdUsage : null;
@@ -67290,9 +67213,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
           setSummary(
             isAdmin
               ? "관리자 계정으로 연결됐어요. 플랜 상태도 같이 확인합니다."
-              : basicTrialActive
-                ? `Basic 체험 ${trialRemainingText}. Free 계정에서 Basic 메뉴가 열려 있어요.`
-                : "로그인 완료. 비밀번호는 쉬고, 요금제만 가볍게 확인합니다."
+              : "로그인 완료. 비밀번호는 쉬고, 요금제만 가볍게 확인합니다."
           );
           elements.loginState.textContent = user.email || user.name || "연결됨";
           setAdminBadgeVisible(isAdmin);
@@ -67300,8 +67221,8 @@ UPNG.encode.alphaMul = function(img, roundA) {
           elements.planState.textContent = planText;
           setTrialState(
             shouldShowTrialState,
-            basicTrialActive ? trialRemainingText : "무료 체험 종료",
-            basicTrialActive ? "active" : "expired"
+            "-",
+            "expired"
           );
           elements.usageState.textContent =
             psdUsageText ||
@@ -67312,9 +67233,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
             setHint(
               isAdmin
                 ? "관리자로 연결됨. 내부 메뉴와 전체 기능이 열렸습니다."
-                : basicTrialActive
-                  ? `Basic 체험 ${trialRemainingText}. Pro 메뉴는 Pro에서 열립니다.`
-                  : `${planLabel}로 연결됨. 요금제 확인 끝.`,
+                : `${planLabel}로 연결됨. 요금제 확인 끝.`,
               "success"
             );
           }
@@ -68964,9 +68883,9 @@ UPNG.encode.alphaMul = function(img, roundA) {
           free: {
             id: "free",
             label: "무료 회원",
-            total: 0,
-            period: "day",
-            cycleLabel: "무료 체험 종료",
+            total: 5,
+            period: "lifetime",
+            cycleLabel: "계정 전체 남음",
           },
           basic: {
             id: "basic",
@@ -69050,6 +68969,8 @@ UPNG.encode.alphaMul = function(img, roundA) {
             "$5 회원": "$5 member",
             "$5 연간 회원": "$5 yearly member",
             "관리자": "Admin",
+            "무료 회원": "Free member",
+            "계정 전체 남음": "Left across account",
             "무료 체험": "Free trial",
             "무료 체험 종료": "Free trial ended",
             "이번 달 남음": "Left this month",
@@ -69083,6 +69004,8 @@ UPNG.encode.alphaMul = function(img, roundA) {
             "$5 회원": "Miembro $5",
             "$5 연간 회원": "Miembro anual $5",
             "관리자": "Administrador",
+            "무료 회원": "Miembro gratis",
+            "계정 전체 남음": "Restante por cuenta",
             "무료 체험": "Prueba gratis",
             "무료 체험 종료": "Prueba gratis finalizada",
             "이번 달 남음": "Restante este mes",
@@ -69116,6 +69039,8 @@ UPNG.encode.alphaMul = function(img, roundA) {
             "$5 회원": "$5 メンバー",
             "$5 연간 회원": "$5 年間メンバー",
             "관리자": "管理者",
+            "무료 회원": "無料メンバー",
+            "계정 전체 남음": "アカウント全体の残り",
             "무료 체험": "無料トライアル",
             "무료 체험 종료": "無料トライアル終了",
             "이번 달 남음": "今月の残り",
@@ -69149,6 +69074,8 @@ UPNG.encode.alphaMul = function(img, roundA) {
             "$5 회원": "$5 会员",
             "$5 연간 회원": "$5 年度会员",
             "관리자": "管理员",
+            "무료 회원": "免费会员",
+            "계정 전체 남음": "账号总剩余",
             "무료 체험": "免费试用",
             "무료 체험 종료": "免费试用已结束",
             "이번 달 남음": "本月剩余",
@@ -69550,10 +69477,8 @@ UPNG.encode.alphaMul = function(img, roundA) {
             return createUnlimitedUsage(plan);
           }
 
-          const publishedPlan = getPublishedPlan();
-          const isFreeTrialActive = plan.id === "free" && publishedPlan && publishedPlan.basicTrialActive === true;
-          const total = isFreeTrialActive ? 3 : plan.total;
-          const label = isFreeTrialActive ? "무료 체험" : plan.id === "free" && total === 0 ? "무료 체험 종료" : plan.label;
+          const total = plan.total;
+          const label = plan.label;
 
           return {
             plan: plan.id,
@@ -69765,7 +69690,9 @@ UPNG.encode.alphaMul = function(img, roundA) {
             used,
             remaining,
             period:
-              source.period === "year" || source.cycle === "year" || fallbackPlan.period === "year"
+              source.period === "lifetime" || source.cycle === "lifetime" || fallbackPlan.period === "lifetime"
+                ? "lifetime"
+                : source.period === "year" || source.cycle === "year" || fallbackPlan.period === "year"
                 ? "year"
                 : source.period === "day" || source.cycle === "day" || fallbackPlan.period === "day"
                   ? "day"
