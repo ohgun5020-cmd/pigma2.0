@@ -352,7 +352,9 @@
       }
 
       let result = null;
-      if (pendingSession.targetKind === "shape-export") {
+      if (shouldApplyGeneratedImageAsNaturalLayer(message)) {
+        result = await applyGeneratedImageAsNaturalLayer(pendingSession, createdImage.hash, bytes.length);
+      } else if (pendingSession.targetKind === "shape-export") {
         result = await applyGeneratedImageToShapeNode(pendingSession, createdImage.hash, bytes.length);
       } else if (pendingSession.targetKind === "container-placement" || pendingSession.targetKind === "new-image-placement") {
         result = await applyGeneratedPromptImagePlacement(pendingSession, createdImage.hash, bytes.length);
@@ -4860,6 +4862,15 @@
     } catch (error) {}
   }
 
+  function sanitizeAiImageApplyMode(value) {
+    const normalized = String(value || "").replace(/[_\s]+/g, "-").trim().toLowerCase();
+    return normalized === "new-layer-natural-size" ? normalized : "";
+  }
+
+  function shouldApplyGeneratedImageAsNaturalLayer(message) {
+    return sanitizeAiImageApplyMode(message && message.applyMode) === "new-layer-natural-size";
+  }
+
   async function replaceSelectionImageFills(session, newImageHash, byteLength) {
     const skipped = [];
     const appliedNodeIds = {};
@@ -4955,6 +4966,108 @@
         resultByteLength: byteLength,
       },
       skipped: skipped.slice(0, 24),
+    };
+  }
+
+  async function resolveImageHashPixelSize(imageHash) {
+    const image = figma.getImageByHash(imageHash);
+    if (!image || typeof image.getSizeAsync !== "function") {
+      return null;
+    }
+    try {
+      const size = await image.getSizeAsync();
+      const width = size && typeof size.width === "number" && Number.isFinite(size.width) ? Math.max(1, Math.round(size.width)) : 0;
+      const height = size && typeof size.height === "number" && Number.isFinite(size.height) ? Math.max(1, Math.round(size.height)) : 0;
+      return width > 0 && height > 0 ? { width, height } : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  async function applyGeneratedImageAsNaturalLayer(session, newImageHash, byteLength) {
+    const skipped = [];
+    let resultNode = null;
+    let placementMode = "";
+
+    try {
+      const size = await resolveImageHashPixelSize(newImageHash);
+      const width = Math.max(1, roundBoundsFitPixel((size && size.width) || (session && session.targetWidth) || 1024));
+      const height = Math.max(1, roundBoundsFitPixel((size && size.height) || (session && session.targetHeight) || 1024));
+      resultNode = createNaturalImageResultNode(session, newImageHash, width, height);
+
+      const targetNode =
+        session && session.targetNodeId && typeof session.targetNodeId === "string"
+          ? await figma.getNodeByIdAsync(session.targetNodeId)
+          : null;
+      const absoluteRect = targetNode && !targetNode.removed ? getBoundsFitNodeRect(targetNode) : null;
+      figma.currentPage.appendChild(resultNode);
+      if (absoluteRect) {
+        resultNode.x = roundBoundsFitMetric(absoluteRect.x + absoluteRect.width + PROMPT_TEXT_ANCHOR_GAP);
+        resultNode.y = roundBoundsFitMetric(absoluteRect.y);
+        placementMode = "page-right-natural-size";
+      } else {
+        const viewportCenter = figma.viewport && figma.viewport.center ? figma.viewport.center : { x: 0, y: 0 };
+        resultNode.x = roundBoundsFitMetric(viewportCenter.x - resultNode.width / 2);
+        resultNode.y = roundBoundsFitMetric(viewportCenter.y - resultNode.height / 2);
+        placementMode = "viewport-center-natural-size";
+      }
+
+      figma.currentPage.selection = [resultNode];
+      if (typeof figma.viewport.scrollAndZoomIntoView === "function") {
+        figma.viewport.scrollAndZoomIntoView([resultNode]);
+      }
+    } catch (error) {
+      if (resultNode && !resultNode.removed && resultNode.parent) {
+        resultNode.remove();
+      }
+      skipped.push({
+        nodeId: session && session.targetNodeId ? session.targetNodeId : "",
+        nodeName: session && session.targetNodeName ? session.targetNodeName : "",
+        reason: normalizeErrorMessage(error, "Failed to create the generated image layer."),
+      });
+      resultNode = null;
+    }
+
+    return buildNaturalLayerApplyResult(session, resultNode, byteLength, skipped, placementMode);
+  }
+
+  function createNaturalImageResultNode(session, newImageHash, width, height) {
+    const node = figma.createRectangle();
+    node.name = buildNaturalLayerResultName(session);
+    node.resize(Math.max(1, roundBoundsFitPixel(width)), Math.max(1, roundBoundsFitPixel(height)));
+    node.fills = [buildVisibleImageFill(newImageHash)];
+    node.strokes = [];
+    if ("cornerRadius" in node) {
+      node.cornerRadius = 0;
+    }
+    return node;
+  }
+
+  function buildNaturalLayerResultName(session) {
+    const baseName =
+      session && typeof session.targetNodeName === "string" && session.targetNodeName.trim()
+        ? session.targetNodeName.trim()
+        : "AI image";
+    return baseName + " / GPT 2.0 rerender";
+  }
+
+  function buildNaturalLayerApplyResult(session, resultNode, byteLength, skipped, placementMode) {
+    return {
+      processedAt: new Date().toISOString(),
+      summary: {
+        selectionLabel: session && session.selectionLabel ? session.selectionLabel : "",
+        targetNodeName: session && session.targetNodeName ? session.targetNodeName : "",
+        appliedFillCount: 0,
+        appliedNodeCount: resultNode ? 1 : 0,
+        skippedCount: Array.isArray(skipped) ? skipped.length : 0,
+        resultNodeId: resultNode && resultNode.id ? resultNode.id : "",
+        resultNodeName: resultNode && resultNode.name ? resultNode.name : "",
+        placementMode: placementMode || "",
+        naturalWidth: resultNode && typeof resultNode.width === "number" ? Math.round(resultNode.width) : 0,
+        naturalHeight: resultNode && typeof resultNode.height === "number" ? Math.round(resultNode.height) : 0,
+        resultByteLength: byteLength,
+      },
+      skipped: Array.isArray(skipped) ? skipped.slice(0, 24) : [],
     };
   }
 
@@ -5523,7 +5636,7 @@
 
   function sanitizePromptOutputSize(value) {
     const normalized = typeof value === "string" ? value.replace(/\s+/g, "").trim().toUpperCase() : "";
-    return normalized === "2K" || normalized === "4K" ? normalized : "1K";
+    return normalized === "2K" || normalized === "3K" || normalized === "4K" ? normalized : "1K";
   }
 
   function isSharpenOperationLabel(value) {
@@ -5550,6 +5663,9 @@
     const normalizedSize = sanitizePromptOutputSize(outputSize);
     if (normalizedSize === "4K") {
       return { width: 4096, height: 4096 };
+    }
+    if (normalizedSize === "3K") {
+      return { width: 3072, height: 3072 };
     }
     if (normalizedSize === "2K") {
       return { width: 2048, height: 2048 };

@@ -1312,6 +1312,10 @@
         transform: translateY(0);
       }
 
+      #aiImagePromptEditButton {
+        display: none !important;
+      }
+
       #designAssistMoButton,
       #aiSelectAllTextButton,
       #aiTypoAuditButton,
@@ -7026,9 +7030,22 @@
                 <div class="ai-correction-group-actions">
                   <button
                   class="button-secondary ai-correction-action"
+                  id="aiImageGptRerenderButton"
+                  type="button"
+                  data-ai-action="image-gpt-rerender"
+                  title="GPT 2.0 &#xC774;&#xBBF8;&#xC9C0; &#xC7AC;&#xB80C;&#xB354;&#xB9C1;"
+                  aria-label="GPT 2.0 &#xC774;&#xBBF8;&#xC9C0; &#xC7AC;&#xB80C;&#xB354;&#xB9C1;. &#xC120;&#xD0DD;&#xD55C; &#xD504;&#xB808;&#xC784;&#xC774;&#xB098; &#xC774;&#xBBF8;&#xC9C0;&#xB97C; &#xAE30;&#xC900;&#xC73C;&#xB85C; &#xD750;&#xB9BF;&#xD55C; AI &#xC774;&#xBBF8;&#xC9C0;&#xB97C; &#xB2E4;&#xC2DC; &#xC120;&#xBA85;&#xD558;&#xAC8C; &#xC0DD;&#xC131;&#xD569;&#xB2C8;&#xB2E4;."
+                  >
+                  GPT 2.0 &#xC7AC;&#xB80C;&#xB354;&#xB9C1;
+                  </button>
+                  <button
+                  class="button-secondary ai-correction-action"
                   id="aiImagePromptEditButton"
                   type="button"
                   data-ai-action="image-prompt-edit"
+                  hidden
+                  aria-hidden="true"
+                  tabindex="-1"
 
 
                   title="&#xD504;&#xB86C;&#xD504;&#xD2B8; &#xD3B8;&#xC9D1;/&#xC0DD;&#xC131;"
@@ -7272,6 +7289,7 @@
                   "image-bounds-fit": "crop_free",
                   "image-composite": "auto_awesome",
                   "image-extend": "open_in_full",
+                  "image-gpt-rerender": "auto_awesome",
                   "image-merge": "call_merge",
                   "image-original-size-fit": "photo_size_select_large",
                   "image-prompt-edit": "add_photo_alternate",
@@ -15060,20 +15078,55 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
           return translated ? withOriginalSpacing(raw, translated) : raw;
         }
 
-        const spanishTopTabLabels = new Map(
-          Object.entries({
-            tabMain: "Crear",
-            tabImport: "Importar",
-            tabAi: "Editar",
-            tabSettings: "Ajustes",
-          })
-        );
+        const topTabLabelsByLocale = {
+          ko: new Map(
+            Object.entries({
+              tabMain: "만들기",
+              tabImport: "가져오기",
+              tabAi: "편집하기",
+              tabSettings: "설정",
+            })
+          ),
+          en: new Map(
+            Object.entries({
+              tabMain: "Create",
+              tabImport: "Import",
+              tabAi: "Edit",
+              tabSettings: "Settings",
+            })
+          ),
+          es: new Map(
+            Object.entries({
+              tabMain: "Crear",
+              tabImport: "Importar",
+              tabAi: "Editar",
+              tabSettings: "Ajustes",
+            })
+          ),
+          ja: new Map(
+            Object.entries({
+              tabMain: "作成",
+              tabImport: "インポート",
+              tabAi: "編集",
+              tabSettings: "設定",
+            })
+          ),
+          "zh-CN": new Map(
+            Object.entries({
+              tabMain: "创建",
+              tabImport: "导入",
+              tabAi: "编辑",
+              tabSettings: "设置",
+            })
+          ),
+        };
 
-        function applyCompactSpanishTopTabs() {
-          if (getActiveUiLocale() !== "es") {
+        function applyLocalizedTopTabs() {
+          const labels = topTabLabelsByLocale[getActiveUiLocale()];
+          if (!labels) {
             return;
           }
-          spanishTopTabLabels.forEach((label, id) => {
+          labels.forEach((label, id) => {
             const tab = document.getElementById(id);
             if (tab instanceof HTMLElement && normalize(tab.textContent) !== label) {
               tab.textContent = label;
@@ -15323,7 +15376,7 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
             document.querySelectorAll("*").forEach((element) => {
               applyElementAttributes(element);
             });
-            applyCompactSpanishTopTabs();
+            applyLocalizedTopTabs();
             applyStableAiCorrectionActionLocalization();
           } finally {
             isApplying = false;
@@ -17767,6 +17820,7 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
             ["aiTranslateModalConfirm", "any"],
             ["aiImageReferenceSearchButton", "any"],
             ["aiImageReferenceModalConfirm", "any"],
+            ["aiImageGptRerenderButton", "openai"],
             ["aiImagePromptEditButton", "any"],
             ["aiImagePromptModalConfirm", "any"],
             ["aiImageExtendButton", "any"],
@@ -17784,6 +17838,7 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
             ["typo-fix", "any"],
             ["translate", "any"],
             ["image-reference-search", "any"],
+            ["image-gpt-rerender", "openai"],
             ["image-prompt-edit", "any"],
             ["image-extend", "any"],
             ["image-text-feasibility", "any"],
@@ -18910,10 +18965,20 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
           revealAndFocusPanel,
         };
 
+        window.__PIGMA_AI_CORRECTION_DEBUG_MODE_CONTROLLER__ = {
+          setEnabled(enabled) {
+            currentDebugMode = applyDebugMode(enabled === true);
+            writeDebugMode(currentDebugMode);
+            notifyDebugModeChanged(currentDebugMode);
+            return currentDebugMode;
+          },
+          isEnabled() {
+            return currentDebugMode;
+          },
+        };
+
         toggle.addEventListener("click", () => {
-          currentDebugMode = applyDebugMode(!currentDebugMode);
-          writeDebugMode(currentDebugMode);
-          notifyDebugModeChanged(currentDebugMode);
+          window.__PIGMA_AI_CORRECTION_DEBUG_MODE_CONTROLLER__.setEnabled(!currentDebugMode);
         });
       })();
     </script>
@@ -30873,10 +30938,78 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
           }
         }
 
-        function pickOpenAiOutputSize(preparedInput, options) {
+        function isOpenAiImage2Model(model) {
+          return /^gpt-image-2(?:$|-)/i.test(String(model || "").trim());
+        }
+
+        function normalizeOpenAiRequestedOutputSize(options) {
+          const raw =
+            resolveSourceRequestOption(options, "rerenderOutputSize") ||
+            resolveSourceRequestOption(options, "requestedOutputSize") ||
+            "";
+          const normalized = String(raw || "").replace(/\s+/g, "").trim().toUpperCase();
+          return normalized === "4K" || normalized === "3K" || normalized === "2K" ? normalized : "1K";
+        }
+
+        function getOpenAiImage2RequestedLongEdge(options) {
+          const outputSize = normalizeOpenAiRequestedOutputSize(options);
+          if (outputSize === "4K") {
+            return 3840;
+          }
+          if (outputSize === "3K") {
+            return 3072;
+          }
+          if (outputSize === "2K") {
+            return 2048;
+          }
+          return 1024;
+        }
+
+        function roundOpenAiImage2LongEdge(value) {
+          return Math.max(16, Math.round(Math.max(16, Number(value) || 16) / 16) * 16);
+        }
+
+        function roundOpenAiImage2ShortEdge(value) {
+          return Math.max(16, Math.ceil(Math.max(16, Number(value) || 16) / 16) * 16);
+        }
+
+        function buildOpenAiImage2OutputSize(width, height, options) {
+          const safeWidth = Math.max(1, Number(width) || 1);
+          const safeHeight = Math.max(1, Number(height) || 1);
+          const ratio = Math.max(1 / 3, Math.min(3, safeWidth / Math.max(1, safeHeight)));
+          const maxLongEdge = 3840;
+          const maxPixelCount = 3840 * 2160;
+          let longEdge = Math.min(maxLongEdge, getOpenAiImage2RequestedLongEdge(options));
+          let nextWidth = 1024;
+          let nextHeight = 1024;
+
+          const calculate = () => {
+            if (ratio >= 1) {
+              nextWidth = roundOpenAiImage2LongEdge(longEdge);
+              nextHeight = roundOpenAiImage2ShortEdge(nextWidth / ratio);
+            } else {
+              nextHeight = roundOpenAiImage2LongEdge(longEdge);
+              nextWidth = roundOpenAiImage2ShortEdge(nextHeight * ratio);
+            }
+          };
+
+          calculate();
+          while ((nextWidth * nextHeight > maxPixelCount || nextWidth > maxLongEdge || nextHeight > maxLongEdge) && longEdge > 16) {
+            longEdge -= 16;
+            calculate();
+          }
+
+          return `${nextWidth}x${nextHeight}`;
+        }
+
+        function pickOpenAiOutputSize(preparedInput, options, model) {
           const resolved = resolveRequestedOutputDimensions(preparedInput, options);
           const width = resolved.width;
           const height = resolved.height;
+
+          if (isOpenAiImage2Model(model)) {
+            return buildOpenAiImage2OutputSize(width || 1024, height || 1024, options);
+          }
 
           if (width > 0 && height > 0) {
             if (width >= height * 1.08) {
@@ -31143,7 +31276,7 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
                 body: JSON.stringify({
                   model: requestOpenAiImageModel,
                   prompt,
-                  size: pickOpenAiOutputSize(null, options),
+                  size: pickOpenAiOutputSize(null, options, requestOpenAiImageModel),
                   quality: openAiImageQuality,
                   output_format: "png",
                   n: 1,
@@ -31182,7 +31315,7 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
           formData.append("model", requestOpenAiImageModel);
           formData.append("image", preparedInput.blob, preparedInput.fileName);
           formData.append("prompt", prompt);
-          formData.append("size", pickOpenAiOutputSize(preparedInput, options));
+          formData.append("size", pickOpenAiOutputSize(preparedInput, options, requestOpenAiImageModel));
           formData.append("quality", openAiImageQuality);
           formData.append("output_format", "png");
           if (openAiInputFidelity) {
@@ -33131,6 +33264,10 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
                 sessionId: payload.sessionId,
                 clientRequestId: currentRequest.clientRequestId,
                 bytes: processedBytes,
+                applyMode:
+                  currentRequest.sourceRequest && typeof currentRequest.sourceRequest.applyMode === "string"
+                    ? currentRequest.sourceRequest.applyMode
+                    : "",
                 operationLabel: typeof options.operationLabel === "string" ? options.operationLabel : defaultLabel,
               });
               return;
@@ -33268,6 +33405,10 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
                   sessionId: payload.sessionId,
                   clientRequestId: currentRequest.clientRequestId,
                   bytes: customBytes,
+                  applyMode:
+                    currentRequest.sourceRequest && typeof currentRequest.sourceRequest.applyMode === "string"
+                      ? currentRequest.sourceRequest.applyMode
+                      : "",
                   operationLabel: typeof options.operationLabel === "string" ? options.operationLabel : defaultLabel,
                 });
                 return;
@@ -33376,8 +33517,11 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
               if (!isBusy || currentRequest !== activeRequestContext || (requestOptions.signal && requestOptions.signal.aborted)) {
                 return;
               }
+              const shouldFitGeneratedResult = !(
+                currentRequest.sourceRequest && currentRequest.sourceRequest.disableResultFitting === true
+              );
               fittedResultBytes =
-                requestTargetWidth > 0 && requestTargetHeight > 0
+                shouldFitGeneratedResult && requestTargetWidth > 0 && requestTargetHeight > 0
                   ? await fitGeneratedImageBytesToTarget(resultBytes, requestTargetWidth, requestTargetHeight, {
                       provider: resultProvider,
                       referenceImagePayload: requestImagePayload,
@@ -33421,6 +33565,10 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
               sessionId: payload.sessionId,
               clientRequestId: currentRequest.clientRequestId,
               bytes: fittedResultBytes,
+              applyMode:
+                currentRequest.sourceRequest && typeof currentRequest.sourceRequest.applyMode === "string"
+                  ? currentRequest.sourceRequest.applyMode
+                  : "",
               operationLabel: typeof options.operationLabel === "string" ? options.operationLabel : defaultLabel,
             });
           };
@@ -38135,6 +38283,7 @@ self.addEventListener("message", (event) => {
           "aiImageTextFeasibilityButton",
           "aiImageSharpenButton",
           "aiImageAutoToneButton",
+          "aiImageGptRerenderButton",
           "aiImagePromptEditButton",
           "aiImageExtendButton",
           "aiImageOriginalSizeFitButton",
@@ -40521,6 +40670,7 @@ self.addEventListener("message", (event) => {
           "aiImageTextFeasibilityButton",
           "aiImageSharpenButton",
           "aiImageAutoToneButton",
+          "aiImageGptRerenderButton",
           "aiImagePromptEditButton",
           "aiImageExtendButton",
           "aiImageOriginalSizeFitButton",
@@ -41460,6 +41610,7 @@ ${buildReferencePromptOutputRules()}
           "aiImageReferenceSearchButton",
           "aiImageSharpenButton",
           "aiImageAutoToneButton",
+          "aiImageGptRerenderButton",
           "aiImagePromptEditButton",
           "aiImageExtendButton",
           "aiImageOriginalSizeFitButton",
@@ -42133,6 +42284,7 @@ ${buildReferencePromptOutputRules()}
           "aiImageReferenceSearchButton",
           "aiImageSharpenButton",
           "aiImageAutoToneButton",
+          "aiImageGptRerenderButton",
           "aiImagePromptEditButton",
           "aiImageExtendButton",
           "aiImageOriginalSizeFitButton",
@@ -43256,6 +43408,7 @@ ${buildReferencePromptOutputRules()}
           "aiImageTextFeasibilityButton",
           "aiImageSharpenButton",
           "aiImageAutoToneButton",
+          "aiImageGptRerenderButton",
           "aiImagePromptEditButton",
           "aiImageExtendButton",
           "aiImageOriginalSizeFitButton",
@@ -43385,6 +43538,7 @@ ${buildReferencePromptOutputRules()}
           "aiImageTextFeasibilityButton",
           "aiImageSharpenButton",
           "aiImageAutoToneButton",
+          "aiImageGptRerenderButton",
           "aiImagePromptEditButton",
           "aiImageExtendButton",
           "aiImageOriginalSizeFitButton",
@@ -46161,6 +46315,7 @@ ${buildReferencePromptOutputRules()}
           "aiImageTextFeasibilityButton",
           "aiImageSharpenButton",
           "aiImageAutoToneButton",
+          "aiImageGptRerenderButton",
           "aiImagePromptEditButton",
           "aiImageOriginalSizeFitButton",
           "aiImageBoundsFitButton",
@@ -48360,6 +48515,7 @@ ${buildReferencePromptOutputRules()}
             "aiImageTextFeasibilityButton",
             "aiImageSharpenButton",
             "aiImageAutoToneButton",
+            "aiImageGptRerenderButton",
             "aiImageExtendButton",
           ],
           defaultLabel: "프롬프트 편집/생성",
@@ -48554,6 +48710,666 @@ ${buildReferencePromptOutputRules()}
     </script>
     <script>
       (() => {
+        if (window.__PIGMA_AI_IMAGE_GPT_RERENDER_V1__) {
+          return;
+        }
+
+        const shared = window.__PIGMA_AI_IMAGE_UPSCALE_SHARED__;
+        if (!shared || typeof shared.createController !== "function") {
+          return;
+        }
+
+        const storageKey = "pigma:ai-image-gpt-rerender:last:v2";
+        const labels = {
+          button: "GPT 2.0 \uC7AC\uB80C\uB354\uB9C1",
+          preparing: "\uD504\uB808\uC784 \uD655\uC778 \uC911...",
+          applying: "Figma\uC5D0 \uC801\uC6A9 \uC911...",
+          startError: "GPT 2.0 \uC7AC\uB80C\uB354\uB9C1\uC744 \uC2DC\uC791\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.",
+          requestError: "GPT 2.0 \uC7AC\uB80C\uB354\uB9C1 \uC694\uCCAD\uC744 \uC644\uB8CC\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.",
+          busySuffix: "\uC7AC\uB80C\uB354\uB9C1 \uC911...",
+          operation: "GPT 2.0 \uC7AC\uB80C\uB354\uB9C1",
+          title:
+            "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC774\uB098 \uC774\uBBF8\uC9C0\uB97C GPT Image 2\uB85C \uB2E4\uC2DC \uB80C\uB354\uB9C1\uD569\uB2C8\uB2E4.",
+          modalTitle: "GPT 2.0 \uC774\uBBF8\uC9C0 \uC7AC\uB80C\uB354\uB9C1",
+          modalDescription:
+            "\uC120\uD0DD\uD55C \uD504\uB808\uC784/\uC774\uBBF8\uC9C0\uB97C \uAE30\uC900\uC73C\uB85C \uD750\uB9BF\uD55C AI \uACB0\uACFC\uB97C \uB2E4\uC2DC \uB80C\uB354\uB9C1\uD569\uB2C8\uB2E4.",
+          quality: "\uD488\uC9C8",
+          resolution: "\uCC98\uB9AC \uD06C\uAE30",
+          instruction: "\uCD94\uAC00 \uC9C0\uC2DC",
+          instructionPlaceholder:
+            "\uBC18\uB4DC\uC2DC \uC720\uC9C0\uD560 \uBC30\uACBD, \uC0C9, \uC2E4\uB8E8\uC5E3, \uC778\uBB3C \uD2B9\uC9D5\uC744 \uC801\uC5B4\uC8FC\uC138\uC694.",
+          note:
+            "\uC801\uC6A9 \uD06C\uAE30\uB294 \uC6D0\uBCF8\uC744 \uC720\uC9C0\uD558\uACE0, \uCC98\uB9AC \uD06C\uAE30\uB294 AI \uC138\uBD80 \uBCF5\uC6D0 \uAC15\uB3C4\uB85C\uB9CC \uC0AC\uC6A9\uD569\uB2C8\uB2E4.",
+          cancel: "\uCDE8\uC18C",
+          generate: "\uC0DD\uC131",
+        };
+        const qualityLabels = {
+          low: "\uB0AE\uC74C",
+          medium: "\uC911\uAC04",
+          high: "\uB192\uC74C",
+        };
+        const outputSizes = {
+          "1K": 1024,
+          "2K": 2048,
+          "3K": 3072,
+        };
+        let optionsModal = null;
+        let optionsResolver = null;
+        let sizePolicyModal = null;
+        let sizePolicyResolver = null;
+
+        function isAdminAccountActive() {
+          return document.documentElement.dataset.pigmaWebAdmin === "true";
+        }
+
+        function normalizeQuality(value) {
+          const normalized = String(value || "").trim().toLowerCase();
+          return normalized === "low" || normalized === "medium" || normalized === "high" ? normalized : "low";
+        }
+
+        function normalizeOutputSize(value) {
+          const normalized = String(value || "").replace(/\s+/g, "").trim().toUpperCase();
+          return normalized === "2K" || normalized === "3K" ? normalized : "1K";
+        }
+
+        function normalizeLabelLanguage(value) {
+          const normalized = String(value || "").replace(/_/g, "-").trim().toLowerCase();
+          return normalized === "ko" ||
+            normalized === "en" ||
+            normalized === "ja" ||
+            normalized === "zh-cn" ||
+            normalized === "es"
+            ? normalized
+            : "auto";
+        }
+
+        function readStoredOptions() {
+          try {
+            const parsed = JSON.parse(window.localStorage.getItem(storageKey) || "{}");
+            if (!parsed || typeof parsed !== "object") {
+              return {};
+            }
+            return {
+              quality: parsed.quality ? normalizeQuality(parsed.quality) : "low",
+              outputSize: parsed.outputSize ? normalizeOutputSize(parsed.outputSize) : "1K",
+              instruction: typeof parsed.instruction === "string" ? parsed.instruction : "",
+            };
+          } catch (error) {
+            return {};
+          }
+        }
+
+        function writeStoredOptions(options) {
+          try {
+            window.localStorage.setItem(
+              storageKey,
+              JSON.stringify({
+                quality: "low",
+                outputSize: "1K",
+                instruction: String((options && options.instruction) || "").slice(0, 2000),
+              })
+            );
+          } catch (error) {}
+        }
+
+        function closeOptionsModal(value) {
+          if (optionsModal) {
+            optionsModal.hidden = true;
+          }
+          if (optionsResolver) {
+            const resolve = optionsResolver;
+            optionsResolver = null;
+            resolve(value || null);
+          }
+        }
+
+        function ensureOptionsModal() {
+          if (optionsModal) {
+            return optionsModal;
+          }
+
+          optionsModal = document.createElement("div");
+          optionsModal.className = "modal-backdrop";
+          optionsModal.hidden = true;
+          optionsModal.innerHTML = `
+            <div class="modal-card image-extend-modal-card" role="dialog" aria-modal="true" aria-labelledby="aiImageGptRerenderModalTitle" aria-describedby="aiImageGptRerenderModalDescription">
+              <button class="modal-close" type="button" aria-label="Close">&times;</button>
+              <div class="image-extend-modal-copy">
+                <p class="modal-title" id="aiImageGptRerenderModalTitle">${labels.modalTitle}</p>
+                <p class="modal-description" id="aiImageGptRerenderModalDescription">${labels.modalDescription}</p>
+              </div>
+              <div class="image-extend-modal-grid">
+                <label class="image-extend-modal-field" for="aiImageGptRerenderQualitySelect">
+                  <span class="image-extend-modal-label">${labels.quality}</span>
+                  <select class="image-extend-modal-input" id="aiImageGptRerenderQualitySelect">
+                    <option value="low">${qualityLabels.low}</option>
+                    <option value="medium">${qualityLabels.medium}</option>
+                    <option value="high">${qualityLabels.high}</option>
+                  </select>
+                </label>
+                <label class="image-extend-modal-field" for="aiImageGptRerenderSizeSelect">
+                  <span class="image-extend-modal-label">${labels.resolution}</span>
+                  <select class="image-extend-modal-input" id="aiImageGptRerenderSizeSelect">
+                    <option value="1K">1K</option>
+                    <option value="2K">2K</option>
+                    <option value="3K">3K</option>
+                  </select>
+                </label>
+              </div>
+              <label class="image-extend-modal-field" for="aiImageGptRerenderInstructionInput">
+                <span class="image-extend-modal-label">${labels.instruction}</span>
+                <textarea class="image-extend-modal-textarea" id="aiImageGptRerenderInstructionInput" spellcheck="false" placeholder="${labels.instructionPlaceholder}"></textarea>
+              </label>
+              <p class="image-extend-modal-note">${labels.note}</p>
+              <div class="image-extend-modal-actions">
+                <button class="button-secondary" type="button" data-cancel>${labels.cancel}</button>
+                <button class="button-primary" type="button" data-apply>${labels.generate}</button>
+              </div>
+            </div>
+          `;
+          document.body.appendChild(optionsModal);
+          optionsModal.querySelector(".modal-close").addEventListener("click", () => closeOptionsModal(null));
+          optionsModal.querySelector("[data-cancel]").addEventListener("click", () => closeOptionsModal(null));
+          optionsModal.querySelector("[data-apply]").addEventListener("click", () => {
+            const qualitySelect = optionsModal.querySelector("#aiImageGptRerenderQualitySelect");
+            const sizeSelect = optionsModal.querySelector("#aiImageGptRerenderSizeSelect");
+            const instructionInput = optionsModal.querySelector("#aiImageGptRerenderInstructionInput");
+            const nextOptions = {
+              quality: normalizeQuality(qualitySelect && qualitySelect.value),
+              outputSize: normalizeOutputSize(sizeSelect && sizeSelect.value),
+              instruction: instructionInput instanceof HTMLTextAreaElement ? instructionInput.value.trim() : "",
+            };
+            writeStoredOptions(nextOptions);
+            closeOptionsModal(nextOptions);
+          });
+          optionsModal.addEventListener("click", (event) => {
+            if (event.target === optionsModal) {
+              closeOptionsModal(null);
+            }
+          });
+          window.addEventListener(
+            "keydown",
+            (event) => {
+              if (!optionsModal.hidden && event.key === "Escape") {
+                event.preventDefault();
+                closeOptionsModal(null);
+              }
+            },
+            true
+          );
+          return optionsModal;
+        }
+
+        function openOptionsModal() {
+          const modal = ensureOptionsModal();
+          const stored = readStoredOptions();
+          const qualitySelect = modal.querySelector("#aiImageGptRerenderQualitySelect");
+          const sizeSelect = modal.querySelector("#aiImageGptRerenderSizeSelect");
+          const instructionInput = modal.querySelector("#aiImageGptRerenderInstructionInput");
+          if (qualitySelect instanceof HTMLSelectElement) {
+            qualitySelect.value = "low";
+          }
+          if (sizeSelect instanceof HTMLSelectElement) {
+            sizeSelect.value = "1K";
+          }
+          if (instructionInput instanceof HTMLTextAreaElement) {
+            instructionInput.value = typeof stored.instruction === "string" ? stored.instruction : "";
+          }
+          modal.hidden = false;
+          window.setTimeout(() => {
+            if (qualitySelect instanceof HTMLSelectElement) {
+              qualitySelect.focus();
+            }
+          }, 0);
+          return new Promise((resolve) => {
+            optionsResolver = resolve;
+          });
+        }
+
+        function getInputPreparation(outputSize) {
+          const normalized = normalizeOutputSize(outputSize);
+          if (normalized === "3K") {
+            return { maxLongEdge: 1536, maxPixelCount: 2359296 };
+          }
+          if (normalized === "2K") {
+            return { maxLongEdge: 1280, maxPixelCount: 1638400 };
+          }
+          return { maxLongEdge: 1024, maxPixelCount: 1048576 };
+        }
+
+        function getRequestProfile(outputSize) {
+          const normalized = normalizeOutputSize(outputSize);
+          if (normalized === "3K") {
+            return {
+              requestTimeoutMs: 960000,
+              requestTimeoutLabel: "GPT 2.0 rerender 3K request timed out. Try 2K or 1K, or retry after a moment.",
+              openAiRequestTimeoutMs: 900000,
+              openAiRequestTimeoutLabel: "OpenAI GPT Image 2 3K rerender request timed out. Try 2K or 1K, or retry after a moment.",
+            };
+          }
+          if (normalized === "2K") {
+            return {
+              requestTimeoutMs: 780000,
+              requestTimeoutLabel: "GPT 2.0 rerender 2K request timed out. Try 1K, or retry after a moment.",
+              openAiRequestTimeoutMs: 720000,
+              openAiRequestTimeoutLabel: "OpenAI GPT Image 2 2K rerender request timed out. Try 1K, or retry after a moment.",
+            };
+          }
+          return {
+            requestTimeoutMs: 600000,
+            requestTimeoutLabel: "GPT 2.0 rerender 1K request timed out. The model may be busy, so retry after a moment.",
+            openAiRequestTimeoutMs: 540000,
+            openAiRequestTimeoutLabel: "OpenAI GPT Image 2 1K rerender request timed out. The model may be busy, so retry after a moment.",
+          };
+        }
+
+        function buildSizePolicy(longEdge, outputSize) {
+          const safeLongEdge = Math.max(0, Math.round(Number(longEdge) || 0));
+          const normalizedSize = normalizeOutputSize(outputSize);
+          if (!(safeLongEdge > 0)) {
+            return null;
+          }
+          if (safeLongEdge >= 5000 && normalizedSize === "3K") {
+            return {
+              title: "\uB300\uD615 \uC6D0\uBCF8 \uC0D8\uD50C \uACBD\uACE0",
+              description: `\uC6D0\uBCF8 \uAE34 \uBCC0\uC774 ${safeLongEdge}px\uC785\uB2C8\uB2E4. 3K\uB3C4 \uC804\uCCB4 \uACE0\uD654\uC9C8 \uBCF5\uC6D0\uBCF4\uB2E4 \uBD80\uBD84 \uBCF5\uC6D0/\uC0D8\uD50C\uC5D0 \uAC00\uAE5D\uC2B5\uB2C8\uB2E4.`,
+              note: "\uB290\uB9AC\uACE0, \uC0C8\uB85C \uADF8\uB9AC\uB294 \uACBD\uD5A5\uC774 \uCEE4\uC9C8 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+              primaryLabel: "3K\uB85C \uACC4\uC18D",
+              primaryValue: "3K",
+              secondaryLabel: "2K\uB85C \uB0AE\uCDA4",
+              secondaryValue: "2K",
+            };
+          }
+          if (safeLongEdge >= 3500 && normalizedSize === "1K") {
+            return {
+              title: "\uD070 \uC6D0\uBCF8\uC5D0\uC11C 1K \uC81C\uD55C",
+              description: `\uC6D0\uBCF8 \uAE34 \uBCC0\uC774 ${safeLongEdge}px\uC785\uB2C8\uB2E4. 1K\uB294 \uD070 \uC6D0\uBCF8\uC744 \uC791\uAC8C \uC694\uC57D\uD574 \uB2E4\uC2DC \uADF8\uB9AC\uBBC0\uB85C \uB514\uD14C\uC77C \uC190\uC2E4\uC774 \uD07D\uB2C8\uB2E4.`,
+              note: "\uC2E4\uC81C \uBCF5\uC6D0\uC740 2K \uC774\uC0C1\uC744 \uCD94\uCC9C\uD569\uB2C8\uB2E4.",
+              primaryLabel: "2K\uB85C \uBCC0\uACBD",
+              primaryValue: "2K",
+              secondaryLabel: "1K\uB85C \uACC4\uC18D",
+              secondaryValue: "1K",
+            };
+          }
+          if (safeLongEdge > 2000 && safeLongEdge < 3500 && normalizedSize === "1K") {
+            return {
+              title: "1K\uB294 \uBBF8\uB9AC\uBCF4\uAE30\uC6A9",
+              description: `\uC6D0\uBCF8 \uAE34 \uBCC0\uC774 ${safeLongEdge}px\uC785\uB2C8\uB2E4. 1K\uB294 \uBE60\uB978 \uBBF8\uB9AC\uBCF4\uAE30\uC5D0 \uAC00\uAE5D\uACE0, \uC791\uC740 \uAE00\uC790\uB098 \uC9C8\uAC10\uC740 \uC190\uC2E4\uB420 \uC218 \uC788\uC2B5\uB2C8\uB2E4.`,
+              note: "\uC2E4\uC81C \uBCF5\uC6D0\uC740 2K\uB97C \uCD94\uCC9C\uD569\uB2C8\uB2E4.",
+              primaryLabel: "2K\uB85C \uBCC0\uACBD",
+              primaryValue: "2K",
+              secondaryLabel: "1K\uB85C \uACC4\uC18D",
+              secondaryValue: "1K",
+            };
+          }
+          return null;
+        }
+
+        function closeSizePolicyModal(value) {
+          if (sizePolicyModal) {
+            sizePolicyModal.hidden = true;
+          }
+          if (sizePolicyResolver) {
+            const resolve = sizePolicyResolver;
+            sizePolicyResolver = null;
+            resolve(value || "");
+          }
+        }
+
+        function ensureSizePolicyModal() {
+          if (sizePolicyModal) {
+            return sizePolicyModal;
+          }
+          sizePolicyModal = document.createElement("div");
+          sizePolicyModal.className = "modal-backdrop";
+          sizePolicyModal.hidden = true;
+          sizePolicyModal.innerHTML = `
+            <div class="modal-card image-extend-modal-card" role="dialog" aria-modal="true" aria-labelledby="aiImageGptRerenderSizePolicyTitle" aria-describedby="aiImageGptRerenderSizePolicyDescription">
+              <button class="modal-close" type="button" aria-label="Close">&times;</button>
+              <div class="image-extend-modal-copy">
+                <p class="modal-title" id="aiImageGptRerenderSizePolicyTitle" data-policy-title></p>
+                <p class="modal-description" id="aiImageGptRerenderSizePolicyDescription" data-policy-description></p>
+              </div>
+              <p class="image-extend-modal-note" data-policy-note></p>
+              <div class="image-extend-modal-actions">
+                <button class="button-secondary" type="button" data-secondary></button>
+                <button class="button-primary" type="button" data-primary></button>
+              </div>
+            </div>
+          `;
+          document.body.appendChild(sizePolicyModal);
+          sizePolicyModal.querySelector(".modal-close").addEventListener("click", () => closeSizePolicyModal(""));
+          sizePolicyModal.querySelector("[data-secondary]").addEventListener("click", () => {
+            closeSizePolicyModal(sizePolicyModal.dataset.secondaryValue || "");
+          });
+          sizePolicyModal.querySelector("[data-primary]").addEventListener("click", () => {
+            closeSizePolicyModal(sizePolicyModal.dataset.primaryValue || "");
+          });
+          sizePolicyModal.addEventListener("click", (event) => {
+            if (event.target === sizePolicyModal) {
+              closeSizePolicyModal("");
+            }
+          });
+          window.addEventListener(
+            "keydown",
+            (event) => {
+              if (!sizePolicyModal.hidden && event.key === "Escape") {
+                event.preventDefault();
+                closeSizePolicyModal("");
+              }
+            },
+            true
+          );
+          return sizePolicyModal;
+        }
+
+        function openSizePolicyModal(policy) {
+          const modal = ensureSizePolicyModal();
+          modal.dataset.primaryValue = normalizeOutputSize(policy && policy.primaryValue);
+          modal.dataset.secondaryValue = normalizeOutputSize(policy && policy.secondaryValue);
+          const title = modal.querySelector("[data-policy-title]");
+          const description = modal.querySelector("[data-policy-description]");
+          const note = modal.querySelector("[data-policy-note]");
+          const primary = modal.querySelector("[data-primary]");
+          const secondary = modal.querySelector("[data-secondary]");
+          if (title instanceof HTMLElement) {
+            title.textContent = String((policy && policy.title) || "");
+          }
+          if (description instanceof HTMLElement) {
+            description.textContent = String((policy && policy.description) || "");
+          }
+          if (note instanceof HTMLElement) {
+            note.textContent = String((policy && policy.note) || "");
+          }
+          if (primary instanceof HTMLButtonElement) {
+            primary.textContent = String((policy && policy.primaryLabel) || "OK");
+          }
+          if (secondary instanceof HTMLButtonElement) {
+            secondary.textContent = String((policy && policy.secondaryLabel) || "Continue");
+          }
+          modal.hidden = false;
+          window.setTimeout(() => {
+            if (primary instanceof HTMLButtonElement) {
+              primary.focus();
+            }
+          }, 0);
+          return new Promise((resolve) => {
+            sizePolicyResolver = resolve;
+          });
+        }
+
+        async function resolveOutputSizePolicy(outputSize, payload) {
+          const reference = getPayloadReferenceDimensions(payload);
+          const longEdge = Math.max(reference.width, reference.height);
+          const policy = buildSizePolicy(longEdge, outputSize);
+          if (!policy) {
+            return normalizeOutputSize(outputSize);
+          }
+          const selected = await openSizePolicyModal(policy);
+          return selected ? normalizeOutputSize(selected) : normalizeOutputSize(outputSize);
+        }
+
+        function pickPositiveNumber() {
+          for (let index = 0; index < arguments.length; index += 1) {
+            const value = Math.round(Number(arguments[index]) || 0);
+            if (Number.isFinite(value) && value > 0) {
+              return value;
+            }
+          }
+          return 0;
+        }
+
+        function getPayloadReferenceDimensions(payload) {
+          const summary = payload && payload.summary && typeof payload.summary === "object" ? payload.summary : {};
+          const image = payload && payload.image && typeof payload.image === "object" ? payload.image : {};
+          const width = pickPositiveNumber(
+            summary.targetWidth,
+            summary.currentWidth,
+            summary.sourceWidth,
+            summary.width,
+            image.width
+          );
+          const height = pickPositiveNumber(
+            summary.targetHeight,
+            summary.currentHeight,
+            summary.sourceHeight,
+            summary.height,
+            image.height
+          );
+          return {
+            width: width || 1024,
+            height: height || 1024,
+          };
+        }
+
+        function buildRerenderDimensions(payload, outputSize) {
+          const reference = getPayloadReferenceDimensions(payload);
+          return {
+            width: Math.max(1, Math.round(reference.width || 1024)),
+            height: Math.max(1, Math.round(reference.height || 1024)),
+            sourceWidth: reference.width,
+            sourceHeight: reference.height,
+          };
+        }
+
+        function getLabelLanguageInstruction(labelLanguage) {
+          const normalized = normalizeLabelLanguage(labelLanguage);
+          if (normalized === "ko") {
+            return "Reconstruct blurry or pixelated labels in Korean. Use natural concise Korean UI wording, while preserving the original layout, hierarchy, and label intent.";
+          }
+          if (normalized === "en") {
+            return "Reconstruct blurry or pixelated labels in English. Use natural concise English UI wording, while preserving the original layout, hierarchy, and label intent.";
+          }
+          if (normalized === "ja") {
+            return "Reconstruct blurry or pixelated labels in Japanese. Use natural concise Japanese UI wording, while preserving the original layout, hierarchy, and label intent.";
+          }
+          if (normalized === "zh-cn") {
+            return "Reconstruct blurry or pixelated labels in Simplified Chinese. Use natural concise Simplified Chinese UI wording, while preserving the original layout, hierarchy, and label intent.";
+          }
+          if (normalized === "es") {
+            return "Reconstruct blurry or pixelated labels in Spanish. Use natural concise Spanish UI wording, while preserving the original layout, hierarchy, and label intent.";
+          }
+          return "Detect the source language of labels automatically. If the text is too degraded to read, reconstruct short labels in the most likely language for the UI/context instead of leaving meaningless glyphs.";
+        }
+
+        function buildPrompt(options) {
+          const quality = normalizeQuality(options && options.quality);
+          const outputSize = normalizeOutputSize(options && options.outputSize);
+          const labelLanguageInstruction = getLabelLanguageInstruction("auto");
+          const detailInstruction =
+            outputSize === "3K"
+              ? "Aim for 4K-grade perceived clarity, but keep the original canvas size and do not create new scene details."
+              : outputSize === "2K"
+                ? "Aim for high-definition perceived clarity, but keep the original canvas size and do not create new scene details."
+                : "Use a conservative preview-level restoration with the original canvas size preserved.";
+          const qualityInstruction =
+            quality === "high"
+              ? "Use stronger deblurring and artifact cleanup, but only reconstruct details that are directly implied by the source."
+              : quality === "low"
+                ? "Use light restoration. Prioritize source fidelity over sharpness; leave uncertain areas softly ambiguous."
+                : "Use balanced deblurring, pixel cleanup, edge recovery, and faithful detail reconstruction.";
+          const extraInstruction = String((options && options.instruction) || "").trim();
+          return [
+            "[STRICT SOURCE-LOCKED LOW-RES RESTORATION]",
+            "Use the provided Figma frame or image as the locked source template, not as a loose mood reference.",
+            "Goal: make the same image look cleaner and higher quality while preserving its original feeling. This is restoration, not redesign.",
+            "",
+            "[NON-NEGOTIABLE SOURCE LOCK]",
+            "Preserve the exact crop, aspect ratio, subject scale, head/body size, silhouette, pose, expression, camera angle, object geometry, clothing shape, clothing colors, layout, background colors, background shapes, typography, logos, and visible text placement.",
+            "If the source has a flat teal circle, gray square, solid color background, icon/avatar style, UI screenshot style, product render style, or illustration style, keep that exact visual category. Do not convert it into an outdoor portrait, studio portrait, cinematic scene, bokeh background, new environment, or different art style.",
+            "Keep all already-readable text and logos faithful to the source. Blurry labels may be reconstructed only under the text rules below.",
+            "",
+            "[TEXT AND LABEL RECONSTRUCTION]",
+            "You may reconstruct blurry or pixelated UI labels, short button text, icon labels, captions, tab names, menu labels, badges, headings, and simple lettering when doing so improves readability.",
+            labelLanguageInstruction,
+            "Preserve each text block's original position, approximate width, height, baseline, alignment, font weight, color, visual hierarchy, and line count.",
+            "For UI labels, prefer short practical interface wording over decorative prose. Match the surrounding UI context and visible icons.",
+            "For names, brands, logos, product marks, IDs, prices, phone numbers, addresses, legal text, or exact numeric values: do not invent new content. If uncertain, keep the original-looking mark soft or approximate rather than fabricating a different value.",
+            "Do not add extra labels, paragraphs, slogans, watermarks, or decorative typography that were not implied by the source.",
+            "",
+            "[IDENTITY AND UNCERTAINTY LOCK]",
+            "Do not replace the person, face, hairstyle, beard, smile, age, skin tone, expression, clothing, or background with a generic stock-photo version.",
+            "When the source is extremely blurry or pixelated, infer only the minimum detail needed to clean it. If a detail is uncertain, keep it soft or approximate instead of inventing a new feature.",
+            "Do not beautify, retouch, slim, age-change, change facial structure, change eye shape, change mouth shape, add teeth detail that is not implied, add hair strands that change the hairstyle, or alter the outfit.",
+            "",
+            "[DEGRADATION REMOVAL]",
+            "Remove pixelation, blockiness, compression artifacts, blur, AI smearing, jagged edges, haloing, ringing, noise, banding, and muddy textures.",
+            "Recover clean contours and stable surfaces conservatively. Keep the same colors, same lighting direction, same contrast relationship, and same background simplicity.",
+            qualityInstruction,
+            detailInstruction,
+            "",
+            "[OUTPUT LOCK]",
+            "Preserve the original canvas dimensions, crop, margins, and aspect ratio. Do not zoom, reframe, expand, shrink, crop, or resize the subject.",
+            "The output should look like the same low-quality image was carefully restored, not like a new image inspired by it.",
+            "",
+            "[NEGATIVE PROMPT]",
+            "new person, different face, stock photo, cinematic lighting, outdoor background, bokeh, studio portrait, fashion retouch, beauty retouch, redesigned scene, added objects, removed objects, changed style, changed crop, changed background, changed clothing, extra details not in source, rewritten text, fake logo, over-sharpened, plastic skin, waxy skin",
+            extraInstruction ? ["", "[EXTRA DIRECTION]", extraInstruction].join("\n") : "",
+          ]
+            .filter(Boolean)
+            .join("\n");
+        }
+
+        const controller = shared.createController({
+          buttonId: "aiImageGptRerenderButton",
+          peerButtonIds: [
+            "aiImageReferenceSearchButton",
+            "aiImageTextFeasibilityButton",
+            "aiImageSharpenButton",
+            "aiImageAutoToneButton",
+            "aiImagePromptEditButton",
+            "aiImageExtendButton",
+            "aiImageMergeButton",
+          ],
+          defaultLabel: labels.button,
+          preparingLabel: labels.preparing,
+          applyingLabel: labels.applying,
+          startErrorLabel: labels.startError,
+          requestErrorLabel: labels.requestError,
+          providerBusySuffix: labels.busySuffix,
+          operationLabel: labels.operation,
+          title: labels.title,
+          ariaLabel: labels.title,
+          preferredProvider: "openai",
+          requiredProvider: "openai",
+          sourceMode: "prompt-smart",
+          inputPreparation: {
+            mode: "prompt-edit",
+            maxLongEdge: 1280,
+            maxPixelCount: 1638400,
+            geminiOutputIntent: "quality",
+          },
+          resolvePrompt: async () => {
+            if (!isAdminAccountActive()) {
+              throw new Error("This hidden menu is available only for the owner admin account.");
+            }
+            const selectedOptions = await openOptionsModal();
+            if (!selectedOptions) {
+              return "";
+            }
+            const outputSize = normalizeOutputSize(selectedOptions.outputSize);
+            const quality = normalizeQuality(selectedOptions.quality);
+            const preparation = getInputPreparation(outputSize);
+            const requestProfile = getRequestProfile(outputSize);
+            return {
+              prompt: buildPrompt(selectedOptions),
+              inputPreparation: {
+                mode: "prompt-edit",
+                maxLongEdge: preparation.maxLongEdge,
+                maxPixelCount: preparation.maxPixelCount,
+                geminiOutputIntent: "quality",
+              },
+              sourceRequest: Object.assign(
+                {
+                  preferredProvider: "openai",
+                  requiredProvider: "openai",
+                  openAiImageModel: "gpt-image-2",
+                  openAiImageQuality: quality,
+                  openAiInputFidelity: quality === "high" ? "high" : "default",
+                  requestedOutputSize: outputSize,
+                  applyMode: "new-layer-natural-size",
+                  disableResultFitting: true,
+                  disableSegmentedUpscale: true,
+                  multiImagePromptRequested: false,
+                  rerenderQuality: quality,
+                  rerenderOutputSize: outputSize,
+                },
+                requestProfile
+              ),
+            };
+          },
+          resolvePromptFromSource: async ({ prompt, payload, requestContext }) => {
+            const payloadSummary = payload && payload.summary && typeof payload.summary === "object" ? payload.summary : {};
+            const requestMode =
+              typeof payloadSummary.requestMode === "string" && payloadSummary.requestMode.trim()
+                ? payloadSummary.requestMode.trim().toLowerCase()
+                : "";
+            const hasSourceImage =
+              !!(
+                payload &&
+                payload.image &&
+                typeof payload.image === "object" &&
+                payload.image.bytes &&
+                typeof payload.image.bytes.length === "number" &&
+                payload.image.bytes.length > 0
+              );
+            if (requestMode === "prompt-only" || !hasSourceImage) {
+              throw new Error(
+                "\uC7AC\uB80C\uB354\uB9C1\uD560 \uD504\uB808\uC784\uC774\uB098 \uC774\uBBF8\uC9C0\uB97C \uBA3C\uC800 \uC120\uD0DD\uD574 \uC8FC\uC138\uC694."
+              );
+            }
+            const sourceRequest =
+              requestContext && requestContext.sourceRequest && typeof requestContext.sourceRequest === "object"
+                ? requestContext.sourceRequest
+                : {};
+            const outputSize = await resolveOutputSizePolicy(
+              sourceRequest.rerenderOutputSize || sourceRequest.requestedOutputSize,
+              payload
+            );
+            const preparation = getInputPreparation(outputSize);
+            const requestProfile = getRequestProfile(outputSize);
+            requestContext.inputPreparation = Object.assign({}, requestContext.inputPreparation || {}, {
+              mode: "prompt-edit",
+              maxLongEdge: preparation.maxLongEdge,
+              maxPixelCount: preparation.maxPixelCount,
+              geminiOutputIntent: "quality",
+            });
+            const dimensions = buildRerenderDimensions(payload, outputSize);
+            requestContext.outputTargetDimensions = {
+              width: dimensions.width,
+              height: dimensions.height,
+              label: outputSize,
+              intent: "gpt-rerender",
+              scale: 1,
+              sourceWidth: dimensions.sourceWidth,
+              sourceHeight: dimensions.sourceHeight,
+            };
+            requestContext.sourceRequest = Object.assign({}, sourceRequest, requestProfile, {
+              requestedOutputSize: outputSize,
+              rerenderOutputSize: outputSize,
+              targetWidth: dimensions.width,
+              targetHeight: dimensions.height,
+            });
+            return [
+              prompt,
+              "",
+              "[OUTPUT]",
+              `Return a PNG for the same original canvas target (${dimensions.width}x${dimensions.height}). Do not use the processing size as a resize instruction.`,
+              "The result must read as the same image with blur and pixel artifacts reduced. If it no longer resembles the source, the restoration failed.",
+            ].join("\n");
+          },
+          processPayload: async () => null,
+        });
+
+        if (!controller) {
+          return;
+        }
+
+        window.__PIGMA_AI_IMAGE_GPT_RERENDER_V1__ = true;
+      })();
+    </script>
+    <script>
+      (() => {
         if (window.__PIGMA_AI_IMAGE_SHARPEN_V2__) {
           return;
         }
@@ -48742,6 +49558,7 @@ ${buildReferencePromptOutputRules()}
             "aiImageReferenceSearchButton",
             "aiImageTextFeasibilityButton",
             "aiImageAutoToneButton",
+            "aiImageGptRerenderButton",
             "aiImagePromptEditButton",
             "aiImageExtendButton",
           ],
@@ -48944,6 +49761,7 @@ ${buildReferencePromptOutputRules()}
             "aiImageReferenceSearchButton",
             "aiImageTextFeasibilityButton",
             "aiImageSharpenButton",
+            "aiImageGptRerenderButton",
             "aiImagePromptEditButton",
             "aiImageExtendButton",
           ],
@@ -49022,6 +49840,7 @@ ${buildReferencePromptOutputRules()}
           "aiImageReferenceSearchButton",
           "aiImageTextFeasibilityButton",
           "aiImageAutoToneButton",
+          "aiImageGptRerenderButton",
           "aiImagePromptEditButton",
           "aiImageExtendButton",
           "aiImageOriginalSizeFitButton",
@@ -64531,6 +65350,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
           "aiImageTextFeasibilityButton",
           "aiImageSharpenButton",
           "aiImageAutoToneButton",
+          "aiImageGptRerenderButton",
           "aiImagePromptEditButton",
           "aiImageExtendButton",
           "aiImageOriginalSizeFitButton",
@@ -65845,6 +66665,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
         }
 
         const DEFAULT_SERVER_URL = "https://oy-tools-production.up.railway.app";
+        const OWNER_ADMIN_EMAIL = "ohgun5020@gmail.com";
         const PLAN_REFRESH_INTERVAL_MS = 60 * 60 * 1000;
         const SESSION_REQUEST_TIMEOUT_MS = 10000;
         const BACKGROUND_SESSION_REQUEST_TIMEOUT_MS = 8000;
@@ -66272,17 +67093,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
           if (!user || typeof user !== "object") {
             return false;
           }
-          if (user.isAdmin === true) {
-            return true;
-          }
-          if (String(user.plan || "").trim().toLowerCase() === "admin") {
-            return true;
-          }
-          const entitlement = user.entitlement && typeof user.entitlement === "object" ? user.entitlement : null;
-          if (entitlement && Number(entitlement.effectiveTier) >= 3) {
-            return true;
-          }
-          return String(user.email || "").trim().toLowerCase() === "ohgun5020@gmail.com";
+          return String(user.email || "").trim().toLowerCase() === OWNER_ADMIN_EMAIL;
         };
 
         const isAdminPlan = (user, entitlement = null) => {
@@ -66314,6 +67125,29 @@ UPNG.encode.alphaMul = function(img, roundA) {
               node.open = false;
             }
           });
+
+          if (!visible) {
+            const debugController = window.__PIGMA_AI_CORRECTION_DEBUG_MODE_CONTROLLER__;
+            if (debugController && typeof debugController.setEnabled === "function") {
+              debugController.setEnabled(false);
+              return;
+            }
+
+            const debugPanels = document.getElementById("aiCorrectionDebugPanels");
+            if (debugPanels instanceof HTMLElement) {
+              debugPanels.hidden = true;
+              debugPanels.setAttribute("aria-hidden", "true");
+            }
+            root.dataset.aiCorrectionDebugMode = "false";
+            window.__PIGMA_AI_CORRECTION_DEBUG_MODE__ = false;
+            window.dispatchEvent(
+              new CustomEvent("pigma:debug-mode-changed", {
+                detail: {
+                  enabled: false,
+                },
+              })
+            );
+          }
         };
 
         const publishPlanState = (payload) => {
@@ -67853,6 +68687,35 @@ UPNG.encode.alphaMul = function(img, roundA) {
 
         applyFeaturePlanGates();
         window.__PIGMA_FEATURE_PLAN_GATES__ = true;
+      })();
+    </script>
+    <script>
+      (() => {
+        if (window.__PIGMA_ADMIN_IMAGE_GENERATION_MENU__) {
+          return;
+        }
+
+        const root = document.documentElement;
+        const group = document.getElementById("aiImageGenerateExtendGroup");
+        if (!(group instanceof HTMLElement)) {
+          return;
+        }
+
+        const syncAdminImageGenerationMenu = () => {
+          const visible = root.dataset.pigmaWebAdmin === "true";
+          group.hidden = !visible;
+          group.setAttribute("aria-hidden", visible ? "false" : "true");
+          if ("inert" in group) {
+            group.inert = !visible;
+          }
+          if (!visible && group instanceof HTMLDetailsElement) {
+            group.open = false;
+          }
+        };
+
+        window.addEventListener("pigma:web-account-changed", syncAdminImageGenerationMenu);
+        syncAdminImageGenerationMenu();
+        window.__PIGMA_ADMIN_IMAGE_GENERATION_MENU__ = true;
       })();
     </script>
     <script>
