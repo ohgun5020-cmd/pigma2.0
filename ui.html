@@ -4187,6 +4187,45 @@
         font-weight: 650;
       }
 
+      .login-first-modal-card {
+        width: min(292px, calc(100vw - 40px));
+        aspect-ratio: auto;
+        place-content: stretch;
+        justify-items: stretch;
+        gap: 16px;
+        padding: 22px 20px 20px;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+      }
+
+      .login-first-modal-copy {
+        display: grid;
+        gap: 8px;
+        min-width: 0;
+        padding-right: 28px;
+      }
+
+      .login-first-modal-copy .modal-title {
+        font-size: 15px;
+        line-height: 1.35;
+      }
+
+      .login-first-modal-copy .modal-description {
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .login-first-modal-actions {
+        display: grid;
+      }
+
+      .login-first-modal-actions .button-primary {
+        min-height: 42px;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 650;
+      }
+
       .ai-setting-row.is-attention input:not([type="checkbox"]):not([type="radio"]) {
         border-color: var(--accent-selected-border);
         box-shadow: var(--accent-selected-ring);
@@ -10254,6 +10293,26 @@
           </div>
         </div>
       </div>
+      <div class="modal-backdrop" id="pigmaLoginFirstModal" hidden aria-hidden="true">
+        <div
+          class="modal-card login-first-modal-card"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="pigmaLoginFirstModalTitle"
+          aria-describedby="pigmaLoginFirstModalDescription"
+        >
+          <button class="modal-close" id="pigmaLoginFirstModalClose" type="button" aria-label="닫기">×</button>
+          <div class="login-first-modal-copy">
+            <p class="modal-title" id="pigmaLoginFirstModalTitle">로그인이 필요해요</p>
+            <p class="modal-description" id="pigmaLoginFirstModalDescription">
+              Pigma 플러그인을 사용하려면 먼저 웹에서 로그인해 주세요.
+            </p>
+          </div>
+          <div class="login-first-modal-actions">
+            <button class="button-primary" id="pigmaLoginFirstModalSignIn" type="button">로그인하기</button>
+          </div>
+        </div>
+      </div>
       <div class="modal-backdrop" id="splitLongFrameModeModal" hidden aria-hidden="true">
         <div
           class="modal-card split-long-frame-mode-modal-card"
@@ -11362,6 +11421,16 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
             "라운드 값을 적용하고 있습니다.": "Applying radius values.",
             "라운드 값 형식을 확인해 주세요. 예: auto, 6, 12px, 25%": "Check the radius value format. Example: auto, 6, 12px, 25%",
             "모서리 둥글기 조정에 실패했습니다.": "Failed to adjust corner radius.",
+            "비슷한 색 묶기": "Group Similar Colors",
+            "선택 범위 안의 fill, stroke, 텍스트 색 중 아주 비슷한 색을 대표색으로 통일합니다.":
+              "Merge very similar fill, stroke, and text colors in the selection into representative colors.",
+            "비슷한 색 묶기. 선택 범위 안의 fill, stroke, 텍스트 색 중 아주 비슷한 색을 대표색으로 통일합니다.":
+              "Group Similar Colors. Merge very similar fill, stroke, and text colors in the selection into representative colors.",
+            "텍스트 스타일 정리": "Normalize Text Styles",
+            "선택 범위 안의 소수점처럼 아주 미세하게 어긋난 텍스트 크기, 행간, 색만 대표 스타일로 정리합니다.":
+              "Clean up tiny text size, line-height, and color drifts into representative styles.",
+            "텍스트 스타일 정리. 선택 범위 안의 소수점처럼 아주 미세하게 어긋난 텍스트 크기, 행간, 색만 대표 스타일로 정리합니다.":
+              "Normalize Text Styles. Clean up tiny text size, line-height, and color drifts into representative styles.",
             "픽셀 교정 주석 삭제": "Delete Pixel Notes",
             "주석 삭제": "Delete Pixel Notes",
             "주석 삭제 중...": "Deleting pixel notes...",
@@ -11746,6 +11815,94 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
             "이 기기 브라우저 저장소 (AI 키 / 모델 포함)": "This device browser storage (including AI keys / models)",
             "최근 LLM 실행": "Recent LLM Runs",
             "로그 새로고침": "Refresh Logs",
+            "공지사항": "Notices",
+            "릴리즈 노트와 서비스 안내를 확인합니다. 변환 품질에 필요한 설정은 플러그인 내부에 그대로 유지됩니다.":
+              "Check release notes and service notices. Settings needed for conversion quality stay inside the plugin.",
+            "공지사항을 불러올 준비가 되었습니다.": "Ready to load notices.",
+            "새로고침": "Refresh",
+            "아직 표시할 공지사항이 없습니다.": "No notices to show yet.",
+            "현재 표시할 공지사항이 없습니다.": "No notices to show right now.",
+            "공지사항을 불러오는 중입니다.": "Loading notices.",
+            "최신 공지사항을 불러왔습니다.": "Loaded the latest notices.",
+            "네트워크 오류로 저장된 공지사항을 표시합니다.": "Network error. Showing saved notices.",
+            "공지사항을 불러오지 못했습니다. R2에 notices/pigma-notices.json을 업로드했는지 확인해 주세요.":
+              "Could not load notices. Check whether notices/pigma-notices.json has been uploaded to R2.",
+            "공지사항을 불러오지 못했습니다.": "Could not load notices.",
+            "자세히 보기": "Learn more",
+            "로그인이 필요해요": "Sign in required",
+            "Pigma 플러그인을 사용하려면 먼저 웹에서 로그인해 주세요.": "Sign in on the web to use the Pigma plugin.",
+            "로그인하기": "Sign In",
+            "계정 / 플랜": "Account / Plan",
+            "플랜 상태": "Plan Status",
+            "이메일은 여기서, Google과 결제는 웹에서. 딱 필요한 만큼만 연결합니다.": "Use email here, and continue Google sign-in or billing on the web.",
+            "Google 로그인": "Google Sign In",
+            "이메일": "Email",
+            "가입한 이메일": "Registered email",
+            "비밀번호": "Password",
+            "로그인": "Sign In",
+            "계정": "Account",
+            "연결 대기": "Waiting to connect",
+            "관리자": "Admin",
+            "요금제": "Plan",
+            "미확인": "Unchecked",
+            "무료 체험": "Free Trial",
+            "연동": "Connection",
+            "웹에서 관리": "Managed on the web",
+            "플랜별 기간 한도에서 PSD 파일 개수만큼 차감됩니다. 리셋은 한국 시간 기준입니다.": "PSD files are deducted from your plan's period limit. Resets follow Korea time.",
+            "계정 관리": "Account Management",
+            "상태 새로고침": "Refresh Status",
+            "로그아웃": "Log Out",
+            "이메일 로그인은 플러그인에서 처리하고, Google/결제는 웹에서 이어갑니다.": "Email sign-in happens in the plugin. Google and billing continue on the web.",
+            "결제 페이지 열기": "Open Billing Page",
+            "로그인 후 확인": "Check after sign-in",
+            "로그인이 살짝 풀렸어요. 다시 연결하면 바로 이어집니다.": "Your sign-in has expired. Reconnect to continue.",
+            "토큰 확인 필요": "Token check required",
+            "다시 로그인 필요": "Sign in again",
+            "Google 로그인 다시 연결": "Reconnect Google Sign In",
+            "관리자 계정으로 연결됐어요. 플랜 상태도 같이 확인합니다.": "Connected as an admin account. Plan status is also checked.",
+            "로그인 완료. 비밀번호는 쉬고, 요금제만 가볍게 확인합니다.": "Signed in. Password stays out of the way while the plan is checked.",
+            "연결됨": "Connected",
+            "무료 체험 종료": "Free Trial Ended",
+            "PSD 무제한": "Unlimited PSD",
+            "전체 기능 활성화": "All features active",
+            "Pro 기능 준비 완료": "Pro features ready",
+            "Basic 메뉴 활성화": "Basic menu active",
+            "Free 기능 연결 완료": "Free features connected",
+            "결제 관리 열기": "Open Billing Management",
+            "요금제 보기": "View Plans",
+            "관리자로 연결됨. 내부 메뉴와 전체 기능이 열렸습니다.": "Connected as admin. Internal menus and all features are unlocked.",
+            "Pro 메뉴는 Pro에서 열립니다.": "Pro menus unlock on Pro.",
+            "요금제 확인 끝.": "Plan check complete.",
+            "PSD 사용량": "PSD usage",
+            "요금제 확인 중": "Checking plan",
+            "PSD 남은 횟수": "PSD remaining",
+            "확인 중": "Checking",
+            "무료 회원": "Free member",
+            "$2 회원": "$2 member",
+            "$2 연간 회원": "$2 yearly member",
+            "$5 회원": "$5 member",
+            "$5 연간 회원": "$5 yearly member",
+            "이번 달 남음": "Left this month",
+            "올해 남음": "Left this year",
+            "제한 없음": "No limit",
+            "무제한": "Unlimited",
+            "남은 횟수 없음": "No PSD exports left",
+            "요금제와 PSD 남은 횟수를 확인 중입니다.": "Checking your plan and remaining PSD exports.",
+            "PSD 남은 횟수가 없습니다.": "No PSD exports left.",
+            "횟수 부족": "Not enough exports",
+            "로그인 필요": "Sign in required",
+            "웹 연결 필요": "Web connection required",
+            "확인 실패": "Check failed",
+            "다시 시도": "Try again",
+            "서버 확인 지연": "Server check delayed",
+            "서버 업데이트 필요": "Server update required",
+            "배포 필요": "Deploy required",
+            "서버 오류": "Server error",
+            "잠시 후": "Try later",
+            "사용량 확인 중": "Checking usage",
+            "서버 확인 중": "Checking server",
+            "Basic 필요": "Basic required",
+            "Pro 필요": "Pro required",
             "최근 실행 기록을 확인하는 중입니다.": "Checking recent run history.",
             "최근 실행 기록을 불러오는 중입니다.": "Loading recent run history.",
             "아직 기록이 없습니다.": "No records yet.",
@@ -11931,6 +12088,33 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
         const englishPhraseTranslationsByLocale = {
           es: new Map(Object.entries({
             "0 selected": "0 seleccionado",
+            "Check release notes and service notices. Settings needed for conversion quality stay inside the plugin.":
+              "Consulta las notas de version y los avisos del servicio. Los ajustes necesarios para la calidad de conversion permanecen dentro del plugin.",
+            "Clean up tiny text size, line-height, and color drifts into representative styles.":
+              "Limpia pequenas variaciones de tamano de texto, interlineado y color en estilos representativos.",
+            "Could not load notices.": "No se pudieron cargar los avisos.",
+            "Could not load notices. Check whether notices/pigma-notices.json has been uploaded to R2.":
+              "No se pudieron cargar los avisos. Comprueba si notices/pigma-notices.json se subio a R2.",
+            "Group Similar Colors": "Agrupar colores similares",
+            "Group Similar Colors. Merge very similar fill, stroke, and text colors in the selection into representative colors.":
+              "Agrupar colores similares. Unifica colores muy parecidos de relleno, trazo y texto de la seleccion en colores representativos.",
+            "Learn more": "Mas informacion",
+            "Loaded the latest notices.": "Se cargaron los avisos mas recientes.",
+            "Loading notices.": "Cargando avisos.",
+            "Merge very similar fill, stroke, and text colors in the selection into representative colors.":
+              "Unifica colores muy parecidos de relleno, trazo y texto de la seleccion en colores representativos.",
+            "Network error. Showing saved notices.": "Error de red. Mostrando avisos guardados.",
+            "No notices to show right now.": "No hay avisos para mostrar ahora.",
+            "No notices to show yet.": "Aun no hay avisos para mostrar.",
+            "Normalize Text Styles": "Normalizar estilos de texto",
+            "Normalize Text Styles. Clean up tiny text size, line-height, and color drifts into representative styles.":
+              "Normalizar estilos de texto. Limpia pequenas variaciones de tamano de texto, interlineado y color en estilos representativos.",
+            "Notices": "Avisos",
+            "Ready to load notices.": "Listo para cargar avisos.",
+            "Refresh": "Actualizar",
+            "Sign In": "Iniciar sesion",
+            "Sign in on the web to use the Pigma plugin.": "Inicia sesion en la web para usar el plugin Pigma.",
+            "Sign in required": "Inicio de sesion requerido",
             "A problem occurred while reading the SVG file.": "Se produjo un problema al leer el archivo SVG.",
             "A server processing issue occurred. Try again shortly.": "Se produjo un problema de procesamiento del servidor. Vuelve a intentarlo en breve.",
             "Accessibility Review": "Revisión de accesibilidad",
@@ -12724,6 +12908,33 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
           })),
           ja: new Map(Object.entries({
             "0 selected": "0 件が選択されました",
+            "Check release notes and service notices. Settings needed for conversion quality stay inside the plugin.":
+              "リリースノートとサービスのお知らせを確認します。変換品質に必要な設定はプラグイン内に保持されます。",
+            "Clean up tiny text size, line-height, and color drifts into representative styles.":
+              "ごく小さな文字サイズ、行間、色のずれを代表スタイルに整理します。",
+            "Could not load notices.": "お知らせを読み込めませんでした。",
+            "Could not load notices. Check whether notices/pigma-notices.json has been uploaded to R2.":
+              "お知らせを読み込めませんでした。notices/pigma-notices.json が R2 にアップロードされているか確認してください。",
+            "Group Similar Colors": "近い色をまとめる",
+            "Group Similar Colors. Merge very similar fill, stroke, and text colors in the selection into representative colors.":
+              "近い色をまとめる。選択範囲内の塗り、線、テキストの非常に近い色を代表色に統一します。",
+            "Learn more": "詳しく見る",
+            "Loaded the latest notices.": "最新のお知らせを読み込みました。",
+            "Loading notices.": "お知らせを読み込み中です。",
+            "Merge very similar fill, stroke, and text colors in the selection into representative colors.":
+              "選択範囲内の塗り、線、テキストの非常に近い色を代表色に統一します。",
+            "Network error. Showing saved notices.": "ネットワークエラーのため、保存済みのお知らせを表示しています。",
+            "No notices to show right now.": "現在表示できるお知らせはありません。",
+            "No notices to show yet.": "まだ表示できるお知らせはありません。",
+            "Normalize Text Styles": "テキストスタイルを整理",
+            "Normalize Text Styles. Clean up tiny text size, line-height, and color drifts into representative styles.":
+              "テキストスタイルを整理。ごく小さな文字サイズ、行間、色のずれを代表スタイルに整理します。",
+            "Notices": "お知らせ",
+            "Ready to load notices.": "お知らせを読み込む準備ができました。",
+            "Refresh": "更新",
+            "Sign In": "ログイン",
+            "Sign in on the web to use the Pigma plugin.": "Pigma プラグインを使用するには、先にウェブでログインしてください。",
+            "Sign in required": "ログインが必要です",
             "A problem occurred while reading the SVG file.": "SVG ファイルの読み取り中に問題が発生しました。",
             "A server processing issue occurred. Try again shortly.": "サーバー処理の問題が発生しました。しばらくしてからもう一度お試しください。",
             "Accessibility Review": "アクセシビリティのレビュー",
@@ -13515,6 +13726,33 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
           })),
           "zh-CN": new Map(Object.entries({
             "0 selected": "已选择 0 个",
+            "Check release notes and service notices. Settings needed for conversion quality stay inside the plugin.":
+              "查看发行说明和服务通知。转换质量所需的设置会保留在插件内。",
+            "Clean up tiny text size, line-height, and color drifts into representative styles.":
+              "将细微的文本大小、行高和颜色偏差整理为代表样式。",
+            "Could not load notices.": "无法加载通知。",
+            "Could not load notices. Check whether notices/pigma-notices.json has been uploaded to R2.":
+              "无法加载通知。请检查 notices/pigma-notices.json 是否已上传到 R2。",
+            "Group Similar Colors": "合并相近颜色",
+            "Group Similar Colors. Merge very similar fill, stroke, and text colors in the selection into representative colors.":
+              "合并相近颜色。将所选内容中非常相近的填充、描边和文本颜色统一为代表色。",
+            "Learn more": "了解更多",
+            "Loaded the latest notices.": "已加载最新通知。",
+            "Loading notices.": "正在加载通知。",
+            "Merge very similar fill, stroke, and text colors in the selection into representative colors.":
+              "将所选内容中非常相近的填充、描边和文本颜色统一为代表色。",
+            "Network error. Showing saved notices.": "网络错误。正在显示已保存的通知。",
+            "No notices to show right now.": "当前没有可显示的通知。",
+            "No notices to show yet.": "还没有可显示的通知。",
+            "Normalize Text Styles": "整理文本样式",
+            "Normalize Text Styles. Clean up tiny text size, line-height, and color drifts into representative styles.":
+              "整理文本样式。将细微的文本大小、行高和颜色偏差整理为代表样式。",
+            "Notices": "通知",
+            "Ready to load notices.": "已准备好加载通知。",
+            "Refresh": "刷新",
+            "Sign In": "登录",
+            "Sign in on the web to use the Pigma plugin.": "请先在网页上登录，才能使用 Pigma 插件。",
+            "Sign in required": "需要登录",
             "A problem occurred while reading the SVG file.": "读取 SVG 文件时出现问题。",
             "A server processing issue occurred. Try again shortly.": "发生服务器处理问题。稍后再试。",
             "Accessibility Review": "无障碍审查",
@@ -14434,6 +14672,75 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
           const direct = translations.get(key) || corrections.get(key);
           if (direct) {
             return direct;
+          }
+
+          const accountBasicTrial = key.match(/^(.+?)\s+·\s+Basic 체험$/);
+          if (accountBasicTrial) {
+            const planLabel = findEnglishTranslation(accountBasicTrial[1]) || accountBasicTrial[1];
+            return `${planLabel} · Basic trial`;
+          }
+
+          const accountConnectedPlan = key.match(/^(.+?)로 연결됨\.\s+요금제 확인 끝\.$/);
+          if (accountConnectedPlan) {
+            const planLabel = findEnglishTranslation(accountConnectedPlan[1]) || accountConnectedPlan[1];
+            return `${planLabel} connected. Plan check complete.`;
+          }
+
+          const basicTrialSummary = key.match(/^Basic 체험\s+(.+?)\.\s+Free 계정에서 Basic 메뉴가 열려 있어요\.$/);
+          if (basicTrialSummary) {
+            const remaining = findEnglishTranslation(basicTrialSummary[1]) || basicTrialSummary[1];
+            return `Basic trial ${remaining}. Basic menus are unlocked on the Free account.`;
+          }
+
+          const basicTrialHint = key.match(/^Basic 체험\s+(.+?)\.\s+Pro 메뉴는 Pro에서 열립니다\.$/);
+          if (basicTrialHint) {
+            const remaining = findEnglishTranslation(basicTrialHint[1]) || basicTrialHint[1];
+            return `Basic trial ${remaining}. Pro menus unlock on Pro.`;
+          }
+
+          const daysHoursRemaining = key.match(/^(\d+)일\s+(\d+)시간\s+남음$/);
+          if (daysHoursRemaining) {
+            return `${daysHoursRemaining[1]}d ${daysHoursRemaining[2]}h left`;
+          }
+
+          const daysRemaining = key.match(/^(\d+)일\s+남음$/);
+          if (daysRemaining) {
+            return `${daysRemaining[1]}d left`;
+          }
+
+          const hoursMinutesRemaining = key.match(/^(\d+)시간\s+(\d+)분\s+남음$/);
+          if (hoursMinutesRemaining) {
+            return `${hoursMinutesRemaining[1]}h ${hoursMinutesRemaining[2]}m left`;
+          }
+
+          const hoursRemaining = key.match(/^(\d+)시간\s+남음$/);
+          if (hoursRemaining) {
+            return `${hoursRemaining[1]}h left`;
+          }
+
+          const minutesRemaining = key.match(/^(\d+)분\s+남음$/);
+          if (minutesRemaining) {
+            return `${minutesRemaining[1]}m left`;
+          }
+
+          const psdRemaining = key.match(/^PSD\s+(\d+)회\s+남음$/);
+          if (psdRemaining) {
+            return `${psdRemaining[1]} PSD left`;
+          }
+
+          const usageCount = key.match(/^(\d+)회$/);
+          if (usageCount) {
+            return `${usageCount[1]} uses`;
+          }
+
+          const usageNeeded = key.match(/^(\d+)회\s+필요$/);
+          if (usageNeeded) {
+            return `${usageNeeded[1]} needed`;
+          }
+
+          const usageShortage = key.match(/^(\d+)회가\s+필요하지만\s+(\d+)회만\s+남았습니다\.$/);
+          if (usageShortage) {
+            return `${usageShortage[1]} needed, but only ${usageShortage[2]} left.`;
           }
 
           const referenceCandidateSummary = key.match(/^(.+?)\s+기준 후보\s+(\d+)개$/);
@@ -65546,6 +65853,9 @@ UPNG.encode.alphaMul = function(img, roundA) {
           billingLink: document.getElementById("pigmaWebBillingLink"),
           adminOnlyApiPanel: document.getElementById("settingsAiApiPanel"),
           adminOnlyDebugRow: document.getElementById("settingsScreenDebugRow"),
+          loginFirstModal: document.getElementById("pigmaLoginFirstModal"),
+          loginFirstModalClose: document.getElementById("pigmaLoginFirstModalClose"),
+          loginFirstModalSignIn: document.getElementById("pigmaLoginFirstModalSignIn"),
         };
 
         if (
@@ -65569,7 +65879,10 @@ UPNG.encode.alphaMul = function(img, roundA) {
           !(elements.trialState instanceof HTMLElement) ||
           !(elements.usageState instanceof HTMLElement) ||
           !(elements.quotaPolicyHint instanceof HTMLElement) ||
-          !(elements.billingLink instanceof HTMLAnchorElement)
+          !(elements.billingLink instanceof HTMLAnchorElement) ||
+          !(elements.loginFirstModal instanceof HTMLElement) ||
+          !(elements.loginFirstModalClose instanceof HTMLButtonElement) ||
+          !(elements.loginFirstModalSignIn instanceof HTMLButtonElement)
         ) {
           return;
         }
@@ -65579,6 +65892,9 @@ UPNG.encode.alphaMul = function(img, roundA) {
         let connectionPollTimer = 0;
         let connectionPollAbortController = null;
         let planRefreshTimer = 0;
+        let loginFirstModalPrompted = false;
+        let loginFirstModalDismissed = false;
+        let loginFirstModalLastFocused = null;
         const PSD_USAGE_POLICY_NOTE =
           "플랜별 기간 한도에서 PSD 파일 개수만큼 차감됩니다. 무료 체험 사용분은 유료 한도에 포함되지 않습니다. 리셋은 한국 시간 기준입니다.";
 
@@ -65691,6 +66007,69 @@ UPNG.encode.alphaMul = function(img, roundA) {
 
         const clearPassword = () => {
           elements.passwordInput.value = "";
+        };
+
+        const hasAuthenticatedWebAccount = () =>
+          Boolean(window.__PIGMA_WEB_ACCOUNT__ && window.__PIGMA_WEB_ACCOUNT__.user);
+
+        const closeLoginFirstModal = (restoreFocus = true) => {
+          elements.loginFirstModal.hidden = true;
+          elements.loginFirstModal.setAttribute("aria-hidden", "true");
+          if (
+            restoreFocus &&
+            loginFirstModalLastFocused instanceof HTMLElement &&
+            document.contains(loginFirstModalLastFocused)
+          ) {
+            loginFirstModalLastFocused.focus();
+          }
+          loginFirstModalLastFocused = null;
+        };
+
+        const showLoginFirstModal = (options = {}) => {
+          const force = options && options.force === true;
+          const allowStoredToken = options && options.allowStoredToken === true;
+          if (hasAuthenticatedWebAccount()) {
+            return;
+          }
+          if (!force && (loginFirstModalPrompted || loginFirstModalDismissed)) {
+            return;
+          }
+          if (!force && !allowStoredToken && sanitizeAccessToken(elements.accessToken.value)) {
+            return;
+          }
+
+          loginFirstModalPrompted = true;
+          loginFirstModalLastFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+          elements.loginFirstModal.hidden = false;
+          elements.loginFirstModal.setAttribute("aria-hidden", "false");
+          requestAnimationFrame(() => {
+            elements.loginFirstModalSignIn.focus();
+          });
+        };
+
+        const scheduleLoginFirstModal = (options = {}) => {
+          const force = options && options.force === true;
+          if (!force && (loginFirstModalPrompted || loginFirstModalDismissed)) {
+            return;
+          }
+          window.setTimeout(() => {
+            showLoginFirstModal(options);
+          }, force ? 0 : 250);
+        };
+
+        const dismissLoginFirstModal = () => {
+          loginFirstModalDismissed = true;
+          closeLoginFirstModal();
+        };
+
+        const continueToLoginFromModal = () => {
+          loginFirstModalDismissed = true;
+          closeLoginFirstModal(false);
+          startWebConnection();
+        };
+
+        window.__PIGMA_SHOW_LOGIN_FIRST_MODAL__ = () => {
+          scheduleLoginFirstModal({ force: true });
         };
 
         const setLoginControlsVisible = (visible) => {
@@ -66000,6 +66379,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
           elements.quotaPolicyHint.textContent = "";
           setBillingLink(currentLinks.connect || buildWebUrl("/plugin/connect"), "Google 로그인 다시 연결");
           publishPlanState(null);
+          scheduleLoginFirstModal({ allowStoredToken: true });
         };
 
         const renderAuthenticated = (data, options = {}) => {
@@ -66011,6 +66391,8 @@ UPNG.encode.alphaMul = function(img, roundA) {
             return;
           }
 
+          loginFirstModalDismissed = true;
+          closeLoginFirstModal(false);
           const planLabel = getPlanLabel(user.plan);
           const statusLabel = getStatusLabel(user.planStatus || user.plan);
           const tier = getPlanTier(user.plan);
@@ -66382,6 +66764,27 @@ UPNG.encode.alphaMul = function(img, roundA) {
           setHint("로그아웃했습니다.");
         });
 
+        elements.loginFirstModalClose.addEventListener("click", () => {
+          dismissLoginFirstModal();
+        });
+
+        elements.loginFirstModalSignIn.addEventListener("click", () => {
+          continueToLoginFromModal();
+        });
+
+        elements.loginFirstModal.addEventListener("click", (event) => {
+          if (event.target === elements.loginFirstModal) {
+            dismissLoginFirstModal();
+          }
+        });
+
+        elements.loginFirstModal.addEventListener("keydown", (event) => {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            dismissLoginFirstModal();
+          }
+        });
+
         elements.billingLink.addEventListener("click", (event) => {
           if (elements.billingLink.classList.contains("disabled")) {
             event.preventDefault();
@@ -66405,6 +66808,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
             refreshSession();
           } else {
             renderDisconnected();
+            scheduleLoginFirstModal();
           }
         });
 
@@ -66651,13 +67055,27 @@ UPNG.encode.alphaMul = function(img, roundA) {
           }
         };
 
+        const getNoticeDateLocale = () => {
+          const select = document.getElementById("uiLanguageSelect");
+          const selectedValue = select instanceof HTMLSelectElement ? select.value || "" : "";
+          const selectedLabel = select instanceof HTMLSelectElement ? select.options[select.selectedIndex]?.textContent || "" : "";
+          const selected = `${selectedValue} ${selectedLabel}`.trim().toLowerCase();
+          const fallback = String(document.documentElement.lang || navigator.language || "").toLowerCase();
+          const source = selectedValue === "auto" || selected.includes("자동") ? fallback : selected;
+          if (source.startsWith("en") || source.includes("english")) return "en-US";
+          if (source.startsWith("es") || source.includes("español") || source.includes("spanish")) return "es-ES";
+          if (source.startsWith("ja") || source.includes("日本語") || source.includes("japanese")) return "ja-JP";
+          if (source.startsWith("zh") || source.includes("简体中文") || source.includes("chinese")) return "zh-CN";
+          return "ko-KR";
+        };
+
         const formatDate = (value) => {
           const date = new Date(value || "");
           if (Number.isNaN(date.getTime())) {
             return "";
           }
           try {
-            return new Intl.DateTimeFormat("ko-KR", {
+            return new Intl.DateTimeFormat(getNoticeDateLocale(), {
               year: "numeric",
               month: "2-digit",
               day: "2-digit",
@@ -67222,6 +67640,13 @@ UPNG.encode.alphaMul = function(img, roundA) {
           loadNotices({ force: true });
         });
 
+        document.getElementById("uiLanguageSelect")?.addEventListener("change", () => {
+          const cachedItems = readCachedItems();
+          if (cachedItems.length) {
+            renderItems(cachedItems);
+          }
+        });
+
         window.setTimeout(() => {
           loadNotices();
         }, 400);
@@ -67429,6 +67854,14 @@ UPNG.encode.alphaMul = function(img, roundA) {
               label: "Clear Frame Guides",
               aria: "Clear Frame Guides. Clear all ruler guides inside the selected frames.",
             },
+            aiGroupSimilarColorsButton: {
+              label: "Group Similar Colors",
+              aria: "Group Similar Colors. Merge very similar fill, stroke, and text colors in the selection into representative colors.",
+            },
+            aiTextStyleNormalizeButton: {
+              label: "Normalize Text Styles",
+              aria: "Normalize Text Styles. Clean up tiny text size, line-height, and color drifts into representative styles.",
+            },
           },
           es: {
             aiDetachLinkedComponentsButton: {
@@ -67443,6 +67876,16 @@ UPNG.encode.alphaMul = function(img, roundA) {
             aiClearFrameGuidesButton: {
               label: "Borrar gu\u00EDas de marco",
               aria: "Borrar gu\u00EDas de marco. Borra todas las gu\u00EDas de regla dentro de los marcos seleccionados.",
+            },
+            aiGroupSimilarColorsButton: {
+              label: "Agrupar colores similares",
+              aria:
+                "Agrupar colores similares. Unifica colores muy parecidos de relleno, trazo y texto de la selecci\u00F3n en colores representativos.",
+            },
+            aiTextStyleNormalizeButton: {
+              label: "Normalizar estilos de texto",
+              aria:
+                "Normalizar estilos de texto. Limpia peque\u00F1as variaciones de tama\u00F1o de texto, interlineado y color en estilos representativos.",
             },
           },
           ja: {
@@ -67461,6 +67904,16 @@ UPNG.encode.alphaMul = function(img, roundA) {
               aria:
                 "\u30D5\u30EC\u30FC\u30E0\u30AC\u30A4\u30C9\u3092\u6D88\u53BB\u3002\u9078\u629E\u3057\u305F\u30D5\u30EC\u30FC\u30E0\u5185\u306E\u30EB\u30FC\u30E9\u30FC\u30AC\u30A4\u30C9\u3092\u3059\u3079\u3066\u6D88\u53BB\u3057\u307E\u3059\u3002",
             },
+            aiGroupSimilarColorsButton: {
+              label: "\u8FD1\u3044\u8272\u3092\u307E\u3068\u3081\u308B",
+              aria:
+                "\u8FD1\u3044\u8272\u3092\u307E\u3068\u3081\u308B\u3002\u9078\u629E\u7BC4\u56F2\u5185\u306E\u5857\u308A\u3001\u7DDA\u3001\u30C6\u30AD\u30B9\u30C8\u306E\u975E\u5E38\u306B\u8FD1\u3044\u8272\u3092\u4EE3\u8868\u8272\u306B\u7D71\u4E00\u3057\u307E\u3059\u3002",
+            },
+            aiTextStyleNormalizeButton: {
+              label: "\u30C6\u30AD\u30B9\u30C8\u30B9\u30BF\u30A4\u30EB\u3092\u6574\u7406",
+              aria:
+                "\u30C6\u30AD\u30B9\u30C8\u30B9\u30BF\u30A4\u30EB\u3092\u6574\u7406\u3002\u3054\u304F\u5C0F\u3055\u306A\u6587\u5B57\u30B5\u30A4\u30BA\u3001\u884C\u9593\u3001\u8272\u306E\u305A\u308C\u3092\u4EE3\u8868\u30B9\u30BF\u30A4\u30EB\u306B\u6574\u7406\u3057\u307E\u3059\u3002",
+            },
           },
           "zh-CN": {
             aiDetachLinkedComponentsButton: {
@@ -67477,6 +67930,16 @@ UPNG.encode.alphaMul = function(img, roundA) {
               label: "\u6E05\u9664\u6846\u67B6\u53C2\u8003\u7EBF",
               aria:
                 "\u6E05\u9664\u6846\u67B6\u53C2\u8003\u7EBF\u3002\u6E05\u9664\u6240\u9009\u6846\u67B6\u5185\u7684\u6240\u6709\u6807\u5C3A\u53C2\u8003\u7EBF\u3002",
+            },
+            aiGroupSimilarColorsButton: {
+              label: "\u5408\u5E76\u76F8\u8FD1\u989C\u8272",
+              aria:
+                "\u5408\u5E76\u76F8\u8FD1\u989C\u8272\u3002\u5C06\u6240\u9009\u5185\u5BB9\u4E2D\u975E\u5E38\u76F8\u8FD1\u7684\u586B\u5145\u3001\u63CF\u8FB9\u548C\u6587\u672C\u989C\u8272\u7EDF\u4E00\u4E3A\u4EE3\u8868\u8272\u3002",
+            },
+            aiTextStyleNormalizeButton: {
+              label: "\u6574\u7406\u6587\u672C\u6837\u5F0F",
+              aria:
+                "\u6574\u7406\u6587\u672C\u6837\u5F0F\u3002\u5C06\u7EC6\u5FAE\u7684\u6587\u672C\u5927\u5C0F\u3001\u884C\u9AD8\u548C\u989C\u8272\u504F\u5DEE\u6574\u7406\u4E3A\u4EE3\u8868\u6837\u5F0F\u3002",
             },
           },
         };
@@ -67669,6 +68132,251 @@ UPNG.encode.alphaMul = function(img, roundA) {
           return String(value || "").replace(/\s+/g, " ").trim().toLowerCase();
         }
 
+        const usageTextByLocale = {
+          en: {
+            "무료 회원": "Free member",
+            "$2 회원": "$2 member",
+            "$2 연간 회원": "$2 yearly member",
+            "$5 회원": "$5 member",
+            "$5 연간 회원": "$5 yearly member",
+            "관리자": "Admin",
+            "무료 체험": "Free trial",
+            "무료 체험 종료": "Free trial ended",
+            "이번 달 남음": "Left this month",
+            "올해 남음": "Left this year",
+            "제한 없음": "No limit",
+            "무제한": "Unlimited",
+            "확인 중": "Checking",
+            "요금제 확인 중": "Checking plan",
+            "남은 횟수 없음": "No exports left",
+            "요금제와 PSD 남은 횟수를 확인 중입니다.": "Checking your plan and remaining PSD exports.",
+            "PSD 남은 횟수가 없습니다.": "No PSD exports left.",
+            "횟수 부족": "Not enough exports",
+            "로그인 필요": "Sign in required",
+            "웹 연결 필요": "Web connection required",
+            "확인 실패": "Check failed",
+            "다시 시도": "Try again",
+            "서버 확인 지연": "Server check delayed",
+            "서버 업데이트 필요": "Server update required",
+            "배포 필요": "Deploy required",
+            "서버 오류": "Server error",
+            "잠시 후": "Try later",
+            "사용량 확인 중": "Checking usage",
+            "서버 확인 중": "Checking server",
+            "PSD 만들기": "Create PSD",
+            "레이어 선택 필요": "Select a layer",
+          },
+          es: {
+            "무료 회원": "Miembro gratis",
+            "$2 회원": "Miembro $2",
+            "$2 연간 회원": "Miembro anual $2",
+            "$5 회원": "Miembro $5",
+            "$5 연간 회원": "Miembro anual $5",
+            "관리자": "Administrador",
+            "무료 체험": "Prueba gratis",
+            "무료 체험 종료": "Prueba gratis finalizada",
+            "이번 달 남음": "Restante este mes",
+            "올해 남음": "Restante este ano",
+            "제한 없음": "Sin limite",
+            "무제한": "Ilimitado",
+            "확인 중": "Comprobando",
+            "요금제 확인 중": "Comprobando plan",
+            "남은 횟수 없음": "Sin exportaciones",
+            "요금제와 PSD 남은 횟수를 확인 중입니다.": "Comprobando tu plan y exportaciones PSD restantes.",
+            "PSD 남은 횟수가 없습니다.": "No quedan exportaciones PSD.",
+            "횟수 부족": "Exportaciones insuficientes",
+            "로그인 필요": "Inicio de sesion requerido",
+            "웹 연결 필요": "Conexion web requerida",
+            "확인 실패": "Error al comprobar",
+            "다시 시도": "Reintentar",
+            "서버 확인 지연": "Comprobacion del servidor retrasada",
+            "서버 업데이트 필요": "Actualizacion del servidor requerida",
+            "배포 필요": "Despliegue requerido",
+            "서버 오류": "Error del servidor",
+            "잠시 후": "Mas tarde",
+            "사용량 확인 중": "Comprobando uso",
+            "서버 확인 중": "Comprobando servidor",
+            "PSD 만들기": "Crear PSD",
+            "레이어 선택 필요": "Selecciona una capa",
+          },
+          ja: {
+            "무료 회원": "無料メンバー",
+            "$2 회원": "$2 メンバー",
+            "$2 연간 회원": "$2 年間メンバー",
+            "$5 회원": "$5 メンバー",
+            "$5 연간 회원": "$5 年間メンバー",
+            "관리자": "管理者",
+            "무료 체험": "無料トライアル",
+            "무료 체험 종료": "無料トライアル終了",
+            "이번 달 남음": "今月の残り",
+            "올해 남음": "今年の残り",
+            "제한 없음": "制限なし",
+            "무제한": "無制限",
+            "확인 중": "確認中",
+            "요금제 확인 중": "プラン確認中",
+            "남은 횟수 없음": "残りなし",
+            "요금제와 PSD 남은 횟수를 확인 중입니다.": "プランとPSDの残り回数を確認中です。",
+            "PSD 남은 횟수가 없습니다.": "PSDの残り回数がありません。",
+            "횟수 부족": "回数不足",
+            "로그인 필요": "ログインが必要です",
+            "웹 연결 필요": "Web接続が必要です",
+            "확인 실패": "確認失敗",
+            "다시 시도": "再試行",
+            "서버 확인 지연": "サーバー確認遅延",
+            "서버 업데이트 필요": "サーバー更新が必要",
+            "배포 필요": "デプロイが必要",
+            "서버 오류": "サーバーエラー",
+            "잠시 후": "あとで",
+            "사용량 확인 중": "使用量を確認中",
+            "서버 확인 중": "サーバー確認中",
+            "PSD 만들기": "PSDを作成",
+            "레이어 선택 필요": "レイヤーを選択",
+          },
+          "zh-CN": {
+            "무료 회원": "免费会员",
+            "$2 회원": "$2 会员",
+            "$2 연간 회원": "$2 年度会员",
+            "$5 회원": "$5 会员",
+            "$5 연간 회원": "$5 年度会员",
+            "관리자": "管理员",
+            "무료 체험": "免费试用",
+            "무료 체험 종료": "免费试用已结束",
+            "이번 달 남음": "本月剩余",
+            "올해 남음": "今年剩余",
+            "제한 없음": "无限制",
+            "무제한": "无限",
+            "확인 중": "检查中",
+            "요금제 확인 중": "正在检查套餐",
+            "남은 횟수 없음": "无剩余次数",
+            "요금제와 PSD 남은 횟수를 확인 중입니다.": "正在检查套餐和PSD剩余次数。",
+            "PSD 남은 횟수가 없습니다.": "没有剩余PSD导出次数。",
+            "횟수 부족": "次数不足",
+            "로그인 필요": "需要登录",
+            "웹 연결 필요": "需要网页连接",
+            "확인 실패": "检查失败",
+            "다시 시도": "重试",
+            "서버 확인 지연": "服务器检查延迟",
+            "서버 업데이트 필요": "需要服务器更新",
+            "배포 필요": "需要部署",
+            "서버 오류": "服务器错误",
+            "잠시 후": "稍后",
+            "사용량 확인 중": "正在检查用量",
+            "서버 확인 중": "正在检查服务器",
+            "PSD 만들기": "创建PSD",
+            "레이어 선택 필요": "请选择图层",
+          },
+        };
+
+        function normalizeUsageLocale(value) {
+          const normalized = String(value || "").toLowerCase();
+          if (normalized === "ko" || normalized.startsWith("ko ") || normalized.startsWith("ko-") || normalized.includes("한국어")) {
+            return "ko";
+          }
+          if (normalized === "en" || normalized.startsWith("en ") || normalized.startsWith("en-") || normalized.includes("english") || normalized.includes("영어")) {
+            return "en";
+          }
+          if (normalized === "es" || normalized.startsWith("es ") || normalized.startsWith("es-") || normalized.includes("spanish") || normalized.includes("español")) {
+            return "es";
+          }
+          if (normalized === "ja" || normalized.startsWith("ja ") || normalized.startsWith("ja-") || normalized.includes("japanese") || normalized.includes("日本語")) {
+            return "ja";
+          }
+          if (normalized === "zh" || normalized === "zh-cn" || normalized.startsWith("zh ") || normalized.startsWith("zh-cn") || normalized.includes("chinese") || normalized.includes("简体中文")) {
+            return "zh-CN";
+          }
+          return "";
+        }
+
+        function getUsageLocale() {
+          const select = document.getElementById("uiLanguageSelect");
+          if (select instanceof HTMLSelectElement) {
+            const value = String(select.value || "");
+            const label = select.options[select.selectedIndex]?.textContent || "";
+            const normalized = normalizeUsageLocale(`${value} ${label}`);
+            if (normalized && normalized !== "auto") {
+              return normalized;
+            }
+          }
+          return normalizeUsageLocale(document.documentElement.lang || navigator.language || "") || "ko";
+        }
+
+        function formatUsageCount(locale, count) {
+          if (locale === "ja") {
+            return `${count}回`;
+          }
+          if (locale === "zh-CN") {
+            return `${count}次`;
+          }
+          return String(count);
+        }
+
+        function translateUsageText(value) {
+          const raw = String(value ?? "");
+          const key = raw.replace(/\s+/g, " ").trim();
+          const locale = getUsageLocale();
+          if (!key || locale === "ko") {
+            return raw;
+          }
+
+          const exact = usageTextByLocale[locale]?.[key];
+          if (exact) {
+            return exact;
+          }
+
+          const psdRemaining = key.match(/^PSD\s+(\d+)회\s+남음$/);
+          if (psdRemaining) {
+            const count = psdRemaining[1];
+            if (locale === "es") return `Quedan ${count} PSD`;
+            if (locale === "ja") return `PSD 残り${count}回`;
+            if (locale === "zh-CN") return `剩余 ${count} 个 PSD`;
+            return `${count} PSD left`;
+          }
+
+          const remainingCountOnly = key.match(/^(\d+)회$/);
+          if (remainingCountOnly) {
+            return formatUsageCount(locale, remainingCountOnly[1]);
+          }
+
+          const neededCount = key.match(/^(\d+)회\s+필요$/);
+          if (neededCount) {
+            const count = neededCount[1];
+            if (locale === "es") return `Se necesitan ${count}`;
+            if (locale === "ja") return `${count}回必要`;
+            if (locale === "zh-CN") return `需要 ${count} 次`;
+            return `${count} needed`;
+          }
+
+          const shortage = key.match(/^(\d+)회가\s+필요하지만\s+(\d+)회만\s+남았습니다\.$/);
+          if (shortage) {
+            const required = shortage[1];
+            const remaining = shortage[2];
+            if (locale === "es") return `Se necesitan ${required}, pero solo quedan ${remaining}.`;
+            if (locale === "ja") return `${required}回必要ですが、残りは${remaining}回です。`;
+            if (locale === "zh-CN") return `需要 ${required} 次，但只剩 ${remaining} 次。`;
+            return `${required} needed, but only ${remaining} left.`;
+          }
+
+          if (typeof window.__PIGMA_TRANSLATE_UI_TEXT__ === "function") {
+            const translated = window.__PIGMA_TRANSLATE_UI_TEXT__(raw);
+            if (translated !== raw) {
+              return translated;
+            }
+          }
+          return raw;
+        }
+
+        function setUsageText(element, value) {
+          if (element) {
+            element.textContent = translateUsageText(value);
+          }
+        }
+
+        function setUsageTitle(element, value) {
+          if (element) {
+            element.title = translateUsageText(value);
+          }
+        }
+
         function isCreateTabActive() {
           const tab = document.getElementById("tabMain");
           const view = document.getElementById("viewMain");
@@ -67783,9 +68491,9 @@ UPNG.encode.alphaMul = function(img, roundA) {
             }
             button.disabled = true;
             button.setAttribute("aria-disabled", "true");
-            button.title = titleText;
+            setUsageTitle(button, titleText);
             if (label) {
-              label.textContent = labelText;
+              setUsageText(label, labelText);
             }
             return;
           }
@@ -67811,10 +68519,10 @@ UPNG.encode.alphaMul = function(img, roundA) {
           if (exportButtonQuotaSnapshot.title === null) {
             button.removeAttribute("title");
           } else {
-            button.title = exportButtonQuotaSnapshot.title;
+            setUsageTitle(button, exportButtonQuotaSnapshot.title);
           }
-          if (label && /확인 중|남은 횟수 없음|횟수 부족/.test(String(label.textContent || ""))) {
-            label.textContent = exportButtonQuotaSnapshot.label || (isExportSelectionReady() ? "PSD 만들기" : "레이어 선택 필요");
+          if (label) {
+            setUsageText(label, exportButtonQuotaSnapshot.label || (isExportSelectionReady() ? "PSD 만들기" : "레이어 선택 필요"));
           }
           exportButtonQuotaSnapshot = null;
         }
@@ -68680,9 +69388,9 @@ UPNG.encode.alphaMul = function(img, roundA) {
           if (!plan && !usage) {
             bar.dataset.currentPlan = "unknown";
             bar.dataset.quotaEmpty = "false";
-            planLabel.textContent = "요금제 확인 중";
-            remainingCount.textContent = "-";
-            cycleLabel.textContent = "확인 중";
+            setUsageText(planLabel, "요금제 확인 중");
+            setUsageText(remainingCount, "-");
+            setUsageText(cycleLabel, "확인 중");
             updateExportButtonQuotaState(true, {
               pending: true,
               label: "확인 중",
@@ -68703,9 +69411,10 @@ UPNG.encode.alphaMul = function(img, roundA) {
 
           bar.dataset.currentPlan = activePlan.id;
           bar.dataset.quotaEmpty = isEmpty || isInsufficient ? "true" : "false";
-          planLabel.textContent = usage ? usage.label : activePlan.label;
-          remainingCount.textContent = usage && usage.unlimited ? "무제한" : remaining !== null ? `${remaining}회` : "-";
-          cycleLabel.textContent =
+          setUsageText(planLabel, usage ? usage.label : activePlan.label);
+          setUsageText(remainingCount, usage && usage.unlimited ? "무제한" : remaining !== null ? `${remaining}회` : "-");
+          setUsageText(
+            cycleLabel,
             usage && usage.unlimited
               ? "제한 없음"
               : isInsufficient
@@ -68714,7 +69423,8 @@ UPNG.encode.alphaMul = function(img, roundA) {
                   ? "남은 횟수 없음"
                   : usage && usage.provisional
                     ? "서버 확인 중"
-                    : activePlan.cycleLabel;
+                    : activePlan.cycleLabel
+          );
           updateExportButtonQuotaState(
             isBlocked,
             isChecking
@@ -68743,37 +69453,40 @@ UPNG.encode.alphaMul = function(img, roundA) {
           bar.dataset.quotaEmpty = "true";
           if (reason === "auth") {
             bar.dataset.currentPlan = "unknown";
-            planLabel.textContent = "로그인 필요";
-            remainingCount.textContent = "-";
-            cycleLabel.textContent = "웹 연결 필요";
+            setUsageText(planLabel, "로그인 필요");
+            setUsageText(remainingCount, "-");
+            setUsageText(cycleLabel, "웹 연결 필요");
+            if (typeof window.__PIGMA_SHOW_LOGIN_FIRST_MODAL__ === "function") {
+              window.__PIGMA_SHOW_LOGIN_FIRST_MODAL__();
+            }
             return;
           }
           if (reason === "unknown") {
             bar.dataset.currentPlan = "unknown";
-            planLabel.textContent = "확인 실패";
-            remainingCount.textContent = "-";
-            cycleLabel.textContent = "다시 시도";
+            setUsageText(planLabel, "확인 실패");
+            setUsageText(remainingCount, "-");
+            setUsageText(cycleLabel, "다시 시도");
             return;
           }
           if (reason === "timeout") {
             bar.dataset.currentPlan = "unknown";
-            planLabel.textContent = "서버 확인 지연";
-            remainingCount.textContent = "-";
-            cycleLabel.textContent = "다시 시도";
+            setUsageText(planLabel, "서버 확인 지연");
+            setUsageText(remainingCount, "-");
+            setUsageText(cycleLabel, "다시 시도");
             return;
           }
           if (reason === "missing") {
             bar.dataset.currentPlan = "unknown";
-            planLabel.textContent = "서버 업데이트 필요";
-            remainingCount.textContent = "-";
-            cycleLabel.textContent = "배포 필요";
+            setUsageText(planLabel, "서버 업데이트 필요");
+            setUsageText(remainingCount, "-");
+            setUsageText(cycleLabel, "배포 필요");
             return;
           }
           if (reason === "server") {
             bar.dataset.currentPlan = "unknown";
-            planLabel.textContent = "서버 오류";
-            remainingCount.textContent = "-";
-            cycleLabel.textContent = "잠시 후";
+            setUsageText(planLabel, "서버 오류");
+            setUsageText(remainingCount, "-");
+            setUsageText(cycleLabel, "잠시 후");
             return;
           }
           renderUsageBar();
@@ -68817,8 +69530,8 @@ UPNG.encode.alphaMul = function(img, roundA) {
           syncBarVisibility();
           bar.dataset.currentPlan = "checking";
           bar.dataset.quotaEmpty = "false";
-          planLabel.textContent = "사용량 확인 중";
-          cycleLabel.textContent = "서버 확인 중";
+          setUsageText(planLabel, "사용량 확인 중");
+          setUsageText(cycleLabel, "서버 확인 중");
           try {
             const chargeAmount = getPsdChargeAmount();
             let preparedReservation = claimPreparedUsageReservation(chargeAmount);
@@ -69013,6 +69726,13 @@ UPNG.encode.alphaMul = function(img, roundA) {
             schedule();
             void fetchRemoteUsage(false);
           }
+        });
+
+        document.getElementById("uiLanguageSelect")?.addEventListener("change", () => {
+          renderUsageBar();
+          schedule();
+          setTimeout(renderUsageBar, 0);
+          setTimeout(schedule, 120);
         });
 
         window.addEventListener("message", (event) => {
