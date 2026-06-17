@@ -113,7 +113,7 @@ Recommended notice JSON shape:
     "minimumSupported": "2.8.0",
     "channel": "stable",
     "message": "Latest public build is available from the Figma Community listing.",
-    "communityUrl": "https://www.figma.com/community/plugin/1645743599892655504"
+    "communityUrl": "https://www.figma.com/community/plugin/1648522749593358950"
   },
   "items": [
     {
