@@ -15060,6 +15060,27 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
           return translated ? withOriginalSpacing(raw, translated) : raw;
         }
 
+        const spanishTopTabLabels = new Map(
+          Object.entries({
+            tabMain: "Crear",
+            tabImport: "Importar",
+            tabAi: "Editar",
+            tabSettings: "Ajustes",
+          })
+        );
+
+        function applyCompactSpanishTopTabs() {
+          if (getActiveUiLocale() !== "es") {
+            return;
+          }
+          spanishTopTabLabels.forEach((label, id) => {
+            const tab = document.getElementById(id);
+            if (tab instanceof HTMLElement && normalize(tab.textContent) !== label) {
+              tab.textContent = label;
+            }
+          });
+        }
+
         const stableAiCorrectionActions = new Map(Object.entries({
           aiDetachLinkedComponentsButton: {
             label: "\uC5F0\uACB0\uB41C \uCEF4\uD3EC\uB10C\uD2B8 \uD574\uC81C",
@@ -15302,6 +15323,7 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
             document.querySelectorAll("*").forEach((element) => {
               applyElementAttributes(element);
             });
+            applyCompactSpanishTopTabs();
             applyStableAiCorrectionActionLocalization();
           } finally {
             isApplying = false;
