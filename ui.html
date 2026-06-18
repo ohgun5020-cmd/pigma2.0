@@ -66724,9 +66724,6 @@ UPNG.encode.alphaMul = function(img, roundA) {
         let loginFirstModalLastFocused = null;
         const PSD_USAGE_POLICY_NOTE =
           "무료 계정은 계정당 총 5회까지 PSD를 만들 수 있습니다. 유료 월간은 월 단위, 유료 연간은 연 단위로 PSD 파일 개수만큼 차감됩니다.";
-        const FREE_ACCOUNT_BETA_PERIOD_ACTIVE = true;
-        const FREE_BETA_PSD_USAGE_NOTE = "무료 베타 기간에는 PSD 만들기를 무제한으로 사용할 수 있습니다.";
-        window.__PIGMA_FREE_ACCOUNT_BETA_ACTIVE__ = FREE_ACCOUNT_BETA_PERIOD_ACTIVE;
 
         const postPluginMessage = (message) => {
           parent.postMessage({ pluginMessage: message }, "*");
@@ -67051,7 +67048,6 @@ UPNG.encode.alphaMul = function(img, roundA) {
         const resolveEntitlementAccess = (tier, entitlement) => {
           const paidTier = clampPlanTier(tier);
           const legacyEffectiveTier = readEntitlementTier(entitlement, ["effectiveTier"]);
-          const freeAccountBetaTier = paidTier === 0 && FREE_ACCOUNT_BETA_PERIOD_ACTIVE ? 2 : null;
           const betaTier = readEntitlementTier(entitlement, [
             "nonAiEffectiveTier",
             "nonAiTier",
@@ -67061,15 +67057,12 @@ UPNG.encode.alphaMul = function(img, roundA) {
           ]);
           const nonAiBetaActive =
             (paidTier === 0 &&
-              (freeAccountBetaTier !== null ||
-                betaTier !== null ||
-                (legacyEffectiveTier !== null && legacyEffectiveTier > paidTier))) ||
+              (betaTier !== null || (legacyEffectiveTier !== null && legacyEffectiveTier > paidTier))) ||
             readEntitlementFlag(entitlement, ["nonAiBetaActive", "freeBetaActive", "betaActive", "trialActive"]);
           const nonAiEffectiveTier = Math.max(
             paidTier,
             betaTier !== null ? betaTier : 0,
-            legacyEffectiveTier !== null ? legacyEffectiveTier : 0,
-            freeAccountBetaTier !== null ? freeAccountBetaTier : 0
+            legacyEffectiveTier !== null ? legacyEffectiveTier : 0
           );
           const explicitAiTier = readEntitlementTier(entitlement, ["aiEffectiveTier", "aiTier"]);
           const aiEffectiveTier = explicitAiTier !== null ? explicitAiTier : paidTier;
@@ -67090,23 +67083,28 @@ UPNG.encode.alphaMul = function(img, roundA) {
           };
         };
 
-        const shouldEnableFreeBetaPsdUnlimited = (tier, access) =>
-          Boolean(access && access.nonAiBetaActive && clampPlanTier(tier) === 0);
+        const hasServerFreeBetaPsdUsage = (usage = null) =>
+          Boolean(usage && typeof usage === "object" && usage.freeBetaUnlimited === true);
 
-        const createFreeBetaPsdUsage = (usage = null) => {
+        const normalizeServerPsdUsage = (usage = null) => {
+          if (!usage || typeof usage !== "object") {
+            return null;
+          }
+          if (!hasServerFreeBetaPsdUsage(usage)) {
+            return usage;
+          }
           const base = usage && typeof usage === "object" ? usage : {};
           return {
             ...base,
             plan: base.plan || "free",
-            planLabel: "무료 베타",
-            label: "무료 베타",
+            planLabel: base.planLabel || base.label || "무료 베타",
+            label: base.label || base.planLabel || "무료 베타",
             limit: null,
-            used: 0,
+            used: Number.isFinite(Number(base.used)) ? Number(base.used) : 0,
             remaining: null,
             period: base.period || "lifetime",
             unlimited: true,
             freeBetaUnlimited: true,
-            policyNote: FREE_BETA_PSD_USAGE_NOTE,
           };
         };
 
@@ -67195,8 +67193,8 @@ UPNG.encode.alphaMul = function(img, roundA) {
           const adminPlanActive = isAdminPlan(user, entitlement);
           const serverAiEnabled = Boolean(user && access.serverAiEnabled);
           const rawPsdUsage = user && user.psdUsage ? user.psdUsage : null;
-          const freeBetaPsdUnlimited = Boolean(user && shouldEnableFreeBetaPsdUnlimited(tier, access));
-          const psdUsage = freeBetaPsdUnlimited ? createFreeBetaPsdUsage(rawPsdUsage) : rawPsdUsage;
+          const psdUsage = normalizeServerPsdUsage(rawPsdUsage);
+          const freeBetaPsdUnlimited = Boolean(psdUsage && psdUsage.freeBetaUnlimited === true);
           const accountPayload =
             user && psdUsage !== rawPsdUsage
               ? {
@@ -67308,9 +67306,8 @@ UPNG.encode.alphaMul = function(img, roundA) {
             : planStatusValue && !planStatusIsPlanName
                 ? `${planLabel} · ${statusLabel}`
                 : planLabel;
-          const freeBetaPsdUnlimited = shouldEnableFreeBetaPsdUnlimited(tier, access);
           const rawPsdUsage = user.psdUsage && typeof user.psdUsage === "object" ? user.psdUsage : null;
-          const psdUsage = freeBetaPsdUnlimited ? createFreeBetaPsdUsage(rawPsdUsage) : rawPsdUsage;
+          const psdUsage = normalizeServerPsdUsage(rawPsdUsage);
           const psdPolicyNote =
             psdUsage && typeof psdUsage.policyNote === "string" && psdUsage.policyNote.trim()
               ? psdUsage.policyNote.trim()
@@ -69635,14 +69632,6 @@ UPNG.encode.alphaMul = function(img, roundA) {
           return window.__PIGMA_WEB_PLAN__ && typeof window.__PIGMA_WEB_PLAN__ === "object" ? window.__PIGMA_WEB_PLAN__ : null;
         }
 
-        function isFreeAccountBetaPeriodActive() {
-          return Boolean(
-            window.__PIGMA_FREE_ACCOUNT_BETA_ACTIVE__ === true ||
-              root.dataset.pigmaWebFreeBetaPsd === "true" ||
-              root.dataset.pigmaWebNonAiBeta === "true"
-          );
-        }
-
         function isFreeBetaPsdUnlimited() {
           if (root.dataset.pigmaWebFreeBetaPsd === "true") {
             return true;
@@ -69657,19 +69646,15 @@ UPNG.encode.alphaMul = function(img, roundA) {
             return true;
           }
 
-          const paidTier = Number(
-            publishedPlan && publishedPlan.paidTier !== undefined ? publishedPlan.paidTier : publishedPlan && publishedPlan.tier
-          );
-          const rootPaidTier = Number(root.dataset.pigmaWebPlanTier || 0);
-          const betaActive = Boolean(
-            isFreeAccountBetaPeriodActive() || (publishedPlan && publishedPlan.nonAiBetaActive === true)
-          );
-          const isFreeAccount = Number.isFinite(paidTier) ? paidTier === 0 : rootPaidTier === 0;
-          return betaActive && isFreeAccount && (hasKnownAccount() || hasQuotaAuth());
+          if (remoteUsage && remoteUsage.freeBetaUnlimited === true) {
+            return true;
+          }
+
+          return false;
         }
 
         function createUnlimitedUsage(plan, options = {}) {
-          const freeBetaUnlimited = Boolean((options && options.freeBeta === true) || isFreeBetaPsdUnlimited());
+          const freeBetaUnlimited = Boolean(options && options.freeBeta === true);
           const activePlan = freeBetaUnlimited ? plans.free : plan && plan.id === "admin" ? plan : plans.admin;
           return {
             plan: activePlan.id,
@@ -69896,7 +69881,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
             return null;
           }
 
-          const freeBetaUnlimited = isFreeBetaPsdUnlimited();
+          const freeBetaUnlimited = source.freeBetaUnlimited === true;
           const planId = normalizePlanId(source.plan || source.id);
           const fallbackPlan = freeBetaUnlimited ? plans.free : plans[planId] || getCurrentPlan() || plans.free;
           const unlimited = freeBetaUnlimited || source.unlimited === true || source.limit === null || fallbackPlan.total === null;
@@ -70039,9 +70024,6 @@ UPNG.encode.alphaMul = function(img, roundA) {
 
         async function fetchRemoteUsage(force = false, options = {}) {
           const strict = Boolean(options && options.strict);
-          if (isFreeBetaPsdUnlimited()) {
-            return applyRemoteUsage(createUnlimitedUsage(getCurrentPlan(), { freeBeta: true }), { skipCache: true });
-          }
 
           const settings = readAuthSettings();
           const url = getUsageLink("psdUsage", "/api/plugin/psd-usage");
@@ -70131,6 +70113,9 @@ UPNG.encode.alphaMul = function(img, roundA) {
             if (!payload || payload.authKey !== authKey || !payload.usage) {
               return null;
             }
+            if (payload.usage.freeBetaUnlimited === true) {
+              return null;
+            }
             const savedAt = Number(payload.savedAt);
             if (!Number.isFinite(savedAt) || Date.now() - savedAt > PSD_USAGE_CACHE_TTL_MS) {
               return null;
@@ -70145,6 +70130,10 @@ UPNG.encode.alphaMul = function(img, roundA) {
           try {
             const authKey = getUsageCacheAuthKey();
             if (!authKey || !usage) {
+              return;
+            }
+            if (usage.freeBetaUnlimited === true) {
+              clearCachedUsage();
               return;
             }
             window.localStorage.setItem(
@@ -70179,11 +70168,6 @@ UPNG.encode.alphaMul = function(img, roundA) {
 
         async function postUsageEvent(linkKey, fallbackPath, body, options = {}) {
           const strict = Boolean(options && options.strict);
-          if (isFreeBetaPsdUnlimited()) {
-            return {
-              usage: createUnlimitedUsage(getCurrentPlan(), { freeBeta: true }),
-            };
-          }
 
           const bypassInFlight = Boolean(options && options.bypassInFlight);
           const deferUsageApply = Boolean(options && options.deferUsageApply);
@@ -70455,9 +70439,9 @@ UPNG.encode.alphaMul = function(img, roundA) {
         function renderUsageBar() {
           const plan = getCurrentPlan();
           const usage =
-            (isFreeBetaPsdUnlimited() ? createUnlimitedUsage(plan, { freeBeta: true }) : null) ||
             remoteUsage ||
             syncSessionUsage() ||
+            (isFreeBetaPsdUnlimited() ? createUnlimitedUsage(plan, { freeBeta: true }) : null) ||
             (hasKnownUnlimitedQuota() ? createUnlimitedUsage(plan) : null) ||
             (plan ? readExplicitUsage(plan) : null) ||
             createPlanFallbackUsage(plan);
