@@ -66724,6 +66724,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
         let loginFirstModalLastFocused = null;
         const PSD_USAGE_POLICY_NOTE =
           "무료 계정은 계정당 총 5회까지 PSD를 만들 수 있습니다. 유료 월간은 월 단위, 유료 연간은 연 단위로 PSD 파일 개수만큼 차감됩니다.";
+        const FREE_BETA_PSD_USAGE_NOTE = "무료 베타 기간에는 PSD 만들기를 무제한으로 사용할 수 있습니다.";
 
         const postPluginMessage = (message) => {
           parent.postMessage({ pluginMessage: message }, "*");
@@ -67081,6 +67082,26 @@ UPNG.encode.alphaMul = function(img, roundA) {
           };
         };
 
+        const shouldEnableFreeBetaPsdUnlimited = (tier, access) =>
+          Boolean(access && access.nonAiBetaActive && clampPlanTier(tier) === 0);
+
+        const createFreeBetaPsdUsage = (usage = null) => {
+          const base = usage && typeof usage === "object" ? usage : {};
+          return {
+            ...base,
+            plan: base.plan || "free",
+            planLabel: "무료 베타",
+            label: "무료 베타",
+            limit: null,
+            used: 0,
+            remaining: null,
+            period: base.period || "lifetime",
+            unlimited: true,
+            freeBetaUnlimited: true,
+            policyNote: FREE_BETA_PSD_USAGE_NOTE,
+          };
+        };
+
         const setTrialState = (visible, message, tone = "active") => {
           elements.trialRow.hidden = !visible;
           elements.trialRow.setAttribute("aria-hidden", visible ? "false" : "true");
@@ -67165,6 +67186,19 @@ UPNG.encode.alphaMul = function(img, roundA) {
           const isAdmin = isAdminAccount(user);
           const adminPlanActive = isAdminPlan(user, entitlement);
           const serverAiEnabled = Boolean(user && access.serverAiEnabled);
+          const rawPsdUsage = user && user.psdUsage ? user.psdUsage : null;
+          const freeBetaPsdUnlimited = Boolean(user && shouldEnableFreeBetaPsdUnlimited(tier, access));
+          const psdUsage = freeBetaPsdUnlimited ? createFreeBetaPsdUsage(rawPsdUsage) : rawPsdUsage;
+          const accountPayload =
+            user && psdUsage !== rawPsdUsage
+              ? {
+                  ...(payload || {}),
+                  user: {
+                    ...user,
+                    psdUsage,
+                  },
+                }
+              : payload || null;
           root.dataset.pigmaWebPlan = plan;
           root.dataset.pigmaWebPlanTier = String(tier);
           root.dataset.pigmaWebEffectiveTier = String(effectiveTier);
@@ -67173,7 +67207,9 @@ UPNG.encode.alphaMul = function(img, roundA) {
           root.dataset.pigmaWebAdmin = isAdmin ? "true" : "false";
           root.dataset.pigmaWebServerAi = serverAiEnabled ? "true" : "false";
           root.dataset.pigmaWebNonAiBeta = access.nonAiBetaActive ? "true" : "false";
-          window.__PIGMA_WEB_ACCOUNT__ = payload || null;
+          root.dataset.pigmaWebFreeBetaPsd = freeBetaPsdUnlimited ? "true" : "false";
+          root.dataset.pigmaWebPsdUnlimited = psdUsage && psdUsage.unlimited ? "true" : "false";
+          window.__PIGMA_WEB_ACCOUNT__ = accountPayload;
           window.__PIGMA_WEB_PLAN__ = {
             plan,
             tier,
@@ -67193,7 +67229,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
             hasProPlan: tier >= 2,
             isAdmin,
             adminPlanActive,
-            psdUsage: user && user.psdUsage ? user.psdUsage : null,
+            psdUsage,
           };
           window.dispatchEvent(
             new CustomEvent("pigma:web-account-changed", {
@@ -67264,14 +67300,18 @@ UPNG.encode.alphaMul = function(img, roundA) {
             : planStatusValue && !planStatusIsPlanName
                 ? `${planLabel} · ${statusLabel}`
                 : planLabel;
-          const psdUsage = user.psdUsage && typeof user.psdUsage === "object" ? user.psdUsage : null;
+          const freeBetaPsdUnlimited = shouldEnableFreeBetaPsdUnlimited(tier, access);
+          const rawPsdUsage = user.psdUsage && typeof user.psdUsage === "object" ? user.psdUsage : null;
+          const psdUsage = freeBetaPsdUnlimited ? createFreeBetaPsdUsage(rawPsdUsage) : rawPsdUsage;
           const psdPolicyNote =
             psdUsage && typeof psdUsage.policyNote === "string" && psdUsage.policyNote.trim()
               ? psdUsage.policyNote.trim()
               : PSD_USAGE_POLICY_NOTE;
           const psdUsageText = psdUsage
             ? psdUsage.unlimited
-              ? "PSD 무제한"
+              ? psdUsage.freeBetaUnlimited
+                ? "베타 PSD 무제한"
+                : "PSD 무제한"
               : `PSD ${Number(psdUsage.remaining || 0)}회 남음`
             : "";
           setLoginControlsVisible(false);
@@ -68621,18 +68661,21 @@ UPNG.encode.alphaMul = function(img, roundA) {
           if (button.closest("#aiDesignChatGroup")) {
             return 2;
           }
+          const designAssistAction = button.dataset ? button.dataset.designAssistAction : "";
+          if (proDesignAssistActions.has(designAssistAction)) {
+            return 2;
+          }
           const action = button.dataset ? button.dataset.aiAction : "";
+          if (!aiActions.has(action)) {
+            return 0;
+          }
           if (proActions.has(action)) {
             return 2;
           }
           if (basicActions.has(action)) {
             return 1;
           }
-          const designAssistAction = button.dataset ? button.dataset.designAssistAction : "";
-          if (proDesignAssistActions.has(designAssistAction)) {
-            return 2;
-          }
-          return 0;
+          return 2;
         };
 
         const getEffectiveTierForButton = (button) => (isAiFeatureButton(button) ? getAiEffectiveTier() : getNonAiEffectiveTier());
@@ -69100,6 +69143,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
             "계정 전체 남음": "Left across account",
             "무료 체험": "Free trial",
             "무료 체험 종료": "Free trial ended",
+            "무료 베타": "Free beta",
             "이번 달 남음": "Left this month",
             "올해 남음": "Left this year",
             "제한 없음": "No limit",
@@ -69135,6 +69179,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
             "계정 전체 남음": "Restante por cuenta",
             "무료 체험": "Prueba gratis",
             "무료 체험 종료": "Prueba gratis finalizada",
+            "무료 베타": "Beta gratis",
             "이번 달 남음": "Restante este mes",
             "올해 남음": "Restante este ano",
             "제한 없음": "Sin limite",
@@ -69170,6 +69215,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
             "계정 전체 남음": "アカウント全体の残り",
             "무료 체험": "無料トライアル",
             "무료 체험 종료": "無料トライアル終了",
+            "무료 베타": "無料ベータ",
             "이번 달 남음": "今月の残り",
             "올해 남음": "今年の残り",
             "제한 없음": "制限なし",
@@ -69205,6 +69251,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
             "계정 전체 남음": "账号总剩余",
             "무료 체험": "免费试用",
             "무료 체험 종료": "免费试用已结束",
+            "무료 베타": "免费测试",
             "이번 달 남음": "本月剩余",
             "올해 남음": "今年剩余",
             "제한 없음": "无限制",
@@ -69580,18 +69627,41 @@ UPNG.encode.alphaMul = function(img, roundA) {
           return window.__PIGMA_WEB_PLAN__ && typeof window.__PIGMA_WEB_PLAN__ === "object" ? window.__PIGMA_WEB_PLAN__ : null;
         }
 
-        function createUnlimitedUsage(plan) {
-          const activePlan = plan && plan.id === "admin" ? plan : plans.admin;
+        function isFreeBetaPsdUnlimited() {
+          const publishedPlan = getPublishedPlan();
+          const psdUsage =
+            publishedPlan && publishedPlan.psdUsage && typeof publishedPlan.psdUsage === "object"
+              ? publishedPlan.psdUsage
+              : null;
+          if (psdUsage && psdUsage.freeBetaUnlimited === true) {
+            return true;
+          }
+
+          const paidTier = Number(
+            publishedPlan && publishedPlan.paidTier !== undefined ? publishedPlan.paidTier : publishedPlan && publishedPlan.tier
+          );
+          const rootPaidTier = Number(root.dataset.pigmaWebPlanTier || 0);
+          const betaActive = Boolean(
+            (publishedPlan && publishedPlan.nonAiBetaActive === true) || root.dataset.pigmaWebNonAiBeta === "true"
+          );
+          const isFreeAccount = Number.isFinite(paidTier) ? paidTier === 0 : rootPaidTier === 0;
+          return betaActive && isFreeAccount;
+        }
+
+        function createUnlimitedUsage(plan, options = {}) {
+          const freeBetaUnlimited = Boolean((options && options.freeBeta === true) || isFreeBetaPsdUnlimited());
+          const activePlan = freeBetaUnlimited ? plans.free : plan && plan.id === "admin" ? plan : plans.admin;
           return {
             plan: activePlan.id,
-            label: activePlan.label,
+            label: freeBetaUnlimited ? "무료 베타" : activePlan.label,
             limit: null,
             used: 0,
             remaining: null,
-            period: activePlan.period,
+            period: freeBetaUnlimited ? "lifetime" : activePlan.period,
             periodKey: "",
             resetsAt: "",
             unlimited: true,
+            freeBetaUnlimited,
           };
         }
 
@@ -69622,6 +69692,10 @@ UPNG.encode.alphaMul = function(img, roundA) {
         }
 
         function hasKnownUnlimitedQuota() {
+          if (isFreeBetaPsdUnlimited()) {
+            return true;
+          }
+
           if (remoteUsage && remoteUsage.unlimited) {
             return true;
           }
@@ -69659,6 +69733,9 @@ UPNG.encode.alphaMul = function(img, roundA) {
             const planId = normalizePlanId(publishedPlan.plan);
             if (plans[planId] && (planId !== "free" || hasKnownAccount())) {
               return plans[planId];
+            }
+            if (isFreeBetaPsdUnlimited()) {
+              return plans.free;
             }
             const planFromTier = getPlanByTier(publishedPlan.effectiveTier);
             if (planFromTier && (planFromTier.id !== "free" || hasKnownAccount())) {
@@ -69799,12 +69876,13 @@ UPNG.encode.alphaMul = function(img, roundA) {
             return null;
           }
 
+          const freeBetaUnlimited = isFreeBetaPsdUnlimited();
           const planId = normalizePlanId(source.plan || source.id);
-          const fallbackPlan = plans[planId] || getCurrentPlan() || plans.free;
-          const unlimited = source.unlimited === true || source.limit === null || fallbackPlan.total === null;
+          const fallbackPlan = freeBetaUnlimited ? plans.free : plans[planId] || getCurrentPlan() || plans.free;
+          const unlimited = freeBetaUnlimited || source.unlimited === true || source.limit === null || fallbackPlan.total === null;
           const rawLimit = source.limit !== undefined ? source.limit : source.total;
           const limit = unlimited ? null : clampNumber(rawLimit !== undefined ? rawLimit : fallbackPlan.total, 1, 100000);
-          const used = clampNumber(source.used, 0, limit === null ? 100000 : limit) || 0;
+          const used = freeBetaUnlimited ? 0 : clampNumber(source.used, 0, limit === null ? 100000 : limit) || 0;
           let remaining = unlimited ? null : clampNumber(source.remaining, 0, limit === null ? 100000 : limit);
           if (remaining === null && limit !== null) {
             remaining = Math.max(0, limit - used);
@@ -69812,21 +69890,24 @@ UPNG.encode.alphaMul = function(img, roundA) {
 
           return {
             plan: fallbackPlan.id,
-            label: String(source.planLabel || fallbackPlan.label),
+            label: freeBetaUnlimited ? "무료 베타" : String(source.planLabel || source.label || fallbackPlan.label),
             limit,
             used,
             remaining,
             period:
-              source.period === "lifetime" || source.cycle === "lifetime" || fallbackPlan.period === "lifetime"
+              freeBetaUnlimited
                 ? "lifetime"
-                : source.period === "year" || source.cycle === "year" || fallbackPlan.period === "year"
-                ? "year"
-                : source.period === "day" || source.cycle === "day" || fallbackPlan.period === "day"
-                  ? "day"
-                  : "month",
+                : source.period === "lifetime" || source.cycle === "lifetime" || fallbackPlan.period === "lifetime"
+                  ? "lifetime"
+                  : source.period === "year" || source.cycle === "year" || fallbackPlan.period === "year"
+                    ? "year"
+                    : source.period === "day" || source.cycle === "day" || fallbackPlan.period === "day"
+                      ? "day"
+                      : "month",
             periodKey: String(source.periodKey || ""),
             resetsAt: String(source.resetsAt || ""),
             unlimited,
+            freeBetaUnlimited,
             provisional: source.provisional === true,
           };
         }
@@ -69938,6 +70019,10 @@ UPNG.encode.alphaMul = function(img, roundA) {
 
         async function fetchRemoteUsage(force = false, options = {}) {
           const strict = Boolean(options && options.strict);
+          if (isFreeBetaPsdUnlimited()) {
+            return applyRemoteUsage(createUnlimitedUsage(getCurrentPlan(), { freeBeta: true }), { skipCache: true });
+          }
+
           const settings = readAuthSettings();
           const url = getUsageLink("psdUsage", "/api/plugin/psd-usage");
           if (!settings.accessToken || !url) {
@@ -70074,6 +70159,12 @@ UPNG.encode.alphaMul = function(img, roundA) {
 
         async function postUsageEvent(linkKey, fallbackPath, body, options = {}) {
           const strict = Boolean(options && options.strict);
+          if (isFreeBetaPsdUnlimited()) {
+            return {
+              usage: createUnlimitedUsage(getCurrentPlan(), { freeBeta: true }),
+            };
+          }
+
           const bypassInFlight = Boolean(options && options.bypassInFlight);
           const deferUsageApply = Boolean(options && options.deferUsageApply);
           const settings = readAuthSettings();
@@ -70344,6 +70435,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
         function renderUsageBar() {
           const plan = getCurrentPlan();
           const usage =
+            (isFreeBetaPsdUnlimited() ? createUnlimitedUsage(plan, { freeBeta: true }) : null) ||
             remoteUsage ||
             syncSessionUsage() ||
             (hasKnownUnlimitedQuota() ? createUnlimitedUsage(plan) : null) ||
@@ -70636,10 +70728,15 @@ UPNG.encode.alphaMul = function(img, roundA) {
             "data-psd-remaining",
             "data-psd-used",
             "data-psd-limit",
+            "data-psd-unlimited",
             "data-psd-usage-period",
             "data-pigma-web-effective-tier",
+            "data-pigma-web-non-ai-effective-tier",
             "data-pigma-web-plan-tier",
             "data-pigma-web-plan",
+            "data-pigma-web-non-ai-beta",
+            "data-pigma-web-free-beta-psd",
+            "data-pigma-web-psd-unlimited",
           ],
         });
         observer.observe(document.body, {

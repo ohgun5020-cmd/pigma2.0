@@ -236,8 +236,9 @@ Free beta access is for non-AI features only. Do not treat a beta `effectiveTier
 - Account state should publish separate `nonAiEffectiveTier` and `aiEffectiveTier` values.
 - Feature gating should use `nonAiEffectiveTier` for local editing tools and `aiEffectiveTier` for tools that call OpenAI, Gemini, or Pigma server AI.
 - Server AI checks should rely on `serverAiEnabled`, not `effectiveTier >= 2`.
+- Free beta should treat PSD creation/export quota as unlimited for the free account while the beta is active.
 - Current Edit-tab AI actions are: `typo-audit`, `typo-fix`, `translate`, `read-design`, `design-consistency`, `design-consistency-clear`, `image-text-feasibility`, `color-extract`, `image-reference-search`, `image-composite`, `image-gpt-rerender`, `image-prompt-edit`, `image-extend`, `ai-video-generate`, the design-assist actions, and the hidden AI design chat controls.
-- Local Edit-tab tools such as `pixel-perfect`, `image-sharpen`, `image-auto-tone`, `image-merge`, video GIF/APNG conversion, layer cleanup, text highlight, and text style/line-height cleanup should stay eligible for non-AI beta access.
+- Local Edit-tab tools such as `pixel-perfect`, `image-sharpen`, `image-auto-tone`, `image-merge`, video GIF/APNG conversion, layer cleanup, text highlight, and text style/line-height cleanup do not call AI and should remain usable on the Free tier.
 
 ### PSD Shadow Export Note
 
