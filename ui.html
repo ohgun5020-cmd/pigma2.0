@@ -11925,6 +11925,10 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
             "서버 확인 중": "Checking server",
             "Basic 필요": "Basic required",
             "Pro 필요": "Pro required",
+            "GPT 2.0 재렌더링": "GPT 2.0 Rerender",
+            "GPT 2.0 이미지 재렌더링": "GPT 2.0 Image Rerender",
+            "GPT 2.0 이미지 재렌더링. 선택한 프레임이나 이미지를 기준으로 흐릿한 AI 이미지를 다시 선명하게 생성합니다.":
+              "GPT 2.0 Image Rerender. Regenerate a clearer AI image from the selected frame or image.",
             "Basic 필요 메뉴입니다. 요금제를 올리면 사용할 수 있어요.": "Basic required. Upgrade your plan to use it.",
             "Pro 필요 메뉴입니다. 요금제를 올리면 사용할 수 있어요.": "Pro required. Upgrade your plan to use it.",
             "최근 실행 기록을 확인하는 중입니다.": "Checking recent run history.",
@@ -14575,6 +14579,10 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
             "AI Features": "Funciones de AI",
             "Basic required": "Basic requerido",
             "Basic required. Upgrade your plan to use it.": "Basic requerido. Mejora tu plan para usarlo.",
+            "GPT 2.0 Rerender": "Re-renderizar GPT 2.0",
+            "GPT 2.0 Image Rerender": "Re-renderizar imagen con GPT 2.0",
+            "GPT 2.0 Image Rerender. Regenerate a clearer AI image from the selected frame or image.":
+              "Re-renderizar imagen con GPT 2.0. Vuelve a generar una imagen AI más nítida desde el marco o la imagen seleccionados.",
             "AI image settings are not ready.": "La configuración de imagen de AI no está lista.",
             "AI is interpreting the current selection.": "AI está interpretando la selección actual.",
             "AI Routing": "Enrutamiento de AI",
@@ -14591,6 +14599,10 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
             "AI Features": "AI 機能",
             "Basic required": "Basic が必要",
             "Basic required. Upgrade your plan to use it.": "Basic が必要です。プランをアップグレードすると使用できます。",
+            "GPT 2.0 Rerender": "GPT 2.0 再レンダリング",
+            "GPT 2.0 Image Rerender": "GPT 2.0 画像再レンダリング",
+            "GPT 2.0 Image Rerender. Regenerate a clearer AI image from the selected frame or image.":
+              "GPT 2.0 画像再レンダリング。選択したフレームまたは画像をもとに、より鮮明な AI 画像を再生成します。",
             "Pro required": "Pro が必要",
             "Pro required. Upgrade your plan to use it.": "Pro が必要です。プランをアップグレードすると使用できます。"
           })),
@@ -14600,6 +14612,10 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
             "AI Features": "AI 功能",
             "Basic required": "需要 Basic",
             "Basic required. Upgrade your plan to use it.": "需要 Basic。升级套餐后即可使用。",
+            "GPT 2.0 Rerender": "GPT 2.0 重新渲染",
+            "GPT 2.0 Image Rerender": "GPT 2.0 图像重新渲染",
+            "GPT 2.0 Image Rerender. Regenerate a clearer AI image from the selected frame or image.":
+              "GPT 2.0 图像重新渲染。根据所选画框或图像重新生成更清晰的 AI 图像。",
             "Pro required": "需要 Pro",
             "Pro required. Upgrade your plan to use it.": "需要 Pro。升级套餐后即可使用。"
           }))
@@ -68866,6 +68882,11 @@ UPNG.encode.alphaMul = function(img, roundA) {
               aria:
                 "텍스트 스타일 정리. 선택 범위 안의 소수점처럼 아주 미세하게 어긋난 텍스트 크기, 행간, 색만 대표 스타일로 정리합니다.",
             },
+            aiImageGptRerenderButton: {
+              label: "GPT 2.0 재렌더링",
+              aria:
+                "GPT 2.0 이미지 재렌더링. 선택한 프레임이나 이미지를 기준으로 흐릿한 AI 이미지를 다시 선명하게 생성합니다.",
+            },
           },
           en: {
             aiDetachLinkedComponentsButton: {
@@ -68887,6 +68908,10 @@ UPNG.encode.alphaMul = function(img, roundA) {
             aiTextStyleNormalizeButton: {
               label: "Normalize Text Styles",
               aria: "Normalize Text Styles. Clean up tiny text size, line-height, and color drifts into representative styles.",
+            },
+            aiImageGptRerenderButton: {
+              label: "GPT 2.0 Rerender",
+              aria: "GPT 2.0 Image Rerender. Regenerate a clearer AI image from the selected frame or image.",
             },
           },
           es: {
@@ -68912,6 +68937,11 @@ UPNG.encode.alphaMul = function(img, roundA) {
               label: "Normalizar estilos de texto",
               aria:
                 "Normalizar estilos de texto. Limpia peque\u00F1as variaciones de tama\u00F1o de texto, interlineado y color en estilos representativos.",
+            },
+            aiImageGptRerenderButton: {
+              label: "Re-renderizar GPT 2.0",
+              aria:
+                "Re-renderizar imagen con GPT 2.0. Vuelve a generar una imagen AI m\u00E1s n\u00EDtida desde el marco o la imagen seleccionados.",
             },
           },
           ja: {
@@ -68940,6 +68970,11 @@ UPNG.encode.alphaMul = function(img, roundA) {
               aria:
                 "\u30C6\u30AD\u30B9\u30C8\u30B9\u30BF\u30A4\u30EB\u3092\u6574\u7406\u3002\u3054\u304F\u5C0F\u3055\u306A\u6587\u5B57\u30B5\u30A4\u30BA\u3001\u884C\u9593\u3001\u8272\u306E\u305A\u308C\u3092\u4EE3\u8868\u30B9\u30BF\u30A4\u30EB\u306B\u6574\u7406\u3057\u307E\u3059\u3002",
             },
+            aiImageGptRerenderButton: {
+              label: "GPT 2.0 \u518D\u30EC\u30F3\u30C0\u30EA\u30F3\u30B0",
+              aria:
+                "GPT 2.0 \u753B\u50CF\u518D\u30EC\u30F3\u30C0\u30EA\u30F3\u30B0\u3002\u9078\u629E\u3057\u305F\u30D5\u30EC\u30FC\u30E0\u307E\u305F\u306F\u753B\u50CF\u3092\u3082\u3068\u306B\u3001\u3088\u308A\u9BAE\u660E\u306A AI \u753B\u50CF\u3092\u518D\u751F\u6210\u3057\u307E\u3059\u3002",
+            },
           },
           "zh-CN": {
             aiDetachLinkedComponentsButton: {
@@ -68966,6 +69001,11 @@ UPNG.encode.alphaMul = function(img, roundA) {
               label: "\u6574\u7406\u6587\u672C\u6837\u5F0F",
               aria:
                 "\u6574\u7406\u6587\u672C\u6837\u5F0F\u3002\u5C06\u7EC6\u5FAE\u7684\u6587\u672C\u5927\u5C0F\u3001\u884C\u9AD8\u548C\u989C\u8272\u504F\u5DEE\u6574\u7406\u4E3A\u4EE3\u8868\u6837\u5F0F\u3002",
+            },
+            aiImageGptRerenderButton: {
+              label: "GPT 2.0 \u91CD\u65B0\u6E32\u67D3",
+              aria:
+                "GPT 2.0 \u56FE\u50CF\u91CD\u65B0\u6E32\u67D3\u3002\u6839\u636E\u6240\u9009\u753B\u6846\u6216\u56FE\u50CF\u91CD\u65B0\u751F\u6210\u66F4\u6E05\u6670\u7684 AI \u56FE\u50CF\u3002",
             },
           },
         };
