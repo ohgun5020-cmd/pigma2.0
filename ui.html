@@ -8356,8 +8356,10 @@
                     clone.appendChild(node.cloneNode(true));
                   });
                   if (sourcePlanLocked) {
+                    const requiredTier = Number(source.dataset.planRequiredTier || 0);
                     clone.dataset.shortcutPlanLocked = "true";
-                    clone.dataset.shortcutPlanLockLabel = source.dataset.planLockLabel || "";
+                    clone.dataset.shortcutPlanLockLabel =
+                      requiredTier >= 2 ? "Pro 필요" : requiredTier >= 1 ? "Basic 필요" : source.dataset.planLockLabel || "";
                     clone.dataset.shortcutPlanRequiredTier = source.dataset.planRequiredTier || "";
                   } else {
                     delete clone.dataset.shortcutPlanLocked;
@@ -11923,6 +11925,8 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
             "서버 확인 중": "Checking server",
             "Basic 필요": "Basic required",
             "Pro 필요": "Pro required",
+            "Basic 필요 메뉴입니다. 요금제를 올리면 사용할 수 있어요.": "Basic required. Upgrade your plan to use it.",
+            "Pro 필요 메뉴입니다. 요금제를 올리면 사용할 수 있어요.": "Pro required. Upgrade your plan to use it.",
             "최근 실행 기록을 확인하는 중입니다.": "Checking recent run history.",
             "최근 실행 기록을 불러오는 중입니다.": "Loading recent run history.",
             "아직 기록이 없습니다.": "No records yet.",
@@ -14569,23 +14573,35 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
             "AI Connection Required": "Conexión de AI requerida",
             "AI Design Chat": "Chat de diseño AI",
             "AI Features": "Funciones de AI",
+            "Basic required": "Basic requerido",
+            "Basic required. Upgrade your plan to use it.": "Basic requerido. Mejora tu plan para usarlo.",
             "AI image settings are not ready.": "La configuración de imagen de AI no está lista.",
             "AI is interpreting the current selection.": "AI está interpretando la selección actual.",
             "AI Routing": "Enrutamiento de AI",
             "AI Settings": "Configuración de AI",
             "AI settings are complete.": "La configuración de AI está completa.",
             "AI settings have been applied.": "La configuración de AI se ha aplicado.",
-            "Apply AI Settings": "Aplicar configuración de AI"
+            "Apply AI Settings": "Aplicar configuración de AI",
+            "Pro required": "Pro requerido",
+            "Pro required. Upgrade your plan to use it.": "Pro requerido. Mejora tu plan para usarlo."
           })),
           ja: new Map(Object.entries({
             "AI Connection Required": "AI 接続が必要です",
             "AI Design Chat": "AI デザインチャット",
-            "AI Features": "AI 機能"
+            "AI Features": "AI 機能",
+            "Basic required": "Basic が必要",
+            "Basic required. Upgrade your plan to use it.": "Basic が必要です。プランをアップグレードすると使用できます。",
+            "Pro required": "Pro が必要",
+            "Pro required. Upgrade your plan to use it.": "Pro が必要です。プランをアップグレードすると使用できます。"
           })),
           "zh-CN": new Map(Object.entries({
             "AI Connection Required": "需要 AI 连接",
             "AI Design Chat": "AI 设计聊天",
-            "AI Features": "AI 功能"
+            "AI Features": "AI 功能",
+            "Basic required": "需要 Basic",
+            "Basic required. Upgrade your plan to use it.": "需要 Basic。升级套餐后即可使用。",
+            "Pro required": "需要 Pro",
+            "Pro required. Upgrade your plan to use it.": "需要 Pro。升级套餐后即可使用。"
           }))
         };
 
@@ -14600,7 +14616,15 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
         const textOriginals = new WeakMap();
         const attrOriginals = new WeakMap();
         const ignoredTags = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEXTAREA"]);
-        const attrNames = ["aria-label", "title", "placeholder", "data-tooltip", "data-design-chat-template"];
+        const attrNames = [
+          "aria-label",
+          "title",
+          "placeholder",
+          "data-tooltip",
+          "data-design-chat-template",
+          "data-plan-lock-label",
+          "data-shortcut-plan-lock-label",
+        ];
         let scheduled = false;
         let isApplying = false;
 
