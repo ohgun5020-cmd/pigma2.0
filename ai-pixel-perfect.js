@@ -1,13 +1,13 @@
 ;(() => {
   const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
-  if (globalScope.__PIGMA_AI_PIXEL_PERFECT_PATCH__) {
+  if (globalScope.__PIGER_AI_PIXEL_PERFECT_PATCH__) {
     return;
   }
 
   const originalOnMessage = figma.ui.onmessage;
-  const AI_DESIGN_READ_CACHE_KEY = "pigma:ai-design-read-cache:v1";
-  const AI_PIXEL_PERFECT_CACHE_KEY = "pigma:ai-pixel-perfect-cache:v1";
-  const AI_PIXEL_PERFECT_CLEAR_CACHE_KEY = "pigma:ai-pixel-perfect-clear-cache:v1";
+  const AI_DESIGN_READ_CACHE_KEY = "piger:ai-design-read-cache:v1";
+  const AI_PIXEL_PERFECT_CACHE_KEY = "piger:ai-pixel-perfect-cache:v1";
+  const AI_PIXEL_PERFECT_CLEAR_CACHE_KEY = "piger:ai-pixel-perfect-clear-cache:v1";
   const PATCH_VERSION = 7;
   const RESULT_PREVIEW_LIMIT = 80;
   const VALUE_EPSILON = 0.0001;
@@ -16,9 +16,9 @@
   const PIXEL_APPLY_YIELD_INTERVAL = 24;
   const EFFECT_RADIUS_KEYS = new Set(["radius", "spread", "startRadius", "endRadius"]);
   const OPACITY_PERCENT_SCALE = 100;
-  const ANNOTATION_CATEGORY_LABEL = "Pigma Perfect pixel";
+  const ANNOTATION_CATEGORY_LABEL = "PIGER Perfect pixel";
   const ANNOTATION_CATEGORY_COLOR = "red";
-  const ANNOTATION_LABEL_PREFIX = "Pigma Perfect pixel";
+  const ANNOTATION_LABEL_PREFIX = "PIGER Perfect pixel";
   const ANNOTATION_CHANGE_PREVIEW_LIMIT = 4;
   let activePixelPerfectTask = "";
 
@@ -50,7 +50,7 @@
     return originalOnMessage(message);
   };
 
-  globalScope.__PIGMA_AI_PIXEL_PERFECT_PATCH__ = true;
+  globalScope.__PIGER_AI_PIXEL_PERFECT_PATCH__ = true;
 
   function isAiPixelPerfectMessage(message) {
     return (

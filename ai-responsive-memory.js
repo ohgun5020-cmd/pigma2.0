@@ -1,11 +1,11 @@
 ;(() => {
   const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
-  if (globalScope.__PIGMA_AI_RESPONSIVE_MEMORY_PATCH__) {
+  if (globalScope.__PIGER_AI_RESPONSIVE_MEMORY_PATCH__) {
     return;
   }
 
   const originalOnMessage = figma.ui.onmessage;
-  const RESPONSIVE_MEMORY_KEY = "pigma:responsive-memory:v1";
+  const RESPONSIVE_MEMORY_KEY = "piger:responsive-memory:v1";
   const RESPONSIVE_MEMORY_SCHEMA_VERSION = 1;
   const DEFAULT_RESPONSIVE_MEMORY = Object.freeze({
     schemaVersion: RESPONSIVE_MEMORY_SCHEMA_VERSION,
@@ -18,7 +18,7 @@
     return;
   }
 
-  globalScope.__PIGMA_RESPONSIVE_MEMORY__ = {
+  globalScope.__PIGER_RESPONSIVE_MEMORY__ = {
     readStoreAsync: readResponsiveMemoryStore,
     writeStoreAsync: writeResponsiveMemoryStore,
     appendRecordsAsync: appendResponsiveMemoryRecords,
@@ -37,7 +37,7 @@
     return originalOnMessage(message);
   };
 
-  globalScope.__PIGMA_AI_RESPONSIVE_MEMORY_PATCH__ = true;
+  globalScope.__PIGER_AI_RESPONSIVE_MEMORY_PATCH__ = true;
 
   function isResponsiveMemoryMessage(message) {
     return (

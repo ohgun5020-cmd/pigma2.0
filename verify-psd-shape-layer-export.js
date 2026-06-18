@@ -78,8 +78,8 @@ assertExcludes(uiContent, contract.uiFile || "ui", contract.forbiddenUiSnippets 
 assertIncludes(buildScriptContent, contract.buildScript, [contract.sourceFile], "patch reference");
 assertIncludes(buildScriptContent, contract.buildScript, ["verify-psd-shape-layer-export.js"], "verifier hook");
 
-const exportBoundaryIndex = bundleContent.indexOf("PIGMA_EXPORT_BOUNDARY::SOURCE_OF_TRUTH");
-const shapeLayerExportIndex = bundleContent.indexOf("PIGMA_PSD_SHAPE_LAYER_EXPORT::SOURCE_OF_TRUTH");
+const exportBoundaryIndex = bundleContent.indexOf("PIGER_EXPORT_BOUNDARY::SOURCE_OF_TRUTH");
+const shapeLayerExportIndex = bundleContent.indexOf("PIGER_PSD_SHAPE_LAYER_EXPORT::SOURCE_OF_TRUTH");
 
 if (exportBoundaryIndex !== -1 && shapeLayerExportIndex !== -1 && shapeLayerExportIndex < exportBoundaryIndex) {
   fail("PSD shape layer export patch must be appended after PSD export boundary patch.");

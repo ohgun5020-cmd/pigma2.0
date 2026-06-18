@@ -1,10 +1,10 @@
 ;(()=>{
-  // PIGMA_AI_SETTINGS_STORAGE::SOURCE_OF_TRUTH
+  // PIGER_AI_SETTINGS_STORAGE::SOURCE_OF_TRUTH
   // Keep AI settings persistence in plugin storage so the UI can survive
   // panel reloads and full Figma app restarts.
   const originalOnMessage = figma.ui.onmessage;
-  const AI_SETTINGS_KEY = "pigma:ai-settings:v1";
-  const AI_CORRECTION_SHORTCUTS_KEY = "pigma:ai-correction-action-shortcuts:v1";
+  const AI_SETTINGS_KEY = "piger:ai-settings:v1";
+  const AI_CORRECTION_SHORTCUTS_KEY = "piger:ai-correction-action-shortcuts:v1";
   const DEFAULT_AI_SETTINGS = Object.freeze({
     enabled: false,
     provider: "openai",

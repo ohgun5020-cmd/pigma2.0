@@ -1,4 +1,4 @@
-# Pigma i18n Translation Memory
+# PIGER i18n Translation Memory
 
 Updated: 2026-05-08
 
@@ -6,12 +6,12 @@ Updated: 2026-05-08
 
 ## Source Of Truth
 
-- UI 런타임 번역 훅: `ui.html`의 `__PIGMA_I18N_UI_LOCALE_STABILIZER__`
+- UI 런타임 번역 훅: `ui.html`의 `__PIGER_I18N_UI_LOCALE_STABILIZER__`
 - 현재 영어 번역 맵: `ui.html`의 `const translations = new Map(Object.entries({...}))`
 - 현재 추출 기준 번역 키 수: 793개
 - 다른 언어 초안 맵: `ui.html`의 `englishPhraseTranslationsByLocale` (`es`, `ja`, `zh-CN`, 각 759개 고유 영어 문구 기준)
 - 중요 용어 보정 맵: `ui.html`의 `englishPhraseOverridesByLocale`
-- 런타임 버튼/토스트 번역 훅: `window.__PIGMA_TRANSLATE_UI_TEXT__`
+- 런타임 버튼/토스트 번역 훅: `window.__PIGER_TRANSLATE_UI_TEXT__`
 - 번들 검증 대상: `code.patched.js`
 - 소스 패치 후 번들 생성: `build-patched-main.ps1`
 
@@ -146,5 +146,5 @@ rg -n --glob "*.js" --glob "!code.patched.js" --glob "!code.js" --glob "!vendor/
 Find the UI translation hook:
 
 ```powershell
-rg -n "__PIGMA_ENGLISH_UI_LOCALE_STABILIZER__|__PIGMA_TRANSLATE_UI_TEXT__|function findTranslation" ui.html
+rg -n "__PIGER_ENGLISH_UI_LOCALE_STABILIZER__|__PIGER_TRANSLATE_UI_TEXT__|function findTranslation" ui.html
 ```

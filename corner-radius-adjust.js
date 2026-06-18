@@ -1,11 +1,11 @@
 ;(() => {
   const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
-  if (globalScope.__PIGMA_CORNER_RADIUS_ADJUST_PATCH__) {
+  if (globalScope.__PIGER_CORNER_RADIUS_ADJUST_PATCH__) {
     return;
   }
 
   const originalOnMessage = figma.ui.onmessage;
-  const LAST_VALUE_STORAGE_KEY = "pigma:corner-radius-adjust:last-value:v1";
+  const LAST_VALUE_STORAGE_KEY = "piger:corner-radius-adjust:last-value:v1";
   const FORMULA_PERCENT_RADIUS = 25;
   const MAX_PERCENT_RADIUS = 50;
   const AUTO_RADIUS_SOFT_CAP_START_SIDE = 96;
@@ -26,7 +26,7 @@
     return originalOnMessage(message);
   };
 
-  globalScope.__PIGMA_CORNER_RADIUS_ADJUST_PATCH__ = true;
+  globalScope.__PIGER_CORNER_RADIUS_ADJUST_PATCH__ = true;
 
   function isCornerRadiusAdjustMessage(message) {
     return (
@@ -84,7 +84,7 @@
     try {
       await figma.loadAllPagesAsync();
     } catch (error) {
-      console.warn("[pigma] corner radius selection preload failed:", error);
+      console.warn("[piger] corner radius selection preload failed:", error);
     }
   }
 

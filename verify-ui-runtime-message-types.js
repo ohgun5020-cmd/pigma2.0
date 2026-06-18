@@ -11,7 +11,7 @@ const runtimeFiles = [
   "psd-export-boundary.js",
   "psd-shape-layer-export.js",
   "ai-settings-storage.js",
-  "pigma-web-integration.js",
+  "piger-web-integration.js",
   "ai-responsive-memory.js",
   "ai-responsive-pair-analyzer.js",
   "ai-llm-client.js",

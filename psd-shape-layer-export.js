@@ -1,14 +1,14 @@
 ;(() => {
-  // PIGMA_PSD_SHAPE_LAYER_EXPORT::SOURCE_OF_TRUTH
+  // PIGER_PSD_SHAPE_LAYER_EXPORT::SOURCE_OF_TRUTH
   // Keeps Photoshop shape-layer export gating outside ui.html. The PSD writer
   // can emit vectorFill/vectorMask layers. The PSD writer converts exported SVG
   // paths into Photoshop vector masks, so affine transforms such as rotation and
   // scale are safe; only degenerate transforms should force bitmap previews.
-  // PIGMA_PSD_SHAPE_LAYER_EXPORT::MESSAGE_NORMALIZER
-  // PIGMA_PSD_SHAPE_LAYER_EXPORT::PHOTOSHOP_SHAPE_GATE
-  // PIGMA_PSD_SHAPE_LAYER_EXPORT::PHOTOSHOP_FIGMA_SHAPE_MAP
+  // PIGER_PSD_SHAPE_LAYER_EXPORT::MESSAGE_NORMALIZER
+  // PIGER_PSD_SHAPE_LAYER_EXPORT::PHOTOSHOP_SHAPE_GATE
+  // PIGER_PSD_SHAPE_LAYER_EXPORT::PHOTOSHOP_FIGMA_SHAPE_MAP
   const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
-  const PATCH_FLAG = "__PIGMA_PSD_SHAPE_LAYER_EXPORT_PATCH__";
+  const PATCH_FLAG = "__PIGER_PSD_SHAPE_LAYER_EXPORT_PATCH__";
   const PHOTOSHOP_SHAPE_KIND_TO_FIGMA_TYPES = Object.freeze({
     rectangle: Object.freeze(["RECTANGLE"]),
     roundedRectangle: Object.freeze(["RECTANGLE"]),

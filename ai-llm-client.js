@@ -1,13 +1,13 @@
 ;(() => {
   const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
-  if (globalScope.__PIGMA_AI_LLM_CLIENT_PATCH__) {
+  if (globalScope.__PIGER_AI_LLM_CLIENT_PATCH__) {
     return;
   }
 
   const originalOnMessage = figma.ui.onmessage;
-  const AI_SETTINGS_KEY = "pigma:ai-settings:v1";
-  const WEB_AUTH_KEY = "pigma:web-auth:v1";
-  const AI_LLM_RUN_LOG_KEY = "pigma:ai-llm-run-log:v1";
+  const AI_SETTINGS_KEY = "piger:ai-settings:v1";
+  const WEB_AUTH_KEY = "piger:web-auth:v1";
+  const AI_LLM_RUN_LOG_KEY = "piger:ai-llm-run-log:v1";
   const AI_LLM_RUN_LOG_LIMIT = 40;
   const AI_LLM_REQUEST_TIMEOUT_MS = 45000;
   const DEFAULT_SERVER_URL = "https://oy-tools-production.up.railway.app";
@@ -24,7 +24,7 @@
   const DEFAULT_MODEL_BY_PROVIDER = Object.freeze({
     openai: "gpt-5-mini",
     gemini: "gemini-2.5-flash",
-    "server-openai": "pigma-server-ai",
+    "server-openai": "piger-server-ai",
   });
   const FALLBACK_MODELS_BY_PROVIDER = Object.freeze({
     openai: ["gpt-5-mini", "gpt-4.1-mini"],
@@ -33,7 +33,7 @@
   const TEXT_AI_PROVIDERS = Object.freeze(["openai", "gemini"]);
   const pendingUiRequests = new Map();
 
-  globalScope.__PIGMA_AI_LLM__ = {
+  globalScope.__PIGER_AI_LLM__ = {
     getAiSettingsAsync,
     getAiRunLogAsync,
     getResolvedRunInfo,
@@ -58,7 +58,7 @@
     };
   }
 
-  globalScope.__PIGMA_AI_LLM_CLIENT_PATCH__ = true;
+  globalScope.__PIGER_AI_LLM_CLIENT_PATCH__ = true;
 
   async function getAiSettingsAsync() {
     try {
@@ -293,11 +293,11 @@
     return {
       provider: "server-openai",
       apiKey: "",
-      model: "pigma-server-ai",
+      model: "piger-server-ai",
       serverAi: true,
       serverUrl: webAuth.serverUrl,
       accessToken: webAuth.accessToken,
-      providerProfile: buildProviderProfile("", "server-openai", "pigma-server-ai", "server-ai", "proxy"),
+      providerProfile: buildProviderProfile("", "server-openai", "piger-server-ai", "server-ai", "proxy"),
     };
   }
 
@@ -475,7 +475,7 @@
     const accessToken = sanitizeAccessToken(runInfo.accessToken);
 
     if (!accessToken) {
-      throw new Error("PIGMA web login is required for server AI.");
+      throw new Error("PIGER web login is required for server AI.");
     }
     if (!prompt) {
       throw new Error("AI prompt is empty.");
@@ -765,14 +765,14 @@
 
   function createAiClientError(error, fallbackMessage, requestMeta, runInfo, durationMs, failureType) {
     const wrapped = new Error(normalizeErrorMessage(error, fallbackMessage));
-    wrapped.pigmaAiFailureType = failureType || "unknown";
-    wrapped.pigmaAiTaskType = requestMeta && requestMeta.taskType ? requestMeta.taskType : "generic-json-task";
-    wrapped.pigmaAiTaskContext = requestMeta && requestMeta.taskContext ? requestMeta.taskContext : "";
-    wrapped.pigmaAiPlannerVersion = requestMeta && requestMeta.plannerVersion ? requestMeta.plannerVersion : "unspecified";
-    wrapped.pigmaAiProviderProfile = requestMeta && requestMeta.providerProfile ? requestMeta.providerProfile : "";
-    wrapped.pigmaAiProvider = runInfo && runInfo.provider ? runInfo.provider : "openai";
-    wrapped.pigmaAiModel = runInfo && runInfo.model ? runInfo.model : "";
-    wrapped.pigmaAiDurationMs = Math.max(0, Math.round(Number(durationMs) || 0));
+    wrapped.pigerAiFailureType = failureType || "unknown";
+    wrapped.pigerAiTaskType = requestMeta && requestMeta.taskType ? requestMeta.taskType : "generic-json-task";
+    wrapped.pigerAiTaskContext = requestMeta && requestMeta.taskContext ? requestMeta.taskContext : "";
+    wrapped.pigerAiPlannerVersion = requestMeta && requestMeta.plannerVersion ? requestMeta.plannerVersion : "unspecified";
+    wrapped.pigerAiProviderProfile = requestMeta && requestMeta.providerProfile ? requestMeta.providerProfile : "";
+    wrapped.pigerAiProvider = runInfo && runInfo.provider ? runInfo.provider : "openai";
+    wrapped.pigerAiModel = runInfo && runInfo.model ? runInfo.model : "";
+    wrapped.pigerAiDurationMs = Math.max(0, Math.round(Number(durationMs) || 0));
     return wrapped;
   }
 

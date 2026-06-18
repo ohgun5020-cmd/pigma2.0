@@ -1,10 +1,10 @@
 ;(() => {
   const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
-  if (globalScope.__PIGMA_AI_DESIGN_CHAT_PATCH__) {
+  if (globalScope.__PIGER_AI_DESIGN_CHAT_PATCH__) {
     return;
   }
 
-  const ANNOTATION_CATEGORY_LABEL = "Pigma Design Chat";
+  const ANNOTATION_CATEGORY_LABEL = "PIGER Design Chat";
   const ANNOTATION_CATEGORY_COLOR = "yellow";
   const ANNOTATION_LABEL_PREFIX = "[Design Chat]";
   const TEXT_PREVIEW_LIMIT = 320;
@@ -37,7 +37,7 @@
     }
   };
 
-  globalScope.__PIGMA_AI_DESIGN_CHAT_PATCH__ = true;
+  globalScope.__PIGER_AI_DESIGN_CHAT_PATCH__ = true;
 
   figma.on("selectionchange", () => {
     if (shouldSkipAutomaticSelectionState()) {
@@ -438,7 +438,7 @@
 
   async function exportCombinedRoots(roots, bounds, width, height) {
     const tempFrame = figma.createFrame();
-    tempFrame.name = "__Pigma Design Chat Capture__";
+    tempFrame.name = "__PIGER Design Chat Capture__";
     tempFrame.x = roundPixel(bounds.x + width + 4000);
     tempFrame.y = roundPixel(bounds.y);
     tempFrame.resize(Math.max(1, roundPixel(width)), Math.max(1, roundPixel(height)));
@@ -777,7 +777,7 @@
 
   function shouldSkipAutomaticSelectionState() {
     try {
-      return Number(globalScope.__PIGMA_SELECT_ALL_TEXT_SKIP_SELECTION_SYNC_UNTIL__ || 0) > Date.now();
+      return Number(globalScope.__PIGER_SELECT_ALL_TEXT_SKIP_SELECTION_SYNC_UNTIL__ || 0) > Date.now();
     } catch (error) {
       return false;
     }

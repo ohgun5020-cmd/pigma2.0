@@ -3,8 +3,8 @@ const path = require("path");
 
 const root = __dirname;
 const uiPath = path.join(root, "ui.html");
-const startMarker = "<!-- PIGMA_PDFJS_ASSET_BUNDLE:START -->";
-const endMarker = "<!-- PIGMA_PDFJS_ASSET_BUNDLE:END -->";
+const startMarker = "<!-- PIGER_PDFJS_ASSET_BUNDLE:START -->";
+const endMarker = "<!-- PIGER_PDFJS_ASSET_BUNDLE:END -->";
 
 function main() {
   const uiSource = fs.readFileSync(uiPath, "utf8");

@@ -2,7 +2,7 @@
 
 ## Why
 
-`pigma` already has the core pieces for PC -> MO conversion:
+`piger` already has the core pieces for PC -> MO conversion:
 
 - provider-aware LLM requests in `ai-llm-client.js`
 - reusable responsive memory in `ai-responsive-memory.js`

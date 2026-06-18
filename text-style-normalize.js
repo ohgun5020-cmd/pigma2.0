@@ -1,6 +1,6 @@
 ;(() => {
   const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
-  if (globalScope.__PIGMA_TEXT_STYLE_NORMALIZE_PATCH__) {
+  if (globalScope.__PIGER_TEXT_STYLE_NORMALIZE_PATCH__) {
     return;
   }
 
@@ -39,7 +39,7 @@
     return originalOnMessage(message);
   };
 
-  globalScope.__PIGMA_TEXT_STYLE_NORMALIZE_PATCH__ = true;
+  globalScope.__PIGER_TEXT_STYLE_NORMALIZE_PATCH__ = true;
 
   function isTextStyleNormalizeMessage(message) {
     return !!message && message.type === "run-text-style-normalize";
@@ -1273,7 +1273,7 @@
     try {
       await figma.loadAllPagesAsync();
     } catch (error) {
-      console.warn("[pigma] text style selection preload failed:", error);
+      console.warn("[piger] text style selection preload failed:", error);
     }
   }
 

@@ -1,17 +1,17 @@
 ;(() => {
   const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
-  if (globalScope.__PIGMA_AI_TYPO_AUDIT_PATCH__) {
+  if (globalScope.__PIGER_AI_TYPO_AUDIT_PATCH__) {
     return;
   }
 
   const originalOnMessage = figma.ui.onmessage;
-  const AI_DESIGN_READ_CACHE_KEY = "pigma:ai-design-read-cache:v1";
-  const AI_TYPO_AUDIT_CACHE_KEY = "pigma:ai-typo-audit-cache:v2";
-  const AI_TYPO_FIX_CACHE_KEY = "pigma:ai-typo-fix-cache:v2";
-  const AI_TYPO_CLEAR_CACHE_KEY = "pigma:ai-typo-clear-cache:v1";
-  const AI_TRANSLATE_CACHE_KEY = "pigma:ai-translate-cache:v1";
-  const AI_TRANSLATE_MEMORY_KEY = "pigma:ai-translate-memory:v1";
-  const AI_TRANSLATE_TARGET_LANGUAGE_KEY = "pigma:ai-translate-target-language:v1";
+  const AI_DESIGN_READ_CACHE_KEY = "piger:ai-design-read-cache:v1";
+  const AI_TYPO_AUDIT_CACHE_KEY = "piger:ai-typo-audit-cache:v2";
+  const AI_TYPO_FIX_CACHE_KEY = "piger:ai-typo-fix-cache:v2";
+  const AI_TYPO_CLEAR_CACHE_KEY = "piger:ai-typo-clear-cache:v1";
+  const AI_TRANSLATE_CACHE_KEY = "piger:ai-translate-cache:v1";
+  const AI_TRANSLATE_MEMORY_KEY = "piger:ai-translate-memory:v1";
+  const AI_TRANSLATE_TARGET_LANGUAGE_KEY = "piger:ai-translate-target-language:v1";
   const AI_TEXT_HIGHLIGHT_DEFAULT_COLOR = "#F5FF74";
   const AI_TEXT_HIGHLIGHT_DEFAULT_TEXT_COLOR = "#111111";
   const AI_TEXT_HIGHLIGHT_DEFAULT_RADIUS = 0;
@@ -31,10 +31,10 @@
   const AI_TEXT_HIGHLIGHT_MEASURE_COLOR = "#FF00FF";
   const AI_TEXT_HIGHLIGHT_PROBE_EXPORT_TIMEOUT_MS = 15000;
   const AI_TEXT_HIGHLIGHT_GROUP_NAME = "#high-light-text";
-  const AI_TEXT_HIGHLIGHT_GROUP_PLUGIN_KEY = "pigma:text-highlight-group";
-  const AI_TEXT_HIGHLIGHT_GROUP_TEXT_NODE_KEY = "pigma:text-highlight-text-node-id";
-  const AI_TEXT_HIGHLIGHT_GROUP_WIDTH_KEY = "pigma:text-highlight-container-width";
-  const AI_TEXT_HIGHLIGHT_GROUP_HEIGHT_KEY = "pigma:text-highlight-container-height";
+  const AI_TEXT_HIGHLIGHT_GROUP_PLUGIN_KEY = "piger:text-highlight-group";
+  const AI_TEXT_HIGHLIGHT_GROUP_TEXT_NODE_KEY = "piger:text-highlight-text-node-id";
+  const AI_TEXT_HIGHLIGHT_GROUP_WIDTH_KEY = "piger:text-highlight-container-width";
+  const AI_TEXT_HIGHLIGHT_GROUP_HEIGHT_KEY = "piger:text-highlight-container-height";
   const PATCH_VERSION = 13;
   const TYPO_AUDIT_MODEL_BY_PROVIDER = Object.freeze({
     openai: "gpt-5-mini",
@@ -60,8 +60,8 @@
   let textHighlightMeasureRequestSequence = 0;
   let pendingTranslatePreviewState = null;
   const ANNOTATION_PREFIX = "[Ai 판단]";
-  const LEGACY_ANNOTATION_PREFIXES = ["[AI Typo]", ANNOTATION_PREFIX, "[Pigma Ai Audit]"];
-  const ANNOTATION_CATEGORY_LABEL = "Pigma Ai Audit";
+  const LEGACY_ANNOTATION_PREFIXES = ["[AI Typo]", ANNOTATION_PREFIX, "[PIGER AI Audit]"];
+  const ANNOTATION_CATEGORY_LABEL = "PIGER AI Audit";
   const ANNOTATION_CATEGORY_COLOR = "yellow";
   const TRANSLATION_LANGUAGE_METADATA = Object.freeze({
     "en-US": { label: "영어 (미국)", aiLabel: "English (United States)", latinLocaleHint: "english" },
@@ -487,7 +487,7 @@
     return originalOnMessage(message);
   };
 
-  globalScope.__PIGMA_AI_TYPO_AUDIT_PATCH__ = true;
+  globalScope.__PIGER_AI_TYPO_AUDIT_PATCH__ = true;
 
   function isAiTypoMessage(message) {
     return (
@@ -973,7 +973,14 @@
 
       postTextHighlightStatus("running", "텍스트 하이라이트 도형을 만드는 중입니다.");
 
-      const measurement = await measureTextHighlightBounds(range.node, range.start, range.end, textColorHex);
+      const measurement = await measureTextHighlightBounds(
+        range.node,
+        range.start,
+        range.end,
+        textColorHex,
+        { preferDirectSelectionBounds: true }
+      );
+      const usesDirectSelectionBounds = measurement && measurement.source === "direct-selection";
       let boundsList = getTextHighlightMeasurementBoundsList(measurement);
       if (!boundsList.length) {
         throw new Error("선택한 텍스트 범위를 정확히 측정하지 못했습니다. 다시 드래그한 뒤 시도해 주세요.");
@@ -997,13 +1004,15 @@
         range.node,
         boundsList,
         measurement.fontSize,
-        measurement.lineHeight
+        measurement.lineHeight,
+        { preserveMeasuredRowCenter: usesDirectSelectionBounds }
       );
       boundsList = tightenTextHighlightBoxBoundsToVisualRows(
         range.node,
         boundsList,
         measurement.fontSize,
-        measurement.lineHeight
+        measurement.lineHeight,
+        { preserveMeasuredRowCenter: usesDirectSelectionBounds }
       );
       if (!boundsList.length) {
         throw new Error("선택한 텍스트 범위의 위치를 안전하게 계산하지 못했습니다. 다시 드래그한 뒤 시도해 주세요.");
@@ -4122,7 +4131,7 @@
   function buildAnnotation(issue, category) {
     const kindLabels = getAnnotationKindLabels(issue);
     const label = [
-      `[Pigma Ai Audit] ${kindLabels.join(", ")}`,
+      `[PIGER AI Audit] ${kindLabels.join(", ")}`,
       `전 : ${previewText(issue.currentText, 72)}`,
       `후 : ${previewText(issue.suggestion, 72)}`,
       `이유 : ${buildAnnotationReason(issue, kindLabels)}`,
@@ -6758,6 +6767,18 @@
     const isAlignmentSensitivePartialSingleLineSelection =
       isPartialSingleLineSelection && isAlignmentSensitiveTextHighlightNode(node);
     const preferAlignmentSensitiveFallback = !!(options && options.preferAlignmentSensitiveFallback);
+    const preferDirectSelectionBounds = !!(options && options.preferDirectSelectionBounds);
+    const estimatedSoftWrappedSelectionBoundsList = isPartialSingleLineSelection
+      ? buildEstimatedAlignmentSensitiveTextHighlightSelectionBounds(
+          node,
+          rangeStart,
+          rangeEnd,
+          fontSize,
+          lineHeight,
+          selectedText
+        )
+      : [];
+    const hasEstimatedSoftWrappedSelection = estimatedSoftWrappedSelectionBoundsList.length > 1;
 
     const directMeasurement = await measureExactTextHighlightBounds(
       node,
@@ -6768,6 +6789,28 @@
       lineHeight
     );
     const directBoundsList = getTextHighlightMeasurementBoundsList(directMeasurement);
+    if (
+      preferDirectSelectionBounds &&
+      isUsableDirectTextHighlightSelectionBounds(
+        node,
+        directBoundsList,
+        rangeStart,
+        rangeEnd,
+        selectedText,
+        fontSize,
+        lineHeight
+      )
+    ) {
+      const directSelectionBoundsList = sortTextHighlightBoundsList(directBoundsList);
+      return {
+        bounds: mergeTextHighlightBoundsList(directSelectionBoundsList),
+        boundsList: directSelectionBoundsList,
+        segments: directSelectionBoundsList.slice(),
+        fontSize,
+        lineHeight,
+        source: "direct-selection",
+      };
+    }
     const directBoundsAreSafe =
       directBoundsList.length &&
       !hasSuspiciousTextHighlightDirectBounds(node, directBoundsList, rangeStart, rangeEnd, fontSize, lineHeight);
@@ -6784,6 +6827,21 @@
       directBoundsAreSafe &&
       !hasUnderwideAlignmentSensitiveTextHighlightSelectionRows(directBoundsList, selectedText, fontSize);
     if (isAlignmentSensitivePartialSingleLineSelection && directBoundsAreAlignmentSafe && !preferAlignmentSensitiveFallback) {
+      return {
+        bounds: mergeTextHighlightBoundsList(directBoundsList),
+        boundsList: directBoundsList,
+        segments: directBoundsList.slice(),
+        fontSize,
+        lineHeight,
+      };
+    }
+    if (
+      preferDirectSelectionBounds &&
+      isPartialSingleLineSelection &&
+      directBoundsList.length === 1 &&
+      directBoundsAreSafe &&
+      !hasEstimatedSoftWrappedSelection
+    ) {
       return {
         bounds: mergeTextHighlightBoundsList(directBoundsList),
         boundsList: directBoundsList,
@@ -6879,6 +6937,27 @@
       }
     }
 
+    if (hasEstimatedSoftWrappedSelection && directBoundsList.length > 1) {
+      const directSoftWrappedBoundsList = sortTextHighlightBoundsList(directBoundsList);
+      if (
+        isPlausibleSoftWrappedTextHighlightSelectionRows(
+          node,
+          directSoftWrappedBoundsList,
+          selectedText,
+          fontSize,
+          lineHeight
+        )
+      ) {
+        return {
+          bounds: mergeTextHighlightBoundsList(directSoftWrappedBoundsList),
+          boundsList: directSoftWrappedBoundsList,
+          segments: directSoftWrappedBoundsList.slice(),
+          fontSize,
+          lineHeight,
+        };
+      }
+    }
+
     if (!isAlignmentSensitivePartialSingleLineSelection && directBoundsAreSafe) {
       return {
         bounds: mergeTextHighlightBoundsList(directBoundsList),
@@ -6935,6 +7014,14 @@
           boundsList = extractTrailingTextHighlightBounds(endBoundsList, startBoundsList, fontSize, lineHeight);
         }
       }
+    }
+
+    if (
+      hasEstimatedSoftWrappedSelection &&
+      (!boundsList.length || boundsList.length < estimatedSoftWrappedSelectionBoundsList.length)
+    ) {
+      boundsList = estimatedSoftWrappedSelectionBoundsList;
+      usedEstimatedSelectionFallback = true;
     }
 
     if (!boundsList.length && !isAlignmentSensitivePartialSingleLineSelection) {
@@ -9707,7 +9794,7 @@
       probe.clipsContent = false;
       probe.fills = [];
       probe.strokes = [];
-      probe.name = "__pigma_text_highlight_measure__";
+      probe.name = "__piger_text_highlight_measure__";
       probe.x = roundTextHighlightMetric(probeBounds ? probeBounds.x : 0);
       probe.y = roundTextHighlightMetric(probeBounds ? probeBounds.y : 0);
       figma.currentPage.appendChild(probe);
@@ -10120,6 +10207,48 @@
     return !nearFullHeight || (!nearFullWidth && looksLikeSingleTextRow);
   }
 
+  function isUsableDirectTextHighlightSelectionBounds(node, boundsList, start, end, selectedText, fontSize, lineHeight) {
+    const rows = sortTextHighlightBoundsList(boundsList);
+    if (!rows.length) {
+      return false;
+    }
+
+    const nodeBounds = normalizeTextHighlightWorldBounds(getNodeRenderBounds(node));
+    const size = getTextHighlightMetricFontSize(fontSize);
+    const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
+    const maximumRowHeight = Math.max(8, resolvedLineHeight * 2.1, size * 2.6);
+    const expandedNodeBounds = nodeBounds
+      ? {
+          x: nodeBounds.x - Math.max(size * 2, 8),
+          y: nodeBounds.y - resolvedLineHeight,
+          width: nodeBounds.width + Math.max(size * 4, 16),
+          height: nodeBounds.height + resolvedLineHeight * 2,
+        }
+      : null;
+
+    for (const row of rows) {
+      const bounds = normalizeTextHighlightWorldBounds(row);
+      if (!bounds || bounds.height > maximumRowHeight) {
+        return false;
+      }
+      if (expandedNodeBounds && !doTextHighlightBoundsIntersect(bounds, expandedNodeBounds)) {
+        return false;
+      }
+    }
+
+    if (
+      rows.length === 1 &&
+      selectedText &&
+      !/[\r\n]/.test(selectedText) &&
+      !isWholeTextHighlightRange(node, start, end) &&
+      hasOverwideTextHighlightSelectionRows(rows, selectedText, fontSize, lineHeight)
+    ) {
+      return false;
+    }
+
+    return true;
+  }
+
   function hasSuspiciousTextHighlightDirectBounds(node, boundsList, start, end, fontSize, lineHeight) {
     const normalizedBoundsList = sortTextHighlightBoundsList(boundsList);
     if (!normalizedBoundsList.length || isWholeTextHighlightRange(node, start, end)) {
@@ -10162,13 +10291,55 @@
     const looksLikeWholeRow = bounds.height <= resolvedLineHeight * 1.35 && bounds.width >= nodeBounds.width * 0.72;
     return (
       (looksLikeWholeRow && bounds.width > estimatedMaxWidth) ||
-      hasUnderwideTextHighlightSelectionRows(
+      hasUnderwideTextHighlightDirectSelectionRows(
         normalizedBoundsList,
         selectedText,
         fontSize,
         getTextHighlightHorizontalAlignment(node)
       )
     );
+  }
+
+  function hasUnderwideTextHighlightDirectSelectionRows(boundsList, selectedText, fontSize, alignment) {
+    const rows = sortTextHighlightBoundsList(boundsList);
+    if (!rows.length || !selectedText || /[\r\n]/.test(selectedText) || rows.length > 1) {
+      return false;
+    }
+
+    const compactSelectedText = compactText(selectedText);
+    if (compactSelectedText.length <= 1) {
+      return false;
+    }
+
+    const bounds = normalizeTextHighlightWorldBounds(rows[0]);
+    if (!bounds) {
+      return false;
+    }
+
+    const size = getTextHighlightMetricFontSize(fontSize);
+    const estimatedWidth = estimateTextHighlightInlineTextWidth(compactSelectedText, size);
+    const alignmentBucket = getTextHighlightAlignmentBucket(alignment);
+    let ratio = 0.52;
+    if (compactSelectedText.length <= 3) {
+      ratio = 0.22;
+    } else if (compactSelectedText.length <= 8) {
+      ratio = 0.32;
+    } else if (size <= 16) {
+      ratio = 0.48;
+    } else if (size <= 28) {
+      ratio = 0.5;
+    } else if (size <= 44) {
+      ratio = 0.54;
+    }
+    if (alignmentBucket === "center" || alignmentBucket === "right" || alignmentBucket === "justified") {
+      ratio += 0.04;
+    }
+
+    const minimumExpectedWidth = Math.max(
+      getTextHighlightMinimumWidth(size),
+      estimatedWidth * Math.max(0.2, Math.min(0.72, ratio))
+    );
+    return bounds.width < minimumExpectedWidth;
   }
 
   function isAlignmentSensitiveTextHighlightNode(node) {
@@ -10771,7 +10942,7 @@
     });
   }
 
-  function stabilizeTextHighlightBoxBoundsToTypographyRows(node, boundsList, fontSize, lineHeight) {
+  function stabilizeTextHighlightBoxBoundsToTypographyRows(node, boundsList, fontSize, lineHeight, options) {
     const rows = sortTextHighlightBoundsList(boundsList);
     if (!rows.length || !node || node.removed) {
       return rows;
@@ -10793,6 +10964,8 @@
     const maximumLineIndex = getTextHighlightMaximumLocalLineIndex(node, layoutHeight, resolvedLineHeight);
     const maximumSnapShift = Math.max(size * 0.9, resolvedLineHeight * 0.55);
     const preserveMeasuredRowCenter = shouldPreserveTextHighlightMeasuredRowCenter(node);
+    const shouldKeepMeasuredRowCenter =
+      preserveMeasuredRowCenter || !!(options && options.preserveMeasuredRowCenter === true);
     const stableRows = [];
 
     for (const row of rows) {
@@ -10814,7 +10987,9 @@
       const centeredY = localCenterY - targetHeight / 2;
       let nextY = centeredY;
       if (!preserveMeasuredRowCenter && Math.abs(snappedY - localBounds.y) <= maximumSnapShift) {
-        nextY = snappedY;
+        if (!shouldKeepMeasuredRowCenter) {
+          nextY = snappedY;
+        }
       }
       const stableWorldBounds = getTextHighlightWorldBoundsFromLocalBounds(node, {
         x: localBounds.x,
@@ -10830,7 +11005,7 @@
     return stableRows.length ? sortTextHighlightBoundsList(stableRows) : rows;
   }
 
-  function tightenTextHighlightBoxBoundsToVisualRows(node, boundsList, fontSize, lineHeight) {
+  function tightenTextHighlightBoxBoundsToVisualRows(node, boundsList, fontSize, lineHeight, options) {
     const rows = sortTextHighlightBoundsList(boundsList);
     if (!rows.length || !node || node.removed) {
       return rows;
@@ -10846,6 +11021,7 @@
     const resolvedLineHeight = Math.max(size, Number(lineHeight) || size * 1.2);
     const targetHeight = buildTextHighlightBoxVisualRowHeight(size, resolvedLineHeight);
     const visualYCorrection = getTextHighlightBoxVisualYCorrection(size);
+    const preserveMeasuredRowCenter = !!(options && options.preserveMeasuredRowCenter === true);
     const tightenedRows = [];
 
     for (const row of rows) {
@@ -10856,9 +11032,11 @@
 
       const localBounds = getTextHighlightLocalBounds(inverseNodeTransform, bounds);
       const localCenterY = localBounds.y + localBounds.height / 2;
+      const correctedLocalY = localCenterY - targetHeight / 2 + visualYCorrection;
+      const nextLocalY = preserveMeasuredRowCenter ? localCenterY - targetHeight / 2 : correctedLocalY;
       const tightenedWorldBounds = getTextHighlightWorldBoundsFromLocalBounds(node, {
         x: localBounds.x,
-        y: roundTextHighlightMetric(localCenterY - targetHeight / 2 + visualYCorrection),
+        y: roundTextHighlightMetric(nextLocalY),
         width: localBounds.width,
         height: targetHeight,
       });
@@ -11923,7 +12101,7 @@
   }
 
   function getAiHelper() {
-    const helper = globalScope.__PIGMA_AI_LLM__;
+    const helper = globalScope.__PIGER_AI_LLM__;
     return helper && typeof helper.requestJsonTask === "function" && typeof helper.hasConfiguredAiAsync === "function"
       ? helper
       : null;

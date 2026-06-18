@@ -1,6 +1,6 @@
 ;(() => {
   const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
-  if (globalScope.__PIGMA_AI_DESIGN_CONSISTENCY_PATCH__) {
+  if (globalScope.__PIGER_AI_DESIGN_CONSISTENCY_PATCH__) {
     return;
   }
 
@@ -9,8 +9,8 @@
     return;
   }
 
-  const AI_DESIGN_CONSISTENCY_CACHE_KEY = "pigma:ai-design-consistency-cache:v1";
-  const AI_DESIGN_READ_CACHE_KEY = "pigma:ai-design-read-cache:v1";
+  const AI_DESIGN_CONSISTENCY_CACHE_KEY = "piger:ai-design-consistency-cache:v1";
+  const AI_DESIGN_READ_CACHE_KEY = "piger:ai-design-read-cache:v1";
   const PATCH_VERSION = 1;
   const ANNOTATION_CATEGORY_LABEL = "디자인 일관성";
   const ANNOTATION_CATEGORY_COLOR = "blue";
@@ -81,7 +81,7 @@
     return originalOnMessage(message);
   };
 
-  globalScope.__PIGMA_AI_DESIGN_CONSISTENCY_PATCH__ = true;
+  globalScope.__PIGER_AI_DESIGN_CONSISTENCY_PATCH__ = true;
 
   function isConsistencyMessage(message) {
     return (
@@ -2832,7 +2832,7 @@
   }
 
   function getAiHelper() {
-    const helper = globalScope.__PIGMA_AI_LLM__;
+    const helper = globalScope.__PIGER_AI_LLM__;
     return helper &&
       typeof helper.requestJsonTask === "function" &&
       typeof helper.hasConfiguredAiAsync === "function"

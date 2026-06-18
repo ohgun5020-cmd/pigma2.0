@@ -1,6 +1,6 @@
 ;(() => {
   const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
-  if (globalScope.__PIGMA_TEXT_LINE_HEIGHT_ADJUST_PATCH__) {
+  if (globalScope.__PIGER_TEXT_LINE_HEIGHT_ADJUST_PATCH__) {
     return;
   }
 
@@ -49,7 +49,7 @@
     return originalOnMessage(message);
   };
 
-  globalScope.__PIGMA_TEXT_LINE_HEIGHT_ADJUST_PATCH__ = true;
+  globalScope.__PIGER_TEXT_LINE_HEIGHT_ADJUST_PATCH__ = true;
 
   function isTextLineHeightMessage(message) {
     return !!message && message.type === "run-text-line-height-adjust";
@@ -607,7 +607,7 @@
     try {
       await figma.loadAllPagesAsync();
     } catch (error) {
-      console.warn("[pigma] text line height selection preload failed:", error);
+      console.warn("[piger] text line height selection preload failed:", error);
     }
   }
 

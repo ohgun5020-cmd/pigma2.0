@@ -843,7 +843,7 @@
       fallbackThemeColors.__fontScheme = resolveThemeFontScheme(null);
       return fallbackThemeColors;
     } catch (error) {
-      console.warn("[pigma-import-dispatcher] failed to read PPTX theme colors", error);
+      console.warn("[piger-import-dispatcher] failed to read PPTX theme colors", error);
       const fallbackThemeColors = Object.assign({}, DEFAULT_THEME_COLORS);
       fallbackThemeColors.__fontScheme = resolveThemeFontScheme(null);
       return fallbackThemeColors;
@@ -3509,7 +3509,7 @@
             });
             svgTextFallback = fullSlideSvg.svgText;
           } catch (error) {
-            console.warn("[pigma-import-dispatcher] failed to build PPTX editable-text SVG fallback", error);
+            console.warn("[piger-import-dispatcher] failed to build PPTX editable-text SVG fallback", error);
           }
         }
 
@@ -3692,7 +3692,7 @@
               : "The selected PPTX deck was expanded slide by slide and imported as flattened PNG payloads.",
         });
       } catch (error) {
-        console.warn("[pigma-import-dispatcher] PPTX import payload preparation failed", error);
+        console.warn("[piger-import-dispatcher] PPTX import payload preparation failed", error);
         env.setAnalysis({
           ...analysis,
           mode: "blocked",
@@ -3715,7 +3715,7 @@
     return true;
   }
 
-  window.PigmaPresentationImport = Object.freeze({
+  window.PigerPresentationImport = Object.freeze({
     dispatch: dispatch,
   });
 })();

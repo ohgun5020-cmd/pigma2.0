@@ -1,6 +1,6 @@
 ;(() => {
   const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
-  if (globalScope.__PIGMA_UNLOCK_LOCKED_LAYERS_PATCH__) {
+  if (globalScope.__PIGER_UNLOCK_LOCKED_LAYERS_PATCH__) {
     return;
   }
 
@@ -26,7 +26,7 @@
     return originalOnMessage(message);
   };
 
-  globalScope.__PIGMA_UNLOCK_LOCKED_LAYERS_PATCH__ = true;
+  globalScope.__PIGER_UNLOCK_LOCKED_LAYERS_PATCH__ = true;
 
   function isUnlockLockedLayersMessage(message) {
     return !!message && message.type === "run-unlock-locked-layers";

@@ -5,8 +5,8 @@ const root = __dirname;
 const uiPath = path.join(root, "ui.html");
 const sourcePath = path.join(root, "presentation-import.js");
 
-const startMarker = "<!-- PIGMA_PRESENTATION_IMPORT_RUNTIME:START -->";
-const endMarker = "<!-- PIGMA_PRESENTATION_IMPORT_RUNTIME:END -->";
+const startMarker = "<!-- PIGER_PRESENTATION_IMPORT_RUNTIME:START -->";
+const endMarker = "<!-- PIGER_PRESENTATION_IMPORT_RUNTIME:END -->";
 const legacyScriptTag = '    <script src="presentation-import.js"></script>';
 
 function readUtf8(filePath) {

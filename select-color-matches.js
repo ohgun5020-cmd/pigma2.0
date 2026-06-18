@@ -1,6 +1,6 @@
 ;(() => {
   const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
-  if (globalScope.__PIGMA_SELECT_COLOR_MATCHES_PATCH__) {
+  if (globalScope.__PIGER_SELECT_COLOR_MATCHES_PATCH__) {
     return;
   }
 
@@ -46,7 +46,7 @@
     return originalOnMessage(message);
   };
 
-  globalScope.__PIGMA_SELECT_COLOR_MATCHES_PATCH__ = true;
+  globalScope.__PIGER_SELECT_COLOR_MATCHES_PATCH__ = true;
 
   function isGroupSimilarColorsMessage(message) {
     return !!message && message.type === "run-group-similar-colors";
@@ -1161,7 +1161,7 @@
 
   function suppressBaseSelectionSync() {
     try {
-      globalScope.__PIGMA_SELECT_ALL_TEXT_SKIP_SELECTION_SYNC_UNTIL__ =
+      globalScope.__PIGER_SELECT_ALL_TEXT_SKIP_SELECTION_SYNC_UNTIL__ =
         Date.now() + BASE_SELECTION_SYNC_SUPPRESS_MS;
     } catch (error) {}
   }

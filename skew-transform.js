@@ -1,6 +1,6 @@
 ;(() => {
   const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
-  if (globalScope.__PIGMA_SKEW_TRANSFORM_PATCH__) {
+  if (globalScope.__PIGER_SKEW_TRANSFORM_PATCH__) {
     return;
   }
 
@@ -9,7 +9,7 @@
   const MAX_TANGENT_SKEW_DEGREES = 89.9;
   const MAX_ROTATION_DEGREES = 180;
   const TRANSFORM_PRECISION = 1000000;
-  const SKEW_PLUGIN_DATA_KEY = "__pigmaSkewTransform";
+  const SKEW_PLUGIN_DATA_KEY = "__pigerSkewTransform";
   const SKEW_EPSILON_DEGREES = 0.05;
   let activeSession = null;
 
@@ -26,7 +26,7 @@
     return originalOnMessage(message);
   };
 
-  globalScope.__PIGMA_SKEW_TRANSFORM_PATCH__ = true;
+  globalScope.__PIGER_SKEW_TRANSFORM_PATCH__ = true;
 
   function isSkewTransformMessage(message) {
     return (

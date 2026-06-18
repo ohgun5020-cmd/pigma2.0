@@ -1,6 +1,6 @@
 ;(() => {
   const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
-  if (globalScope.__PIGMA_SELECT_ALL_TEXT_PATCH__) {
+  if (globalScope.__PIGER_SELECT_ALL_TEXT_PATCH__) {
     return;
   }
 
@@ -30,7 +30,7 @@
     return originalOnMessage(message);
   };
 
-  globalScope.__PIGMA_SELECT_ALL_TEXT_PATCH__ = true;
+  globalScope.__PIGER_SELECT_ALL_TEXT_PATCH__ = true;
 
   function isSelectAllTextMessage(message) {
     return !!message && message.type === "run-select-all-text";
@@ -218,7 +218,7 @@
 
   function suppressBaseSelectionSync() {
     try {
-      globalScope.__PIGMA_SELECT_ALL_TEXT_SKIP_SELECTION_SYNC_UNTIL__ =
+      globalScope.__PIGER_SELECT_ALL_TEXT_SKIP_SELECTION_SYNC_UNTIL__ =
         Date.now() + BASE_SELECTION_SYNC_SUPPRESS_MS;
     } catch (error) {
       // Selection should still proceed if a host blocks global flag writes.
@@ -235,7 +235,7 @@
           }
         }
       } catch (error) {
-        // The visible selection is already applied; this only refreshes Pigma's summary card.
+        // The visible selection is already applied; this only refreshes PIGER's summary card.
       }
     }, BASE_SELECTION_SYNC_REFRESH_DELAY_MS);
   }

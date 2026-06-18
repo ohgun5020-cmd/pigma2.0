@@ -1,6 +1,6 @@
 ;(() => {
   const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
-  if (globalScope.__PIGMA_CLEAR_FRAME_GUIDES_PATCH__) {
+  if (globalScope.__PIGER_CLEAR_FRAME_GUIDES_PATCH__) {
     return;
   }
 
@@ -26,7 +26,7 @@
     return originalOnMessage(message);
   };
 
-  globalScope.__PIGMA_CLEAR_FRAME_GUIDES_PATCH__ = true;
+  globalScope.__PIGER_CLEAR_FRAME_GUIDES_PATCH__ = true;
 
   function isClearFrameGuidesMessage(message) {
     return !!message && message.type === "run-clear-frame-guides";

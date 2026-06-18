@@ -1,10 +1,10 @@
 ;(()=>{
-  // PIGMA_EXPORT_BOUNDARY::SOURCE_OF_TRUTH
+  // PIGER_EXPORT_BOUNDARY::SOURCE_OF_TRUTH
   // Keep export-only message guards in this file so PSD export changes can
   // evolve without touching PSD import post-processing.
-  // PIGMA_EXPORT_BOUNDARY::MESSAGE_TYPES
-  // PIGMA_EXPORT_BOUNDARY::NORMALIZE_SETTINGS
-  // PIGMA_EXPORT_BOUNDARY::LONG_EDITABLE_SEGMENTS
+  // PIGER_EXPORT_BOUNDARY::MESSAGE_TYPES
+  // PIGER_EXPORT_BOUNDARY::NORMALIZE_SETTINGS
+  // PIGER_EXPORT_BOUNDARY::LONG_EDITABLE_SEGMENTS
   const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
   const originalOnMessage = figma.ui.onmessage;
   const originalPostMessage = figma.ui.postMessage.bind(figma.ui);
@@ -27,15 +27,15 @@
   const LONG_EDITABLE_WHITESPACE_CAPTURE_MIN = 8;
   const LONG_EDITABLE_WHITESPACE_CAPTURE_MAX = 160;
   const LONG_EDITABLE_WHITESPACE_EDGE_TOLERANCE = 4;
-  const PIGMA_EXPORT_TEMP_NODE_NAMES = Object.freeze([
-    "__pigma-mask-preview__",
-    "__pigma-background-blur-crop__",
-    "__pigma-vector-preview__",
-    "__pigma-text-preview-padding__",
-    "__pigma-text-visual-probe__",
-    "__pigma-long-frame-tile__"
+  const PIGER_EXPORT_TEMP_NODE_NAMES = Object.freeze([
+    "__piger-mask-preview__",
+    "__piger-background-blur-crop__",
+    "__piger-vector-preview__",
+    "__piger-text-preview-padding__",
+    "__piger-text-visual-probe__",
+    "__piger-long-frame-tile__"
   ]);
-  const PIGMA_EXPORT_TEMP_NODE_NAME_SET = new Set(PIGMA_EXPORT_TEMP_NODE_NAMES);
+  const PIGER_EXPORT_TEMP_NODE_NAME_SET = new Set(PIGER_EXPORT_TEMP_NODE_NAMES);
   let activeEditableSegmentSession = null;
 
   if (typeof originalOnMessage !== "function") {
@@ -576,7 +576,7 @@
       };
     } catch (error) {
       try {
-        console.warn("[pigma][long-editable-section-split]", error);
+        console.warn("[piger][long-editable-section-split]", error);
       } catch (warnError) {
       }
       return null;
@@ -584,7 +584,7 @@
   }
 
   function getSplitLongFrameApi() {
-    const api = globalScope.__PIGMA_SPLIT_LONG_FRAME_API__;
+    const api = globalScope.__PIGER_SPLIT_LONG_FRAME_API__;
     return api && typeof api === "object" ? api : null;
   }
 
@@ -1005,28 +1005,28 @@
 
   function cleanupExportMemory(reason) {
     cleanupEditableSegmentSession();
-    cleanupOrphanPigmaExportNodes(reason);
+    cleanupOrphanPigerExportNodes(reason);
   }
 
-  function cleanupOrphanPigmaExportNodes(reason) {
+  function cleanupOrphanPigerExportNodes(reason) {
     let removedCount = 0;
     try {
       const pages = figma.currentPage ? [figma.currentPage] : [];
       for (let index = 0; index < pages.length; index += 1) {
-        removedCount += cleanupPigmaExportTempDescendants(pages[index]);
+        removedCount += cleanupPigerExportTempDescendants(pages[index]);
       }
     } catch (error) {
     }
 
     if (removedCount > 0) {
       try {
-        console.info("[pigma][export-memory-cleanup]", reason || "export", "removed", removedCount);
+        console.info("[piger][export-memory-cleanup]", reason || "export", "removed", removedCount);
       } catch (error) {
       }
     }
   }
 
-  function cleanupPigmaExportTempDescendants(parent) {
+  function cleanupPigerExportTempDescendants(parent) {
     try {
       if (!parent || !("children" in parent) || !Array.isArray(parent.children)) {
         return 0;
@@ -1040,14 +1040,14 @@
           continue;
         }
 
-        if (isPigmaExportTempNode(child)) {
+        if (isPigerExportTempNode(child)) {
           if (removeNodeSafely(child)) {
             removedCount += 1;
           }
           continue;
         }
 
-        removedCount += cleanupPigmaExportTempDescendants(child);
+        removedCount += cleanupPigerExportTempDescendants(child);
       }
 
       return removedCount;
@@ -1056,10 +1056,10 @@
     }
   }
 
-  function isPigmaExportTempNode(node) {
+  function isPigerExportTempNode(node) {
     try {
       const name = node && typeof node.name === "string" ? node.name : "";
-      return PIGMA_EXPORT_TEMP_NODE_NAME_SET.has(name);
+      return PIGER_EXPORT_TEMP_NODE_NAME_SET.has(name);
     } catch (error) {
       return false;
     }

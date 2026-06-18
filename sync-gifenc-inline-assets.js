@@ -6,8 +6,8 @@ const root = __dirname;
 const uiPath = path.join(root, "ui.html");
 const assetPath = path.join(root, "vendor", "gifenc.esm.js");
 
-const startMarker = "<!-- PIGMA_GIFENC_ASSET_BUNDLE:START -->";
-const endMarker = "<!-- PIGMA_GIFENC_ASSET_BUNDLE:END -->";
+const startMarker = "<!-- PIGER_GIFENC_ASSET_BUNDLE:START -->";
+const endMarker = "<!-- PIGER_GIFENC_ASSET_BUNDLE:END -->";
 
 function readUtf8(filePath) {
   return fs.readFileSync(filePath, "utf8");
@@ -32,7 +32,7 @@ function buildAssetBlock() {
   return [
     startMarker,
     "    <script>",
-    "      window.__PIGMA_GIFENC_INLINE_ASSETS__ = Object.freeze({",
+    "      window.__PIGER_GIFENC_INLINE_ASSETS__ = Object.freeze({",
     `        contentHash: ${JSON.stringify(contentHash)},`,
     `        moduleBase64: ${JSON.stringify(moduleBase64)},`,
     "      });",

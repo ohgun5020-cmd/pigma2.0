@@ -1,5 +1,5 @@
 {
-  "name": "Pigma - Figma to PSD",
+  "name": "PIGER - PSD-ready handoff",
   "id": "1648522749593358950",
   "api": "1.0.0",
   "main": "code.patched.js",
@@ -24,6 +24,6 @@
     "devAllowedDomains": [
       "http://localhost:3000"
     ],
-    "reasoning": "Calls user-configured AI APIs, reads PIGMA web account plan status, fetches design reference/color palette data, and can load externally hosted PDF.js and Ghostscript import assets."
+    "reasoning": "Calls user-configured AI APIs, reads PIGER web account plan status, fetches design reference/color palette data, and can load externally hosted PDF.js and Ghostscript import assets."
   }
 }

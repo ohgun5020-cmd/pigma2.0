@@ -1,6 +1,6 @@
 ;(() => {
   const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
-  if (globalScope.__PIGMA_AI_IMAGE_SHARED_BRIDGE_PATCH__) {
+  if (globalScope.__PIGER_AI_IMAGE_SHARED_BRIDGE_PATCH__) {
     return;
   }
 
@@ -222,7 +222,7 @@
     return originalOnMessage(message);
   };
 
-  globalScope.__PIGMA_AI_IMAGE_SHARED_BRIDGE_PATCH__ = true;
+  globalScope.__PIGER_AI_IMAGE_SHARED_BRIDGE_PATCH__ = true;
 
   function isAiImageSharedBridgeMessage(message) {
     return (
@@ -2327,7 +2327,7 @@
     const preview = figma.createFrame();
     let clone = null;
     try {
-      preview.name = "__pigma-image-extend-source-bounds__";
+      preview.name = "__piger-image-extend-source-bounds__";
       preview.resize(bounds.width, bounds.height);
       preview.clipsContent = true;
       preview.fills = [];
@@ -3141,7 +3141,7 @@
       );
       return bytes && typeof bytes.length === "number" && bytes.length > 0 ? bytes : null;
     } catch (error) {
-      console.warn("[pigma] image merge direct export fallback:", normalizeErrorMessage(error, "direct export failed"));
+      console.warn("[piger] image merge direct export fallback:", normalizeErrorMessage(error, "direct export failed"));
       return null;
     }
   }
@@ -3154,7 +3154,7 @@
     let slice = null;
     try {
       slice = figma.createSlice();
-      slice.name = "__pigma-image-merge-slice__";
+      slice.name = "__piger-image-merge-slice__";
       slice.x = unionRect.x;
       slice.y = unionRect.y;
       slice.resize(Math.max(1, unionRect.width), Math.max(1, unionRect.height));
@@ -3169,7 +3169,7 @@
       const bytes = await withImageMergeTimeout(slice.exportAsync(exportSettings), timeoutMs, "이미지 합치기 slice export");
       return bytes && typeof bytes.length === "number" && bytes.length > 0 ? bytes : null;
     } catch (error) {
-      console.warn("[pigma] image merge slice export fallback:", normalizeErrorMessage(error, "slice export failed"));
+      console.warn("[piger] image merge slice export fallback:", normalizeErrorMessage(error, "slice export failed"));
       return null;
     } finally {
       if (slice && !slice.removed) {
@@ -3362,7 +3362,7 @@
     const preview = figma.createFrame();
     const clones = [];
     try {
-      preview.name = "__pigma-image-merge-preview__";
+      preview.name = "__piger-image-merge-preview__";
       preview.resize(unionRect.width, unionRect.height);
       preview.clipsContent = true;
       preview.fills = [];
@@ -4857,8 +4857,8 @@
     }
 
     try {
-      node.setPluginData("__pigmaTextOverlay", "1");
-      node.setPluginData("__pigmaTextOverlayRole", String(role || ""));
+      node.setPluginData("__pigerTextOverlay", "1");
+      node.setPluginData("__pigerTextOverlayRole", String(role || ""));
     } catch (error) {}
   }
 
@@ -6166,7 +6166,7 @@
 
     const placeholder = figma.createRectangle();
     try {
-      placeholder.name = "__pigma-shape-source-placeholder__";
+      placeholder.name = "__piger-shape-source-placeholder__";
       placeholder.resize(width, height);
       placeholder.fills = [createSolidPaintFromColor("#f4f4f5", 1)];
       placeholder.strokes = [];
@@ -7430,7 +7430,7 @@
     let clonedNode = null;
 
     try {
-      preview.name = "__pigma-bounds-fit-preview__";
+      preview.name = "__piger-bounds-fit-preview__";
       preview.resize(visibleRect.width, visibleRect.height);
       preview.clipsContent = true;
       preview.fills = [];
@@ -8088,7 +8088,7 @@
     let flattenedNode = null;
 
     try {
-      probe.name = "__pigma-bounds-fit-text-probe__";
+      probe.name = "__piger-bounds-fit-text-probe__";
       probe.resize(layoutRect.width, layoutRect.height);
       probe.clipsContent = false;
       probe.fills = [];

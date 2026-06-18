@@ -1,6 +1,6 @@
 ;(() => {
   const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
-  if (globalScope.__PIGMA_AI_RESPONSIVE_PAIR_ANALYZER_PATCH__) {
+  if (globalScope.__PIGER_AI_RESPONSIVE_PAIR_ANALYZER_PATCH__) {
     return;
   }
 
@@ -98,7 +98,7 @@
     return originalOnMessage(message);
   };
 
-  globalScope.__PIGMA_AI_RESPONSIVE_PAIR_ANALYZER_PATCH__ = true;
+  globalScope.__PIGER_AI_RESPONSIVE_PAIR_ANALYZER_PATCH__ = true;
 
   function isResponsivePairAnalyzerMessage(message) {
     return !!message && message.type === "run-responsive-pair-analysis";
@@ -5271,7 +5271,7 @@
   }
 
   function getResponsiveMemoryHelper() {
-    const memory = globalScope.__PIGMA_RESPONSIVE_MEMORY__;
+    const memory = globalScope.__PIGER_RESPONSIVE_MEMORY__;
     if (!memory || typeof memory.appendRecordsAsync !== "function" || typeof memory.summarizeStore !== "function") {
       throw new Error("Responsive memory 저장소를 찾지 못했습니다. 메모리 패치를 먼저 로드해 주세요.");
     }
@@ -5576,7 +5576,7 @@
   }
 
   function normalizeErrorMessage(error) {
-    const memory = globalScope.__PIGMA_RESPONSIVE_MEMORY__;
+    const memory = globalScope.__PIGER_RESPONSIVE_MEMORY__;
     if (memory && typeof memory.normalizeErrorMessage === "function") {
       return memory.normalizeErrorMessage(error);
     }

@@ -1,9 +1,9 @@
 ;(() => {
-  // PIGMA_PSD_ORIGINAL_IMAGE_SMART_OBJECT::SOURCE_OF_TRUTH
+  // PIGER_PSD_ORIGINAL_IMAGE_SMART_OBJECT::SOURCE_OF_TRUTH
   // Adds original IMAGE fill bytes to simple bitmap PSD layers so Photoshop can
   // open the layer as a Smart Object at the original image dimensions.
   const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
-  const PATCH_FLAG = "__PIGMA_PSD_ORIGINAL_IMAGE_SMART_OBJECT_PATCH__";
+  const PATCH_FLAG = "__PIGER_PSD_ORIGINAL_IMAGE_SMART_OBJECT_PATCH__";
   const SCAN_YIELD_INTERVAL = 96;
   const READ_YIELD_INTERVAL = 4;
   const AXIS_EPSILON = 0.0001;
@@ -38,7 +38,7 @@
           enrichExportRootReadyMessage(message);
         }
       } catch (error) {
-        console.warn("[pigma-original-smart-object] Could not enrich PSD payload.", error);
+        console.warn("[piger-original-smart-object] Could not enrich PSD payload.", error);
       }
 
       const result = originalPostMessage(message);
@@ -50,7 +50,7 @@
       return result;
     };
   } catch (error) {
-    console.warn("[pigma-original-smart-object] Could not wrap postMessage.", error);
+    console.warn("[piger-original-smart-object] Could not wrap postMessage.", error);
   }
 
   function isExportStartMessage(message) {
@@ -70,7 +70,7 @@
       originalSmartObjectCache = await collectOriginalSmartObjectSources(message);
     } catch (error) {
       originalSmartObjectCache = new Map();
-      console.warn("[pigma-original-smart-object] Original image source scan failed.", error);
+      console.warn("[piger-original-smart-object] Original image source scan failed.", error);
     }
   }
 

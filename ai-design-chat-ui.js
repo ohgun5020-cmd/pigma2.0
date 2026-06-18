@@ -1,12 +1,12 @@
 (() => {
-  if (window.__PIGMA_AI_DESIGN_CHAT_UI__) {
+  if (window.__PIGER_AI_DESIGN_CHAT_UI__) {
     return;
   }
 
-  const shared = window.__PIGMA_AI_IMAGE_UPSCALE_SHARED__ || null;
+  const shared = window.__PIGER_AI_IMAGE_UPSCALE_SHARED__ || null;
 
-  const STORAGE_KEY = "pigma:ai-design-chat:threads:v1";
-  const MODEL_STORAGE_KEY = "pigma:ai-design-chat:model:v1";
+  const STORAGE_KEY = "piger:ai-design-chat:threads:v1";
+  const MODEL_STORAGE_KEY = "piger:ai-design-chat:model:v1";
   const AUTO_MODEL_KEY = "auto";
   const DEFAULT_OPENAI_MODEL = "gpt-5.4-mini";
   const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
@@ -142,12 +142,12 @@
     !hasInput(elements.input) ||
     !hasButton(elements.sendButton)
   ) {
-    window.__PIGMA_AI_DESIGN_CHAT_UI_BOOT__ = "missing-elements";
+    window.__PIGER_AI_DESIGN_CHAT_UI_BOOT__ = "missing-elements";
     console.error("[ai-design-chat-ui] required elements are missing or not ready");
     return;
   }
 
-  window.__PIGMA_AI_DESIGN_CHAT_UI_BOOT__ = "started";
+  window.__PIGER_AI_DESIGN_CHAT_UI_BOOT__ = "started";
 
   let previewObjectUrl = "";
   const pendingAnnotationRequests = new Map();
@@ -212,7 +212,7 @@
   }
 
   function readCurrentAiSettings() {
-    const source = window.__PIGMA_AI_SETTINGS__ && typeof window.__PIGMA_AI_SETTINGS__ === "object" ? window.__PIGMA_AI_SETTINGS__ : {};
+    const source = window.__PIGER_AI_SETTINGS__ && typeof window.__PIGER_AI_SETTINGS__ === "object" ? window.__PIGER_AI_SETTINGS__ : {};
     return {
       provider: source.provider === "gemini" ? "gemini" : "openai",
       openAiTextModel: normalizeModelId(source.openAiTextModel, DEFAULT_OPENAI_MODEL),
@@ -540,7 +540,7 @@
   }
 
   function readDebugMode() {
-    return window.__PIGMA_AI_CORRECTION_DEBUG_MODE__ === true || document.documentElement.dataset.aiCorrectionDebugMode === "true";
+    return window.__PIGER_AI_CORRECTION_DEBUG_MODE__ === true || document.documentElement.dataset.aiCorrectionDebugMode === "true";
   }
 
   function isDetailsElement(element) {
@@ -2888,7 +2888,7 @@
 
   function openPromptDraft(messageId) {
     const message = getCurrentMessages().find((entry) => entry && entry.id === messageId);
-    const promptModal = window.__PIGMA_AI_IMAGE_PROMPT_MODAL__;
+    const promptModal = window.__PIGER_AI_IMAGE_PROMPT_MODAL__;
     if (!message) {
       return;
     }
@@ -3216,11 +3216,11 @@
   }
 
   window.addEventListener("message", handlePluginMessage);
-  window.addEventListener("pigma:debug-mode-changed", (event) => {
+  window.addEventListener("piger:debug-mode-changed", (event) => {
     state.debugModeEnabled = event && event.detail && event.detail.enabled === true;
     render();
   });
-  window.addEventListener("pigma:ai-settings-changed", () => {
+  window.addEventListener("piger:ai-settings-changed", () => {
     renderModelSelect();
   });
   window.addEventListener("beforeunload", () => {
@@ -3241,6 +3241,6 @@
     scheduleAutoCapture();
   }
 
-  window.__PIGMA_AI_DESIGN_CHAT_UI_LIVE__ = true;
-  window.__PIGMA_AI_DESIGN_CHAT_UI__ = true;
+  window.__PIGER_AI_DESIGN_CHAT_UI_LIVE__ = true;
+  window.__PIGER_AI_DESIGN_CHAT_UI__ = true;
 })();

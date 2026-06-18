@@ -1,11 +1,11 @@
 ;(() => {
   const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
-  if (globalScope.__PIGMA_WEB_INTEGRATION_PATCH__) {
+  if (globalScope.__PIGER_WEB_INTEGRATION_PATCH__) {
     return;
   }
 
   const originalOnMessage = figma.ui.onmessage;
-  const WEB_AUTH_KEY = "pigma:web-auth:v1";
+  const WEB_AUTH_KEY = "piger:web-auth:v1";
   const DEFAULT_WEB_AUTH = Object.freeze({
     serverUrl: "https://oy-tools-production.up.railway.app",
     accessToken: ""
@@ -16,27 +16,27 @@
   }
 
   figma.ui.onmessage = async message => {
-    if (isPigmaWebMessage(message)) {
-      if (message.type === "pigma-web-auth-get") {
+    if (isPigerWebMessage(message)) {
+      if (message.type === "piger-web-auth-get") {
         await postWebAuthState();
         return;
       }
 
-      if (message.type === "pigma-web-auth-save") {
+      if (message.type === "piger-web-auth-save") {
         await writeWebAuth(message.settings);
         await postWebAuthState();
-        figma.notify("Pigma web connection saved.", { timeout: 1600 });
+        figma.notify("PIGER web connection saved.", { timeout: 1600 });
         return;
       }
 
-      if (message.type === "pigma-web-auth-clear") {
+      if (message.type === "piger-web-auth-clear") {
         await writeWebAuth(DEFAULT_WEB_AUTH);
         await postWebAuthState();
-        figma.notify("Pigma 로그아웃했습니다.", { timeout: 1600 });
+        figma.notify("PIGER signed out.", { timeout: 1600 });
         return;
       }
 
-      if (message.type === "pigma-web-open-url") {
+      if (message.type === "piger-web-open-url") {
         openExternalUrl(message.url);
         return;
       }
@@ -45,21 +45,21 @@
     return originalOnMessage(message);
   };
 
-  globalScope.__PIGMA_WEB_INTEGRATION_PATCH__ = true;
+  globalScope.__PIGER_WEB_INTEGRATION_PATCH__ = true;
 
-  function isPigmaWebMessage(message) {
+  function isPigerWebMessage(message) {
     return (
       !!message &&
-      (message.type === "pigma-web-auth-get" ||
-        message.type === "pigma-web-auth-save" ||
-        message.type === "pigma-web-auth-clear" ||
-        message.type === "pigma-web-open-url")
+      (message.type === "piger-web-auth-get" ||
+        message.type === "piger-web-auth-save" ||
+        message.type === "piger-web-auth-clear" ||
+        message.type === "piger-web-open-url")
     );
   }
 
   async function postWebAuthState() {
     figma.ui.postMessage({
-      type: "pigma-web-auth-state",
+      type: "piger-web-auth-state",
       state: await readWebAuth()
     });
   }

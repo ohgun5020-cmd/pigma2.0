@@ -10,7 +10,7 @@ const defaultFiles = [
   { file: "psd-export-boundary.js" },
   { file: "psd-shape-layer-export.js" },
   { file: "ai-settings-storage.js" },
-  { file: "pigma-web-integration.js" },
+  { file: "piger-web-integration.js" },
   { file: "ai-responsive-memory.js" },
   { file: "ai-responsive-pair-analyzer.js" },
   { file: "ai-llm-client.js" },

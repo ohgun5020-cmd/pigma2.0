@@ -1,6 +1,6 @@
 ;(() => {
   const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
-  if (globalScope.__PIGMA_BUTTON_TEXT_AUTO_SIZE_PATCH__) {
+  if (globalScope.__PIGER_BUTTON_TEXT_AUTO_SIZE_PATCH__) {
     return;
   }
 
@@ -35,7 +35,7 @@
     return originalOnMessage(message);
   };
 
-  globalScope.__PIGMA_BUTTON_TEXT_AUTO_SIZE_PATCH__ = true;
+  globalScope.__PIGER_BUTTON_TEXT_AUTO_SIZE_PATCH__ = true;
 
   function isButtonTextAutoSizeMessage(message) {
     return !!message && message.type === "run-button-text-auto-size";
@@ -889,7 +889,7 @@
     try {
       await figma.loadAllPagesAsync();
     } catch (error) {
-      console.warn("[pigma] button text auto size selection preload failed:", error);
+      console.warn("[piger] button text auto size selection preload failed:", error);
     }
   }
 

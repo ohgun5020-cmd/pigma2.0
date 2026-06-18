@@ -1,6 +1,6 @@
 ;(() => {
   const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
-  if (globalScope.__PIGMA_COPY_PROTOTYPE_LINK_PATCH__) {
+  if (globalScope.__PIGER_COPY_PROTOTYPE_LINK_PATCH__) {
     return;
   }
 
@@ -25,7 +25,7 @@
     return originalOnMessage(message);
   };
 
-  globalScope.__PIGMA_COPY_PROTOTYPE_LINK_PATCH__ = true;
+  globalScope.__PIGER_COPY_PROTOTYPE_LINK_PATCH__ = true;
 
   function isCopyPrototypeLinkMessage(message) {
     return !!message && message.type === "run-copy-prototype-link";

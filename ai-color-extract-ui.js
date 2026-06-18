@@ -13,7 +13,7 @@
         "*"
       );
     } catch (error) {
-      console.error("[pigma] failed to report color extract init error:", error);
+      console.error("[piger] failed to report color extract init error:", error);
     }
   }
 
@@ -24,19 +24,19 @@
         ? message.trim()
         : "Extract Colors could not initialize. Reopen the plugin.";
 
-    window.__PIGMA_AI_COLOR_EXTRACT_V2_INIT_FAILED__ = normalizedMessage;
+    window.__PIGER_AI_COLOR_EXTRACT_V2_INIT_FAILED__ = normalizedMessage;
     if (error) {
-      console.error("[pigma] ai color extract V2 init failed:", error);
+      console.error("[piger] ai color extract V2 init failed:", error);
     }
 
     if (!(button instanceof HTMLButtonElement)) {
       return;
     }
-    if (button.dataset.pigmaColorExtractInitFailureBound === "true") {
+    if (button.dataset.pigerColorExtractInitFailureBound === "true") {
       return;
     }
 
-    button.dataset.pigmaColorExtractInitFailureBound = "true";
+    button.dataset.pigerColorExtractInitFailureBound = "true";
     button.disabled = false;
     button.setAttribute("aria-busy", "false");
     button.setAttribute("aria-disabled", "false");
@@ -47,13 +47,13 @@
     });
   }
 
-  if (window.__PIGMA_AI_COLOR_EXTRACT_V2__) {
+  if (window.__PIGER_AI_COLOR_EXTRACT_V2__) {
     return;
   }
 
   try {
 
-  const shared = window.__PIGMA_AI_IMAGE_UPSCALE_SHARED__;
+  const shared = window.__PIGER_AI_IMAGE_UPSCALE_SHARED__;
   if (
     !shared ||
     typeof shared.postPluginMessage !== "function" ||
@@ -86,8 +86,8 @@
   }
 
   function translateUiMessage(message) {
-    if (typeof window.__PIGMA_TRANSLATE_UI_TEXT__ === "function") {
-      return window.__PIGMA_TRANSLATE_UI_TEXT__(message);
+    if (typeof window.__PIGER_TRANSLATE_UI_TEXT__ === "function") {
+      return window.__PIGER_TRANSLATE_UI_TEXT__(message);
     }
     return String(message ?? "");
   }
@@ -112,7 +112,7 @@
   const geminiModel = "gemini-2.5-flash-lite";
   const processingToast = shared.ensureProcessingToast();
   const toastOwnerKey = "ai-image:aiColorExtractButton";
-  const serverAiBridge = window.__PIGMA_SERVER_AI_BRIDGE__;
+  const serverAiBridge = window.__PIGER_SERVER_AI_BRIDGE__;
   const peerButtons = [
     "aiImageReferenceSearchButton",
     "aiOriginalImageDownloadButton",
@@ -258,14 +258,14 @@
     return peerButtons.some(
       (peerButton) =>
         peerButton.getAttribute("aria-busy") === "true" ||
-        peerButton.dataset.pigmaBusy === "true"
+        peerButton.dataset.pigerBusy === "true"
     );
   }
 
   function setButtonBusy(busy, label) {
     isBusy = busy;
     button.disabled = busy;
-    button.dataset.pigmaBusy = busy ? "true" : "false";
+    button.dataset.pigerBusy = busy ? "true" : "false";
     button.setAttribute("aria-busy", busy ? "true" : "false");
     button.setAttribute("aria-disabled", busy ? "true" : "false");
     button.textContent = translateUiMessage(busy ? label : defaultLabel);
@@ -744,7 +744,7 @@
 
   async function requestServerAiColorPalette(payload, signal) {
     if (!serverAiBridge || typeof serverAiBridge.requestJson !== "function") {
-      throw new Error("Pigma 서버 AI 연결을 사용할 수 없습니다.");
+      throw new Error("PIGER 서버 AI 연결을 사용할 수 없습니다.");
     }
     const prompt = buildColorExtractPrompt(payload);
     const image = await prepareImagePayloadForAi(payload && payload.image);
@@ -2000,7 +2000,7 @@
     } catch (error) {
       adobeTrendThumbnailPaletteCache.delete(url);
       if (!shared.isAbortError(error)) {
-        console.warn("[pigma] adobe thumbnail swatch extraction failed:", url, error);
+        console.warn("[piger] adobe thumbnail swatch extraction failed:", url, error);
       }
       return [];
     }
@@ -2058,7 +2058,7 @@
           return;
         }
         settled = true;
-        console.warn("[pigma] timed out " + label + "; continuing with the local palette.");
+        console.warn("[piger] timed out " + label + "; continuing with the local palette.");
         resolve(fallback);
       }, safeTimeout);
 
@@ -2081,7 +2081,7 @@
             reject(error);
             return;
           }
-          console.warn("[pigma] failed " + label + "; continuing with the local palette:", error);
+          console.warn("[piger] failed " + label + "; continuing with the local palette:", error);
           resolve(fallback);
         }
       );
@@ -2859,7 +2859,7 @@
         throw error;
       }
       aiError = error;
-      console.warn("[pigma] ai color extract AI analysis failed:", error);
+      console.warn("[piger] ai color extract AI analysis failed:", error);
     }
 
     const needsFallback = !!aiError || paletteNeedsFallback(aiResult);
@@ -3074,7 +3074,7 @@
   });
 
   button.textContent = translateUiMessage(defaultLabel);
-  window.__PIGMA_AI_COLOR_EXTRACT_V2__ = true;
+  window.__PIGER_AI_COLOR_EXTRACT_V2__ = true;
   } catch (error) {
     bindColorExtractInitFailure("Extract Colors initialization failed. Reopen the plugin.", error);
   }

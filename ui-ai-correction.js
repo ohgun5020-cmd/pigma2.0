@@ -1,9 +1,9 @@
 (() => {
-  if (window.__PIGMA_AI_LLM_UI_BRIDGE__) {
+  if (window.__PIGER_AI_LLM_UI_BRIDGE__) {
     return;
   }
 
-  window.__PIGMA_AI_LLM_UI_BRIDGE__ = true;
+  window.__PIGER_AI_LLM_UI_BRIDGE__ = true;
   const AI_UI_BRIDGE_RETRY_DELAYS_MS = [500, 1500];
 
   window.addEventListener("message", async (event) => {
@@ -294,7 +294,7 @@
 })();
 
 (() => {
-  if (window.__PIGMA_AI_CORRECTION__) {
+  if (window.__PIGER_AI_CORRECTION__) {
     return;
   }
 
@@ -337,7 +337,7 @@
         ariaLabel: "숨겨진 레이어 삭제. 현재 선택 내부의 숨겨진 레이어를 정리하기 위한 준비 단계입니다.",
       },
     };
-    const AI_READ_SUMMARY_OPEN_KEY = "pigma:ai-read-summary-open:v1";
+    const AI_READ_SUMMARY_OPEN_KEY = "piger:ai-read-summary-open:v1";
     const elements = {
       summaryPanel: document.getElementById("aiReadSummaryPanel"),
       panelTitle: document.getElementById("aiReadPanelTitle"),
@@ -917,7 +917,7 @@
       attributeFilter: ["hidden", "class"],
     });
 
-    window.__PIGMA_AI_CORRECTION__ = {
+    window.__PIGER_AI_CORRECTION__ = {
       activate: activateAiTab,
       deactivate: deactivateAiTab,
       requestCachedDesignRead,
@@ -926,7 +926,7 @@
 
   return;
 
-  /* PIGMA_DEAD_UI_BLOCK: legacy AI correction bootstrap left only as a disabled
+  /* PIGER_DEAD_UI_BLOCK: legacy AI correction bootstrap left only as a disabled
      reference copy. Runtime source of truth currently lives in ui.html.
 
   const root = document.documentElement;
@@ -960,7 +960,7 @@
     },
   };
 
-  const AI_READ_SUMMARY_OPEN_KEY = "pigma:ai-read-summary-open:v1";
+  const AI_READ_SUMMARY_OPEN_KEY = "piger:ai-read-summary-open:v1";
   const elements = {
     summaryPanel: document.getElementById("aiReadSummaryPanel"),
     panelTitle: document.getElementById("aiReadPanelTitle"),
@@ -1112,7 +1112,7 @@
   };
 
   const isDebugModeEnabled = () =>
-    window.__PIGMA_AI_CORRECTION_DEBUG_MODE__ === true ||
+    window.__PIGER_AI_CORRECTION_DEBUG_MODE__ === true ||
     document.documentElement.dataset.aiCorrectionDebugMode === "true";
 
   const syncDeveloperOnlyVisibility = () => {
@@ -1441,7 +1441,7 @@
     attributeFilter: ["hidden", "class"],
   });
 
-  window.__PIGMA_AI_CORRECTION__ = {
+  window.__PIGER_AI_CORRECTION__ = {
     activate: activateAiTab,
     deactivate: deactivateAiTab,
     requestCachedDesignRead,
@@ -1450,7 +1450,7 @@
 })();
 
 (() => {
-  if (window.__PIGMA_AI_DESIGN_CONSISTENCY_UI__) {
+  if (window.__PIGER_AI_DESIGN_CONSISTENCY_UI__) {
     return;
   }
 
@@ -2084,7 +2084,7 @@
   elements.readButton.addEventListener("click", applyAccessibilityLabels);
   elements.button.addEventListener("click", runDiagnosis);
   elements.clearButton.addEventListener("click", runClearAnnotations);
-  window.addEventListener("pigma:debug-mode-changed", syncDeveloperOnlyVisibility);
+  window.addEventListener("piger:debug-mode-changed", syncDeveloperOnlyVisibility);
 
   elements.insightList.addEventListener("click", (event) => {
     const button = event.target instanceof Element ? event.target.closest("button[data-consistency-issue-id]") : null;
@@ -2192,7 +2192,7 @@
   syncDeveloperOnlyVisibility();
   syncButtonState();
 
-  window.__PIGMA_AI_DESIGN_CONSISTENCY_UI__ = {
+  window.__PIGER_AI_DESIGN_CONSISTENCY_UI__ = {
     requestCached: () => postPluginMessage({ type: "request-ai-design-consistency-cache" }),
   };
 })();
@@ -2200,8 +2200,8 @@
 
 (() => {
   if (
-    window.__PIGMA_AI_CORRECTION_TYPO_AUDIT__ &&
-    window.__PIGMA_AI_CORRECTION_TYPO_AUDIT__.profileModal === true
+    window.__PIGER_AI_CORRECTION_TYPO_AUDIT__ &&
+    window.__PIGER_AI_CORRECTION_TYPO_AUDIT__.profileModal === true
   ) {
     return;
   }
@@ -2210,7 +2210,7 @@
   const postPluginMessage = (message) => {
     parent.postMessage({ pluginMessage: message }, "*");
   };
-  const PANEL_STATE_KEY = "pigma:ai-typo-audit-open:v1";
+  const PANEL_STATE_KEY = "piger:ai-typo-audit-open:v1";
   const elements = {
     panel: document.getElementById("aiTypoAuditPanel"),
     panelTitle: document.getElementById("aiTypoAuditPanelTitle"),
@@ -2498,7 +2498,7 @@
     closeAuditModal();
     const profile = auditProfile === "speed" ? "speed" : "quality";
     const profileLabel = getAuditProfileLabel(profile);
-    window.__PIGMA_AI_CORRECTION_PANEL_VISIBILITY__?.revealAndFocusPanel(elements.panel);
+    window.__PIGER_AI_CORRECTION_PANEL_VISIBILITY__?.revealAndFocusPanel(elements.panel);
     setButtonBusy(true);
     setStatus("running", "검수 중");
     elements.panelTitle.textContent = `${profileLabel} 오타 검수 진행 중`;
@@ -2575,10 +2575,10 @@
   requestCachedResult();
 
   if (
-    window.__PIGMA_AI_CORRECTION_TAB_WATCHER__ &&
-    typeof window.__PIGMA_AI_CORRECTION_TAB_WATCHER__.subscribe === "function"
+    window.__PIGER_AI_CORRECTION_TAB_WATCHER__ &&
+    typeof window.__PIGER_AI_CORRECTION_TAB_WATCHER__.subscribe === "function"
   ) {
-    window.__PIGMA_AI_CORRECTION_TAB_WATCHER__.subscribe((active) => {
+    window.__PIGER_AI_CORRECTION_TAB_WATCHER__.subscribe((active) => {
       if (active) {
         requestCachedResult();
       }
@@ -2595,7 +2595,7 @@
     });
   }
 
-  window.__PIGMA_AI_CORRECTION_TYPO_AUDIT__ = {
+  window.__PIGER_AI_CORRECTION_TYPO_AUDIT__ = {
     requestCachedResult,
     profileModal: true,
   };
@@ -2606,7 +2606,7 @@
   const postPluginMessage = (message) => {
     parent.postMessage({ pluginMessage: message }, "*");
   };
-  const PANEL_STATE_KEY = "pigma:ai-typo-fix-open:v1";
+  const PANEL_STATE_KEY = "piger:ai-typo-fix-open:v1";
   const elements = {
     panel: document.getElementById("aiTypoFixPanel"),
     panelTitle: document.getElementById("aiTypoFixPanelTitle"),
@@ -2905,10 +2905,10 @@
   requestCachedResult();
 
   if (
-    window.__PIGMA_AI_CORRECTION_TAB_WATCHER__ &&
-    typeof window.__PIGMA_AI_CORRECTION_TAB_WATCHER__.subscribe === "function"
+    window.__PIGER_AI_CORRECTION_TAB_WATCHER__ &&
+    typeof window.__PIGER_AI_CORRECTION_TAB_WATCHER__.subscribe === "function"
   ) {
-    window.__PIGMA_AI_CORRECTION_TAB_WATCHER__.subscribe((active) => {
+    window.__PIGER_AI_CORRECTION_TAB_WATCHER__.subscribe((active) => {
       if (active) {
         requestCachedResult();
       }
@@ -2925,13 +2925,13 @@
     });
   }
 
-window.__PIGMA_AI_CORRECTION_TYPO_FIX__ = {
+window.__PIGER_AI_CORRECTION_TYPO_FIX__ = {
     requestCachedResult,
   };
 })();
 
 (() => {
-  if (window.__PIGMA_AI_CORRECTION_PIXEL_PERFECT__) {
+  if (window.__PIGER_AI_CORRECTION_PIXEL_PERFECT__) {
     return;
   }
 
@@ -2939,7 +2939,7 @@ window.__PIGMA_AI_CORRECTION_TYPO_FIX__ = {
   const postPluginMessage = (message) => {
     parent.postMessage({ pluginMessage: message }, "*");
   };
-  const PANEL_STATE_KEY = "pigma:ai-pixel-perfect-open:v1";
+  const PANEL_STATE_KEY = "piger:ai-pixel-perfect-open:v1";
   const elements = {
     panel: document.getElementById("aiPixelPerfectPanel"),
     panelTitle: document.getElementById("aiPixelPerfectPanelTitle"),
@@ -3254,10 +3254,10 @@ window.__PIGMA_AI_CORRECTION_TYPO_FIX__ = {
   requestCachedResult();
 
   if (
-    window.__PIGMA_AI_CORRECTION_TAB_WATCHER__ &&
-    typeof window.__PIGMA_AI_CORRECTION_TAB_WATCHER__.subscribe === "function"
+    window.__PIGER_AI_CORRECTION_TAB_WATCHER__ &&
+    typeof window.__PIGER_AI_CORRECTION_TAB_WATCHER__.subscribe === "function"
   ) {
-    window.__PIGMA_AI_CORRECTION_TAB_WATCHER__.subscribe((active) => {
+    window.__PIGER_AI_CORRECTION_TAB_WATCHER__.subscribe((active) => {
       if (active) {
         requestCachedResult();
       }
@@ -3274,13 +3274,13 @@ window.__PIGMA_AI_CORRECTION_TYPO_FIX__ = {
     });
   }
 
-  window.__PIGMA_AI_CORRECTION_PIXEL_PERFECT__ = {
+  window.__PIGER_AI_CORRECTION_PIXEL_PERFECT__ = {
     requestCachedResult,
   };
 })();
 
 (() => {
-  if (window.__PIGMA_AI_CORRECTION_DELETE_HIDDEN_LAYERS__) {
+  if (window.__PIGER_AI_CORRECTION_DELETE_HIDDEN_LAYERS__) {
     return;
   }
 
@@ -3331,5 +3331,5 @@ window.__PIGMA_AI_CORRECTION_TYPO_FIX__ = {
     }
   });
 
-  window.__PIGMA_AI_CORRECTION_DELETE_HIDDEN_LAYERS__ = true;
+  window.__PIGER_AI_CORRECTION_DELETE_HIDDEN_LAYERS__ = true;
 })();

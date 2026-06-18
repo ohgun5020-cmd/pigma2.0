@@ -177,7 +177,7 @@ function verifyMirrorBoundary() {
   }
 
   const requiredMarkers = [
-    "PIGMA_DEAD_UI_BLOCK",
+    "PIGER_DEAD_UI_BLOCK",
     "Runtime source of truth currently lives in ui.html",
   ];
 
@@ -189,9 +189,9 @@ function verifyMirrorBoundary() {
 }
 
 function verifyTabWatcherBoundary(scriptTags) {
-  const assignmentMatches = uiSource.match(/window\.__PIGMA_AI_CORRECTION_TAB_WATCHER__\s*=\s*\{/g) || [];
+  const assignmentMatches = uiSource.match(/window\.__PIGER_AI_CORRECTION_TAB_WATCHER__\s*=\s*\{/g) || [];
   if (assignmentMatches.length !== 1) {
-    fail(`${uiFile} should define window.__PIGMA_AI_CORRECTION_TAB_WATCHER__ exactly once; found ${assignmentMatches.length}.`);
+    fail(`${uiFile} should define window.__PIGER_AI_CORRECTION_TAB_WATCHER__ exactly once; found ${assignmentMatches.length}.`);
   }
 
   if (uiSource.indexOf("subscribe: (callback)") < 0) {
@@ -221,7 +221,7 @@ function verifyTabWatcherBoundary(scriptTags) {
 }
 
 function verifyRemovedImageUpscaleBoundary() {
-  if (uiSource.indexOf("window.__PIGMA_AI_IMAGE_UPSCALE_SHARED__ = {") < 0) {
+  if (uiSource.indexOf("window.__PIGER_AI_IMAGE_UPSCALE_SHARED__ = {") < 0) {
     fail(`${uiFile} must keep the shared image bridge after direct image-upscale UI removal.`);
   }
 
@@ -234,11 +234,11 @@ function verifyRemovedImageUpscaleBoundary() {
     '"image-upscale-object":',
     '["image-upscale",',
     '["image-upscale-object",',
-    "__PIGMA_AI_IMAGE_UPSCALE_RETIRED__",
-    "__PIGMA_AI_CORRECTION_IMAGE_UPSCALE__",
-    "__PIGMA_AI_CORRECTION_IMAGE_UPSCALE_OBJECT__",
-    "__PIGMA_AI_IMAGE_UPSCALE_PERSON_V2__",
-    "__PIGMA_AI_IMAGE_UPSCALE_OBJECT_V2__",
+    "__PIGER_AI_IMAGE_UPSCALE_RETIRED__",
+    "__PIGER_AI_CORRECTION_IMAGE_UPSCALE__",
+    "__PIGER_AI_CORRECTION_IMAGE_UPSCALE_OBJECT__",
+    "__PIGER_AI_IMAGE_UPSCALE_PERSON_V2__",
+    "__PIGER_AI_IMAGE_UPSCALE_OBJECT_V2__",
   ];
 
   for (const marker of removedUiMarkers) {
@@ -269,9 +269,9 @@ function verifyTabAttributeObservers(file, scripts, allowSharedDefinition) {
       const scriptHasSharedDefinition =
         allowSharedDefinition &&
         activeSource.indexOf("const callbacks = new Set()") >= 0 &&
-        activeSource.indexOf("window.__PIGMA_AI_CORRECTION_TAB_WATCHER__ = {") >= 0;
+        activeSource.indexOf("window.__PIGER_AI_CORRECTION_TAB_WATCHER__ = {") >= 0;
       const isFallbackObserver =
-        before.indexOf("window.__PIGMA_AI_CORRECTION_TAB_WATCHER__") >= 0 &&
+        before.indexOf("window.__PIGER_AI_CORRECTION_TAB_WATCHER__") >= 0 &&
         before.indexOf(".subscribe") >= 0 &&
         before.indexOf("} else {") >= 0;
 
@@ -286,7 +286,7 @@ function verifyTabAttributeObservers(file, scripts, allowSharedDefinition) {
       }
 
       fail(
-        `${file}:${line} observes data-ai-correction-tab outside the shared watcher/fallback path. Route active refreshes through window.__PIGMA_AI_CORRECTION_TAB_WATCHER__.subscribe(...).`
+        `${file}:${line} observes data-ai-correction-tab outside the shared watcher/fallback path. Route active refreshes through window.__PIGER_AI_CORRECTION_TAB_WATCHER__.subscribe(...).`
       );
 
       if (after.indexOf("rootObserver.observe") < 0 && before.indexOf("rootObserver.observe") < 0) {
@@ -299,7 +299,7 @@ function verifyTabAttributeObservers(file, scripts, allowSharedDefinition) {
 }
 
 function isInsideDeadUiBlock(source, index) {
-  const marker = source.lastIndexOf("PIGMA_DEAD_UI_BLOCK", index);
+  const marker = source.lastIndexOf("PIGER_DEAD_UI_BLOCK", index);
   if (marker < 0) {
     return false;
   }

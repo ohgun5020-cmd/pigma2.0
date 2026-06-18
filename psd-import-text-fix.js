@@ -1,14 +1,14 @@
 ;(()=>{
-  // PIGMA_TEXT_IMPORT_GUARD::SOURCE_OF_TRUTH
+  // PIGER_TEXT_IMPORT_GUARD::SOURCE_OF_TRUTH
   // Keep PSD import text guard rules in this file so rebuilds do not depend on
   // ad-hoc edits inside the generated runtime bundle.
-  // PIGMA_TEXT_IMPORT_GUARD::BROAD_TEXT_UPDATES_DISABLED_IN_BUNDLE
-  // PIGMA_TEXT_IMPORT_GUARD::SOURCE_ID_MATCHING
-  // PIGMA_TEXT_IMPORT_GUARD::SOURCE_ID_TAGGING
+  // PIGER_TEXT_IMPORT_GUARD::BROAD_TEXT_UPDATES_DISABLED_IN_BUNDLE
+  // PIGER_TEXT_IMPORT_GUARD::SOURCE_ID_MATCHING
+  // PIGER_TEXT_IMPORT_GUARD::SOURCE_ID_TAGGING
   const originalOnMessage = figma.ui.onmessage;
   const DEFAULT_BATCH_FRAME_GAP = 10;
-  const IMPORT_SOURCE_ID_KEY = "__pigmaImportSourceId";
-  const IMPORT_SYNTHETIC_ROOT_KEY = "__pigmaSyntheticImportRoot";
+  const IMPORT_SOURCE_ID_KEY = "__pigerImportSourceId";
+  const IMPORT_SYNTHETIC_ROOT_KEY = "__pigerSyntheticImportRoot";
   const IMPORT_POSTPROCESS_DEBUG = true;
   const SVG_IMPORT_BATCH_ROOT_NAME = "SVG Import";
   let availableFontsPromise = null;
@@ -37,7 +37,7 @@
         fixBatchImport(message.batch, getSelectedImportRoot());
       }
     } catch (error) {
-      console.warn("[pigma-import-text-fix]", error);
+      console.warn("[piger-import-text-fix]", error);
     }
   };
 
@@ -76,7 +76,7 @@
           : "SVG를 가져왔습니다."
       );
     } catch (error) {
-      console.warn("[pigma-svg-import]", error);
+      console.warn("[piger-svg-import]", error);
       figma.notify(getSvgImportErrorMessage(error), { error: true });
     }
   }
@@ -148,7 +148,7 @@
     try {
       textImportResult = await appendEditableTextRuns(importedNode, payload);
     } catch (error) {
-      console.warn("[pigma-svg-import] failed to append editable text runs", error);
+      console.warn("[piger-svg-import] failed to append editable text runs", error);
     }
     if (
       textImportResult &&
@@ -273,7 +273,7 @@
       try {
         textNode = await createEditableTextNode(run, availableFonts);
       } catch (error) {
-        console.warn("[pigma-svg-import] failed to create one editable text node", error, run);
+        console.warn("[piger-svg-import] failed to create one editable text node", error, run);
         continue;
       }
       if (!textNode) {
@@ -324,7 +324,7 @@
       try {
         parent.insertChild(index >= 0 ? index : parent.children.length, fallbackNode);
       } catch (error) {
-        console.warn("[pigma-svg-import] failed to preserve fallback node order", error);
+        console.warn("[piger-svg-import] failed to preserve fallback node order", error);
       }
     }
 
@@ -551,7 +551,7 @@
         textNode.resize(targetWidth, targetHeight);
       }
     } catch (error) {
-      console.warn("[pigma-svg-import] failed to apply explicit text sizing", error);
+      console.warn("[piger-svg-import] failed to apply explicit text sizing", error);
       if ("textAutoResize" in textNode) {
         textNode.textAutoResize = "WIDTH_AND_HEIGHT";
       }
@@ -733,7 +733,7 @@
         await figma.loadFontAsync(fontName);
         return fontName;
       } catch (error) {
-        console.warn("[pigma-svg-import] failed to load font", fontName, error);
+        console.warn("[piger-svg-import] failed to load font", fontName, error);
       }
     }
 
@@ -1534,7 +1534,7 @@
     try {
       return await getAvailableFonts();
     } catch (error) {
-      console.warn("[pigma-import-text-fix] failed to read available fonts", error);
+      console.warn("[piger-import-text-fix] failed to read available fonts", error);
       return [];
     }
   }
@@ -1654,7 +1654,7 @@
     try {
       root.remove();
     } catch (error) {
-      console.warn("[pigma-import-text-fix] failed to remove stitched batch root", error);
+      console.warn("[piger-import-text-fix] failed to remove stitched batch root", error);
     }
 
     selectImportedBatchSections(sections);
@@ -1826,7 +1826,7 @@
     }
 
     try {
-      figma.notify(`[pigma] ${label}: ${detail}`, { timeout: 2500 });
+      figma.notify(`[piger] ${label}: ${detail}`, { timeout: 2500 });
     } catch (error) {
       // Ignore notification failures in restricted contexts.
     }
@@ -1948,7 +1948,7 @@
     try {
       root.remove();
     } catch (error) {
-      console.warn("[pigma-import-text-fix] failed to remove single PSD artboard wrapper", error);
+      console.warn("[piger-import-text-fix] failed to remove single PSD artboard wrapper", error);
     }
 
     return children.filter(node => node && !node.removed);
@@ -2051,7 +2051,7 @@
     try {
       group.remove();
     } catch (error) {
-      console.warn("[pigma-import-text-fix] failed to remove PSD artboard group", error);
+      console.warn("[piger-import-text-fix] failed to remove PSD artboard group", error);
     }
 
     return frame;
@@ -2373,7 +2373,7 @@
     };
   }
 
-  // PIGMA_TEXT_IMPORT_GUARD::NO_BROAD_TEXT_UPDATES
+  // PIGER_TEXT_IMPORT_GUARD::NO_BROAD_TEXT_UPDATES
   function shouldApplyScopedTextFixes(payloadNodes, parentNode) {
     if (!Array.isArray(payloadNodes) || !hasChildren(parentNode)) {
       return false;
@@ -2406,7 +2406,7 @@
     return count;
   }
 
-  // PIGMA_TEXT_IMPORT_GUARD::TEXT_ALIGNMENT_SCOPE
+  // PIGER_TEXT_IMPORT_GUARD::TEXT_ALIGNMENT_SCOPE
   function applyTextFixes(payloadNodes, parentNode) {
     if (!Array.isArray(payloadNodes) || !hasChildren(parentNode)) {
       return;
@@ -2417,12 +2417,12 @@
       importedTextNodesBySourceId.size === 0 ? createOrderedTextFallbackMatches(payloadNodes, parentNode) : new Map();
 
     if (importedTextNodesBySourceId.size === 0 && orderedFallbackMatches.size === 0) {
-      console.warn("[pigma-import-text-fix] skipped text alignment because imported source IDs were not tagged");
+      console.warn("[piger-import-text-fix] skipped text alignment because imported source IDs were not tagged");
       return;
     }
 
     if (importedTextNodesBySourceId.size === 0 && orderedFallbackMatches.size > 0) {
-      console.warn("[pigma-import-text-fix] aligned text using ordered fallback because imported source IDs were not tagged");
+      console.warn("[piger-import-text-fix] aligned text using ordered fallback because imported source IDs were not tagged");
     }
 
     applyTextFixesBySourceId(payloadNodes, importedTextNodesBySourceId, orderedFallbackMatches);
@@ -2438,7 +2438,7 @@
 
     if (payloadTextNodes.length !== importedTextNodes.length) {
       console.warn(
-        `[pigma-import-text-fix] skipped ordered text fallback because payload text count (${payloadTextNodes.length}) did not match imported text count (${importedTextNodes.length})`
+        `[piger-import-text-fix] skipped ordered text fallback because payload text count (${payloadTextNodes.length}) did not match imported text count (${importedTextNodes.length})`
       );
       return new Map();
     }

@@ -1,6 +1,6 @@
 ;(() => {
   const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
-  if (globalScope.__PIGMA_ORIGINAL_IMAGE_DOWNLOAD_PATCH__) {
+  if (globalScope.__PIGER_ORIGINAL_IMAGE_DOWNLOAD_PATCH__) {
     return;
   }
 
@@ -34,7 +34,7 @@
     return originalOnMessage(message);
   };
 
-  globalScope.__PIGMA_ORIGINAL_IMAGE_DOWNLOAD_PATCH__ = true;
+  globalScope.__PIGER_ORIGINAL_IMAGE_DOWNLOAD_PATCH__ = true;
 
   function isOriginalImageDownloadMessage(message) {
     return !!message && message.type === "run-original-image-download";

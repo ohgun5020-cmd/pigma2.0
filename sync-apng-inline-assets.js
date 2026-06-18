@@ -7,8 +7,8 @@ const uiPath = path.join(root, "ui.html");
 const pakoPath = path.join(root, "vendor", "pako.min.js");
 const upngPath = path.join(root, "vendor", "upng.js");
 
-const startMarker = "<!-- PIGMA_APNG_ASSET_BUNDLE:START -->";
-const endMarker = "<!-- PIGMA_APNG_ASSET_BUNDLE:END -->";
+const startMarker = "<!-- PIGER_APNG_ASSET_BUNDLE:START -->";
+const endMarker = "<!-- PIGER_APNG_ASSET_BUNDLE:END -->";
 
 function readUtf8(filePath) {
   return fs.readFileSync(filePath, "utf8");
@@ -36,7 +36,7 @@ function buildAssetBlock() {
   return [
     startMarker,
     "    <script>",
-    "      window.__PIGMA_APNG_INLINE_ASSETS__ = Object.freeze({",
+    "      window.__PIGER_APNG_INLINE_ASSETS__ = Object.freeze({",
     `        pakoHash: ${JSON.stringify(crypto.createHash("sha256").update(pakoBuffer).digest("hex"))},`,
     `        upngHash: ${JSON.stringify(crypto.createHash("sha256").update(upngBuffer).digest("hex"))},`,
     `        pakoBase64: ${JSON.stringify(pakoBuffer.toString("base64"))},`,

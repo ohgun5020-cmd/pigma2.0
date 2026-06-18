@@ -1,4 +1,4 @@
-# Pigma 2.0
+# PIGER 2.0
 
 Clean local workspace for the Figma-to-PSD plugin.
 
@@ -45,8 +45,8 @@ Safe implementation order:
 
 ## Plugin Manifest
 
-- Name: `Pigma 2.0 - Figma to PSD`
-- Local plugin ID: `pigma20-clean-local-20260325`
+- Name: `PIGER 2.0 - PSD-ready handoff`
+- Local plugin ID: `piger20-clean-local-20260325`
 - API: `1.0.0`
 - Main bundle: `code.patched.js`
 - UI entry: `ui.html`
@@ -59,10 +59,10 @@ Safe implementation order:
   - Single source of truth for UI edits.
   - Also owns the PSD/AI/EPS/PDF/SVG import dispatcher, including the PDF.js-backed AI/PDF SVG-first path and the Ghostscript/PDF.js-backed EPS SVG-first path with bitmap fallback rules.
 - PDF.js web assets
-  - PDF.js is no longer bundled into the plugin folder. Upload the external `pdfjs` folder, then point `window.__PIGMA_PDFJS_ASSET_BASE_URL__` at that hosted directory.
+  - PDF.js is no longer bundled into the plugin folder. Upload the external `pdfjs` folder, then point `window.__PIGER_PDFJS_ASSET_BASE_URL__` at that hosted directory.
   - Current public asset base: `https://pub-8e2f2ec9d22c4c97b52fe244b86bc4cf.r2.dev/pdfjs/`.
 - Ghostscript web assets
-  - Ghostscript is no longer bundled into the plugin folder. Upload `gs.js`, `gs.wasm`, and `LICENSE` from the external `ghostpdl` folder, then point `window.__PIGMA_GHOSTSCRIPT_ASSET_BASE_URL__` at that hosted directory.
+  - Ghostscript is no longer bundled into the plugin folder. Upload `gs.js`, `gs.wasm`, and `LICENSE` from the external `ghostpdl` folder, then point `window.__PIGER_GHOSTSCRIPT_ASSET_BASE_URL__` at that hosted directory.
   - Current public asset base: `https://pub-8e2f2ec9d22c4c97b52fe244b86bc4cf.r2.dev/ghostpdl/`.
   - R2/CORS note: browser/Figma runtime loading needs `GET` and `HEAD` allowed from `*` or from Figma origins.
   - License note: Ghostscript is AGPL-3.0-or-later unless replaced with a commercial build.
@@ -76,7 +76,7 @@ Good R2 candidates:
 - Large import runtimes: PDF.js module/worker, PDF.js cmaps, PDF.js standard fonts, Ghostscript JS/WASM.
 - Future large AI/EPS/PDF helper assets, workers, WASM files, model-independent dictionaries, and sample import files.
 - Public release notes, update notices, maintenance messages, tutorial images, and downloadable test assets.
-- A small non-executable JSON notice file for the Settings tab, for example `notices/pigma-notices.json`.
+- A small non-executable JSON notice file for the Settings tab, for example `notices/piger-notices.json`.
 - A small version metadata block for Settings footer status, such as latest public version, minimum supported version, and the Community update URL.
 
 Keep inside the plugin bundle:
@@ -95,11 +95,11 @@ Rationale:
 
 Current notices URL:
 
-- `https://pub-8e2f2ec9d22c4c97b52fe244b86bc4cf.r2.dev/notices/pigma-notices.json`
+- `https://pub-8e2f2ec9d22c4c97b52fe244b86bc4cf.r2.dev/notices/piger-notices.json`
 
 Local source before upload:
 
-- `C:\Users\메이크잇_03\Desktop\pigma-ghostscript-web-assets\notices\pigma-notices.json`
+- `C:\Users\메이크잇_03\Desktop\piger-ghostscript-web-assets\notices\piger-notices.json`
 
 Recommended notice JSON shape:
 
@@ -120,7 +120,7 @@ Recommended notice JSON shape:
       "id": "pdf-eps-assets-r2",
       "type": "release",
       "severity": "info",
-      "title": "Pigma 2.8 update",
+      "title": "PIGER 2.8 update",
       "body": "",
       "bullets": [
         "PDF import has been updated.",
@@ -147,8 +147,8 @@ Recommended notice JSON shape:
   - Source of truth for the PSD export message boundary patch.
 - `ai-settings-storage.js`
   - Source of truth for plugin-side AI settings persistence via `figma.clientStorage`.
-- `pigma-web-integration.js`
-  - Source of truth for plugin-side PIGMA web connection persistence via `figma.clientStorage`.
+- `piger-web-integration.js`
+  - Source of truth for plugin-side PIGER web connection persistence via `figma.clientStorage`.
   - The web app remains the source of truth for account, billing, and plan status; the plugin only stores server URL + plugin token and reads the current plan for lightweight UI state and future feature gating.
 - `ai-responsive-memory.js`
   - Source of truth for responsive memory cache state and JSONL import/export plumbing.
@@ -207,7 +207,7 @@ Recommended notice JSON shape:
 
 This `2.0` folder intentionally keeps only the runtime, patch, and verification files that are needed for local plugin work.
 
-Not copied forward from `pigma1.7`:
+Not copied forward from `piger1.7`:
 
 - `.old/` backups
 - debug screenshots and ad-hoc specs
@@ -234,7 +234,7 @@ Plan-gated disabled buttons are for visible ordinary editing tools only. The thr
 Free beta access is for non-AI features only. Do not treat a beta `effectiveTier` as AI access.
 
 - Account state should publish separate `nonAiEffectiveTier` and `aiEffectiveTier` values.
-- Feature gating should use `nonAiEffectiveTier` for local editing tools and `aiEffectiveTier` for tools that call OpenAI, Gemini, or Pigma server AI.
+- Feature gating should use `nonAiEffectiveTier` for local editing tools and `aiEffectiveTier` for tools that call OpenAI, Gemini, or PIGER server AI.
 - Server AI checks should rely on `serverAiEnabled`, not `effectiveTier >= 2`.
 - During the active beta period, authenticated Free accounts should treat PSD creation/export quota as unlimited even if the legacy Free quota response still reports 5 total exports.
 - Current Edit-tab AI actions are: `typo-audit`, `typo-fix`, `translate`, `read-design`, `design-consistency`, `design-consistency-clear`, `image-text-feasibility`, `color-extract`, `image-reference-search`, `image-composite`, `image-gpt-rerender`, `image-prompt-edit`, `image-extend`, `ai-video-generate`, the design-assist actions, and the hidden AI design chat controls.
@@ -275,7 +275,7 @@ Current stabilization target: keep the plugin alive while reducing the hidden co
 - `ui.html` is the live UI source. `ui-ai-correction.js` still contains similar AI correction logic and should be treated as a mirror/cleanup target until the source-of-truth boundary is simplified.
 - Multiple UI modules observe `data-ai-correction-tab`; tab changes can fan out into several cache requests and state refreshes.
 - Automated message checks now cover handler pass-through and direct UI-to-runtime message type coverage via `verify-message-handler-pass-through.js` and `verify-ui-runtime-message-types.js`.
-- Design Assist is retired for now. Keep the disabled UI stub only where other UI modules still call `window.__PIGMA_AI_DESIGN_ASSIST__`; do not reintroduce plugin runtime messages unless the feature is deliberately revived with a real handler.
+- Design Assist is retired for now. Keep the disabled UI stub only where other UI modules still call `window.__PIGER_AI_DESIGN_ASSIST__`; do not reintroduce plugin runtime messages unless the feature is deliberately revived with a real handler.
 - The visible UI does not expose design-read/accessibility as a normal user action. `aiReadDesignButton` is hidden/debug-only; `ai-accessibility-diagnosis.js` remains bundled for compatibility, while `ai-design-read.js` is inactive legacy source.
 - Use the active menu map below before choosing manual tests. A source file is not a manual-test target unless a visible button or active runtime path reaches it.
 - Long-running risk is highest around the shared image source/apply bridge in `ai-image-shared-bridge.js`, then full-tree scans in bundled AI correction features such as accessibility compatibility, design consistency, typo, and pixel-perfect features. The direct image-upscale UI has been removed for now, but this file still backs visible image tools such as image extend, prompt edit/generation, reference search, image merge, and image text extraction.
@@ -346,22 +346,22 @@ node -c code.patched.js
   - Follow-up: the remaining design-assist orphan candidates were retired in step 2.
 - 2026-05-19 step 2: retired the remaining Design Assist UI-to-plugin sends in `ui.html`.
   - Reason: Design Assist is not used, and its disabled script still contained unreachable message sends that made routing audits noisy.
-  - Scope: kept the disabled `window.__PIGMA_AI_DESIGN_ASSIST__` stub for callers, but removed the three plugin message sends from the inactive branch.
+  - Scope: kept the disabled `window.__PIGER_AI_DESIGN_ASSIST__` stub for callers, but removed the three plugin message sends from the inactive branch.
   - Verification: `ui.html` inline script parse, `build-patched-main.ps1`, `verify-figma-runtime-syntax.js`, `verify-externalized-ui.js code.patched.js`, `node -c code.patched.js`, and the UI-to-runtime message audit passed with zero orphan messages.
   - Follow-up: next stability step should target repeated `data-ai-correction-tab` observers.
-- 2026-05-19 step 3: introduced `window.__PIGMA_AI_CORRECTION_TAB_WATCHER__` in `ui.html` and moved the first AI correction tab refresh callbacks onto it.
+- 2026-05-19 step 3: introduced `window.__PIGER_AI_CORRECTION_TAB_WATCHER__` in `ui.html` and moved the first AI correction tab refresh callbacks onto it.
   - Reason: several modules created independent `MutationObserver`s for the same `data-ai-correction-tab` attribute.
   - Scope: migrated the active typo audit, typo fix, pixel-perfect, and pixel-perfect-clear refresh callbacks to the shared watcher. Each block keeps a local observer fallback for safety if the shared watcher is unavailable.
   - Verification: `ui.html` inline script parse, `node -c ui-ai-correction.js`, `build-patched-main.ps1`, `verify-figma-runtime-syntax.js`, `verify-externalized-ui.js code.patched.js`, and `node -c code.patched.js` passed.
   - Follow-up: migrate the remaining active tab observers, especially translate and typo clear, after Figma smoke testing.
 - 2026-05-19 step 4: migrated the remaining active AI correction tab refresh callbacks.
   - Reason: translate and typo-clear still created their own `data-ai-correction-tab` observers after step 3.
-  - Scope: moved translate, translate fallback, and typo-clear refresh callbacks to `window.__PIGMA_AI_CORRECTION_TAB_WATCHER__`. Mirrored the typo audit/fix source blocks in `ui-ai-correction.js` so the source notes do not drift further.
+  - Scope: moved translate, translate fallback, and typo-clear refresh callbacks to `window.__PIGER_AI_CORRECTION_TAB_WATCHER__`. Mirrored the typo audit/fix source blocks in `ui-ai-correction.js` so the source notes do not drift further.
   - Verification: `ui.html` inline script parse, `node -c ui-ai-correction.js`, `build-patched-main.ps1`, `verify-figma-runtime-syntax.js`, `verify-externalized-ui.js code.patched.js`, and `node -c code.patched.js` passed.
   - Follow-up: remaining `data-ai-correction-tab` observer text should be either inactive/commented legacy code or local fallback branches guarded by the shared watcher.
 - 2026-06-11 follow-up: guarded active AI correction tab observers with verifier coverage.
   - Reason: the retired/hidden Design Assist UI still created its own active `data-ai-correction-tab` observer.
-  - Scope: moved Design Assist refresh onto `window.__PIGMA_AI_CORRECTION_TAB_WATCHER__` with the same local fallback pattern, and tightened `verify-ui-source-boundary.js` so active tab observers must be either the shared watcher definition or a guarded fallback.
+  - Scope: moved Design Assist refresh onto `window.__PIGER_AI_CORRECTION_TAB_WATCHER__` with the same local fallback pattern, and tightened `verify-ui-source-boundary.js` so active tab observers must be either the shared watcher definition or a guarded fallback.
   - Verification: `verify-ui-source-boundary.js` now reports the active shared watcher/fallback counts.
 - 2026-05-19 step 5: added cooperative yielding to the read-only design-read tree scan.
   - Reason: `ai-design-read.js` scans every selected descendant synchronously before optional AI enrichment.
@@ -502,7 +502,7 @@ node -c code.patched.js
   - Manual test: reload the plugin, select one small text layer containing an obvious typo, and run `오타 직접 수정`. Confirm the typo is corrected or a clear skipped/fallback result appears, and the button returns to normal. Do not use a large frame for this smoke test.
 
 - 2026-05-21 step 33: added cooperative yielding to the visible typo-annotation clear path.
-  - Reason: `오타 주석 삭제` scans selected text nodes, reads each node's annotations, filters Pigma-managed typo annotations, and writes the remaining annotations back. On large selections this annotation cleanup loop can monopolize the runtime.
+  - Reason: `오타 주석 삭제` scans selected text nodes, reads each node's annotations, filters PIGER-managed typo annotations, and writes the remaining annotations back. On large selections this annotation cleanup loop can monopolize the runtime.
   - Scope: reused the yielding text-node collector for the clear flow and made the shared annotation apply/clear helper yield while indexing nodes, preparing issue buckets, and writing annotations. Annotation category matching, legacy-prefix cleanup, and result payloads are unchanged.
   - Manual test: reload the plugin, select a small text layer or group that has an AI typo annotation from `오타 검수`/`오타 직접 수정`, and run `오타 주석 삭제`. Confirm the typo annotation is removed and the button returns to normal. If no annotation exists, confirm it reports zero removed and still returns to normal.
 
@@ -664,7 +664,7 @@ If a future generated patch needs a newer syntax feature, assume it is unsafe un
 - Changed the visible `취소선형` label to `박스형`.
   - Internally this still uses highlight mode `strike`.
 - Added local setting persistence through `localStorage`.
-  - Storage key: `pigma:ai-text-highlight-settings:v1`
+  - Storage key: `piger:ai-text-highlight-settings:v1`
   - Saved fields:
     - `highlightColorHex`
     - `textColorHex`
@@ -742,15 +742,15 @@ If a future generated patch needs a newer syntax feature, assume it is unsafe un
 
 - Text highlights are grouped under `#high-light-text`.
 - The group/container is marked with plugin data:
-  - `pigma:text-highlight-group`
-  - `pigma:text-highlight-text-node-id`
+  - `piger:text-highlight-group`
+  - `piger:text-highlight-text-node-id`
 - In auto-layout parents, the text node is wrapped in a fixed-size frame named `#high-light-text`.
   - The frame uses `layoutMode = "NONE"`.
   - The frame has no fills or strokes.
   - Highlight rectangles are inserted behind the text.
 - The first auto-layout wrap stores the container size in plugin data:
-  - `pigma:text-highlight-container-width`
-  - `pigma:text-highlight-container-height`
+  - `piger:text-highlight-container-width`
+  - `piger:text-highlight-container-height`
 - On later highlight applications, the plugin reuses the stored container size instead of recomputing from `node.width` / `node.height`.
   - This is meant to prevent the second highlight from stretching the auto-layout frame to huge widths or near-zero widths.
 - Existing broken `#high-light-text` containers may need to be deleted once before retesting, because old containers can already contain bad dimensions.
@@ -774,7 +774,7 @@ When UI behavior changes, reload the local plugin in Figma after rebuilding.
 - This is useful for direct visual and numeric checks after source changes: create a diagnostic duplicate, remove old `Text Highlight` rectangles, measure each target text range, insert generated rectangles, then inspect via screenshot and node geometry.
 - The MCP text runtime can expose a smaller API surface than the local plugin runtime. For diagnostics, `getRangeAllFontNames` may be unavailable, so load `node.fontName` when it is a single font.
 - MCP `fillGeometry` can include transparent glyph geometry together with underline geometry. Diagnostic scripts should isolate the thin underline path before converting it into highlight bounds.
-- Historical comparison note: `pigma_old/pigma1.5` and `pigma_old/pigma1.7` do not contain this AI text-highlight box flow (`ai-text-highlight`, `selectedTextRange`, `fillGeometry`, source polling). Their matching highlight-related code is mostly native text decoration/import styling such as `setRangeTextDecoration`, where Figma owns the glyph metrics. Do not treat those versions as a direct geometry reference for the 2.0 rectangle-backed highlight box.
+- Historical comparison note: `piger_old/piger1.5` and `piger_old/piger1.7` do not contain this AI text-highlight box flow (`ai-text-highlight`, `selectedTextRange`, `fillGeometry`, source polling). Their matching highlight-related code is mostly native text decoration/import styling such as `setRangeTextDecoration`, where Figma owns the glyph metrics. Do not treat those versions as a direct geometry reference for the 2.0 rectangle-backed highlight box.
 
 ### Current Watch Points
 
@@ -814,6 +814,6 @@ When UI behavior changes, reload the local plugin in Figma after rebuilding.
 ## Version Bump Summary
 
 - Folder target moved to `2.0`
-- Plugin display name updated to `Pigma 2.0 - Figma to PSD`
-- Local plugin ID replaced with `pigma20-clean-local-20260325`
+- Plugin display name updated to `PIGER 2.0 - PSD-ready handoff`
+- Local plugin ID replaced with `piger20-clean-local-20260325`
 - README rewritten to match the clean 2.0 workspace

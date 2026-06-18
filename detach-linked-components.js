@@ -1,6 +1,6 @@
 ;(() => {
   const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
-  if (globalScope.__PIGMA_DETACH_LINKED_COMPONENTS_PATCH__) {
+  if (globalScope.__PIGER_DETACH_LINKED_COMPONENTS_PATCH__) {
     return;
   }
 
@@ -27,7 +27,7 @@
     return originalOnMessage(message);
   };
 
-  globalScope.__PIGMA_DETACH_LINKED_COMPONENTS_PATCH__ = true;
+  globalScope.__PIGER_DETACH_LINKED_COMPONENTS_PATCH__ = true;
 
   function isDetachLinkedComponentsMessage(message) {
     return !!message && message.type === "run-detach-linked-components";

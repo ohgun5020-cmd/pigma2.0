@@ -1,12 +1,12 @@
 ;(() => {
   const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
-  if (globalScope.__PIGMA_AI_ACCESSIBILITY_DIAG_PATCH__) {
+  if (globalScope.__PIGER_AI_ACCESSIBILITY_DIAG_PATCH__) {
     return;
   }
 
   const originalOnMessage = figma.ui.onmessage;
-  const AI_DESIGN_READ_CACHE_KEY = "pigma:ai-design-read-cache:v1";
-  const AI_ACCESSIBILITY_CACHE_KEY = "pigma:ai-accessibility-diagnosis-cache:v1";
+  const AI_DESIGN_READ_CACHE_KEY = "piger:ai-design-read-cache:v1";
+  const AI_ACCESSIBILITY_CACHE_KEY = "piger:ai-accessibility-diagnosis-cache:v1";
   const ACCESSIBILITY_MESSAGE_TYPES = {
     requestCache: "request-ai-accessibility-cache",
     runDiagnosis: "run-ai-accessibility-diagnosis",
@@ -117,7 +117,7 @@
     return originalOnMessage(message);
   };
 
-  globalScope.__PIGMA_AI_ACCESSIBILITY_DIAG_PATCH__ = true;
+  globalScope.__PIGER_AI_ACCESSIBILITY_DIAG_PATCH__ = true;
 
   function isAccessibilityMessage(message) {
     return !!message && !!getAccessibilityMessageMode(message.type);
@@ -1370,7 +1370,7 @@
   }
 
   function getAiHelper() {
-    const helper = globalScope.__PIGMA_AI_LLM__;
+    const helper = globalScope.__PIGER_AI_LLM__;
     return helper &&
       typeof helper.requestJsonTask === "function" &&
       typeof helper.hasConfiguredAiAsync === "function" &&

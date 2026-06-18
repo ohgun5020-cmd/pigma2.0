@@ -1,6 +1,6 @@
 ;(() => {
   const globalScope = typeof globalThis !== "undefined" ? globalThis : {};
-  if (globalScope.__PIGMA_AI_COLOR_EXTRACT_PATCH__) {
+  if (globalScope.__PIGER_AI_COLOR_EXTRACT_PATCH__) {
     return;
   }
 
@@ -70,7 +70,7 @@
     return originalOnMessage(message);
   };
 
-  globalScope.__PIGMA_AI_COLOR_EXTRACT_PATCH__ = true;
+  globalScope.__PIGER_AI_COLOR_EXTRACT_PATCH__ = true;
 
   function isColorExtractMessage(message) {
     return (
@@ -848,7 +848,7 @@
       }
       return normalized;
     } catch (error) {
-      console.warn("[pigma] adobe trend palette feed unavailable:", error);
+      console.warn("[piger] adobe trend palette feed unavailable:", error);
       return Array.isArray(adobeTrendCache) ? adobeTrendCache : [];
     }
   }
@@ -879,7 +879,7 @@
           return;
         }
         settled = true;
-        console.warn("[pigma] timed out loading " + label + "; continuing with cached/local palette data.");
+        console.warn("[piger] timed out loading " + label + "; continuing with cached/local palette data.");
         resolve(fallback);
       }, safeTimeout);
 
@@ -898,7 +898,7 @@
           }
           settled = true;
           clearTimeout(timerId);
-          console.warn("[pigma] failed loading " + label + "; continuing with cached/local palette data:", error);
+          console.warn("[piger] failed loading " + label + "; continuing with cached/local palette data:", error);
           resolve(fallback);
         }
       );
@@ -917,11 +917,11 @@
   async function loadAdobeLiveTrendDataset() {
     const [behance, stock] = await Promise.all([
       loadAdobeBehanceTrendDataset().catch((error) => {
-        console.warn("[pigma] adobe behance trend feed unavailable:", error);
+        console.warn("[piger] adobe behance trend feed unavailable:", error);
         return [];
       }),
       loadAdobeStockTrendDataset().catch((error) => {
-        console.warn("[pigma] adobe stock trend feed unavailable:", error);
+        console.warn("[piger] adobe stock trend feed unavailable:", error);
         return [];
       }),
     ]);
@@ -938,7 +938,7 @@
       const batches = await Promise.all(
         COLOR_HUNT_TOPIC_QUERIES.map((topic) =>
           fetchColorHuntTopic(topic).catch((error) => {
-            console.warn("[pigma] colorhunt topic unavailable:", topic && topic.key, error);
+            console.warn("[piger] colorhunt topic unavailable:", topic && topic.key, error);
             return [];
           })
         )
@@ -950,7 +950,7 @@
       }
       return normalized;
     } catch (error) {
-      console.warn("[pigma] colorhunt palette feed unavailable:", error);
+      console.warn("[piger] colorhunt palette feed unavailable:", error);
       return Array.isArray(colorHuntCache) ? colorHuntCache : [];
     }
   }
@@ -1164,7 +1164,7 @@
     const batches = await Promise.all(
       ADOBE_STOCK_TOPIC_QUERIES.map((topic) =>
         fetchAdobeStockTopic(topic).catch((error) => {
-          console.warn("[pigma] adobe stock topic unavailable:", topic && topic.key, error);
+          console.warn("[piger] adobe stock topic unavailable:", topic && topic.key, error);
           return [];
         })
       )
