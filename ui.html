@@ -69665,7 +69665,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
             isFreeAccountBetaPeriodActive() || (publishedPlan && publishedPlan.nonAiBetaActive === true)
           );
           const isFreeAccount = Number.isFinite(paidTier) ? paidTier === 0 : rootPaidTier === 0;
-          return betaActive && isFreeAccount && hasKnownAccount();
+          return betaActive && isFreeAccount && (hasKnownAccount() || hasQuotaAuth());
         }
 
         function createUnlimitedUsage(plan, options = {}) {
