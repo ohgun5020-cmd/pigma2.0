@@ -66724,7 +66724,9 @@ UPNG.encode.alphaMul = function(img, roundA) {
         let loginFirstModalLastFocused = null;
         const PSD_USAGE_POLICY_NOTE =
           "무료 계정은 계정당 총 5회까지 PSD를 만들 수 있습니다. 유료 월간은 월 단위, 유료 연간은 연 단위로 PSD 파일 개수만큼 차감됩니다.";
+        const FREE_ACCOUNT_BETA_PERIOD_ACTIVE = true;
         const FREE_BETA_PSD_USAGE_NOTE = "무료 베타 기간에는 PSD 만들기를 무제한으로 사용할 수 있습니다.";
+        window.__PIGMA_FREE_ACCOUNT_BETA_ACTIVE__ = FREE_ACCOUNT_BETA_PERIOD_ACTIVE;
 
         const postPluginMessage = (message) => {
           parent.postMessage({ pluginMessage: message }, "*");
@@ -67049,6 +67051,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
         const resolveEntitlementAccess = (tier, entitlement) => {
           const paidTier = clampPlanTier(tier);
           const legacyEffectiveTier = readEntitlementTier(entitlement, ["effectiveTier"]);
+          const freeAccountBetaTier = paidTier === 0 && FREE_ACCOUNT_BETA_PERIOD_ACTIVE ? 2 : null;
           const betaTier = readEntitlementTier(entitlement, [
             "nonAiEffectiveTier",
             "nonAiTier",
@@ -67057,11 +67060,16 @@ UPNG.encode.alphaMul = function(img, roundA) {
             "trialEffectiveTier",
           ]);
           const nonAiBetaActive =
-            betaTier !== null ||
+            (paidTier === 0 &&
+              (freeAccountBetaTier !== null ||
+                betaTier !== null ||
+                (legacyEffectiveTier !== null && legacyEffectiveTier > paidTier))) ||
             readEntitlementFlag(entitlement, ["nonAiBetaActive", "freeBetaActive", "betaActive", "trialActive"]);
           const nonAiEffectiveTier = Math.max(
             paidTier,
-            betaTier !== null ? betaTier : legacyEffectiveTier !== null ? legacyEffectiveTier : paidTier
+            betaTier !== null ? betaTier : 0,
+            legacyEffectiveTier !== null ? legacyEffectiveTier : 0,
+            freeAccountBetaTier !== null ? freeAccountBetaTier : 0
           );
           const explicitAiTier = readEntitlementTier(entitlement, ["aiEffectiveTier", "aiTier"]);
           const aiEffectiveTier = explicitAiTier !== null ? explicitAiTier : paidTier;
@@ -69627,7 +69635,19 @@ UPNG.encode.alphaMul = function(img, roundA) {
           return window.__PIGMA_WEB_PLAN__ && typeof window.__PIGMA_WEB_PLAN__ === "object" ? window.__PIGMA_WEB_PLAN__ : null;
         }
 
+        function isFreeAccountBetaPeriodActive() {
+          return Boolean(
+            window.__PIGMA_FREE_ACCOUNT_BETA_ACTIVE__ === true ||
+              root.dataset.pigmaWebFreeBetaPsd === "true" ||
+              root.dataset.pigmaWebNonAiBeta === "true"
+          );
+        }
+
         function isFreeBetaPsdUnlimited() {
+          if (root.dataset.pigmaWebFreeBetaPsd === "true") {
+            return true;
+          }
+
           const publishedPlan = getPublishedPlan();
           const psdUsage =
             publishedPlan && publishedPlan.psdUsage && typeof publishedPlan.psdUsage === "object"
@@ -69642,10 +69662,10 @@ UPNG.encode.alphaMul = function(img, roundA) {
           );
           const rootPaidTier = Number(root.dataset.pigmaWebPlanTier || 0);
           const betaActive = Boolean(
-            (publishedPlan && publishedPlan.nonAiBetaActive === true) || root.dataset.pigmaWebNonAiBeta === "true"
+            isFreeAccountBetaPeriodActive() || (publishedPlan && publishedPlan.nonAiBetaActive === true)
           );
           const isFreeAccount = Number.isFinite(paidTier) ? paidTier === 0 : rootPaidTier === 0;
-          return betaActive && isFreeAccount;
+          return betaActive && isFreeAccount && hasKnownAccount();
         }
 
         function createUnlimitedUsage(plan, options = {}) {
