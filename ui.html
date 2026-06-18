@@ -17920,14 +17920,8 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
           if (plan && plan.serverAiEnabled === true) {
             return true;
           }
-          if (plan && Number(plan.effectiveTier) >= 2) {
-            return true;
-          }
           const root = document.documentElement;
-          if (root.dataset.pigmaWebServerAi === "true") {
-            return true;
-          }
-          return Number(root.dataset.pigmaWebEffectiveTier || root.dataset.pigmaWebPlanTier || 0) >= 2;
+          return root.dataset.pigmaWebServerAi === "true";
         };
 
         const canUseServerAiForRequirement = (requirement) => {
@@ -18212,14 +18206,8 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
           if (plan && plan.serverAiEnabled === true) {
             return true;
           }
-          if (plan && Number(plan.effectiveTier) >= 2) {
-            return true;
-          }
           const root = document.documentElement;
-          if (root.dataset.pigmaWebServerAi === "true") {
-            return true;
-          }
-          return Number(root.dataset.pigmaWebEffectiveTier || root.dataset.pigmaWebPlanTier || 0) >= 2;
+          return root.dataset.pigmaWebServerAi === "true";
         }
 
         function readAuthFromInputs() {
@@ -42342,14 +42330,8 @@ ${buildReferencePromptOutputRules()}
           if (plan && plan.serverAiEnabled === true) {
             return true;
           }
-          if (plan && Number(plan.effectiveTier) >= 2) {
-            return true;
-          }
           const root = document.documentElement;
-          if (root.dataset.pigmaWebServerAi === "true") {
-            return true;
-          }
-          return Number(root.dataset.pigmaWebEffectiveTier || root.dataset.pigmaWebPlanTier || 0) >= 2;
+          return root.dataset.pigmaWebServerAi === "true";
         }
 
         function readServerAiAuthFromInputs() {
@@ -67023,6 +67005,82 @@ UPNG.encode.alphaMul = function(img, roundA) {
           return 0;
         };
 
+        const readEntitlementTier = (entitlement, keys) => {
+          if (!entitlement || typeof entitlement !== "object") {
+            return null;
+          }
+          for (const key of keys) {
+            if (!Object.prototype.hasOwnProperty.call(entitlement, key)) {
+              continue;
+            }
+            const value = entitlement[key];
+            if (value === null || value === undefined || value === "") {
+              continue;
+            }
+            return clampPlanTier(value);
+          }
+          return null;
+        };
+
+        const readEntitlementFlag = (entitlement, keys) => {
+          if (!entitlement || typeof entitlement !== "object") {
+            return false;
+          }
+          return keys.some((key) => {
+            const value = entitlement[key];
+            return value === true || value === 1 || String(value || "").toLowerCase() === "true";
+          });
+        };
+
+        const readEntitlementValue = (entitlement, keys) => {
+          if (!entitlement || typeof entitlement !== "object") {
+            return null;
+          }
+          for (const key of keys) {
+            const value = entitlement[key];
+            if (value !== null && value !== undefined && value !== "") {
+              return value;
+            }
+          }
+          return null;
+        };
+
+        const resolveEntitlementAccess = (tier, entitlement) => {
+          const paidTier = clampPlanTier(tier);
+          const legacyEffectiveTier = readEntitlementTier(entitlement, ["effectiveTier"]);
+          const betaTier = readEntitlementTier(entitlement, [
+            "nonAiEffectiveTier",
+            "nonAiTier",
+            "betaEffectiveTier",
+            "freeBetaEffectiveTier",
+            "trialEffectiveTier",
+          ]);
+          const nonAiBetaActive =
+            betaTier !== null ||
+            readEntitlementFlag(entitlement, ["nonAiBetaActive", "freeBetaActive", "betaActive", "trialActive"]);
+          const nonAiEffectiveTier = Math.max(
+            paidTier,
+            betaTier !== null ? betaTier : legacyEffectiveTier !== null ? legacyEffectiveTier : paidTier
+          );
+          const explicitAiTier = readEntitlementTier(entitlement, ["aiEffectiveTier", "aiTier"]);
+          const aiEffectiveTier = explicitAiTier !== null ? explicitAiTier : paidTier;
+          const serverAiEnabled = Boolean(
+            entitlement && Object.prototype.hasOwnProperty.call(entitlement, "serverAiEnabled")
+              ? readEntitlementFlag(entitlement, ["serverAiEnabled"])
+              : aiEffectiveTier >= 2
+          );
+          return {
+            paidTier,
+            effectiveTier: nonAiEffectiveTier,
+            nonAiEffectiveTier,
+            aiEffectiveTier,
+            serverAiEnabled,
+            nonAiBetaActive,
+            nonAiBetaStartsAt: readEntitlementValue(entitlement, ["nonAiBetaStartsAt", "freeBetaStartsAt", "betaStartsAt"]),
+            nonAiBetaEndsAt: readEntitlementValue(entitlement, ["nonAiBetaEndsAt", "freeBetaEndsAt", "betaEndsAt"]),
+          };
+        };
+
         const setTrialState = (visible, message, tone = "active") => {
           elements.trialRow.hidden = !visible;
           elements.trialRow.setAttribute("aria-hidden", visible ? "false" : "true");
@@ -67096,35 +67154,43 @@ UPNG.encode.alphaMul = function(img, roundA) {
           const plan = user && user.plan ? String(user.plan).toLowerCase() : "free";
           const tier = user ? getPlanTier(plan) : 0;
           const entitlement = user && user.entitlement && typeof user.entitlement === "object" ? user.entitlement : null;
-          const effectiveTier = user
-            ? clampPlanTier(tier === 0 ? tier : entitlement && entitlement.effectiveTier !== undefined ? entitlement.effectiveTier : tier)
-            : 0;
+          const access = user ? resolveEntitlementAccess(tier, entitlement) : resolveEntitlementAccess(0, null);
+          const effectiveTier = access.effectiveTier;
+          const nonAiEffectiveTier = access.nonAiEffectiveTier;
+          const aiEffectiveTier = access.aiEffectiveTier;
           const basicTrialActive = false;
           const basicTrialEndsAt = null;
           const basicTrialDays = 0;
           const basicTrialRemainingMs = 0;
           const isAdmin = isAdminAccount(user);
           const adminPlanActive = isAdminPlan(user, entitlement);
-          const serverAiEnabled = Boolean(
-            user && (entitlement && entitlement.serverAiEnabled !== undefined ? entitlement.serverAiEnabled : effectiveTier >= 2)
-          );
+          const serverAiEnabled = Boolean(user && access.serverAiEnabled);
           root.dataset.pigmaWebPlan = plan;
           root.dataset.pigmaWebPlanTier = String(tier);
           root.dataset.pigmaWebEffectiveTier = String(effectiveTier);
+          root.dataset.pigmaWebNonAiEffectiveTier = String(nonAiEffectiveTier);
+          root.dataset.pigmaWebAiEffectiveTier = String(aiEffectiveTier);
           root.dataset.pigmaWebAdmin = isAdmin ? "true" : "false";
           root.dataset.pigmaWebServerAi = serverAiEnabled ? "true" : "false";
+          root.dataset.pigmaWebNonAiBeta = access.nonAiBetaActive ? "true" : "false";
           window.__PIGMA_WEB_ACCOUNT__ = payload || null;
           window.__PIGMA_WEB_PLAN__ = {
             plan,
             tier,
+            paidTier: access.paidTier,
             effectiveTier,
+            nonAiEffectiveTier,
+            aiEffectiveTier,
             serverAiEnabled,
+            nonAiBetaActive: access.nonAiBetaActive,
+            nonAiBetaStartsAt: access.nonAiBetaStartsAt,
+            nonAiBetaEndsAt: access.nonAiBetaEndsAt,
             basicTrialActive,
             basicTrialEndsAt,
             basicTrialDays,
             basicTrialRemainingMs,
-            hasPaidPlan: effectiveTier >= 1,
-            hasProPlan: effectiveTier >= 2,
+            hasPaidPlan: tier >= 1,
+            hasProPlan: tier >= 2,
             isAdmin,
             adminPlanActive,
             psdUsage: user && user.psdUsage ? user.psdUsage : null,
@@ -67185,9 +67251,8 @@ UPNG.encode.alphaMul = function(img, roundA) {
           const statusLabel = getStatusLabel(user.planStatus || user.plan);
           const tier = getPlanTier(user.plan);
           const entitlement = user.entitlement && typeof user.entitlement === "object" ? user.entitlement : null;
-          const effectiveTier = clampPlanTier(
-            tier === 0 ? tier : entitlement && entitlement.effectiveTier !== undefined ? entitlement.effectiveTier : tier
-          );
+          const access = resolveEntitlementAccess(tier, entitlement);
+          const effectiveTier = access.effectiveTier;
           const basicTrialActive = false;
           const shouldShowTrialState = false;
           const isAdmin = isAdminAccount(user);
@@ -67226,9 +67291,17 @@ UPNG.encode.alphaMul = function(img, roundA) {
           );
           elements.usageState.textContent =
             psdUsageText ||
-            (adminPlanActive ? "전체 기능 활성화" : effectiveTier >= 2 ? "Pro 기능 준비 완료" : effectiveTier >= 1 ? "Basic 메뉴 활성화" : "Free 기능 연결 완료");
+            (adminPlanActive
+              ? "전체 기능 활성화"
+              : access.nonAiBetaActive && tier === 0
+                ? "베타 일반 기능 활성화"
+                : effectiveTier >= 2
+                  ? "Pro 기능 준비 완료"
+                  : effectiveTier >= 1
+                    ? "Basic 메뉴 활성화"
+                    : "Free 기능 연결 완료");
           elements.quotaPolicyHint.textContent = psdPolicyNote;
-          setBillingLink(effectiveTier >= 1 && tier >= 1 ? currentLinks.billing : currentLinks.pricing, tier >= 1 ? "결제 관리 열기" : "요금제 보기");
+          setBillingLink(tier >= 1 ? currentLinks.billing : currentLinks.pricing, tier >= 1 ? "결제 관리 열기" : "요금제 보기");
           if (!silent) {
             setHint(
               isAdmin
@@ -68469,11 +68542,29 @@ UPNG.encode.alphaMul = function(img, roundA) {
           "design-consistency-clear",
           "image-text-feasibility",
           "image-reference-search",
+          "image-composite",
+          "image-gpt-rerender",
           "image-prompt-edit",
           "image-extend",
           "ai-video-generate",
         ]);
         const proDesignAssistActions = new Set(["mobile-design", "pc-design", "train-design-pairs"]);
+        const aiActions = new Set([
+          "typo-audit",
+          "typo-fix",
+          "translate",
+          "read-design",
+          "design-consistency",
+          "design-consistency-clear",
+          "image-text-feasibility",
+          "color-extract",
+          "image-reference-search",
+          "image-composite",
+          "image-gpt-rerender",
+          "image-prompt-edit",
+          "image-extend",
+          "ai-video-generate",
+        ]);
 
         const clampPlanTier = (value) => {
           const numberValue = Number(value);
@@ -68489,17 +68580,46 @@ UPNG.encode.alphaMul = function(img, roundA) {
           return 0;
         };
 
-        const getEffectiveTier = () => {
+        const getNonAiEffectiveTier = () => {
           const plan = window.__PIGMA_WEB_PLAN__ && typeof window.__PIGMA_WEB_PLAN__ === "object" ? window.__PIGMA_WEB_PLAN__ : null;
+          if (plan && plan.nonAiEffectiveTier !== undefined) {
+            return clampPlanTier(plan.nonAiEffectiveTier);
+          }
           if (plan && plan.effectiveTier !== undefined) {
             return clampPlanTier(plan.effectiveTier);
           }
-          return clampPlanTier(root.dataset.pigmaWebEffectiveTier || root.dataset.pigmaWebPlanTier || 0);
+          return clampPlanTier(root.dataset.pigmaWebNonAiEffectiveTier || root.dataset.pigmaWebEffectiveTier || root.dataset.pigmaWebPlanTier || 0);
+        };
+
+        const getAiEffectiveTier = () => {
+          const plan = window.__PIGMA_WEB_PLAN__ && typeof window.__PIGMA_WEB_PLAN__ === "object" ? window.__PIGMA_WEB_PLAN__ : null;
+          if (plan && plan.aiEffectiveTier !== undefined) {
+            return clampPlanTier(plan.aiEffectiveTier);
+          }
+          return clampPlanTier(root.dataset.pigmaWebAiEffectiveTier || root.dataset.pigmaWebPlanTier || 0);
+        };
+
+        const isAiFeatureButton = (button) => {
+          if (!(button instanceof HTMLButtonElement)) {
+            return false;
+          }
+          const action = button.dataset ? button.dataset.aiAction : "";
+          if (aiActions.has(action)) {
+            return true;
+          }
+          const designAssistAction = button.dataset ? button.dataset.designAssistAction : "";
+          if (proDesignAssistActions.has(designAssistAction)) {
+            return true;
+          }
+          return Boolean(button.closest("#aiDesignChatGroup"));
         };
 
         const getRequiredTier = (button) => {
           if (!(button instanceof HTMLButtonElement)) {
             return 0;
+          }
+          if (button.closest("#aiDesignChatGroup")) {
+            return 2;
           }
           const action = button.dataset ? button.dataset.aiAction : "";
           if (proActions.has(action)) {
@@ -68514,6 +68634,8 @@ UPNG.encode.alphaMul = function(img, roundA) {
           }
           return 0;
         };
+
+        const getEffectiveTierForButton = (button) => (isAiFeatureButton(button) ? getAiEffectiveTier() : getNonAiEffectiveTier());
 
         const getTierLabel = (tier) => (tier >= 2 ? "Pro 필요" : tier >= 1 ? "Basic 필요" : "");
 
@@ -68559,14 +68681,19 @@ UPNG.encode.alphaMul = function(img, roundA) {
         };
 
         const applyFeaturePlanGates = (scope = document) => {
-          const effectiveTier = getEffectiveTier();
           const rootNode = scope instanceof Element || scope instanceof Document ? scope : document;
-          const buttons = Array.from(rootNode.querySelectorAll("button[data-ai-action], button[data-design-assist-action]"));
+          const selector = "button[data-ai-action], button[data-design-assist-action], #aiDesignChatGroup button";
+          const buttons = [];
+          if (rootNode instanceof HTMLButtonElement && rootNode.matches(selector)) {
+            buttons.push(rootNode);
+          }
+          buttons.push(...Array.from(rootNode.querySelectorAll(selector)));
           buttons.forEach((button) => {
             if (!(button instanceof HTMLButtonElement)) {
               return;
             }
             const requiredTier = getRequiredTier(button);
+            const effectiveTier = getEffectiveTierForButton(button);
             setLocked(button, requiredTier, requiredTier > effectiveTier);
           });
         };

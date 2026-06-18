@@ -229,6 +229,16 @@ Keep these AI feature entries hidden in the plugin UI. Do not turn them into vis
 
 Plan-gated disabled buttons are for visible ordinary editing tools only. The three AI entries above should stay hidden so they do not reappear while adjusting Free/Basic/Pro gating.
 
+### Free Beta Plan Gating
+
+Free beta access is for non-AI features only. Do not treat a beta `effectiveTier` as AI access.
+
+- Account state should publish separate `nonAiEffectiveTier` and `aiEffectiveTier` values.
+- Feature gating should use `nonAiEffectiveTier` for local editing tools and `aiEffectiveTier` for tools that call OpenAI, Gemini, or Pigma server AI.
+- Server AI checks should rely on `serverAiEnabled`, not `effectiveTier >= 2`.
+- Current Edit-tab AI actions are: `typo-audit`, `typo-fix`, `translate`, `read-design`, `design-consistency`, `design-consistency-clear`, `image-text-feasibility`, `color-extract`, `image-reference-search`, `image-composite`, `image-gpt-rerender`, `image-prompt-edit`, `image-extend`, `ai-video-generate`, the design-assist actions, and the hidden AI design chat controls.
+- Local Edit-tab tools such as `pixel-perfect`, `image-sharpen`, `image-auto-tone`, `image-merge`, video GIF/APNG conversion, layer cleanup, text highlight, and text style/line-height cleanup should stay eligible for non-AI beta access.
+
 ### PSD Shadow Export Note
 
 - Figma nodes can use four outer shadows as a deliberate 360-degree product shadow system. Preserve each shadow's own X/Y, blur, spread, color, and opacity values.
