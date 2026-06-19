@@ -70011,10 +70011,63 @@ UPNG.encode.alphaMul = function(img, roundA) {
           }
         }
 
+        function isSameUsageWindow(nextUsage, currentUsage) {
+          if (!nextUsage || !currentUsage) {
+            return false;
+          }
+          if (nextUsage.plan !== currentUsage.plan || nextUsage.period !== currentUsage.period) {
+            return false;
+          }
+          return !nextUsage.periodKey || !currentUsage.periodKey || nextUsage.periodKey === currentUsage.periodKey;
+        }
+
+        function shouldKeepCurrentUsage(nextUsage, currentUsage) {
+          if (!nextUsage || !currentUsage || currentUsage.provisional) {
+            return false;
+          }
+          if (nextUsage.provisional) {
+            return true;
+          }
+          if (!isSameUsageWindow(nextUsage, currentUsage)) {
+            return false;
+          }
+          return Number(nextUsage.used || 0) < Number(currentUsage.used || 0);
+        }
+
+        function publishUsageToSession(usage) {
+          if (!usage || usage.provisional) {
+            return;
+          }
+
+          const usageSnapshot = { ...usage };
+          const account = window.__PIGER_WEB_ACCOUNT__;
+          if (account && typeof account === "object" && account.user && typeof account.user === "object") {
+            window.__PIGER_WEB_ACCOUNT__ = {
+              ...account,
+              user: {
+                ...account.user,
+                psdUsage: usageSnapshot,
+              },
+            };
+          }
+
+          const publishedPlan = window.__PIGER_WEB_PLAN__;
+          if (publishedPlan && typeof publishedPlan === "object") {
+            window.__PIGER_WEB_PLAN__ = {
+              ...publishedPlan,
+              psdUsage: usageSnapshot,
+            };
+          }
+        }
+
         function applyRemoteUsage(raw, options = {}) {
           const usage = normalizeUsage(raw);
           if (!usage) {
             return null;
+          }
+
+          if (options && options.preserveNewer && shouldKeepCurrentUsage(usage, remoteUsage)) {
+            return remoteUsage;
           }
 
           remoteUsage = usage;
@@ -70025,6 +70078,9 @@ UPNG.encode.alphaMul = function(img, roundA) {
           setDatasetValue("psdUsagePeriod", usage.period);
           setDatasetValue("psdUsagePeriodKey", usage.periodKey);
           setDatasetValue("psdUnlimited", usage.unlimited ? "true" : "false");
+          if (!(options && options.skipSession)) {
+            publishUsageToSession(usage);
+          }
           if (!(options && options.skipCache) && !usage.provisional) {
             writeCachedUsage(usage);
           }
@@ -70034,7 +70090,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
         function syncSessionUsage() {
           const account = window.__PIGER_WEB_ACCOUNT__;
           const usage = account && account.user && account.user.psdUsage ? account.user.psdUsage : null;
-          return applyRemoteUsage(usage);
+          return applyRemoteUsage(usage, { skipSession: true, preserveNewer: true });
         }
 
         function readExplicitUsage(plan) {
