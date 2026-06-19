@@ -3411,7 +3411,7 @@
 
       .psd-usage-count {
         justify-items: end;
-        min-width: 46px;
+        min-width: 76px;
       }
 
       .psd-usage-eyebrow,
@@ -3441,6 +3441,7 @@
         line-height: 1;
         letter-spacing: 0;
         opacity: 1 !important;
+        white-space: nowrap;
         visibility: visible !important;
       }
 
@@ -10259,7 +10260,7 @@
         <div class="psd-usage-current">
           <div class="psd-usage-copy">
             <span class="psd-usage-eyebrow" id="psdUsagePlanLabel">요금제 확인 중</span>
-            <span class="psd-usage-title">PSD 남은 횟수</span>
+            <span class="psd-usage-title">PSD 사용 횟수</span>
           </div>
           <div class="psd-usage-count">
             <span class="psd-usage-remaining" id="psdUsageRemainingCount">-</span>
@@ -11896,6 +11897,7 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
             "Pro 메뉴는 Pro에서 열립니다.": "Pro menus unlock on Pro.",
             "요금제 확인 끝.": "Plan check complete.",
             "PSD 사용량": "PSD usage",
+            "PSD 사용 횟수": "PSD usage",
             "요금제 확인 중": "Checking plan",
             "PSD 남은 횟수": "PSD remaining",
             "확인 중": "Checking",
@@ -69213,6 +69215,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
             "무료 체험": "Free trial",
             "무료 체험 종료": "Free trial ended",
             "무료 베타": "Free beta",
+            "PSD 사용 횟수": "PSD usage",
             "이번 달 남음": "Left this month",
             "올해 남음": "Left this year",
             "제한 없음": "No limit",
@@ -69249,6 +69252,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
             "무료 체험": "Prueba gratis",
             "무료 체험 종료": "Prueba gratis finalizada",
             "무료 베타": "Beta gratis",
+            "PSD 사용 횟수": "Uso de PSD",
             "이번 달 남음": "Restante este mes",
             "올해 남음": "Restante este ano",
             "제한 없음": "Sin limite",
@@ -69285,6 +69289,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
             "무료 체험": "無料トライアル",
             "무료 체험 종료": "無料トライアル終了",
             "무료 베타": "無料ベータ",
+            "PSD 사용 횟수": "PSD使用回数",
             "이번 달 남음": "今月の残り",
             "올해 남음": "今年の残り",
             "제한 없음": "制限なし",
@@ -69321,6 +69326,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
             "무료 체험": "免费试用",
             "무료 체험 종료": "免费试用已结束",
             "무료 베타": "免费测试",
+            "PSD 사용 횟수": "PSD 使用次数",
             "이번 달 남음": "本月剩余",
             "올해 남음": "今年剩余",
             "제한 없음": "无限制",
@@ -69410,6 +69416,17 @@ UPNG.encode.alphaMul = function(img, roundA) {
             if (locale === "ja") return `PSD 残り${count}回`;
             if (locale === "zh-CN") return `剩余 ${count} 个 PSD`;
             return `${count} PSD left`;
+          }
+
+          const unlimitedUsageRatio = key.match(/^(\d+)회\s*\/\s*무제한$/);
+          if (unlimitedUsageRatio) {
+            const count = unlimitedUsageRatio[1];
+            return `${formatUsageCount(locale, count)}/${usageTextByLocale[locale]?.["무제한"] || "Unlimited"}`;
+          }
+
+          const usageRatio = key.match(/^(\d+)회\s*\/\s*(\d+)회$/);
+          if (usageRatio) {
+            return `${formatUsageCount(locale, usageRatio[1])}/${formatUsageCount(locale, usageRatio[2])}`;
           }
 
           const remainingCountOnly = key.match(/^(\d+)회$/);
@@ -69951,7 +69968,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
           const unlimited = freeBetaUnlimited || source.unlimited === true || source.limit === null || fallbackPlan.total === null;
           const rawLimit = source.limit !== undefined ? source.limit : source.total;
           const limit = unlimited ? null : clampNumber(rawLimit !== undefined ? rawLimit : fallbackPlan.total, 1, 100000);
-          const used = freeBetaUnlimited ? 0 : clampNumber(source.used, 0, limit === null ? 100000 : limit) || 0;
+          const used = clampNumber(source.used, 0, limit === null ? Number.MAX_SAFE_INTEGER : limit) || 0;
           let remaining = unlimited ? null : clampNumber(source.remaining, 0, limit === null ? 100000 : limit);
           if (remaining === null && limit !== null) {
             remaining = Math.max(0, limit - used);
@@ -70349,7 +70366,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
           preparedUsageReservation = null;
           clearPreparedUsageReservationTimer(reservation);
           reservation.used = true;
-          if (reservation.consumedUsage && !reservation.consumedUsage.unlimited) {
+          if (reservation.consumedUsage) {
             applyRemoteUsage(reservation.consumedUsage);
             renderUsageBar();
           }
@@ -70500,6 +70517,24 @@ UPNG.encode.alphaMul = function(img, roundA) {
           });
         }
 
+        function formatUsageQuotaDisplay(usage, activePlan, remaining) {
+          if (!usage) {
+            return "-";
+          }
+
+          const rawLimit =
+            usage.limit !== null && usage.limit !== undefined ? usage.limit : activePlan && activePlan.total;
+          const limit = usage.unlimited || rawLimit === null || rawLimit === undefined ? null : clampNumber(rawLimit, 1, 100000);
+          const used = clampNumber(usage.used, 0, limit === null ? Number.MAX_SAFE_INTEGER : limit) || 0;
+          if (usage.unlimited) {
+            return `${used}회/무제한`;
+          }
+          if (limit !== null) {
+            return `${used}회/${limit}회`;
+          }
+          return remaining !== null ? `${remaining}회` : "-";
+        }
+
         function renderUsageBar() {
           const plan = getCurrentPlan();
           const usage =
@@ -70536,7 +70571,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
           bar.dataset.currentPlan = activePlan.id;
           bar.dataset.quotaEmpty = isEmpty || isInsufficient ? "true" : "false";
           setUsageText(planLabel, usage ? usage.label : activePlan.label);
-          setUsageText(remainingCount, usage && usage.unlimited ? "무제한" : remaining !== null ? `${remaining}회` : "-");
+          setUsageText(remainingCount, formatUsageQuotaDisplay(usage, activePlan, remaining));
           setUsageText(
             cycleLabel,
             usage && usage.unlimited
@@ -70689,7 +70724,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
             const reservationKey = createUsageReservationKey();
             const consumeResult = await consumeRemoteUsage(reservationKey, chargeAmount, { strict: true });
             const consumedUsage = normalizeUsage(consumeResult && consumeResult.usage ? consumeResult.usage : null) || remoteUsage;
-            if (consumedUsage && !consumedUsage.unlimited) {
+            if (consumedUsage) {
               applyRemoteUsage(consumedUsage);
               renderUsageBar();
             }
