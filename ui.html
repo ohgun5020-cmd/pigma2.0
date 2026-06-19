@@ -70636,7 +70636,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
           event.preventDefault();
           event.stopImmediatePropagation();
 
-          if (hasKnownUnlimitedQuota()) {
+          if (hasKnownUnlimitedQuota() && !hasQuotaAuth()) {
             applyRemoteUsage(createUnlimitedUsage(getCurrentPlan()));
             renderUsageBar();
             continueExportAfterQuotaCheck(button);
