@@ -70671,13 +70671,6 @@ UPNG.encode.alphaMul = function(img, roundA) {
           event.preventDefault();
           event.stopImmediatePropagation();
 
-          if (hasKnownUnlimitedQuota() && !hasQuotaAuth()) {
-            applyRemoteUsage(createUnlimitedUsage(getCurrentPlan()));
-            renderUsageBar();
-            continueExportAfterQuotaCheck(button);
-            return;
-          }
-
           if (!hasQuotaAuth()) {
             showQuotaBlocked("auth");
             return;
@@ -70739,13 +70732,6 @@ UPNG.encode.alphaMul = function(img, roundA) {
             didContinue = true;
             continueExportAfterQuotaCheck(button);
           } catch (error) {
-            if (hasKnownUnlimitedQuota()) {
-              applyRemoteUsage(createUnlimitedUsage(getCurrentPlan()));
-              renderUsageBar();
-              didContinue = true;
-              continueExportAfterQuotaCheck(button);
-              return;
-            }
             showQuotaBlocked(getUsageErrorCode(error));
           } finally {
             quotaPreflightInProgress = false;
