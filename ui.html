@@ -9858,7 +9858,7 @@
               <p class="panel-text" id="pigerWebAccountSummary">이메일은 여기서, Google과 결제는 웹에서. 딱 필요한 만큼만 연결합니다.</p>
 
               <div class="setting-list">
-                <input id="pigerWebServerUrl" type="hidden" value="https://oy-tools-production.up.railway.app" />
+                <input id="pigerWebServerUrl" type="hidden" value="https://pigerplugin.com" />
                 <input id="pigerWebAccessToken" type="hidden" />
                 <div class="setting-row piger-web-connect-row">
                   <span class="setting-label">Google</span>
@@ -10247,9 +10247,9 @@
               <div class="settings-version-status" id="pigerVersionStatus" data-state="idle">Version status loads with notices.</div>
               <a href="mailto:ohgun5020@gmail.com">ohgun5020@gmail.com</a>
               <nav class="settings-about-links" aria-label="Legal">
-                <a href="https://oy-tools-production.up.railway.app/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+                <a href="https://pigerplugin.com/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
                 <span aria-hidden="true">·</span>
-                <a href="https://oy-tools-production.up.railway.app/terms" target="_blank" rel="noopener noreferrer">Terms</a>
+                <a href="https://pigerplugin.com/terms" target="_blank" rel="noopener noreferrer">Terms</a>
               </nav>
             </footer>
           </div>
@@ -18212,7 +18212,8 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
           return;
         }
 
-        const defaultServerAiUrl = "https://oy-tools-production.up.railway.app";
+        const defaultServerAiUrl = "https://pigerplugin.com";
+        const legacyServerAiUrls = new Set(["https://oy-tools-production.up.railway.app"]);
         const authTimeoutMs = 2000;
         const defaultMaxOutputTokens = 3000;
 
@@ -18237,7 +18238,8 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
             next = "https://" + next;
           }
           try {
-            return new URL(next).origin;
+            const origin = new URL(next).origin;
+            return legacyServerAiUrls.has(origin) ? defaultServerAiUrl : origin;
           } catch (error) {
             return defaultServerAiUrl;
           }
@@ -42304,7 +42306,8 @@ ${buildReferencePromptOutputRules()}
         const applyOperationLabel = "텍스트 레이어 생성";
         const geminiModel = "gemini-2.5-flash-lite";
         const openAiModel = "gpt-4.1-mini";
-        const defaultServerAiUrl = "https://oy-tools-production.up.railway.app";
+        const defaultServerAiUrl = "https://pigerplugin.com";
+        const legacyServerAiUrls = new Set(["https://oy-tools-production.up.railway.app"]);
         const serverAiAuthTimeoutMs = 2000;
         const serverAiMaxOutputTokens = 3000;
         const processingToast = shared.ensureProcessingToast();
@@ -42361,7 +42364,8 @@ ${buildReferencePromptOutputRules()}
             next = "https://" + next;
           }
           try {
-            return new URL(next).origin;
+            const origin = new URL(next).origin;
+            return legacyServerAiUrls.has(origin) ? defaultServerAiUrl : origin;
           } catch (error) {
             return defaultServerAiUrl;
           }
@@ -66690,7 +66694,8 @@ UPNG.encode.alphaMul = function(img, roundA) {
           return;
         }
 
-        const DEFAULT_SERVER_URL = "https://oy-tools-production.up.railway.app";
+        const DEFAULT_SERVER_URL = "https://pigerplugin.com";
+        const LEGACY_SERVER_URLS = new Set(["https://oy-tools-production.up.railway.app"]);
         const OWNER_ADMIN_EMAIL = "ohgun5020@gmail.com";
         const PLAN_REFRESH_INTERVAL_MS = 60 * 60 * 1000;
         const SESSION_REQUEST_TIMEOUT_MS = 10000;
@@ -66780,7 +66785,8 @@ UPNG.encode.alphaMul = function(img, roundA) {
             next = `https://${next}`;
           }
           try {
-            return new URL(next).origin;
+            const origin = new URL(next).origin;
+            return LEGACY_SERVER_URLS.has(origin) ? DEFAULT_SERVER_URL : origin;
           } catch (error) {
             return DEFAULT_SERVER_URL;
           }
@@ -67758,7 +67764,8 @@ UPNG.encode.alphaMul = function(img, roundA) {
           return;
         }
 
-        const DEFAULT_SERVER_URL = "https://oy-tools-production.up.railway.app";
+        const DEFAULT_SERVER_URL = "https://pigerplugin.com";
+        const LEGACY_SERVER_URLS = new Set(["https://oy-tools-production.up.railway.app"]);
         const NOTICE_URL = "https://pub-8e2f2ec9d22c4c97b52fe244b86bc4cf.r2.dev/notices/piger-notices.json";
         const NOTICE_CACHE_KEY = "piger:notices:v1";
         const CURRENT_PLUGIN_VERSION = "2.8.0";
@@ -67893,7 +67900,8 @@ UPNG.encode.alphaMul = function(img, roundA) {
             next = `https://${next}`;
           }
           try {
-            return new URL(next).origin;
+            const origin = new URL(next).origin;
+            return LEGACY_SERVER_URLS.has(origin) ? DEFAULT_SERVER_URL : origin;
           } catch (error) {
             return DEFAULT_SERVER_URL;
           }

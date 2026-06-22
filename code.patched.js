@@ -4580,8 +4580,10 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
 
   const originalOnMessage = figma.ui.onmessage;
   const WEB_AUTH_KEY = "piger:web-auth:v1";
+  const DEFAULT_WEB_ORIGIN = "https://pigerplugin.com";
+  const LEGACY_WEB_ORIGIN = "https://oy-tools-production.up.railway.app";
   const DEFAULT_WEB_AUTH = Object.freeze({
-    serverUrl: "https://oy-tools-production.up.railway.app",
+    serverUrl: DEFAULT_WEB_ORIGIN,
     accessToken: ""
   });
 
@@ -4677,7 +4679,7 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
     }
 
     try {
-      return new URL(next).origin;
+      return normalizeWebOrigin(new URL(next).origin);
     } catch (error) {
       return DEFAULT_WEB_AUTH.serverUrl;
     }
@@ -4697,7 +4699,18 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       next = "https://" + next;
     }
 
+    try {
+      const url = new URL(next);
+      if (normalizeWebOrigin(url.origin) === DEFAULT_WEB_ORIGIN && url.origin !== DEFAULT_WEB_ORIGIN) {
+        return DEFAULT_WEB_ORIGIN + url.pathname + url.search + url.hash;
+      }
+    } catch (error) {}
+
     return next;
+  }
+
+  function normalizeWebOrigin(origin) {
+    return origin === LEGACY_WEB_ORIGIN ? DEFAULT_WEB_ORIGIN : origin;
   }
 
   function sanitizeAccessToken(value) {
@@ -11004,7 +11017,8 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
   const AI_LLM_RUN_LOG_KEY = "piger:ai-llm-run-log:v1";
   const AI_LLM_RUN_LOG_LIMIT = 40;
   const AI_LLM_REQUEST_TIMEOUT_MS = 45000;
-  const DEFAULT_SERVER_URL = "https://oy-tools-production.up.railway.app";
+  const DEFAULT_SERVER_URL = "https://pigerplugin.com";
+  const LEGACY_SERVER_URL = "https://oy-tools-production.up.railway.app";
   const DEFAULT_AI_SETTINGS = Object.freeze({
     enabled: false,
     provider: "openai",
@@ -11609,7 +11623,8 @@ function to(e,t){if(!("fills"in e)||!Array.isArray(e.fills))return;let r=e,o=e.f
       next = `https://${next}`;
     }
     try {
-      return new URL(next).origin;
+      const origin = new URL(next).origin;
+      return origin === LEGACY_SERVER_URL ? DEFAULT_SERVER_URL : origin;
     } catch (error) {
       return DEFAULT_SERVER_URL;
     }

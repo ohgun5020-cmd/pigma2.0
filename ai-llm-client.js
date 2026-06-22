@@ -10,7 +10,8 @@
   const AI_LLM_RUN_LOG_KEY = "piger:ai-llm-run-log:v1";
   const AI_LLM_RUN_LOG_LIMIT = 40;
   const AI_LLM_REQUEST_TIMEOUT_MS = 45000;
-  const DEFAULT_SERVER_URL = "https://oy-tools-production.up.railway.app";
+  const DEFAULT_SERVER_URL = "https://pigerplugin.com";
+  const LEGACY_SERVER_URL = "https://oy-tools-production.up.railway.app";
   const DEFAULT_AI_SETTINGS = Object.freeze({
     enabled: false,
     provider: "openai",
@@ -615,7 +616,8 @@
       next = `https://${next}`;
     }
     try {
-      return new URL(next).origin;
+      const origin = new URL(next).origin;
+      return origin === LEGACY_SERVER_URL ? DEFAULT_SERVER_URL : origin;
     } catch (error) {
       return DEFAULT_SERVER_URL;
     }
