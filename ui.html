@@ -68506,12 +68506,10 @@ UPNG.encode.alphaMul = function(img, roundA) {
               setStatus("네트워크 오류로 저장된 공지사항을 표시합니다.", "warning");
             } else {
               if (versionStatus instanceof HTMLElement) {
-                versionStatus.textContent = "Version info unavailable.";
-                versionStatus.dataset.state = "idle";
-                versionStatus.removeAttribute("title");
+                updateVersionStatus({ version: {} });
               }
-              renderEmpty("공지사항을 불러오지 못했습니다. R2에 notices/piger-notices.json을 업로드했는지 확인해 주세요.");
-              setStatus("공지사항을 불러오지 못했습니다.", "error");
+              renderEmpty("현재 표시할 공지사항이 없습니다.");
+              setStatus("현재 표시할 공지사항이 없습니다.", "ready");
             }
           } finally {
             window.clearTimeout(timeoutId);
