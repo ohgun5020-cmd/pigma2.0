@@ -66792,6 +66792,31 @@ UPNG.encode.alphaMul = function(img, roundA) {
           }
         };
 
+        const normalizeWebLink = (value) => {
+          const next = String(value || "").trim();
+          if (!next || !/^https?:\/\//i.test(next)) {
+            return next;
+          }
+          try {
+            const url = new URL(next);
+            if (LEGACY_SERVER_URLS.has(url.origin)) {
+              return `${DEFAULT_SERVER_URL}${url.pathname}${url.search}${url.hash}`;
+            }
+          } catch (error) {}
+          return next;
+        };
+
+        const normalizeLinkMap = (links) => {
+          if (!links || typeof links !== "object") {
+            return {};
+          }
+          const next = {};
+          Object.entries(links).forEach(([key, value]) => {
+            next[key] = normalizeWebLink(value);
+          });
+          return next;
+        };
+
         const sanitizeAccessToken = (value) =>
           String(value || "")
             .replace(/[\u0000-\u001F\u007F-\u009F]/g, "")
@@ -66963,14 +66988,15 @@ UPNG.encode.alphaMul = function(img, roundA) {
         };
 
         const setBillingLink = (url, label) => {
-          if (!url) {
+          const normalizedUrl = normalizeWebLink(url);
+          if (!normalizedUrl) {
             elements.billingLink.href = "#";
             elements.billingLink.classList.add("disabled");
             elements.billingLink.setAttribute("aria-disabled", "true");
             return;
           }
 
-          elements.billingLink.href = url;
+          elements.billingLink.href = normalizedUrl;
           elements.billingLink.textContent = label || "결제 페이지 열기";
           elements.billingLink.classList.remove("disabled");
           elements.billingLink.removeAttribute("aria-disabled");
@@ -67311,7 +67337,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
 
         const renderUnauthenticated = (links) => {
           stopPlanRefreshTimer();
-          currentLinks = links || {};
+          currentLinks = normalizeLinkMap(links);
           setLoginControlsVisible(true);
           setSummary("로그인이 살짝 풀렸어요. 다시 연결하면 바로 이어집니다.");
           elements.loginState.textContent = "토큰 확인 필요";
@@ -67329,7 +67355,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
         const renderAuthenticated = (data, options = {}) => {
           const silent = options && options.silent === true;
           const user = data && data.user ? data.user : null;
-          currentLinks = data && data.links ? data.links : {};
+          currentLinks = normalizeLinkMap(data && data.links);
           if (!user) {
             renderUnauthenticated(currentLinks);
             return;
@@ -69630,8 +69656,37 @@ UPNG.encode.alphaMul = function(img, roundA) {
           exportButtonQuotaSnapshot = null;
         }
 
+        const DEFAULT_WEB_SERVER_URL = "https://pigerplugin.com";
+        const LEGACY_WEB_SERVER_URLS = new Set(["https://oy-tools-production.up.railway.app"]);
+
         function normalizeServerUrl(value) {
-          return String(value || "").trim().replace(/\/+$/, "");
+          let next = String(value || "").trim().replace(/\/+$/, "");
+          if (!next) {
+            return "";
+          }
+          if (!/^https?:\/\//i.test(next)) {
+            next = `https://${next}`;
+          }
+          try {
+            const origin = new URL(next).origin;
+            return LEGACY_WEB_SERVER_URLS.has(origin) ? DEFAULT_WEB_SERVER_URL : origin;
+          } catch (error) {
+            return "";
+          }
+        }
+
+        function normalizeWebLink(value) {
+          const next = String(value || "").trim();
+          if (!next || !/^https?:\/\//i.test(next)) {
+            return next;
+          }
+          try {
+            const url = new URL(next);
+            if (LEGACY_WEB_SERVER_URLS.has(url.origin)) {
+              return `${DEFAULT_WEB_SERVER_URL}${url.pathname}${url.search}${url.hash}`;
+            }
+          } catch (error) {}
+          return next;
         }
 
         function readAuthSettings() {
@@ -69651,7 +69706,7 @@ UPNG.encode.alphaMul = function(img, roundA) {
         function getUsageLink(key, fallbackPath) {
           const account = window.__PIGER_WEB_ACCOUNT__;
           const links = account && account.links && typeof account.links === "object" ? account.links : {};
-          const linked = String(links[key] || "");
+          const linked = normalizeWebLink(links[key]);
           if (/^https?:\/\//i.test(linked)) {
             return linked;
           }
