@@ -4152,6 +4152,7 @@
       }
 
       .layer-name-replace-field {
+        position: relative;
         display: grid;
         gap: 6px;
         color: var(--text-muted);
@@ -4159,11 +4160,22 @@
         font-weight: 650;
       }
 
+      .layer-name-replace-visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
       .layer-name-replace-input-row {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr);
-        gap: 6px;
-        justify-items: start;
+        position: relative;
+        display: block;
+        width: 100%;
       }
 
       .layer-name-replace-input,
@@ -4182,14 +4194,55 @@
         color: var(--text-faint);
       }
 
+      .layer-name-replace-input:focus::placeholder {
+        color: transparent;
+      }
+
+      .layer-name-replace-input {
+        padding-right: 43px;
+      }
+
       .layer-name-replace-find,
       .layer-name-replace-apply {
-        width: auto;
-        min-width: 76px;
-        min-height: 32px;
-        padding: 0 14px;
-        font-size: 12px;
-        line-height: 1;
+        position: absolute;
+        right: 5px;
+        top: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        min-width: 28px;
+        height: 28px;
+        min-height: 28px;
+        padding: 0;
+        border-radius: 8px;
+        color: var(--text-muted);
+        transform: translateY(-50%);
+      }
+
+      .layer-name-replace-find {
+        background: transparent;
+      }
+
+      .layer-name-replace-apply {
+        color: var(--button-primary-text);
+      }
+
+      .layer-name-replace-find:disabled,
+      .layer-name-replace-apply:disabled {
+        color: var(--button-primary-disabled-text);
+      }
+
+      .layer-name-replace-icon {
+        display: block;
+        width: 16px;
+        height: 16px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        color: currentColor;
       }
 
       .layer-name-replace-options {
@@ -10608,34 +10661,39 @@
           </div>
           <div class="layer-name-replace-fields">
             <div class="layer-name-replace-field">
-              <label id="layerNameFindLabel" for="layerNameFindInput">찾을 레이어명</label>
+              <label class="layer-name-replace-visually-hidden" id="layerNameFindLabel" for="layerNameFindInput">찾을 레이어 명</label>
               <span class="layer-name-replace-input-row">
                 <input
                   class="layer-name-replace-input"
                   id="layerNameFindInput"
                   type="text"
-                  placeholder="monthly"
+                  placeholder="찾을 레이어 명"
                   autocomplete="off"
                   spellcheck="false"
                 />
-                <button class="button-secondary layer-name-replace-find" id="layerNamePreviewButton" type="button" disabled>
-                  찾기
+                <button class="button-secondary layer-name-replace-find" id="layerNamePreviewButton" type="button" aria-label="찾기" title="찾기" disabled>
+                  <svg class="layer-name-replace-icon layer-name-replace-icon-find" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+                    <circle cx="11" cy="11" r="7"></circle>
+                    <path d="m20 20-3.5-3.5"></path>
+                  </svg>
                 </button>
               </span>
             </div>
             <div class="layer-name-replace-field">
-              <label id="layerNameReplaceLabel" for="layerNameReplaceInput">바꿀 레이어명</label>
+              <label class="layer-name-replace-visually-hidden" id="layerNameReplaceLabel" for="layerNameReplaceInput">바꿀 레이어 명</label>
               <span class="layer-name-replace-input-row">
                 <input
                   class="layer-name-replace-input"
                   id="layerNameReplaceInput"
                   type="text"
-                  placeholder="2026-july"
+                  placeholder="바꿀 레이어 명"
                   autocomplete="off"
                   spellcheck="false"
                 />
-                <button class="button-primary layer-name-replace-apply" id="layerNameApplyButton" type="button" disabled>
-                  변경 적용
+                <button class="button-primary layer-name-replace-apply" id="layerNameApplyButton" type="button" aria-label="변경 적용" title="변경 적용" disabled>
+                  <svg class="layer-name-replace-icon layer-name-replace-icon-apply" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+                    <path d="m20 6-11 11-5-5"></path>
+                  </svg>
                 </button>
               </span>
             </div>
@@ -10659,7 +10717,7 @@
           </div>
           <div class="layer-name-replace-result">
             <div class="layer-name-replace-result-head">
-              <span class="layer-name-replace-status" id="layerNameReplaceStatus">찾을 레이어명을 입력하세요.</span>
+              <span class="layer-name-replace-status" id="layerNameReplaceStatus">찾을 레이어 명을 입력하세요.</span>
               <button
                 class="button-secondary layer-name-replace-select-all"
                 id="layerNameSelectAllButton"
@@ -11496,7 +11554,9 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
               "Open a tool to preview and replace layer names in the selection or current page.",
             "선택 범위 안의 레이어 이름을 미리 보고 필요한 항목만 바꿉니다.":
               "Preview layer names in the selection and replace only the items you need.",
+            "찾을 레이어 명": "Find layer name",
             "찾을 레이어명": "Find layer name",
+            "바꿀 레이어 명": "Replace layer name",
             "바꿀 레이어명": "Replace layer name",
             "찾을 이름": "Find name",
             "바꿀 이름": "Replace with",
@@ -11506,6 +11566,7 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
             "현재 페이지": "Current page",
             "대소문자 구분": "Match case",
             "체크한 항목만 적용": "Apply checked only",
+            "찾을 레이어 명을 입력하세요.": "Enter a layer name to find.",
             "찾을 레이어명을 입력하세요.": "Enter a layer name to find.",
             "찾을 이름을 입력하세요.": "Enter a name to find.",
             "찾기 버튼으로 결과를 확인하세요.": "Use Find to preview results.",
@@ -51582,8 +51643,10 @@ UPNG.toRGBA8.decodeImage = function(data, w, h, out)
             close: "닫기",
             title: "레이어 이름 찾기/바꾸기",
             description: "선택 범위 안의 레이어 이름을 미리 보고 필요한 항목만 바꿉니다.",
-            findLabel: "찾을 레이어명",
-            replaceLabel: "바꿀 레이어명",
+            findLabel: "찾을 레이어 명",
+            replaceLabel: "바꿀 레이어 명",
+            findPlaceholder: "찾을 레이어 명",
+            replacePlaceholder: "바꿀 레이어 명",
             applyChange: "변경 적용",
             scope: "범위",
             selection: "선택 범위",
@@ -51597,7 +51660,7 @@ UPNG.toRGBA8.decodeImage = function(data, w, h, out)
             clearSelection: "선택 해제",
             emptyName: "(빈 이름)",
             unnamed: "이름 없음",
-            enterFind: "찾을 레이어명을 입력하세요.",
+            enterFind: "찾을 레이어 명을 입력하세요.",
             useFind: "찾기 버튼으로 결과를 확인하세요.",
             noMatches: "일치하는 레이어 이름이 없습니다.",
             noChanges: "변경된 레이어 이름이 없습니다.",
@@ -51621,6 +51684,8 @@ UPNG.toRGBA8.decodeImage = function(data, w, h, out)
             description: "Preview layer names in the selection and replace only the items you need.",
             findLabel: "Find layer name",
             replaceLabel: "Replace layer name",
+            findPlaceholder: "Find layer name",
+            replacePlaceholder: "Replace layer name",
             applyChange: "Apply change",
             scope: "Scope",
             selection: "Selection",
@@ -51660,6 +51725,8 @@ UPNG.toRGBA8.decodeImage = function(data, w, h, out)
               "Previsualiza los nombres de capa en la selección y reemplaza solo los elementos necesarios.",
             findLabel: "Buscar nombre de capa",
             replaceLabel: "Reemplazar nombre de capa",
+            findPlaceholder: "Buscar nombre de capa",
+            replacePlaceholder: "Reemplazar nombre de capa",
             applyChange: "Aplicar cambio",
             scope: "Alcance",
             selection: "Selección",
@@ -51698,6 +51765,8 @@ UPNG.toRGBA8.decodeImage = function(data, w, h, out)
             description: "選択範囲のレイヤー名をプレビューし、必要な項目だけを置換します。",
             findLabel: "検索するレイヤー名",
             replaceLabel: "置換後のレイヤー名",
+            findPlaceholder: "検索するレイヤー名",
+            replacePlaceholder: "置換後のレイヤー名",
             applyChange: "変更を適用",
             scope: "範囲",
             selection: "選択範囲",
@@ -51734,6 +51803,8 @@ UPNG.toRGBA8.decodeImage = function(data, w, h, out)
             description: "预览所选范围中的图层名称，并只替换需要的项目。",
             findLabel: "查找图层名称",
             replaceLabel: "替换图层名称",
+            findPlaceholder: "查找图层名称",
+            replacePlaceholder: "替换图层名称",
             applyChange: "应用更改",
             scope: "范围",
             selection: "所选范围",
@@ -51820,6 +51891,11 @@ UPNG.toRGBA8.decodeImage = function(data, w, h, out)
           }
         };
 
+        const setIconButtonLabel = (button, label) => {
+          button.setAttribute("aria-label", label);
+          button.setAttribute("title", label);
+        };
+
         const localizeStaticCopy = () => {
           const copy = getLayerNameCopy();
           setActionButtonText(elements.button, copy.buttonLabel);
@@ -51831,6 +51907,8 @@ UPNG.toRGBA8.decodeImage = function(data, w, h, out)
           setElementText(document.getElementById("layerNameReplaceModalDescription"), copy.description);
           setElementText(document.getElementById("layerNameFindLabel"), copy.findLabel);
           setElementText(document.getElementById("layerNameReplaceLabel"), copy.replaceLabel);
+          elements.findInput.setAttribute("placeholder", copy.findPlaceholder);
+          elements.replaceInput.setAttribute("placeholder", copy.replacePlaceholder);
           setElementText(document.getElementById("layerNameScopeLabel"), copy.scope);
           setElementText(document.getElementById("layerNameCaseLabelText"), copy.matchCase);
           setElementText(document.getElementById("layerNameCheckedOnlyLabelText"), copy.checkedOnly);
@@ -51841,8 +51919,8 @@ UPNG.toRGBA8.decodeImage = function(data, w, h, out)
             elements.scopeSelect.options[1].textContent = copy.page;
           }
           elements.cancelButton.textContent = copy.cancel;
-          elements.previewButton.textContent = copy.find;
-          elements.applyButton.textContent = copy.applyChange;
+          setIconButtonLabel(elements.previewButton, copy.find);
+          setIconButtonLabel(elements.applyButton, copy.applyChange);
           updateSelectAllButton();
         };
 
