@@ -4161,8 +4161,9 @@
 
       .layer-name-replace-input-row {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) 116px;
-        gap: 8px;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 6px;
+        justify-items: start;
       }
 
       .layer-name-replace-input,
@@ -4183,8 +4184,12 @@
 
       .layer-name-replace-find,
       .layer-name-replace-apply {
-        min-height: 38px;
-        padding: 0 10px;
+        width: auto;
+        min-width: 76px;
+        min-height: 32px;
+        padding: 0 14px;
+        font-size: 12px;
+        line-height: 1;
       }
 
       .layer-name-replace-options {
@@ -10603,7 +10608,7 @@
           </div>
           <div class="layer-name-replace-fields">
             <div class="layer-name-replace-field">
-              <label id="layerNameFindLabel" for="layerNameFindInput">찾을 레이어 명</label>
+              <label id="layerNameFindLabel" for="layerNameFindInput">찾을 레이어명</label>
               <span class="layer-name-replace-input-row">
                 <input
                   class="layer-name-replace-input"
@@ -10619,7 +10624,7 @@
               </span>
             </div>
             <div class="layer-name-replace-field">
-              <label id="layerNameReplaceLabel" for="layerNameReplaceInput">바꿀 레이어 명</label>
+              <label id="layerNameReplaceLabel" for="layerNameReplaceInput">바꿀 레이어명</label>
               <span class="layer-name-replace-input-row">
                 <input
                   class="layer-name-replace-input"
@@ -10654,7 +10659,7 @@
           </div>
           <div class="layer-name-replace-result">
             <div class="layer-name-replace-result-head">
-              <span class="layer-name-replace-status" id="layerNameReplaceStatus">찾을 레이어 명을 입력하세요.</span>
+              <span class="layer-name-replace-status" id="layerNameReplaceStatus">찾을 레이어명을 입력하세요.</span>
               <button
                 class="button-secondary layer-name-replace-select-all"
                 id="layerNameSelectAllButton"
@@ -11491,8 +11496,8 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
               "Open a tool to preview and replace layer names in the selection or current page.",
             "선택 범위 안의 레이어 이름을 미리 보고 필요한 항목만 바꿉니다.":
               "Preview layer names in the selection and replace only the items you need.",
-            "찾을 레이어 명": "Find layer name",
-            "바꿀 레이어 명": "Replace layer name",
+            "찾을 레이어명": "Find layer name",
+            "바꿀 레이어명": "Replace layer name",
             "찾을 이름": "Find name",
             "바꿀 이름": "Replace with",
             "변경 적용": "Apply change",
@@ -11501,7 +11506,7 @@ function Tm(){return{dropShadow:[],innerShadow:[],outerGlow:[],innerGlow:[]}}fun
             "현재 페이지": "Current page",
             "대소문자 구분": "Match case",
             "체크한 항목만 적용": "Apply checked only",
-            "찾을 레이어 명을 입력하세요.": "Enter a layer name to find.",
+            "찾을 레이어명을 입력하세요.": "Enter a layer name to find.",
             "찾을 이름을 입력하세요.": "Enter a name to find.",
             "찾기 버튼으로 결과를 확인하세요.": "Use Find to preview results.",
             "일치하는 레이어 이름이 없습니다.": "No matching layer names.",
@@ -51577,8 +51582,8 @@ UPNG.toRGBA8.decodeImage = function(data, w, h, out)
             close: "닫기",
             title: "레이어 이름 찾기/바꾸기",
             description: "선택 범위 안의 레이어 이름을 미리 보고 필요한 항목만 바꿉니다.",
-            findLabel: "찾을 레이어 명",
-            replaceLabel: "바꿀 레이어 명",
+            findLabel: "찾을 레이어명",
+            replaceLabel: "바꿀 레이어명",
             applyChange: "변경 적용",
             scope: "범위",
             selection: "선택 범위",
@@ -51592,7 +51597,7 @@ UPNG.toRGBA8.decodeImage = function(data, w, h, out)
             clearSelection: "선택 해제",
             emptyName: "(빈 이름)",
             unnamed: "이름 없음",
-            enterFind: "찾을 레이어 명을 입력하세요.",
+            enterFind: "찾을 레이어명을 입력하세요.",
             useFind: "찾기 버튼으로 결과를 확인하세요.",
             noMatches: "일치하는 레이어 이름이 없습니다.",
             noChanges: "변경된 레이어 이름이 없습니다.",
