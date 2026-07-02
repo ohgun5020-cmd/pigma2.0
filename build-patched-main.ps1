@@ -25,6 +25,7 @@ $detachLinkedComponentsPatch = Join-Path $root "detach-linked-components.js"
 $autoLayoutOffPatch = Join-Path $root "auto-layout-off.js"
 $deleteHiddenLayersPatch = Join-Path $root "delete-hidden-layers.js"
 $clearFrameGuidesPatch = Join-Path $root "clear-frame-guides.js"
+$findReplaceLayerNamesPatch = Join-Path $root "find-replace-layer-names.js"
 $splitLongFramePatch = Join-Path $root "split-long-frame.js"
 $copyPrototypeLinkPatch = Join-Path $root "copy-prototype-link.js"
 $aiColorExtractPatch = Join-Path $root "ai-color-extract.js"
@@ -159,6 +160,10 @@ if (-not (Test-Path $deleteHiddenLayersPatch)) {
 
 if (-not (Test-Path $clearFrameGuidesPatch)) {
   throw "Missing frame guides clear patch: $clearFrameGuidesPatch"
+}
+
+if (-not (Test-Path $findReplaceLayerNamesPatch)) {
+  throw "Missing layer name find/replace patch: $findReplaceLayerNamesPatch"
 }
 
 if (-not (Test-Path $splitLongFramePatch)) {
@@ -336,6 +341,7 @@ $runtimeSyntaxSourceFiles = @(
   $autoLayoutOffPatch,
   $deleteHiddenLayersPatch,
   $clearFrameGuidesPatch,
+  $findReplaceLayerNamesPatch,
   $splitLongFramePatch,
   $copyPrototypeLinkPatch,
   $aiColorExtractPatch,
@@ -3808,6 +3814,7 @@ $detachLinkedComponentsPatchContent = [System.IO.File]::ReadAllText($detachLinke
 $autoLayoutOffPatchContent = [System.IO.File]::ReadAllText($autoLayoutOffPatch, [System.Text.Encoding]::UTF8)
 $deleteHiddenLayersPatchContent = [System.IO.File]::ReadAllText($deleteHiddenLayersPatch, [System.Text.Encoding]::UTF8)
 $clearFrameGuidesPatchContent = [System.IO.File]::ReadAllText($clearFrameGuidesPatch, [System.Text.Encoding]::UTF8)
+$findReplaceLayerNamesPatchContent = [System.IO.File]::ReadAllText($findReplaceLayerNamesPatch, [System.Text.Encoding]::UTF8)
 $splitLongFramePatchContent = [System.IO.File]::ReadAllText($splitLongFramePatch, [System.Text.Encoding]::UTF8)
 $copyPrototypeLinkPatchContent = [System.IO.File]::ReadAllText($copyPrototypeLinkPatch, [System.Text.Encoding]::UTF8)
 $aiColorExtractPatchContent = [System.IO.File]::ReadAllText($aiColorExtractPatch, [System.Text.Encoding]::UTF8)
@@ -3843,6 +3850,7 @@ $patchedRuntimeParts = @(
   $autoLayoutOffPatchContent,
   $deleteHiddenLayersPatchContent,
   $clearFrameGuidesPatchContent,
+  $findReplaceLayerNamesPatchContent,
   $splitLongFramePatchContent,
   $copyPrototypeLinkPatchContent,
   $aiColorExtractPatchContent,

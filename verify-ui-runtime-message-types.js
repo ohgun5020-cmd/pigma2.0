@@ -32,6 +32,7 @@ const runtimeFiles = [
   "auto-layout-off.js",
   "delete-hidden-layers.js",
   "clear-frame-guides.js",
+  "find-replace-layer-names.js",
   "split-long-frame.js",
   "copy-prototype-link.js",
   "ai-color-extract.js",

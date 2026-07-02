@@ -31,6 +31,7 @@ const defaultFiles = [
   { file: "auto-layout-off.js" },
   { file: "delete-hidden-layers.js" },
   { file: "clear-frame-guides.js" },
+  { file: "find-replace-layer-names.js" },
   { file: "split-long-frame.js" },
   { file: "copy-prototype-link.js" },
   { file: "ai-color-extract.js" },
