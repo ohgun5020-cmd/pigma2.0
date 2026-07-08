@@ -52295,7 +52295,8 @@ UPNG.toRGBA8.decodeImage = function(data, w, h, out)
         elements.findInput.addEventListener("keydown", handleFindKeydown);
         elements.replaceInput.addEventListener("keydown", handleReplaceKeydown);
 
-        [elements.findInput, elements.scopeSelect, elements.caseCheckbox].forEach((control) => {
+        elements.findInput.addEventListener("input", () => invalidatePreview("", "useFind"));
+        [elements.scopeSelect, elements.caseCheckbox].forEach((control) => {
           control.addEventListener("input", () => invalidatePreview("", "useFind"));
           control.addEventListener("change", () => invalidatePreview("", "useFind"));
         });
